@@ -1,5 +1,4 @@
 #!/bin/bash
-
 # Configuración
 HTML_FILE="LTXV_WebUI.html"
 PORT=8000
@@ -27,27 +26,25 @@ if command -v ss >/dev/null 2>&1; then
   fi
 fi
 
+# Si ya hay algo escuchando en el puerto de la UI, no se puede bindear.
+# Avisamos con el PID para que el usuario pueda matarlo (kill <PID> o
+# 'pkill -f serve.py' si lo lanzó este script).
+if command -v ss >/dev/null 2>&1; then
+  UI_BIND=$(ss -tlnp 2>/dev/null | awk -v p=":$PORT " '$4 ~ p {print $0; exit}')
+  if [ -n "$UI_BIND" ]; then
+    echo "⚠️  Ya hay algo escuchando en :$PORT:"
+    echo "    $UI_BIND"
+    echo "    Ciérralo (Ctrl+C en la terminal que lo lanzó, o kill <PID>) y vuelve a ejecutar este script."
+  fi
+fi
+
 # Abrir el navegador en segundo plano
 echo "🌐 Abriendo navegador en http://localhost:$PORT/$HTML_FILE ..."
 $BROWSER "http://localhost:$PORT/$HTML_FILE" &
 
-# Iniciar el servidor Python (esto mantendrá la terminal ocupada).
-# Usamos un handler con Cache-Control: no-store para que el móvil siempre
-# recargue la UI al cambiar de versión (sin esto, el navegador del móvil
-# puede seguir mostrando la versión cacheada después de regenerar el HTML).
-python3 -c "
-import http.server, socketserver
-class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
-    def end_headers(self):
-        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
-        self.send_header('Pragma', 'no-cache')
-        self.send_header('Expires', '0')
-        super().end_headers()
-with socketserver.TCPServer(('0.0.0.0', $PORT), NoCacheHandler) as httpd:
-    httpd.allow_reuse_address = True
-    print('Sirviendo en 0.0.0.0:$PORT (no-cache habilitado)')
-    httpd.serve_forever()
-"
+# Servidor: serve.py añade Cache-Control: no-store a todas las respuestas
+# para que el móvil siempre recargue la UI al cambiar de versión.
+echo "🟢 Sirviendo (Ctrl+C para detener)..."
+python3 serve.py "$PORT"
 
-# Cuando cierres el servidor (Ctrl+C), esto se ejecutará
 echo "🛑 Servidor detenido."
