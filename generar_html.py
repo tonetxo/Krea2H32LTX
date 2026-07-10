@@ -294,6 +294,51 @@ function discardTimer(promptId){
   delete timers[promptId];
 }
 
+// Saca tiempos del history JSON de ComfyUI. Devuelve {t1, t2, total} en ms o null
+// si no se puede calcular. Prioriza tiempos por nodo si están disponibles; si no,
+// usa execution_start / execution_success para el total.
+//
+// t1 = tiempo del nodo FIRST_SAVE  (solo si hay eventos executing+executed)
+// t2 = tiempo del nodo FINAL_SAVE  (solo si hay eventos executing+executed)
+// total = execution_success.timestamp - execution_start.timestamp (si ambos existen)
+function extractTimings(entry, N){
+  if(!entry || !entry.status) return null;
+  const msgs = entry.status.messages || [];
+  if(!Array.isArray(msgs) || msgs.length === 0) return null;
+
+  // Total oficial del backend
+  let tStart = null, tSuccess = null;
+  // Tiempos por nodo: map nodeId -> {start, end}
+  const nodeTimes = {};
+  for(const m of msgs){
+    if(!Array.isArray(m) || m.length < 2) continue;
+    const type = m[0];
+    const data = m[1] || {};
+    if(type === "execution_start" && data.timestamp != null){
+      tStart = data.timestamp;
+    } else if(type === "execution_success" && data.timestamp != null){
+      tSuccess = data.timestamp;
+    } else if(type === "executing" && data.node != null && data.timestamp != null){
+      // 'executing' marca el inicio de la ejecución del nodo. Algunos nodos vuelven
+      // a entrar aquí varias veces; nos quedamos con la primera.
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      if(nodeTimes[data.node].start == null) nodeTimes[data.node].start = data.timestamp;
+    } else if(type === "executed" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      nodeTimes[data.node].end = data.timestamp;
+    }
+  }
+
+  const total = (tStart != null && tSuccess != null) ? (tSuccess - tStart) : null;
+  const t1 = nodeTimes[N.FIRST_SAVE] && nodeTimes[N.FIRST_SAVE].start != null && nodeTimes[N.FIRST_SAVE].end != null
+             ? (nodeTimes[N.FIRST_SAVE].end - nodeTimes[N.FIRST_SAVE].start) : null;
+  const t2 = nodeTimes[N.FINAL_SAVE] && nodeTimes[N.FINAL_SAVE].start != null && nodeTimes[N.FINAL_SAVE].end != null
+             ? (nodeTimes[N.FINAL_SAVE].end - nodeTimes[N.FINAL_SAVE].start) : null;
+
+  if(total == null && t1 == null && t2 == null) return null;
+  return { t1, t2, total };
+}
+
 function randomSeed(){
   // entero positivo de 32 bits, válido para el sampler
   return Math.floor(Math.random() * 0xFFFFFFFF);
@@ -350,36 +395,62 @@ async function handlePromptDone(promptId) {
         log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
     }
 
-    // Cronómetro único por prompt. ComfyUI emite UN execution_success con todos los
-    // outputs ya listos, así que solo podemos medir el tiempo total del prompt.
-    // Pintamos ese total SOLO en los slots que tengan video, y limpiamos el otro
-    // (el interval solo pinta time1 mientras corre, pero por si quedó algo en time2).
+    // Cronómetro. Fuente principal: timestamps de status.messages del backend
+    // (execution_success.timestamp - execution_start.timestamp). Es la medida
+    // oficial del tiempo que tardó la API y no incluye latencia de red ni parseo.
+    // Fallback: cronómetro del cliente (startTimer) si el backend no trae los
+    // timestamps (versiones muy viejas o builds sin status.messages).
+    //
+    // Split por fase: si el backend emite eventos 'executing'/'executed' por nodo
+    // (status.messages con pares executing->executed para los nodos FIRST_SAVE y
+    // FINAL_SAVE), sacamos t1 y t2 por separado. En builds con muchos nodos cached
+    // (este caso: todos los nodos están en execution_cached), esos eventos no
+    // existen y caemos al tiempo total.
     const hasFirst = !!entry.outputs[N.FIRST_SAVE];
     const hasFinal = !!entry.outputs[N.FINAL_SAVE];
-    let timeText = "";
+    const timings = extractTimings(entry, N);
+    let clientResult = stopTimer(promptId); // limpia el interval y devuelve el fallback
+
+    const tFirst  = (timings && timings.t1 != null) ? fmtMs(timings.t1) : null;
+    const tFinal  = (timings && timings.t2 != null) ? fmtMs(timings.t2) : null;
+    const tTotal  = (timings && timings.total != null) ? fmtMs(timings.total) :
+                    (clientResult ? fmtMs(clientResult.total) : null);
+
+    function paint(slot, label, value){
+        const el = $("time"+slot);
+        if(!el) return;
+        if(value == null){
+            el.textContent = "";
+            el.classList.remove("live");
+        } else {
+            el.textContent = label ? `⏱ ${label} ${value}` : `⏱ ${value}`;
+            el.classList.remove("live");
+        }
+    }
+
     if(hasFirst || hasFinal){
-        const r = stopTimer(promptId);
-        if(r){
-            timeText = r.text;
-            if(hasFirst){
-                $("time1").textContent = r.text;
-                $("time1").classList.remove("live");
-            } else {
-                $("time1").textContent = "";
-                $("time1").classList.remove("live");
-            }
-            if(hasFinal){
-                $("time2").textContent = r.text;
-                $("time2").classList.remove("live");
-            } else {
-                $("time2").textContent = "";
-                $("time2").classList.remove("live");
-            }
+        if(hasFirst && hasFinal && tFirst && tFinal && tFirst !== tFinal){
+            // split real: el backend dio eventos por nodo y los tiempos son distintos
+            paint(1, "1er", tFirst);
+            paint(2, "final", tFinal);
+        } else {
+            // un solo total para los dos (o solo hay uno)
+            const v = tTotal || tFirst || tFinal || "—";
+            if(hasFirst) paint(1, "1er", v); else paint(1, null, null);
+            if(hasFinal) paint(2, "final", v); else paint(2, null, null);
         }
     } else {
         discardTimer(promptId);
-        $("time1").textContent = "";
-        $("time2").textContent = "";
+        paint(1, null, null);
+        paint(2, null, null);
+    }
+
+    // Texto para la miniatura de variante: priorizamos split si está disponible
+    let timeText = "";
+    if(hasFirst && hasFinal && tFirst && tFinal && tFirst !== tFinal){
+        timeText = `1er ${tFirst} · final ${tFinal}`;
+    } else {
+        timeText = tTotal || "";
     }
 
     // Mostrar en reproductores principales
