@@ -176,7 +176,7 @@ def main():
   </div>
   <div class="grid">
     <div class="controls-col">
-      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7822" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div></div>
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7822" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
       
       <div class="panel">
         <h2>Biblioteca de Prompts</h2>
@@ -355,6 +355,12 @@ function randomSeed(){
 const DEFAULT_BACKEND_PORT = "7822";
 const LEGACY_PORTS = ["7821"];
 const $ = (id) => document.getElementById(id);
+function updateServerHint(){
+  const hint = $("serverHint");
+  if(!hint) return;
+  const v = ($("serverUrl")?.value || "").trim();
+  hint.textContent = v ? `URL efectiva: ${v}` : "";
+}
 (function autoPickServerUrl(){
   try {
     const input = $("serverUrl");
@@ -368,19 +374,23 @@ const $ = (id) => document.getElementById(id);
         localStorage.removeItem("ltxv_serverUrl");
       } else {
         input.value = stored;
+        updateServerHint();
         return;
       }
     }
-    if(cur && !/127\.0\.0\.1|localhost/i.test(cur)) return; // valor manual, respeta
+    if(cur && !/127\.0\.0\.1|localhost/i.test(cur)) { updateServerHint(); return; }
     const host = (window.location.hostname || "").trim();
-    if(!host || /^(127\.|localhost$|::1$)/i.test(host)) return; // también en loopback
+    if(!host || /^(127\.|localhost$|::1$)/i.test(host)) { updateServerHint(); return; }
     input.value = `http://${host}:${DEFAULT_BACKEND_PORT}`;
+    updateServerHint();
   } catch(e) { /* si falla, queda el placeholder */ }
 })();
 // Persiste cambios manuales para que se recuerden entre recargas.
 $("serverUrl").addEventListener("change", (e) => {
   try { localStorage.setItem("ltxv_serverUrl", e.target.value.trim()); } catch(_){}
+  updateServerHint();
 });
+$("serverUrl").addEventListener("input", updateServerHint);
 
 function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
 function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}

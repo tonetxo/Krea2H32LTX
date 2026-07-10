@@ -31,8 +31,23 @@ fi
 echo "🌐 Abriendo navegador en http://localhost:$PORT/$HTML_FILE ..."
 $BROWSER "http://localhost:$PORT/$HTML_FILE" &
 
-# Iniciar el servidor Python (esto mantendrá la terminal ocupada)
-python3 -m http.server $PORT
+# Iniciar el servidor Python (esto mantendrá la terminal ocupada).
+# Usamos un handler con Cache-Control: no-store para que el móvil siempre
+# recargue la UI al cambiar de versión (sin esto, el navegador del móvil
+# puede seguir mostrando la versión cacheada después de regenerar el HTML).
+python3 -c "
+import http.server, socketserver
+class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
+with socketserver.TCPServer(('0.0.0.0', $PORT), NoCacheHandler) as httpd:
+    httpd.allow_reuse_address = True
+    print('Sirviendo en 0.0.0.0:$PORT (no-cache habilitado)')
+    httpd.serve_forever()
+"
 
 # Cuando cierres el servidor (Ctrl+C), esto se ejecutará
 echo "🛑 Servidor detenido."
