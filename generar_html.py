@@ -268,15 +268,16 @@ function fmtMs(ms){
   return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
 }
 
-function startTimer(promptId, slot){
+function startTimer(promptId){
   if(timers[promptId]) return;
   const t = { start: Date.now(), iv: null };
-  const el = $("time"+slot);
   t.iv = setInterval(() => {
     if(!timers[promptId]) return;
     const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
-    el.textContent = live;
-    el.classList.add("live");
+    $("time1").textContent = live;
+    $("time1").classList.add("live");
+    $("time2").textContent = live;
+    $("time2").classList.add("live");
   }, 500);
   timers[promptId] = t;
 }
@@ -433,6 +434,7 @@ function connectSocket() {
 // Idempotente: si ya se ha procesado, no hace nada.
 async function handlePromptDone(promptId) {
     if(handledPrompts.has(promptId)) return;
+    handledPrompts.add(promptId); // marcar ANTES del await para evitar duplicados WS+polling
     let entry;
     try {
         const hr = await fetch(server()+"/history/"+promptId);
@@ -441,8 +443,6 @@ async function handlePromptDone(promptId) {
         entry = hist[promptId];
     } catch(e) { return; }
     if(!entry || !entry.outputs) return; // aún no ha terminado
-
-    handledPrompts.add(promptId);
 
     // La semilla real la conocemos desde que se encoló (la genera el propio navegador),
     // no hace falta (ni se puede) leerla del historial de ComfyUI.
@@ -1046,7 +1046,7 @@ async function runSingleGeneration(index) {
         if(data.error) throw new Error(JSON.stringify(data.error));
 
         pendingSeeds[data.prompt_id] = seedUsed;
-        startTimer(data.prompt_id, window.currentBatchMode ? 1 : 2);
+        startTimer(data.prompt_id);
         pollFallback(data.prompt_id); // respaldo por si el WS no avisa
     } catch(err) {
         // Si el envío falla (p.ej. validación del grafo), no se queda colgado:
