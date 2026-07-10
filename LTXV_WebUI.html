@@ -1270,11 +1270,10 @@ let totalBatchSize = 0;
 let pendingSeeds = {};      // prompt_id -> semilla realmente usada en ese envío
 let handledPrompts = new Set(); // prompt_id ya procesados (evita duplicados WS+polling)
 let batchSeedMode = "random"; // modo capturado al lanzar el batch (independiente del toggle en vivo)
-let timers = {};               // prompt_id -> { start, t1|null, iv }
-// Cronómetros por prompt_id. 'start' se fija al POST /prompt.
-// Si la generación cubre 1er pase + final (mismo prompt_id con FIRST_SAVE y FINAL_SAVE),
-// 't1' se anota cuando aparece FIRST_SAVE y el cronómetro sigue corriendo hasta FINAL_SAVE,
-// de modo que t1 = elapsed del 1er pase y tFinal = elapsed total.
+let timers = {};               // prompt_id -> { start, iv }
+// Cronómetros por prompt_id. Un único tiempo total por prompt: desde POST /prompt
+// hasta execution_success. El backend no notifica por nodo, así que separar '1er pase'
+// y 'final' no es posible desde el cliente (mismo execution_success cubre ambos).
 
 function fmtMs(ms){
   const s = Math.floor(ms / 1000);
@@ -1283,50 +1282,26 @@ function fmtMs(ms){
 
 function startTimer(promptId){
   if(timers[promptId]) return;
-  const t = { start: Date.now(), t1: null, iv: null };
+  const t = { start: Date.now(), iv: null };
   t.iv = setInterval(() => {
-    if(t.t1 !== null){
-      // ya pasó el 1er pase: mostrar el del final contando desde t1
-      $("time2").textContent = `⏱ 00:00 → ${fmtMs(Date.now() - t.start)}`;
-      $("time2").classList.add("live");
-    } else {
-      $("time1").textContent = `⏱ ${fmtMs(Date.now() - t.start)}`;
-      $("time1").classList.add("live");
-      $("time2").textContent = "";
-      $("time2").classList.remove("live");
-    }
+    if(!timers[promptId]) return; // cerrado en otra tick
+    const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
+    $("time1").textContent = live;
+    $("time1").classList.add("live");
   }, 500);
   timers[promptId] = t;
 }
 
-function stopTimer(promptId, phase){
-  // phase: "1st" | "2nd" | "only"
+function stopTimer(promptId){
+  // Cierra el cronómetro y devuelve el tiempo total. NO pinta: lo decide el caller
+  // en función de qué outputs llegaron (FIRST_SAVE / FINAL_SAVE) para no ensuciar
+  // el reproductor final cuando solo se pidió el 1er pase.
   const t = timers[promptId];
   if(!t) return null;
-  if(phase === "1st"){
-    if(t.t1 !== null) return t.t1; // idempotente
-    t.t1 = Date.now() - t.start;
-    $("time1").textContent = `⏱ ${fmtMs(t.t1)}`;
-    $("time1").classList.remove("live");
-    return t.t1;
-  }
-  if(phase === "2nd"){
-    const total = Date.now() - t.start;
-    if(t.iv){ clearInterval(t.iv); t.iv = null; }
-    $("time2").textContent = `⏱ ${fmtMs(total)}`;
-    $("time2").classList.remove("live");
-    delete timers[promptId];
-    return { total, t1: t.t1 };
-  }
-  if(phase === "only"){
-    const total = Date.now() - t.start;
-    if(t.iv){ clearInterval(t.iv); t.iv = null; }
-    $("time1").textContent = `⏱ ${fmtMs(total)}`;
-    $("time1").classList.remove("live");
-    delete timers[promptId];
-    return { total, t1: null };
-  }
-  return null;
+  const total = Date.now() - t.start;
+  if(t.iv){ clearInterval(t.iv); t.iv = null; }
+  delete timers[promptId];
+  return { total, text: `⏱ ${fmtMs(total)}` };
 }
 
 function discardTimer(promptId){
@@ -1393,28 +1368,36 @@ async function handlePromptDone(promptId) {
         log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
     }
 
-    // Cronómetros: en modo "solo 1er pase" solo hay FIRST_SAVE; en "Generar completo"
-    // FIRST_SAVE y FINAL_SAVE están en el MISMO prompt_id, así que 't1' se anota al ver
-    // el primero y se cierra al ver el segundo (total incluye ambos pases).
+    // Cronómetro único por prompt. ComfyUI emite UN execution_success con todos los
+    // outputs ya listos, así que solo podemos medir el tiempo total del prompt.
+    // Pintamos ese total SOLO en los slots que tengan video, y limpiamos el otro
+    // (el interval solo pinta time1 mientras corre, pero por si quedó algo en time2).
     const hasFirst = !!entry.outputs[N.FIRST_SAVE];
     const hasFinal = !!entry.outputs[N.FINAL_SAVE];
-    let variantTimeText = "";
-    if(hasFirst && hasFinal){
-        stopTimer(promptId, "1st");
-        const fin = stopTimer(promptId, "2nd");
-        const t1Str = fin && fin.t1 != null ? fmtMs(fin.t1) : "—";
-        const t2Str = fin ? fmtMs(fin.total) : "—";
-        variantTimeText = `1er ${t1Str} · final ${t2Str}`;
-    } else if(hasFirst){
-        const r = stopTimer(promptId, "only");
-        const tStr = r ? fmtMs(r.total) : "—";
-        variantTimeText = tStr;
-    } else if(hasFinal){
-        const r = stopTimer(promptId, "only");
-        const tStr = r ? fmtMs(r.total) : "—";
-        variantTimeText = tStr;
+    let timeText = "";
+    if(hasFirst || hasFinal){
+        const r = stopTimer(promptId);
+        if(r){
+            timeText = r.text;
+            if(hasFirst){
+                $("time1").textContent = r.text;
+                $("time1").classList.remove("live");
+            } else {
+                $("time1").textContent = "";
+                $("time1").classList.remove("live");
+            }
+            if(hasFinal){
+                $("time2").textContent = r.text;
+                $("time2").classList.remove("live");
+            } else {
+                $("time2").textContent = "";
+                $("time2").classList.remove("live");
+            }
+        }
     } else {
         discardTimer(promptId);
+        $("time1").textContent = "";
+        $("time2").textContent = "";
     }
 
     // Mostrar en reproductores principales
@@ -1424,7 +1407,7 @@ async function handlePromptDone(promptId) {
     // Añadir a la galería de variantes (usando siempre findMedia para extraer filename/subfolder/type)
     const outNode = entry.outputs[N.FIRST_SAVE] || entry.outputs[N.FINAL_SAVE];
     const media = outNode ? findMedia(outNode) : null;
-    addToVariantGallery(media, realSeed, variantTimeText);
+    addToVariantGallery(media, realSeed, timeText);
 
     log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
     delete pendingSeeds[promptId];
