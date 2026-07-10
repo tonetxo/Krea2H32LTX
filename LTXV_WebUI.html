@@ -2375,40 +2375,62 @@ $("btnEditSysPrompts").addEventListener("click", () => {
   sysPromptEditData = loadSysPrompts();
   sysPromptEditMode = "text";
   renderSysPromptEditor();
-  // Activar pestaña texto
-  document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
-  document.querySelector('.modal-tab[data-tab="text"]').classList.add("active");
+  // Activar pestaña texto (el modal ya existe en el DOM)
+  const tabs = document.querySelectorAll(".modal-tab");
+  tabs.forEach(t => t.classList.remove("active"));
+  const textTab = document.querySelector('.modal-tab[data-tab="text"]');
+  if(textTab) textTab.classList.add("active");
   $("sysPromptModal").classList.add("open");
 });
 
-// Tabs del modal
-document.querySelectorAll(".modal-tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
-    tab.classList.add("active");
-    sysPromptEditMode = tab.dataset.tab;
-    renderSysPromptEditor();
-  });
-});
+// Tabs del modal (se adjuntan después de crear el modal abajo)
 
-// Añadir estilo
+// Inicializar enhancer
+(async () => {
+  await loadEnhancerModels();
+  const data = loadSysPrompts();
+  populateStyleSelect(data, $("enhancerMode").value);
+})();
+
+$("btnFirstPass").addEventListener("click",()=>runGeneration(true));
+$("btnFull").addEventListener("click",()=>runGeneration(false));
+updateDuration();
+
+// --- MODAL: Editor de system prompts (inline, antes de </script> para que los elementos existan) ---
+const sysPromptModal = document.createElement("div");
+sysPromptModal.className = "modal-overlay";
+sysPromptModal.id = "sysPromptModal";
+sysPromptModal.innerHTML = \`
+  <div class="modal-content">
+    <h2>Editar System Prompts</h2>
+    <div class="modal-tabs" id="sysPromptTabs">
+      <div class="modal-tab active" data-tab="text">Texto</div>
+      <div class="modal-tab" data-tab="vision">Visión</div>
+    </div>
+    <div id="sysPromptEditor"></div>
+    <div class="modal-actions">
+      <button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>
+      <button id="btnSaveSysPrompts" class="primary">Guardar</button>
+      <button id="btnCancelSysPrompts" class="ghost">Cancelar</button>
+    </div>
+  </div>
+\`;
+document.body.appendChild(sysPromptModal);
+
+// Reconectar listeners del modal (se crearon en el DOM justo ahora)
 $("btnAddSysPrompt").addEventListener("click", () => {
   const mode = sysPromptEditMode;
   if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
   const keys = Object.keys(sysPromptEditData[mode]);
-  // Encontrar la siguiente letra disponible
   let nextKey = "C";
-  for(let i = 67; i < 91; i++){ // C-Z
+  for(let i = 67; i < 91; i++){
     const k = String.fromCharCode(i);
     if(!keys.includes(k)){ nextKey = k; break; }
   }
   sysPromptEditData[mode][nextKey] = { name: "Nuevo estilo", prompt: "" };
   renderSysPromptEditor();
 });
-
-// Guardar
 $("btnSaveSysPrompts").addEventListener("click", () => {
-  // Leer los valores de los inputs
   const container = $("sysPromptEditor");
   container.querySelectorAll(".sysprompt-row").forEach(row => {
     const key = row.querySelector("textarea").dataset.key;
@@ -2424,40 +2446,8 @@ $("btnSaveSysPrompts").addEventListener("click", () => {
   $("sysPromptModal").classList.remove("open");
   log("✅ System prompts guardados.", "l-ok");
 });
-
-// Cancelar
 $("btnCancelSysPrompts").addEventListener("click", () => {
   $("sysPromptModal").classList.remove("open");
 });
-
-// Inicializar enhancer
-(async () => {
-  await loadEnhancerModels();
-  const data = loadSysPrompts();
-  populateStyleSelect(data, $("enhancerMode").value);
-})();
-
-$("btnFirstPass").addEventListener("click",()=>runGeneration(true));
-$("btnFull").addEventListener("click",()=>runGeneration(false));
-updateDuration();
 </script>
-
-<!-- MODAL: Editor de system prompts -->
-<div class="modal-overlay" id="sysPromptModal">
-  <div class="modal-content">
-    <h2>Editar System Prompts</h2>
-    <div class="modal-tabs" id="sysPromptTabs">
-      <div class="modal-tab active" data-tab="text">Texto</div>
-      <div class="modal-tab" data-tab="vision">Visión</div>
-    </div>
-    <div id="sysPromptEditor"></div>
-    <div class="modal-actions">
-      <button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>
-      <button id="btnSaveSysPrompts" class="primary">Guardar</button>
-      <button id="btnCancelSysPrompts" class="ghost">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-</body>
 </html>
