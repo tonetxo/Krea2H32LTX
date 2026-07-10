@@ -58,12 +58,28 @@ Opening `LTXV_WebUI.html` via `file://` will not work — it makes `fetch()` /
 ## Backend connection
 
 - Default server URL is `http://127.0.0.1:7821` (editable in the
-  "Servidor" panel of the UI; key `id="serverUrl"`).
+  "Servidor" panel of the UI; key `id="serverUrl"`). The input starts
+  empty; an inline IIFE (`autoPickServerUrl` in `generar_html.py` /
+  `LTXV_WebUI.html`) auto-fills it with `http://<window.location.hostname>:7821`
+  when the page is opened from a non-loopback host (móvil, otro PC en
+  LAN), unless the user has previously typed a URL (kept in
+  `localStorage["ltxv_serverUrl"]`).
 - The UI expects a SwarmUI/ComfyUI-compatible endpoint that accepts
   `POST` with body `{prompt: <graph>, client_id: ...}` — see
   `LTXV_WebUI.html:1853`.
 - There is **no backend code in this repo**. The `7821` port must be
   running the LTXV backend separately.
+
+## LAN access gotcha (móvil / otro PC)
+
+The Python `http.server` in `lanzar_ltxv.sh` binds to `0.0.0.0:8000`,
+so the UI is reachable on the LAN. **ComfyUI, however, binds to
+`127.0.0.1:7821` by default**, so the auto-detected backend URL will
+appear in the input but every request will be refused by the OS
+(connection refused) until the backend itself is bound to the LAN
+interface. Launch ComfyUI with `--listen 0.0.0.0` (or
+`--listen <IP_LAN>`) to fix this. `lanzar_ltxv.sh` checks `ss` and
+prints a warning when it sees the backend on a loopback address.
 
 ## Conventions
 
