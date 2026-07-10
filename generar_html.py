@@ -1063,8 +1063,6 @@ async function queueAndWait(firstPassOnly){
   currentBatchIndex = 0;
   batchSeedMode = seedMode; // capturado aquí: el toggle en vivo puede cambiar tras cada variante
   window.currentBatchMode = firstPassOnly;
-  $("variantGrid").innerHTML = "";
-  $("variantGalleryBox").style.display = "none";
   setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
   $("btnFirstPass").disabled=true;
   $("btnFull").disabled=true;
