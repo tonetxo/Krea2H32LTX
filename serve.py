@@ -23,9 +23,11 @@ import urllib.error
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
+OLLAMA = "http://127.0.0.1:11434"
 
 # Routes that should be proxied to the backend instead of served as files.
 PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/view", "/upload/image")
+OLLAMA_PREFIXES = ("/api",)
 WS_PREFIX = "/ws"
 
 
@@ -43,32 +45,40 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self._is_ws():
             self._ws_reject()
+        elif self._is_ollama_route():
+            self._proxy("GET", OLLAMA)
         elif self._is_proxy_route():
-            self._proxy("GET")
+            self._proxy("GET", BACKEND)
         else:
             super().do_GET()
 
     def do_POST(self):
         if self._is_ws():
             self._ws_reject()
+        elif self._is_ollama_route():
+            self._proxy("POST", OLLAMA)
         elif self._is_proxy_route():
-            self._proxy("POST")
+            self._proxy("POST", BACKEND)
         else:
             self.send_error(405, "Method Not Allowed")
 
     def do_OPTIONS(self):
         if self._is_ws():
             self._ws_reject()
+        elif self._is_ollama_route():
+            self._proxy("OPTIONS", OLLAMA)
         elif self._is_proxy_route():
-            self._proxy("OPTIONS")
+            self._proxy("OPTIONS", BACKEND)
         else:
             self.send_error(405, "Method Not Allowed")
 
     def do_HEAD(self):
         if self._is_ws():
             self._ws_reject()
+        elif self._is_ollama_route():
+            self._proxy("HEAD", OLLAMA)
         elif self._is_proxy_route():
-            self._proxy("HEAD")
+            self._proxy("HEAD", BACKEND)
         else:
             super().do_HEAD()
 
@@ -76,6 +86,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def _is_proxy_route(self):
         path = self.path.split("?")[0]
         return any(path.startswith(p) for p in PROXY_PREFIXES)
+
+    def _is_ollama_route(self):
+        path = self.path.split("?")[0]
+        return any(path.startswith(p) for p in OLLAMA_PREFIXES)
 
     def _is_ws(self):
         return self.path.split("?")[0].startswith(WS_PREFIX)
@@ -86,9 +100,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"WebSocket not proxied; pollFallback handles it.\n")
 
-    def _proxy(self, method):
-        """Forward the request to BACKEND and relay the response."""
-        target = BACKEND + self.path
+    def _proxy(self, method, base):
+        """Forward the request to `base` and relay the response."""
+        target = base + self.path
         body = None
         if method in ("POST", "PUT", "PATCH"):
             length = int(self.headers.get("Content-Length", 0))

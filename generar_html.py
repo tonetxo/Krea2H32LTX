@@ -152,6 +152,39 @@ def main():
   .variant-seed-display:hover { color: #fff; }
   .copy-icon { font-size: 12px; opacity: 0.7; transition: opacity 0.2s; }
   .variant-seed-display:hover .copy-icon { opacity: 1; }
+
+  /* Collapsible enhancer panel */
+  .collapsible-header{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:4px 0;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+  .collapsible-header:hover{color:var(--text);}
+  .collapsible-header .arrow{font-size:9px;transition:transform .2s;}
+  .collapsible-header.open .arrow{transform:rotate(90deg);}
+  .collapsible-body{overflow:hidden;max-height:0;transition:max-height .3s ease;}
+  .collapsible-body.open{max-height:800px;}
+  .enhancer-row{margin-bottom:10px;}
+  .enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
+  .enhancer-row select{width:100%;}
+  .enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
+  .enhancer-output:focus{border-color:var(--accent);}
+  .enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+  .enhancer-actions button{flex:1;min-width:120px;}
+
+  /* Modal for system prompt editor */
+  .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal-content{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;}
+  .modal-content h2{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;}
+  .modal-tabs{display:flex;gap:4px;margin-bottom:14px;}
+  .modal-tab{padding:6px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--panel-2);}
+  .modal-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  .sysprompt-row{border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:8px;background:var(--panel-2);}
+  .sysprompt-row .spr-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .sysprompt-row .spr-name{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .sysprompt-row .spr-del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;min-width:auto;flex:0;}
+  .sysprompt-row .spr-del:hover{background:var(--danger);color:#fff;}
+  .sysprompt-row textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-family:var(--sans);font-size:12px;outline:none;resize:vertical;min-height:50px;line-height:1.4;}
+  .sysprompt-row textarea:focus{border-color:var(--accent);}
+  .modal-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;}
+  .modal-actions button{min-width:100px;flex:0;}
 </style>
 </head>
 <body>
@@ -180,6 +213,38 @@ def main():
       </div>
 
       <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
+
+      <!-- ENHANCER PANEL -->
+      <div class="panel">
+        <div class="collapsible-header" id="enhancerToggle">
+          <span class="arrow">▶</span> Mejorar prompt con IA
+        </div>
+        <div class="collapsible-body" id="enhancerBody">
+          <div class="enhancer-row">
+            <label>Modelo</label>
+            <select id="enhancerModel"><option value="">Cargando modelos...</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="enhancerMode"><option value="text">Texto</option><option value="vision">Visión</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Estilo</label>
+            <select id="enhancerStyle"></select>
+          </div>
+          <div class="enhancer-row">
+            <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
+          </div>
+          <div class="enhancer-row">
+            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado aparecerá aquí..."></textarea>
+          </div>
+          <div class="enhancer-actions">
+            <button id="btnSaveEnhanced">Guardar en biblioteca</button>
+            <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
+          </div>
+        </div>
+      </div>
+
       <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
       <div class="panel"><h2>LoRAs</h2><div id="loraList"></div></div>
       <div class="panel"><h2>Resolución & duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
@@ -1098,10 +1163,284 @@ async function runGeneration(fp){
   catch(err){ setRun("bad","error");log("Error: "+err.message,"l-err"); $("btnFirstPass").disabled=false;$("btnFull").disabled=false; }
 }
 
+// --- PROMPT ENHANCER (Ollama) ---
+const ENHANCER_DEFAULT_PROMPTS = {
+  text: {
+    A: { name: "Estilo A (cinematográfico)", prompt: "Eres un experto en prompts para generación de video con LTXV. Transforma la idea del usuario en un prompt detallado y cinematográfico. Incluye: tipo de plano, iluminación, movimiento de cámara, atmósfera, colores, y estilo visual. Responde SOLO con el prompt mejorado, sin explicaciones ni prefacios." },
+    B: { name: "Estilo B (narrativo)", prompt: "Eres un asistente creativo especializado en narrativa visual. Toma la idea del usuario y conviértela en un prompt evocador que capture la esencia de la escena. Usa lenguaje descriptivo y poético. Céntrate en la atmósfera, las emociones y la historia que cuenta la imagen. Responde SOLO con el prompt mejorado." },
+  },
+  vision: {
+    A: { name: "Estilo A (descriptivo)", prompt: "Eres un experto en describir imágenes para generación de video. Analiza la imagen proporcionada y genera un prompt detallado que describa: la composición, los sujetos, el fondo, la iluminación, los colores, el movimiento y la atmósfera. El prompt debe ser adecuado para un modelo de texto-a-video. Responde SOLO con el prompt mejorado." },
+    B: { name: "Estilo B (cinematográfico)", prompt: "Eres un cineasta digital. Observa la imagen y transfórmala en una descripción cinematográfica. Describe cómo se movería la cámara, cómo evolucionaría la iluminación, qué acción ocurriría, y cómo cambiaría la escena con el tiempo. Piensa en términos de metraje, no de foto fija. Responde SOLO con el prompt mejorado." },
+  },
+};
+
+function loadSysPrompts(){
+  const saved = localStorage.getItem("ltxv_enhancer_sysprompts");
+  if(saved){
+    try { return JSON.parse(saved); } catch(e) {}
+  }
+  return JSON.parse(JSON.stringify(ENHANCER_DEFAULT_PROMPTS));
+}
+
+function saveSysPrompts(data){
+  localStorage.setItem("ltxv_enhancer_sysprompts", JSON.stringify(data));
+}
+
+function populateStyleSelect(data, mode){
+  const sel = $("enhancerStyle");
+  sel.innerHTML = "";
+  const styles = data[mode] || {};
+  for(const key of Object.keys(styles).sort()){
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = styles[key].name || key;
+    sel.appendChild(opt);
+  }
+}
+
+function getCurrentSysPrompt(data, mode, styleKey){
+  const styles = data[mode] || {};
+  const entry = styles[styleKey];
+  return entry ? entry.prompt : "";
+}
+
+// Collapsible toggle
+$("enhancerToggle").addEventListener("click", () => {
+  const h = $("enhancerToggle");
+  const b = $("enhancerBody");
+  h.classList.toggle("open");
+  b.classList.toggle("open");
+  const arrow = h.querySelector(".arrow");
+  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+});
+
+// Poblar modelos desde Ollama
+async function loadEnhancerModels(){
+  const sel = $("enhancerModel");
+  try {
+    const r = await fetch("/api/tags");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    const models = data.models || [];
+    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
+    for(const m of models){
+      const opt = document.createElement("option");
+      opt.value = m.name;
+      opt.textContent = m.name;
+      sel.appendChild(opt);
+    }
+    // Seleccionar por defecto Qwythos-9B si está disponible
+    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
+    if(defaultModel) sel.value = defaultModel.name;
+  } catch(e) {
+    sel.innerHTML = '<option value="">Ollama no disponible</option>';
+    console.warn("No se pudieron cargar modelos:", e.message);
+  }
+}
+
+// Recargar estilos al cambiar modo
+$("enhancerMode").addEventListener("change", () => {
+  const data = loadSysPrompts();
+  populateStyleSelect(data, $("enhancerMode").value);
+});
+
+// Mejorar prompt
+$("btnEnhance").addEventListener("click", async () => {
+  const model = $("enhancerModel").value;
+  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+  const mode = $("enhancerMode").value;
+  const styleKey = $("enhancerStyle").value;
+  const data = loadSysPrompts();
+  const system = getCurrentSysPrompt(data, mode, styleKey);
+  const userPrompt = $("prompt").value.trim();
+  if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+
+  const payload = { model, system, prompt: userPrompt, stream: false };
+  if(mode === "vision" && localFile){
+    // Leer la imagen cargada como base64
+    try {
+      const b64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result;
+          const base64 = dataUrl.split(",")[1];
+          resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(localFile);
+      });
+      payload.images = [b64];
+    } catch(e) {
+      log("⚠️ No se pudo leer la imagen: "+e.message, "l-err");
+      return;
+    }
+  }
+
+  $("btnEnhance").disabled = true;
+  $("btnEnhance").textContent = "Mejorando...";
+  $("enhancerOutput").value = "";
+  try {
+    const r = await fetch("/api/generate", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload),
+    });
+    if(!r.ok){
+      const t = await r.text().catch(()=>"");
+      throw new Error("HTTP "+r.status+" "+t.slice(0,200));
+    }
+    const result = await r.json();
+    const text = (result.response || "").trim();
+    $("enhancerOutput").value = text;
+    log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
+  } catch(e) {
+    log("❌ Error al mejorar: "+e.message, "l-err");
+    $("enhancerOutput").value = "Error: "+e.message;
+  } finally {
+    $("btnEnhance").disabled = false;
+    $("btnEnhance").textContent = "Mejorar prompt";
+  }
+});
+
+// Guardar en biblioteca
+$("btnSaveEnhanced").addEventListener("click", () => {
+  const text = $("enhancerOutput").value.trim();
+  if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
+  const name = prompt("Nombre para este prompt mejorado:");
+  if(!name) return;
+  const saved = JSON.parse(localStorage.getItem('ltxv_prompts') || '{}');
+  saved[name] = text;
+  localStorage.setItem('ltxv_prompts', JSON.stringify(saved));
+  loadPrompts();
+  log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+});
+
+// --- Editor de system prompts ---
+let sysPromptEditData = null;
+let sysPromptEditMode = "text";
+
+function renderSysPromptEditor(){
+  const container = $("sysPromptEditor");
+  if(!container) return;
+  const data = sysPromptEditData;
+  const mode = sysPromptEditMode;
+  const styles = data[mode] || {};
+  const keys = Object.keys(styles).sort();
+  container.innerHTML = "";
+  for(const key of keys){
+    const entry = styles[key];
+    const isDefault = (key === "A" || key === "B") && ENHANCER_DEFAULT_PROMPTS[mode] && ENHANCER_DEFAULT_PROMPTS[mode][key];
+    const row = document.createElement("div");
+    row.className = "sysprompt-row";
+    row.innerHTML = `
+      <div class="spr-top">
+        <span class="spr-name">${key}</span>
+        <input type="text" class="spr-name-input" value="${entry.name}" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:11px;">
+        ${isDefault ? "" : '<button class="spr-del" data-key="'+key+'">×</button>'}
+      </div>
+      <textarea data-key="${key}">${entry.prompt}</textarea>
+    `;
+    container.appendChild(row);
+  }
+  // Conectar botones de eliminar
+  container.querySelectorAll(".spr-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      delete sysPromptEditData[mode][key];
+      renderSysPromptEditor();
+    });
+  });
+}
+
+$("btnEditSysPrompts").addEventListener("click", () => {
+  sysPromptEditData = loadSysPrompts();
+  sysPromptEditMode = "text";
+  renderSysPromptEditor();
+  // Activar pestaña texto
+  document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
+  document.querySelector('.modal-tab[data-tab="text"]').classList.add("active");
+  $("sysPromptModal").classList.add("open");
+});
+
+// Tabs del modal
+document.querySelectorAll(".modal-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    sysPromptEditMode = tab.dataset.tab;
+    renderSysPromptEditor();
+  });
+});
+
+// Añadir estilo
+$("btnAddSysPrompt").addEventListener("click", () => {
+  const mode = sysPromptEditMode;
+  if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
+  const keys = Object.keys(sysPromptEditData[mode]);
+  // Encontrar la siguiente letra disponible
+  let nextKey = "C";
+  for(let i = 67; i < 91; i++){ // C-Z
+    const k = String.fromCharCode(i);
+    if(!keys.includes(k)){ nextKey = k; break; }
+  }
+  sysPromptEditData[mode][nextKey] = { name: "Nuevo estilo", prompt: "" };
+  renderSysPromptEditor();
+});
+
+// Guardar
+$("btnSaveSysPrompts").addEventListener("click", () => {
+  // Leer los valores de los inputs
+  const container = $("sysPromptEditor");
+  container.querySelectorAll(".sysprompt-row").forEach(row => {
+    const key = row.querySelector("textarea").dataset.key;
+    const name = row.querySelector(".spr-name-input").value;
+    const prompt = row.querySelector("textarea").value;
+    if(sysPromptEditData[sysPromptEditMode] && sysPromptEditData[sysPromptEditMode][key]){
+      sysPromptEditData[sysPromptEditMode][key].name = name;
+      sysPromptEditData[sysPromptEditMode][key].prompt = prompt;
+    }
+  });
+  saveSysPrompts(sysPromptEditData);
+  populateStyleSelect(sysPromptEditData, $("enhancerMode").value);
+  $("sysPromptModal").classList.remove("open");
+  log("✅ System prompts guardados.", "l-ok");
+});
+
+// Cancelar
+$("btnCancelSysPrompts").addEventListener("click", () => {
+  $("sysPromptModal").classList.remove("open");
+});
+
+// Inicializar enhancer
+(async () => {
+  await loadEnhancerModels();
+  const data = loadSysPrompts();
+  populateStyleSelect(data, $("enhancerMode").value);
+})();
+
 $("btnFirstPass").addEventListener("click",()=>runGeneration(true));
 $("btnFull").addEventListener("click",()=>runGeneration(false));
 updateDuration();
 </script>
+
+<!-- MODAL: Editor de system prompts -->
+<div class="modal-overlay" id="sysPromptModal">
+  <div class="modal-content">
+    <h2>Editar System Prompts</h2>
+    <div class="modal-tabs" id="sysPromptTabs">
+      <div class="modal-tab active" data-tab="text">Texto</div>
+      <div class="modal-tab" data-tab="vision">Visión</div>
+    </div>
+    <div id="sysPromptEditor"></div>
+    <div class="modal-actions">
+      <button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>
+      <button id="btnSaveSysPrompts" class="primary">Guardar</button>
+      <button id="btnCancelSysPrompts" class="ghost">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
 '''
