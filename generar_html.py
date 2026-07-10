@@ -122,16 +122,6 @@ def main():
   .prompt-actions button{padding:6px 10px;font-size:10px;min-width:auto;}
 
   /* Estilos Pantalla Completa */
-  .fs-btn {
-    position: absolute; top: 10px; right: 10px; z-index: 10;
-    background: rgba(0,0,0,0.6); border: 1px solid var(--border); color: var(--text);
-    width: 32px; height: 32px; border-radius: 4px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; font-size: 16px;
-    opacity: 0; transition: opacity 0.2s;
-  }
-  .vidbox:hover .fs-btn { opacity: 1; }
-  .fs-btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
-  
   /* Asegurar que el contenido persista en fullscreen */
   .vidbox:fullscreen, .vidbox:-webkit-full-screen, .vidbox:-moz-full-screen {
     width: 100vw !important; height: 100vh !important; max-height: none !important;
@@ -139,9 +129,6 @@ def main():
   }
   .vidbox:fullscreen video, .vidbox:-webkit-full-screen video, .vidbox:-moz-full-screen video {
     width: 100%; height: 100%; object-fit: contain; max-height: none; border-radius: 0;
-  }
-  .vidbox:fullscreen .fs-btn, .vidbox:-webkit-full-screen .fs-btn, .vidbox:-moz-full-screen .fs-btn {
-    opacity: 1; top: 20px; right: 20px; width: 48px; height: 48px; font-size: 24px;
   }
   .vidbox:fullscreen .vid-header, .vidbox:fullscreen .vid-footer, .vidbox:fullscreen .empty {
     display: none !important;
@@ -204,7 +191,6 @@ def main():
     <div class="results-col">
       <!-- REPRODUCTOR 1ER PASE -->
       <div class="vidbox">
-        <button class="fs-btn" onclick="toggleFullscreen('video1')" title="Pantalla completa">⛶</button>
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
         </div>
@@ -218,7 +204,6 @@ def main():
 
       <!-- REPRODUCTOR FINAL -->
       <div class="vidbox">
-        <button class="fs-btn" onclick="toggleFullscreen('video2')" title="Pantalla completa">⛶</button>
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
         </div>
@@ -1039,20 +1024,6 @@ function showVideo(slot, media){
 }
 
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
-function toggleFullscreen(videoId) {
-    const video = document.getElementById(videoId);
-    if (!video) return;
-    if (!document.fullscreenElement) {
-        if (video.requestFullscreen) video.requestFullscreen();
-        else if (video.webkitRequestFullscreen) video.webkitRequestFullscreen();
-        else if (video.msRequestFullscreen) video.msRequestFullscreen();
-    } else {
-        if (document.exitFullscreen) document.exitFullscreen();
-        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-        else if (document.msExitFullscreen) document.msExitFullscreen();
-    }
-}
-
 async function runSingleGeneration(index) {
     try {
         const graph = buildGraph(window.currentBatchMode);
