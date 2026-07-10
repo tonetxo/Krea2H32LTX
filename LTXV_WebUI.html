@@ -142,7 +142,7 @@
   </div>
   <div class="grid">
     <div class="controls-col">
-      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div></div>
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7822" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div></div>
       
       <div class="panel">
         <h2>Biblioteca de Prompts</h2>
@@ -1364,11 +1364,14 @@ function randomSeed(){
 
 // --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
 // Cuando abres la UI desde otro dispositivo (móvil, otro PC) por la IP de la LAN,
-// el host de window.location es esa IP LAN. El backend en :7821 también debe estar
+// el host de window.location es esa IP LAN. El backend en :7822 también debe estar
 // escuchando en esa IP (o en 0.0.0.0), pero la URL por defecto apuntaba a
 // 127.0.0.1, que en el cliente remoto apunta a sí mismo y nunca conecta.
-// Si el input sigue vacío o apunta a loopback, lo reescribimos a http://<hostname>:7821.
+// Si el input sigue vacío o apunta a loopback, lo reescribimos a http://<hostname>:7822.
 // Si el usuario ya escribió algo a mano, lo respetamos.
+// Migración: si localStorage trae el puerto antiguo (7821), lo descartamos.
+const DEFAULT_BACKEND_PORT = "7822";
+const LEGACY_PORTS = ["7821"];
 const $ = (id) => document.getElementById(id);
 (function autoPickServerUrl(){
   try {
@@ -1376,11 +1379,20 @@ const $ = (id) => document.getElementById(id);
     if(!input) return;
     const cur = input.value.trim();
     const stored = localStorage.getItem("ltxv_serverUrl");
-    if(stored){ input.value = stored; return; }
+    if(stored){
+      const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
+      if(storedPort && LEGACY_PORTS.includes(storedPort)){
+        // puerto legacy cacheado: descartarlo
+        localStorage.removeItem("ltxv_serverUrl");
+      } else {
+        input.value = stored;
+        return;
+      }
+    }
     if(cur && !/127\.0\.0\.1|localhost/i.test(cur)) return; // valor manual, respeta
     const host = (window.location.hostname || "").trim();
     if(!host || /^(127\.|localhost$|::1$)/i.test(host)) return; // también en loopback
-    input.value = `http://${host}:7821`;
+    input.value = `http://${host}:${DEFAULT_BACKEND_PORT}`;
   } catch(e) { /* si falla, queda el placeholder */ }
 })();
 // Persiste cambios manuales para que se recuerden entre recargas.

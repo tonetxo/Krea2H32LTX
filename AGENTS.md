@@ -5,7 +5,7 @@ Repo-specific notes for agents working in `/home/tonetxo/Documentos/worflows/LTX
 ## What this repo is
 
 A single-page web UI (`LTXV_WebUI.html`) for an LTXV video-generation backend
-(SwarmUI / ComfyUI-style graph, default endpoint `http://127.0.0.1:7821`).
+(SwarmUI / ComfyUI-style graph, default endpoint `http://127.0.0.1:7822`).
 The HTML is **generated** by `generar_html.py` from a JSON graph
 (`LTXV_DMD_OK.json`); do not hand-edit the HTML for things the generator
 controls — your changes will be overwritten on the next regenerate.
@@ -57,24 +57,30 @@ Opening `LTXV_WebUI.html` via `file://` will not work — it makes `fetch()` /
 
 ## Backend connection
 
-- Default server URL is `http://127.0.0.1:7821` (editable in the
+- Default server URL is `http://127.0.0.1:7822` (editable in the
   "Servidor" panel of the UI; key `id="serverUrl"`). The input starts
   empty; an inline IIFE (`autoPickServerUrl` in `generar_html.py` /
-  `LTXV_WebUI.html`) auto-fills it with `http://<window.location.hostname>:7821`
+  `LTXV_WebUI.html`) auto-fills it with `http://<window.location.hostname>:7822`
   when the page is opened from a non-loopback host (móvil, otro PC en
   LAN), unless the user has previously typed a URL (kept in
   `localStorage["ltxv_serverUrl"]`).
+- The default port lives in `DEFAULT_BACKEND_PORT` at the top of the
+  inline `<script>`. If the backend is launched on a different port
+  (e.g. `7821` was the historical default, current build is `7822`),
+  update `DEFAULT_BACKEND_PORT` and the placeholder, then add the old
+  port to `LEGACY_PORTS` so any `localStorage` entry pointing at the
+  old port is discarded on next load.
 - The UI expects a SwarmUI/ComfyUI-compatible endpoint that accepts
   `POST` with body `{prompt: <graph>, client_id: ...}` — see
   `LTXV_WebUI.html:1853`.
-- There is **no backend code in this repo**. The `7821` port must be
+- There is **no backend code in this repo**. The backend port must be
   running the LTXV backend separately.
 
 ## LAN access gotcha (móvil / otro PC)
 
 The Python `http.server` in `lanzar_ltxv.sh` binds to `0.0.0.0:8000`,
 so the UI is reachable on the LAN. **ComfyUI, however, binds to
-`127.0.0.1:7821` by default**, so the auto-detected backend URL will
+`127.0.0.1:<port>` by default**, so the auto-detected backend URL will
 appear in the input but every request will be refused by the OS
 (connection refused) until the backend itself is bound to the LAN
 interface. Launch ComfyUI with `--listen 0.0.0.0` (or
