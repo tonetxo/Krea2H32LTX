@@ -48,6 +48,7 @@
   .btn-row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
   button{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);padding:11px 16px;cursor:pointer;transition:all .15s;flex:1;min-width:150px;}
   button.primary{background:var(--accent);border-color:var(--accent);color:#08110f;font-weight:700;}
+  button.danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700;}
   button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allowed;}
   .statusbar{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:10px 2px 0;min-height:16px;}
   .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);flex-shrink:0;}
@@ -217,7 +218,7 @@
       <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
       <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
       <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
-      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnFirstPass">Solo 1er pase</button><button id="btnFull" class="primary">Generar completo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
+      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnFirstPass">Solo 1er pase</button><button id="btnFull" class="primary">Generar completo</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar video</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
     </div>
     <div class="results-col">
       <!-- REPRODUCTOR 1ER PASE -->
@@ -1342,6 +1343,7 @@ let pendingSeeds = {};      // prompt_id -> semilla realmente usada en ese enví
 let handledPrompts = new Set(); // prompt_id ya procesados (evita duplicados WS+polling)
 let processingPrompts = new Set(); // prompt_id cuyo history se está consultando ahora
 let batchSeedMode = "random"; // modo capturado al lanzar el batch (independiente del toggle en vivo)
+let currentPromptId = null;   // prompt_id de la variante que se está ejecutando ahora
 let timers = {};               // prompt_id -> { start, iv }
 // Cronómetros por prompt_id. Un único tiempo total por prompt: desde POST /prompt
 // hasta execution_success. El backend no notifica por nodo, así que separar '1er pase'
@@ -1729,6 +1731,7 @@ function processNextBatch() {
         log("🏁 Todas las variantes han sido procesadas.", "l-ok");
         $("btnFirstPass").disabled=false;
         $("btnFull").disabled=false;
+        enableStopButtons(false);
     }
 }
 
@@ -2152,6 +2155,7 @@ async function runSingleGeneration(index) {
         if(data.error) throw new Error(JSON.stringify(data.error));
 
         pendingSeeds[data.prompt_id] = seedUsed;
+        currentPromptId = data.prompt_id;
         startTimer(data.prompt_id, window.currentBatchMode ? 1 : 2);
         pollFallback(data.prompt_id); // respaldo por si el WS no avisa
     } catch(err) {
@@ -2173,6 +2177,7 @@ async function queueAndWait(firstPassOnly){
   setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
   $("btnFirstPass").disabled=true;
   $("btnFull").disabled=true;
+  enableStopButtons(true);
   runSingleGeneration(0);
 }
 
@@ -2452,6 +2457,50 @@ $("btnEditSysPrompts").addEventListener("click", () => {
   const data = loadSysPrompts();
   populateStyleSelect(data, $("enhancerMode").value);
 })();
+
+// --- BOTONES DE PARAR ---
+function enableStopButtons(v){ $("btnStopVideo").disabled = !v; $("btnStopAll").disabled = !v; }
+
+async function stopCurrentVideo(){
+  if(!currentPromptId) return;
+  const pid = currentPromptId;
+  currentPromptId = null;
+  try {
+    await fetch(server()+"/queue", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"cancel", prompt_id:pid})
+    });
+  } catch(e) { /* si falla, igual limpiamos local */ }
+  discardTimer(pid);
+  delete pendingSeeds[pid];
+  handledPrompts.add(pid);
+  log("⏹ Video actual detenido.", "l-err");
+  currentBatchIndex++;
+  processNextBatch();
+}
+
+async function stopAll(){
+  try {
+    await fetch(server()+"/queue", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"cancel_all"})
+    });
+  } catch(e) { /* si falla, igual limpiamos local */ }
+  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
+  pendingSeeds = {};
+  handledPrompts.clear();
+  processingPrompts.clear();
+  currentPromptId = null;
+  currentBatchIndex = totalBatchSize;
+  enableStopButtons(false);
+  $("btnFirstPass").disabled=false;
+  $("btnFull").disabled=false;
+  setRun("bad", "Detenido por usuario");
+  log("🛑 Generación detenida.", "l-err");
+}
+
+$("btnStopVideo").addEventListener("click", stopCurrentVideo);
+$("btnStopAll").addEventListener("click", stopAll);
 
 $("btnFirstPass").addEventListener("click",()=>runGeneration(true));
 $("btnFull").addEventListener("click",()=>runGeneration(false));
