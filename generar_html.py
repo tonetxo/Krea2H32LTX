@@ -268,16 +268,15 @@ function fmtMs(ms){
   return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
 }
 
-function startTimer(promptId){
+function startTimer(promptId, slot){
   if(timers[promptId]) return;
   const t = { start: Date.now(), iv: null };
+  const el = $("time"+slot);
   t.iv = setInterval(() => {
     if(!timers[promptId]) return;
     const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
-    $("time1").textContent = live;
-    $("time1").classList.add("live");
-    $("time2").textContent = live;
-    $("time2").classList.add("live");
+    el.textContent = live;
+    el.classList.add("live");
   }, 500);
   timers[promptId] = t;
 }
@@ -417,7 +416,15 @@ function connectSocket() {
     socket = new WebSocket(url);
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
+        let msg;
+        try { msg = JSON.parse(event.data); } catch(e) {
+            // El proxy de serve.py rechaza /ws con 426 y texto plano;
+            // no es JSON, no podemos procesarlo. Cerramos el socket
+            // para que pollFallback tome el relevo.
+            console.warn("WS mensaje no-JSON, cerrando:", event.data.slice(0,80));
+            socket.close();
+            return;
+        }
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
         if(msg.type === 'execution_error') {
             const pid = msg.data && msg.data.prompt_id;
@@ -1046,7 +1053,7 @@ async function runSingleGeneration(index) {
         if(data.error) throw new Error(JSON.stringify(data.error));
 
         pendingSeeds[data.prompt_id] = seedUsed;
-        startTimer(data.prompt_id);
+        startTimer(data.prompt_id, window.currentBatchMode ? 1 : 2);
         pollFallback(data.prompt_id); // respaldo por si el WS no avisa
     } catch(err) {
         // Si el envío falla (p.ej. validación del grafo), no se queda colgado:
