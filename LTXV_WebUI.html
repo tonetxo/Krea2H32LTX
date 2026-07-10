@@ -2390,6 +2390,48 @@ sysPromptModal.innerHTML = '<div class="modal-content">' +
 '</div>';
 document.body.appendChild(sysPromptModal);
 
+// Listeners del modal
+$("btnAddSysPrompt").addEventListener("click", () => {
+  const mode = sysPromptEditMode;
+  if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
+  const keys = Object.keys(sysPromptEditData[mode]);
+  let nextKey = "C";
+  for(let i = 67; i < 91; i++){
+    const k = String.fromCharCode(i);
+    if(!keys.includes(k)){ nextKey = k; break; }
+  }
+  sysPromptEditData[mode][nextKey] = { name: "Nuevo estilo", prompt: "" };
+  renderSysPromptEditor();
+});
+$("btnSaveSysPrompts").addEventListener("click", () => {
+  const container = $("sysPromptEditor");
+  container.querySelectorAll(".sysprompt-row").forEach(row => {
+    const key = row.querySelector("textarea").dataset.key;
+    const name = row.querySelector(".spr-name-input").value;
+    const prompt = row.querySelector("textarea").value;
+    if(sysPromptEditData[sysPromptEditMode] && sysPromptEditData[sysPromptEditMode][key]){
+      sysPromptEditData[sysPromptEditMode][key].name = name;
+      sysPromptEditData[sysPromptEditMode][key].prompt = prompt;
+    }
+  });
+  saveSysPrompts(sysPromptEditData);
+  populateStyleSelect(sysPromptEditData, $("enhancerMode").value);
+  $("sysPromptModal").classList.remove("open");
+  log("✅ System prompts guardados.", "l-ok");
+});
+$("btnCancelSysPrompts").addEventListener("click", () => {
+  $("sysPromptModal").classList.remove("open");
+});
+// Tabs del modal
+document.querySelectorAll(".modal-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    sysPromptEditMode = tab.dataset.tab;
+    renderSysPromptEditor();
+  });
+});
+
 $("btnEditSysPrompts").addEventListener("click", () => {
   sysPromptEditData = loadSysPrompts();
   sysPromptEditMode = "text";
