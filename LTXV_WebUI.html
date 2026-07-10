@@ -2274,7 +2274,7 @@ $("btnEnhance").addEventListener("click", async () => {
   const userPrompt = $("prompt").value.trim();
   if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
-  const payload = { model, system, prompt: userPrompt, stream: false };
+  const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
   if(mode === "vision" && localFile){
     // Leer la imagen cargada como base64
     try {
