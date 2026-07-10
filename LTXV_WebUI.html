@@ -2371,6 +2371,25 @@ function renderSysPromptEditor(){
   });
 }
 
+// --- MODAL: Editor de system prompts (crear ANTES de los listeners que lo usan) ---
+const sysPromptModal = document.createElement("div");
+sysPromptModal.className = "modal-overlay";
+sysPromptModal.id = "sysPromptModal";
+sysPromptModal.innerHTML = '<div class="modal-content">' +
+  '<h2>Editar System Prompts</h2>' +
+  '<div class="modal-tabs" id="sysPromptTabs">' +
+    '<div class="modal-tab active" data-tab="text">Texto</div>' +
+    '<div class="modal-tab" data-tab="vision">Visión</div>' +
+  '</div>' +
+  '<div id="sysPromptEditor"></div>' +
+  '<div class="modal-actions">' +
+    '<button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>' +
+    '<button id="btnSaveSysPrompts" class="primary">Guardar</button>' +
+    '<button id="btnCancelSysPrompts" class="ghost">Cancelar</button>' +
+  '</div>' +
+'</div>';
+document.body.appendChild(sysPromptModal);
+
 $("btnEditSysPrompts").addEventListener("click", () => {
   sysPromptEditData = loadSysPrompts();
   sysPromptEditMode = "text";
@@ -2395,59 +2414,5 @@ $("btnEditSysPrompts").addEventListener("click", () => {
 $("btnFirstPass").addEventListener("click",()=>runGeneration(true));
 $("btnFull").addEventListener("click",()=>runGeneration(false));
 updateDuration();
-
-// --- MODAL: Editor de system prompts (inline, antes de </script> para que los elementos existan) ---
-const sysPromptModal = document.createElement("div");
-sysPromptModal.className = "modal-overlay";
-sysPromptModal.id = "sysPromptModal";
-sysPromptModal.innerHTML = \`
-  <div class="modal-content">
-    <h2>Editar System Prompts</h2>
-    <div class="modal-tabs" id="sysPromptTabs">
-      <div class="modal-tab active" data-tab="text">Texto</div>
-      <div class="modal-tab" data-tab="vision">Visión</div>
-    </div>
-    <div id="sysPromptEditor"></div>
-    <div class="modal-actions">
-      <button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>
-      <button id="btnSaveSysPrompts" class="primary">Guardar</button>
-      <button id="btnCancelSysPrompts" class="ghost">Cancelar</button>
-    </div>
-  </div>
-\`;
-document.body.appendChild(sysPromptModal);
-
-// Reconectar listeners del modal (se crearon en el DOM justo ahora)
-$("btnAddSysPrompt").addEventListener("click", () => {
-  const mode = sysPromptEditMode;
-  if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
-  const keys = Object.keys(sysPromptEditData[mode]);
-  let nextKey = "C";
-  for(let i = 67; i < 91; i++){
-    const k = String.fromCharCode(i);
-    if(!keys.includes(k)){ nextKey = k; break; }
-  }
-  sysPromptEditData[mode][nextKey] = { name: "Nuevo estilo", prompt: "" };
-  renderSysPromptEditor();
-});
-$("btnSaveSysPrompts").addEventListener("click", () => {
-  const container = $("sysPromptEditor");
-  container.querySelectorAll(".sysprompt-row").forEach(row => {
-    const key = row.querySelector("textarea").dataset.key;
-    const name = row.querySelector(".spr-name-input").value;
-    const prompt = row.querySelector("textarea").value;
-    if(sysPromptEditData[sysPromptEditMode] && sysPromptEditData[sysPromptEditMode][key]){
-      sysPromptEditData[sysPromptEditMode][key].name = name;
-      sysPromptEditData[sysPromptEditMode][key].prompt = prompt;
-    }
-  });
-  saveSysPrompts(sysPromptEditData);
-  populateStyleSelect(sysPromptEditData, $("enhancerMode").value);
-  $("sysPromptModal").classList.remove("open");
-  log("✅ System prompts guardados.", "l-ok");
-});
-$("btnCancelSysPrompts").addEventListener("click", () => {
-  $("sysPromptModal").classList.remove("open");
-});
 </script>
 </html>
