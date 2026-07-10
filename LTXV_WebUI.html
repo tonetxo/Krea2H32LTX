@@ -125,7 +125,7 @@
   .variant-gallery { margin-top: 20px; }
   .variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
   .variant-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-  .variant-card video { width: 100%; height: auto; aspect-ratio: 16/9; object-fit: cover; }
+  .variant-card video { width: 100%; height: auto; max-height: 240px; object-fit: contain; background: #000; }
   .variant-info { padding: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); display: flex; justify-content: space-between; align-items: center; }
   .variant-seed-display { color: var(--accent); cursor: pointer; user-select: text; display: flex; align-items: center; gap: 6px; }
   .variant-seed-display:hover { color: #fff; }
