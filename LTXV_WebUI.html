@@ -130,7 +130,7 @@
   </div>
   <div class="grid">
     <div class="controls-col">
-      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7822" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
       
       <div class="panel">
         <h2>Biblioteca de Prompts</h2>
@@ -1275,6 +1275,7 @@ let currentBatchIndex = 0;
 let totalBatchSize = 0;
 let pendingSeeds = {};      // prompt_id -> semilla realmente usada en ese envío
 let handledPrompts = new Set(); // prompt_id ya procesados (evita duplicados WS+polling)
+let processingPrompts = new Set(); // prompt_id cuyo history se está consultando ahora
 let batchSeedMode = "random"; // modo capturado al lanzar el batch (independiente del toggle en vivo)
 let timers = {};               // prompt_id -> { start, iv }
 // Cronómetros por prompt_id. Un único tiempo total por prompt: desde POST /prompt
@@ -1371,13 +1372,13 @@ function randomSeed(){
 
 // --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
 // Cuando abres la UI desde otro dispositivo (móvil, otro PC) por la IP de la LAN,
-// el servidor de la UI (serve.py) hace de proxy hacia el backend en :7822, así que
+// el servidor de la UI (serve.py) hace de proxy hacia el backend en :7821, así que
 // el input se deja VACÍO (same-origin) y el fetch va al mismo host:puerto que la
 // página. El placeholder muestra la URL de referencia por si se necesita editar.
 // Si el usuario ya escribió algo a mano, lo respetamos.
-// Migración: si localStorage trae el puerto antiguo (7821), lo descartamos.
-const DEFAULT_BACKEND_PORT = "7822";
-const LEGACY_PORTS = ["7821"];
+// Migración: si localStorage trae el puerto antiguo (7822), lo descartamos.
+const DEFAULT_BACKEND_PORT = "7821";
+const LEGACY_PORTS = ["7822"];
 const $ = (id) => document.getElementById(id);
 function updateServerHint(){
   const hint = $("serverHint");
@@ -1459,15 +1460,30 @@ function connectSocket() {
 // Idempotente: si ya se ha procesado, no hace nada.
 async function handlePromptDone(promptId) {
     if(handledPrompts.has(promptId)) return;
-    handledPrompts.add(promptId); // marcar ANTES del await para evitar duplicados WS+polling
+    if(processingPrompts.has(promptId)) return; // ya lo está consultando otro
+    processingPrompts.add(promptId);
     let entry;
     try {
         const hr = await fetch(server()+"/history/"+promptId);
-        if(!hr.ok) return;
+        if(!hr.ok) {
+            log(`⏳ Esperando resultado (HTTP ${hr.status})...`, "l-ok");
+            processingPrompts.delete(promptId);
+            return;
+        }
         const hist = await hr.json();
         entry = hist[promptId];
-    } catch(e) { return; }
-    if(!entry || !entry.outputs) return; // aún no ha terminado
+    } catch(e) {
+        log(`⚠️ Error consultando history: ${e.message}`, "l-err");
+        processingPrompts.delete(promptId);
+        return;
+    }
+    if(!entry || !entry.outputs) {
+        processingPrompts.delete(promptId);
+        return; // aún no ha terminado
+    }
+
+    handledPrompts.add(promptId);
+    processingPrompts.delete(promptId);
 
     // La semilla real la conocemos desde que se encoló (la genera el propio navegador),
     // no hace falta (ni se puede) leerla del historial de ComfyUI.

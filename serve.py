@@ -1,7 +1,7 @@
 """Static file server with no-cache headers + backend proxy.
 
 Used by lanzar_ltxv.sh. Serves LTXV_WebUI.html and proxies API
-requests to the ComfyUI backend (127.0.0.1:7822) so the phone can
+requests to the ComfyUI backend (127.0.0.1:7821) so the phone can
 reach the backend through the same port 8000 (no extra firewall
 rules, no CORS issues).
 
@@ -11,7 +11,7 @@ Backend routes proxied:
 
 Usage: python3 serve.py [PORT] [BACKEND_URL]
   PORT        default 8000
-  BACKEND_URL default http://127.0.0.1:7822
+  BACKEND_URL default http://127.0.0.1:7821
 """
 import http.server
 import io
@@ -22,7 +22,7 @@ import urllib.request
 import urllib.error
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
-BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7822"
+BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
 
 # Routes that should be proxied to the backend instead of served as files.
 PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/view", "/upload/image")
