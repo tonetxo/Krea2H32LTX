@@ -24,6 +24,7 @@
   input[type=text],input[type=number],textarea,select{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;}
   select{cursor:pointer; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b96a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat:no-repeat; background-position:right 8px center; background-size:14px;}
   input[type=number]{font-family:var(--mono);}input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+  input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
   textarea{resize:vertical;min-height:92px;line-height:1.5;}
   .seed-toggle{display:flex;gap:8px;margin-bottom:8px;}
   .seg{flex:1;text-align:center;padding:7px 0;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:var(--muted);background:var(--panel-2);user-select:none;}
@@ -160,7 +161,7 @@
       <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
       <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
       <div class="panel"><h2>LoRAs</h2><div id="loraList"></div></div>
-      <div class="panel"><h2>Resolución & duración</h2><div class="row two-col"><div><label>Ancho (x32)</label><input type="number" id="width" value="1280" step="32" min="256"></div><div><label>Alto (x32)</label><input type="number" id="height" value="736" step="32" min="256"></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
+      <div class="panel"><h2>Resolución & duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
       <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
       <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
       <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
@@ -1263,6 +1264,26 @@ const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "D
 const N = {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923"};
 const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
 let uploadedImage=null, localFile=null, seedMode="random";
+let currentAspectRatio = 16/9; // ratio w/h de la imagen cargada (por defecto 16:9)
+
+function nearest32(v){ return Math.round(v / 32) * 32; }
+
+function recalcResolution(){
+  const mp = parseFloat($("mpSlider").value) || 0.9;
+  const totalPx = mp * 1_000_000;
+  // w = sqrt(totalPx * aspect), h = sqrt(totalPx / aspect)
+  let w = nearest32(Math.sqrt(totalPx * currentAspectRatio));
+  let h = nearest32(Math.sqrt(totalPx / currentAspectRatio));
+  // Ajustar para que w*h se acerque a totalPx (el redondeo a x32 puede desviar)
+  // Recalcular h a partir de w para mantener el aspect ratio exacto
+  h = nearest32(w / currentAspectRatio);
+  // Si h es 0, mínimo 256
+  if(h < 256) h = 256;
+  if(w < 256) w = 256;
+  $("width").value = w;
+  $("height").value = h;
+  $("mpVal").textContent = mp.toFixed(2);
+}
 let loras = [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}];
 let socket = null;
 let currentBatchIndex = 0;
@@ -1747,6 +1768,10 @@ function updateDzInfo(w, h){
   const el = $("dzInfo");
   if(!el) return;
   el.textContent = (w && h) ? `${w}×${h} · ${aspectRatioStr(w, h)}` : "";
+  if(w && h){
+    currentAspectRatio = w / h;
+    recalcResolution();
+  }
 }
 
 async function getImageHash(base64Str) {
@@ -1933,6 +1958,7 @@ $("segRandom").addEventListener("click",()=>{seedMode="random";$("segRandom").cl
 $("segFixed").addEventListener("click",()=>{seedMode="fixed";$("segFixed").classList.add("on");$("segRandom").classList.remove("on");$("seedVal").disabled=false;});
 $("fidelitySlider").addEventListener("input",(e)=>{$("fidelityVal").textContent=parseFloat(e.target.value).toFixed(2);});
 $("motionSlider").addEventListener("input",(e)=>{$("motionVal").textContent=parseFloat(e.target.value).toFixed(1);});
+$("mpSlider").addEventListener("input",()=>{recalcResolution();});
 $("frames").addEventListener("input",updateDuration);
 function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint").textContent=`(${f}/24fps=${(f/24).toFixed(1)}s)`;}
 
