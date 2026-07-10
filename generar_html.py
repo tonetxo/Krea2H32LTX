@@ -94,6 +94,9 @@ def main():
   .vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
   .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; min-height: 24px;}
+  .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
+  .time-tag.live{color:var(--warn);}
+  .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;}
   
   video{width:100%;border-radius:5px;background:#000;display:block;flex-grow:1;max-height:50vh;}
   .empty{height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
@@ -207,7 +210,7 @@ def main():
         <div class="empty" id="empty1">sin generar</div>
         <video id="video1" controls allowfullscreen playsinline style="display:none"></video>
         <div class="vid-footer">
-          <span></span>
+          <span class="time-tag" id="time1"></span>
           <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
         </div>
       </div>
@@ -221,7 +224,7 @@ def main():
         <div class="empty" id="empty2">sin generar</div>
         <video id="video2" controls allowfullscreen playsinline style="display:none"></video>
         <div class="vid-footer">
-          <span></span>
+          <span class="time-tag" id="time2"></span>
           <a class="dl" id="dl2" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
         </div>
       </div>
@@ -249,6 +252,72 @@ let totalBatchSize = 0;
 let pendingSeeds = {};      // prompt_id -> semilla realmente usada en ese envío
 let handledPrompts = new Set(); // prompt_id ya procesados (evita duplicados WS+polling)
 let batchSeedMode = "random"; // modo capturado al lanzar el batch (independiente del toggle en vivo)
+let timers = {};               // prompt_id -> { start, t1|null, iv }
+// Cronómetros por prompt_id. 'start' se fija al POST /prompt.
+// Si la generación cubre 1er pase + final (mismo prompt_id con FIRST_SAVE y FINAL_SAVE),
+// 't1' se anota cuando aparece FIRST_SAVE y el cronómetro sigue corriendo hasta FINAL_SAVE,
+// de modo que t1 = elapsed del 1er pase y tFinal = elapsed total.
+
+function fmtMs(ms){
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function startTimer(promptId){
+  if(timers[promptId]) return;
+  const t = { start: Date.now(), t1: null, iv: null };
+  t.iv = setInterval(() => {
+    if(t.t1 !== null){
+      // ya pasó el 1er pase: mostrar el del final contando desde t1
+      $("time2").textContent = `⏱ 00:00 → ${fmtMs(Date.now() - t.start)}`;
+      $("time2").classList.add("live");
+    } else {
+      $("time1").textContent = `⏱ ${fmtMs(Date.now() - t.start)}`;
+      $("time1").classList.add("live");
+      $("time2").textContent = "";
+      $("time2").classList.remove("live");
+    }
+  }, 500);
+  timers[promptId] = t;
+}
+
+function stopTimer(promptId, phase){
+  // phase: "1st" | "2nd" | "only"
+  const t = timers[promptId];
+  if(!t) return null;
+  if(phase === "1st"){
+    if(t.t1 !== null) return t.t1; // idempotente
+    t.t1 = Date.now() - t.start;
+    $("time1").textContent = `⏱ ${fmtMs(t.t1)}`;
+    $("time1").classList.remove("live");
+    return t.t1;
+  }
+  if(phase === "2nd"){
+    const total = Date.now() - t.start;
+    if(t.iv){ clearInterval(t.iv); t.iv = null; }
+    $("time2").textContent = `⏱ ${fmtMs(total)}`;
+    $("time2").classList.remove("live");
+    delete timers[promptId];
+    return { total, t1: t.t1 };
+  }
+  if(phase === "only"){
+    const total = Date.now() - t.start;
+    if(t.iv){ clearInterval(t.iv); t.iv = null; }
+    $("time1").textContent = `⏱ ${fmtMs(total)}`;
+    $("time1").classList.remove("live");
+    delete timers[promptId];
+    return { total, t1: null };
+  }
+  return null;
+}
+
+function discardTimer(promptId){
+  // para errores: limpia el interval y olvida el cronómetro sin pintar nada
+  const t = timers[promptId];
+  if(!t) return;
+  if(t.iv) clearInterval(t.iv);
+  delete timers[promptId];
+}
 
 function randomSeed(){
   // entero positivo de 32 bits, válido para el sampler
@@ -275,7 +344,7 @@ function connectSocket() {
         if(msg.type === 'execution_error') {
             const pid = msg.data && msg.data.prompt_id;
             log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
-            if(pid){ handledPrompts.add(pid); delete pendingSeeds[pid]; }
+            if(pid){ handledPrompts.add(pid); delete pendingSeeds[pid]; discardTimer(pid); }
             currentBatchIndex++;
             processNextBatch();
         }
@@ -306,6 +375,30 @@ async function handlePromptDone(promptId) {
         log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
     }
 
+    // Cronómetros: en modo "solo 1er pase" solo hay FIRST_SAVE; en "Generar completo"
+    // FIRST_SAVE y FINAL_SAVE están en el MISMO prompt_id, así que 't1' se anota al ver
+    // el primero y se cierra al ver el segundo (total incluye ambos pases).
+    const hasFirst = !!entry.outputs[N.FIRST_SAVE];
+    const hasFinal = !!entry.outputs[N.FINAL_SAVE];
+    let variantTimeText = "";
+    if(hasFirst && hasFinal){
+        stopTimer(promptId, "1st");
+        const fin = stopTimer(promptId, "2nd");
+        const t1Str = fin && fin.t1 != null ? fmtMs(fin.t1) : "—";
+        const t2Str = fin ? fmtMs(fin.total) : "—";
+        variantTimeText = `1er ${t1Str} · final ${t2Str}`;
+    } else if(hasFirst){
+        const r = stopTimer(promptId, "only");
+        const tStr = r ? fmtMs(r.total) : "—";
+        variantTimeText = tStr;
+    } else if(hasFinal){
+        const r = stopTimer(promptId, "only");
+        const tStr = r ? fmtMs(r.total) : "—";
+        variantTimeText = tStr;
+    } else {
+        discardTimer(promptId);
+    }
+
     // Mostrar en reproductores principales
     if(entry.outputs[N.FIRST_SAVE]) showVideo(1, findMedia(entry.outputs[N.FIRST_SAVE]));
     if(entry.outputs[N.FINAL_SAVE]) showVideo(2, findMedia(entry.outputs[N.FINAL_SAVE]));
@@ -313,7 +406,7 @@ async function handlePromptDone(promptId) {
     // Añadir a la galería de variantes (usando siempre findMedia para extraer filename/subfolder/type)
     const outNode = entry.outputs[N.FIRST_SAVE] || entry.outputs[N.FINAL_SAVE];
     const media = outNode ? findMedia(outNode) : null;
-    addToVariantGallery(media, realSeed);
+    addToVariantGallery(media, realSeed, variantTimeText);
 
     log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
     delete pendingSeeds[promptId];
@@ -354,7 +447,7 @@ function updateSeedUI(seedValue) {
 // {filename, subfolder, type} — antes se reimplementaba el parseo aquí con
 // claves equivocadas (media.images) y casi nunca encontraba el archivo real,
 // cayendo siempre en el fallback "video.mp4" (inexistente -> vídeo roto).
-function addToVariantGallery(media, seedValue) {
+function addToVariantGallery(media, seedValue, timeText) {
     if(!media || !media.filename) {
         log("⚠️ No se encontró vídeo de salida para añadir a la galería de variantes.", "l-err");
         return;
@@ -371,6 +464,7 @@ function addToVariantGallery(media, seedValue) {
     const hasSeed = seedValue !== null && seedValue !== undefined;
     const displayText = hasSeed ? String(seedValue) : `Var. #${currentBatchIndex + 1}`;
     const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
+    const timeStr = timeText || "";
     
     const card = document.createElement("div");
     card.className = "variant-card";
@@ -383,6 +477,7 @@ function addToVariantGallery(media, seedValue) {
                 <span class="seed-text">${displayText}</span>
                 <span class="copy-icon">📋</span>
             </span>
+            <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
             <a href="${url}" download style="color:var(--accent)" onclick="event.stopPropagation();">⬇</a>
         </div>
     `;
@@ -842,6 +937,7 @@ async function runSingleGeneration(index) {
         if(data.error) throw new Error(JSON.stringify(data.error));
 
         pendingSeeds[data.prompt_id] = seedUsed;
+        startTimer(data.prompt_id);
         pollFallback(data.prompt_id); // respaldo por si el WS no avisa
     } catch(err) {
         // Si el envío falla (p.ej. validación del grafo), no se queda colgado:
