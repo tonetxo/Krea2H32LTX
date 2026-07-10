@@ -107,7 +107,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         )
 
         try:
-            resp = urllib.request.urlopen(req, timeout=120)
+            resp = urllib.request.urlopen(req, timeout=600)
             self.send_response(resp.status)
             # Copy response headers (except transfer-encoding / connection)
             for k, v in resp.headers.items():
