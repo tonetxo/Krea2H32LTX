@@ -17,7 +17,8 @@ controls — your changes will be overwritten on the next regenerate.
 | `LTXV_WebUI.html` | The delivered UI. Self-contained (inline CSS + JS, no build step, no CDN). | **No** for anything inside the `html_template` in `generar_html.py`. Yes for stuff outside the template (if you ever add it). |
 | `generar_html.py` | Reads `LTXV_DMD_OK.json`, walks a LoRA directory, and emits `LTXV_WebUI.html` with `__GRAPH_JSON__` and a `__LORA_LIST__`-style substitution. | Yes — this is the source of truth for the UI. |
 | `LTXV_DMD_OK.json` | Workflow graph embedded into the HTML at generation time. | Rarely; only if the backend graph changes. |
-| `lanzar_ltxv.sh` | Launches a local `python3 -m http.server 8000` and opens Firefox at `http://localhost:8000/LTXV_WebUI.html`. | Edit `BROWSER` (`firefox` / `google-chrome` / `chromium`) and `PORT` here. |
+| `lanzar_ltxv.sh` | Launches `serve.py` and opens Firefox at `http://localhost:8000/LTXV_WebUI.html`. | Edit `BROWSER` (`firefox` / `google-chrome` / `chromium`) and `PORT` here. |
+| `serve.py` | Static file server with no-cache headers + HTTP proxy to the ComfyUI backend. | Yes, if you change the proxy routes or backend URL. |
 
 ## How to run
 
@@ -86,6 +87,20 @@ appear in the input but every request will be refused by the OS
 interface. Launch ComfyUI with `--listen 0.0.0.0` (or
 `--listen <IP_LAN>`) to fix this. `lanzar_ltxv.sh` checks `ss` and
 prints a warning when it sees the backend on a loopback address.
+
+### Proxy solution (recommended for LAN)
+
+`serve.py` proxies API routes (`/system_stats`, `/prompt`, `/history/*`,
+`/view`, `/upload/image`) to the backend at `http://127.0.0.1:7822`.
+When the `serverUrl` input is empty (same-origin), the browser sends
+requests to the same host:port as the page (`:8000`) and `serve.py`
+forwards them. This means:
+
+- No extra firewall rules needed (only port 8000).
+- No CORS issues (same origin).
+- WebSocket (`/ws`) is rejected with 426; the UI's `pollFallback`
+  handles it via polling every 4s.
+- The user can still type a custom backend URL to bypass the proxy.
 
 ## Conventions
 

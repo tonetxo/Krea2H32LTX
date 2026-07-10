@@ -346,10 +346,9 @@ function randomSeed(){
 
 // --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
 // Cuando abres la UI desde otro dispositivo (móvil, otro PC) por la IP de la LAN,
-// el host de window.location es esa IP LAN. El backend en :7822 también debe estar
-// escuchando en esa IP (o en 0.0.0.0), pero la URL por defecto apuntaba a
-// 127.0.0.1, que en el cliente remoto apunta a sí mismo y nunca conecta.
-// Si el input sigue vacío o apunta a loopback, lo reescribimos a http://<hostname>:7822.
+// el servidor de la UI (serve.py) hace de proxy hacia el backend en :7822, así que
+// el input se deja VACÍO (same-origin) y el fetch va al mismo host:puerto que la
+// página. El placeholder muestra la URL de referencia por si se necesita editar.
 // Si el usuario ya escribió algo a mano, lo respetamos.
 // Migración: si localStorage trae el puerto antiguo (7821), lo descartamos.
 const DEFAULT_BACKEND_PORT = "7822";
@@ -359,18 +358,25 @@ function updateServerHint(){
   const hint = $("serverHint");
   if(!hint) return;
   const v = ($("serverUrl")?.value || "").trim();
-  hint.textContent = v ? `URL efectiva: ${v}` : "";
+  if(v){
+    hint.textContent = `URL efectiva: ${v}`;
+  } else {
+    const host = (window.location.hostname || "").trim();
+    if(host && !/^(127\.|localhost$|::1$)/i.test(host)){
+      hint.textContent = "proxy activo (same-origin)";
+    } else {
+      hint.textContent = "";
+    }
+  }
 }
 (function autoPickServerUrl(){
   try {
     const input = $("serverUrl");
     if(!input) return;
-    const cur = input.value.trim();
     const stored = localStorage.getItem("ltxv_serverUrl");
     if(stored){
       const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
       if(storedPort && LEGACY_PORTS.includes(storedPort)){
-        // puerto legacy cacheado: descartarlo
         localStorage.removeItem("ltxv_serverUrl");
       } else {
         input.value = stored;
@@ -378,10 +384,7 @@ function updateServerHint(){
         return;
       }
     }
-    if(cur && !/127\.0\.0\.1|localhost/i.test(cur)) { updateServerHint(); return; }
-    const host = (window.location.hostname || "").trim();
-    if(!host || /^(127\.|localhost$|::1$)/i.test(host)) { updateServerHint(); return; }
-    input.value = `http://${host}:${DEFAULT_BACKEND_PORT}`;
+    // Dejar vacío: el proxy de serve.py lo captura
     updateServerHint();
   } catch(e) { /* si falla, queda el placeholder */ }
 })();
