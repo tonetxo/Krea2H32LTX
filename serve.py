@@ -46,6 +46,8 @@ def _resolve_krea2_dir():
     candidates = [
         os.path.expanduser("~/ComfyUI/output/krea2"),
         "/home/tonetxo/ComfyUI/output/krea2",
+        os.path.expanduser("~/SwarmUI/dlbackend/ComfyUI/output/krea2"),
+        "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/output/krea2",
     ]
     for c in candidates:
         if os.path.isdir(c):
