@@ -687,27 +687,41 @@ function loadRefImage(url){
 function extractWorkflowFromImage(url){
   fetch(url).then(r => r.arrayBuffer()).then(buf => {
     const bytes = new Uint8Array(buf);
-    const text = new TextDecoder("latin1").decode(bytes);
-    // Buscar el chunk tEXt con keyword "prompt"
-    const idx = text.indexOf("prompt\0");
-    if(idx === -1) return;
-    const chunkStart = text.lastIndexOf("tEXt", idx);
-    if(chunkStart === -1) return;
-    const dataStart = chunkStart + 8;
-    const dataEnd = text.indexOf("\0", dataStart);
-    if(dataEnd === -1) return;
-    const jsonStart = dataEnd + 1;
-    const nextChunk = text.indexOf("tEXt", jsonStart);
-    const iend = text.indexOf("IEND", jsonStart);
-    const jsonEnd = (nextChunk !== -1 && nextChunk < iend) ? nextChunk - 4 : (iend !== -1 ? iend - 4 : text.length);
-    if(jsonEnd <= jsonStart) return;
-    const raw = text.slice(jsonStart, jsonEnd);
-    try {
-      const workflow = JSON.parse(raw);
-      applyWorkflow(workflow);
-    } catch(e) {
-      console.warn("No se pudo parsear workflow de metadatos:", e.message);
+    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return;
+    let pos = 8;
+    let workflowRaw = null;
+    while(pos < bytes.length - 8){
+      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      if(type === "tEXt"){
+        const dataStart = pos + 8;
+        let nullPos = dataStart;
+        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
+        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
+        if(keyword === "prompt"){
+          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
+          break;
+        }
+      }
+      if(type === "IEND") break;
+      pos = pos + 12 + len;
     }
+    if(workflowRaw == null) return;
+    let workflow;
+    try {
+      workflow = JSON.parse(workflowRaw);
+    } catch(e1){
+      const first = workflowRaw.indexOf("{");
+      const last = workflowRaw.lastIndexOf("}");
+      if(first !== -1 && last > first){
+        try { workflow = JSON.parse(workflowRaw.slice(first, last + 1)); }
+        catch(e2){ console.warn("No se pudo parsear workflow de metadatos:", e2.message); return; }
+      } else {
+        console.warn("No se pudo parsear workflow de metadatos:", e1.message);
+        return;
+      }
+    }
+    applyWorkflow(workflow);
   }).catch(e => console.warn("No se pudo leer metadatos:", e.message));
 }
 
@@ -1253,35 +1267,51 @@ $("btnLoadMeta").addEventListener("click", async () => {
     const r = await fetch(refImgEl.src);
     const buf = await r.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    const text = new TextDecoder("latin1").decode(bytes);
-    const idx = text.indexOf("prompt\0");
-    if(idx === -1){
+    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50){
+      log("ℹ️ No es un PNG válido, no puede contener metadatos Krea2.", "l-info");
+      return;
+    }
+    let pos = 8;
+    let workflowRaw = null;
+    while(pos < bytes.length - 8){
+      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      if(type === "tEXt"){
+        const dataStart = pos + 8;
+        let nullPos = dataStart;
+        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
+        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
+        if(keyword === "prompt"){
+          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
+          break;
+        }
+      }
+      if(type === "IEND") break;
+      pos = pos + 12 + len;
+    }
+    if(workflowRaw == null){
       log("ℹ️ Esta imagen no contiene metadatos de workflow Krea2.", "l-info");
       return;
     }
-    const chunkStart = text.lastIndexOf("tEXt", idx);
-    if(chunkStart === -1){
-      log("ℹ️ No se encontró chunk tEXt válido.", "l-info");
-      return;
+    let workflow;
+    try {
+      workflow = JSON.parse(workflowRaw);
+    } catch(e1){
+      const first = workflowRaw.indexOf("{");
+      const last = workflowRaw.lastIndexOf("}");
+      if(first !== -1 && last > first){
+        try {
+          workflow = JSON.parse(workflowRaw.slice(first, last + 1));
+          log("⚠️ Metadatos tenían basura tras el JSON; se recortó.", "l-warn");
+        } catch(e2){
+          throw new Error("JSON inválido tras recortar: "+e2.message);
+        }
+      } else {
+        throw e1;
+      }
     }
-    const dataStart = chunkStart + 8;
-    const dataEnd = text.indexOf("\0", dataStart);
-    if(dataEnd === -1){
-      log("ℹ️ Chunk de metadatos truncado.", "l-info");
-      return;
-    }
-    const jsonStart = dataEnd + 1;
-    const nextChunk = text.indexOf("tEXt", jsonStart);
-    const iend = text.indexOf("IEND", jsonStart);
-    const jsonEnd = (nextChunk !== -1 && nextChunk < iend) ? nextChunk - 4 : (iend !== -1 ? iend - 4 : text.length);
-    if(jsonEnd <= jsonStart){
-      log("ℹ️ No se pudo localizar el JSON de workflow.", "l-info");
-      return;
-    }
-    const raw = text.slice(jsonStart, jsonEnd);
-    const workflow = JSON.parse(raw);
     applyWorkflow(workflow);
-    log("📋 Metadatos cargados: prompt, semilla, LoRAs y demás parámetros actualizados.", "l-ok");
+    log("📋 Metadatos cargados: prompt, semilla, modelo, LoRAs y demás parámetros actualizados.", "l-ok");
   } catch(e) {
     log("❌ Error leyendo metadatos: "+e.message, "l-err");
   } finally {
