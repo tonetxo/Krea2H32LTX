@@ -643,7 +643,7 @@ $("etaSlider").addEventListener("input",()=>{$("etaVal").textContent=parseFloat(
 // --- BUILD GRAPH ---
 function buildGraph(){
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
-  g[N.UNET].inputs.unet_name = $("modelSelect").value;
+  g[N.UNET].inputs.unet_name = "flux2/" + $("modelSelect").value;
   g[N.PROMPT].inputs.string = $("prompt").value.trim();
   g[N.RES_SELECTOR].inputs.megapixels = parseFloat($("mpSlider").value);
   g[N.RES_SELECTOR].inputs.aspect_ratio = $("aspectRatio").value;
