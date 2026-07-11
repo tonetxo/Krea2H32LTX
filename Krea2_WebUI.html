@@ -770,7 +770,13 @@ let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX,
 
 function resetZoom(){
   zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
-  $("outputImg").style.transform = "";
+  const img = $("outputImg");
+  if(img){
+    img.style.transform = "none";
+    void img.offsetWidth;
+  }
+  const wrap = $("imgWrap");
+  if(wrap) wrap.style.cursor = "grab";
 }
 
 function applyZoom(){
@@ -832,11 +838,26 @@ $("btnFullscreenImg").addEventListener("click", () => {
     else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
   }
 });
+let _fsResetTimer = null;
+function scheduleResetAfterFullscreen(){
+  if(_fsResetTimer) clearTimeout(_fsResetTimer);
+  _fsResetTimer = setTimeout(() => {
+    _fsResetTimer = null;
+    const img = $("outputImg");
+    if(img){
+      img.style.transform = "none";
+      void img.offsetWidth;
+    }
+    zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
+    const wrap = $("imgWrap");
+    if(wrap) wrap.style.cursor = "grab";
+  }, 60);
+}
 document.addEventListener("fullscreenchange", () => {
-  if(!document.fullscreenElement) resetZoom();
+  if(!document.fullscreenElement) scheduleResetAfterFullscreen();
 });
 document.addEventListener("webkitfullscreenchange", () => {
-  if(!document.webkitFullscreenElement) resetZoom();
+  if(!document.webkitFullscreenElement) scheduleResetAfterFullscreen();
 });
 
 function addToVariantGallery(media, seedValue, timeText) {
