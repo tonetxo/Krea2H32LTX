@@ -1,0 +1,282 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "flux2/krea2_turbo_convrot_int4_fast.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "5": {
+    "inputs": {
+      "images": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": [
+        "57",
+        0
+      ],
+      "clip": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "conditioning": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "10": {
+    "inputs": {
+      "width": [
+        "69",
+        0
+      ],
+      "height": [
+        "69",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "13": {
+    "inputs": {
+      "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
+      "type": "krea2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "35": {
+    "inputs": {
+      "preset": "SKC3VO",
+      "use_custom": false,
+      "custom_values": "-0.05444335938,-0.1611328125,0.37109375,0.50390625,0.70703125,0.39453125,0.3984375,-1.4375,-0.51171875,-0.890625,-0.609375,0.1127929688",
+      "strength": 1,
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "Krea2 Projector Delta",
+    "_meta": {
+      "title": "Krea2 Projector Delta"
+    }
+  },
+  "39": {
+    "inputs": {
+      "enabled": true,
+      "strength": 0.5,
+      "text_scale": 0.5,
+      "debug": false,
+      "model": [
+        "35",
+        0
+      ]
+    },
+    "class_type": "Krea2T-Enhancer-Advanced",
+    "_meta": {
+      "title": "Krea2T Enhancer Advanced"
+    }
+  },
+  "40": {
+    "inputs": {
+      "lora_name": "K2/realism_engine_krea2_v2.safetensors",
+      "strength_model": 0.4,
+      "model": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "42": {
+    "inputs": {
+      "vae_name": "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors",
+      "disable_offload": true
+    },
+    "class_type": "VAEUtils_CustomVAELoader",
+    "_meta": {
+      "title": "Load VAE (VAE Utils)"
+    }
+  },
+  "43": {
+    "inputs": {
+      "upscale": -1,
+      "tile": false,
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 4096,
+      "temporal_overlap": 64,
+      "samples": [
+        "45",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "VAEUtils_VAEDecodeTiled",
+    "_meta": {
+      "title": "VAE Decode (VAE Utils)"
+    }
+  },
+  "45": {
+    "inputs": {
+      "eta": 0.5,
+      "sampler_name": "exponential/ddim",
+      "scheduler": "beta57",
+      "steps": 8,
+      "steps_to_run": -1,
+      "denoise": 1,
+      "cfg": 1,
+      "seed": 1062442950133633,
+      "sampler_mode": "standard",
+      "bongmath": true,
+      "model": [
+        "68",
+        0
+      ],
+      "positive": [
+        "70",
+        0
+      ],
+      "negative": [
+        "8",
+        0
+      ],
+      "latent_image": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "ClownsharKSampler_Beta",
+    "_meta": {
+      "title": "ClownsharKSampler"
+    }
+  },
+  "55": {
+    "inputs": {
+      "purge_cache": true,
+      "purge_models": true,
+      "anything": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: PurgeVRAM",
+    "_meta": {
+      "title": "LayerUtility: Purge VRAM"
+    }
+  },
+  "57": {
+    "inputs": {
+      "string": "",
+      "strip_newlines": true
+    },
+    "class_type": "StringConstantMultiline",
+    "_meta": {
+      "title": "String Constant Multiline"
+    }
+  },
+  "60": {
+    "inputs": {
+      "lora_name": "K2/ksab/sabK2_merged.safetensors",
+      "strength_model": 0.5,
+      "model": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "68": {
+    "inputs": {
+      "lora_name": "K2/ksab/sabK2_000000500.safetensors",
+      "strength_model": 0.4,
+      "model": [
+        "60",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "69": {
+    "inputs": {
+      "aspect_ratio": "2:3 (Portrait Photo)",
+      "megapixels": 1.5,
+      "multiple": 8
+    },
+    "class_type": "ResolutionSelector",
+    "_meta": {
+      "title": "Resolution Selector"
+    }
+  },
+  "70": {
+    "inputs": {
+      "variance_preset": "🪴 Creative",
+      "fine_tune_variance": 46,
+      "model_type": "📸 Krea2 (SingleStream)",
+      "fade_curve": "Instant",
+      "noise_injection": "Beginning Steps",
+      "protect_mode": "Last Half",
+      "protect_regions": "",
+      "direction_shift": "🚫 None",
+      "shift_strength": 116,
+      "variance_schedule": "constant",
+      "cutoff_step": 8,
+      "total_steps": 20,
+      "cutoff_strength": 0.1,
+      "seed": 315489554057974,
+      "vibe_blend": 0.59,
+      "conditioning": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "RBG_Smart_Seed_Variance",
+    "_meta": {
+      "title": "RBG Smart Seed Variance 🌱"
+    }
+  }
+}
