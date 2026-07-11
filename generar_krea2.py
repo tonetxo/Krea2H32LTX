@@ -209,7 +209,7 @@ def main():
       <div class="panel"><h2>Krea2 Enhancer</h2>
         <div class="row"><label>Projector Delta — Preset</label><select id="projectorPreset"><option value="none" selected>none</option><option value="FB2">FB2</option><option value="FB3">FB3</option><option value="FEDOR">FEDOR</option><option value="SKC3VO">SKC3VO</option></select></div>
         <div class="row slider-row"><label>Projector Delta — Strength</label><input type="range" id="projectorStrength" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="projectorStrengthVal">1.00</div></div>
-        <div class="row" style="display:flex;align-items:center;gap:10px;"><label style="margin:0;flex:0">T-Enhancer</label><div class="switch" id="enhancerEnabled"><i></i></div><span id="enhancerEnabledLabel" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);">desactivado</span></div>
+        <div class="row" style="display:flex;align-items:center;gap:16px;flex-wrap:nowrap;"><label style="margin:0;flex-shrink:0;font-size:11px;">T-Enhancer</label><div class="switch" id="enhancerEnabled"><i></i></div><span id="enhancerEnabledLabel" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);flex-shrink:0;">desactivado</span></div>
         <div class="row slider-row"><label>T-Enhancer — Strength</label><input type="range" id="enhancerStrength" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerStrengthVal">0.50</div></div>
       </div>
 
@@ -255,10 +255,11 @@ def main():
         <div class="img-header">
           <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
         </div>
-        <div class="dropzone" id="refDropzone">
+        <div class="dropzone" id="refDropzone" style="padding:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <input type="file" id="refFileInput" accept="image/*">
-          <div class="ph" id="refPlaceholder">arrastra imagen o clic (para ajustar resolución)</div>
-          <img id="refImg" style="display:none;max-width:100%;max-height:300px;border-radius:5px;display:block;margin:0 auto;">
+          <div class="seg" id="btnBrowseRef" style="flex:0;padding:5px 12px;font-size:10px;cursor:pointer;user-select:none;">Navegar...</div>
+          <div class="ph" id="refPlaceholder" style="flex:1;min-width:120px;font-size:10.5px;color:var(--muted-2);padding:0;text-align:left;">arrastra imagen o clic en Navegar</div>
+          <img id="refImg" style="display:none;max-width:100%;max-height:300px;border-radius:5px;margin:0 auto;">
         </div>
         <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
       </div>
@@ -801,9 +802,9 @@ function applyWorkflow(workflow){
 
 // --- REFERENCE IMAGE DROPZONE ---
 (function(){
-  const dz = $("refDropzone"), input = $("refFileInput");
+  const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef");
   if(!dz) return;
-  dz.addEventListener("click", () => input.click());
+  btn.addEventListener("click", (e) => { e.stopPropagation(); input.click(); });
   // Prevenir que el navegador abra el archivo al soltarlo fuera
   document.addEventListener("dragover", e => e.preventDefault());
   document.addEventListener("drop", e => e.preventDefault());
