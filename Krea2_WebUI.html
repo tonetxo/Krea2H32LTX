@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Krea2 · Panel Pro</title>
+<style>
+  :root{--bg:#0a0c0e;--panel:#12161a;--panel-2:#171c21;--border:#242b31;--text:#e7ecef;--muted:#8b96a0;--muted-2:#5b6670;--accent:#57e8c9;--accent-dim:#2a4d47;--warn:#ffb454;--danger:#ff6a6a;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Roboto,sans-serif;}
+  *{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;}
+  .wrap{max-width:1400px;margin:0 auto;padding:22px 18px 60px;}
+  .head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+  .head h1{font-family:var(--mono);font-size:15px;letter-spacing:.12em;text-transform:uppercase;margin:0;color:var(--text);font-weight:600;}
+  .head h1 span{color:var(--accent);}.head .sub{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.04em;}
+  .grid{display:grid;grid-template-columns:1fr 1.2fr;gap:20px;}@media(max-width:1000px){.grid{grid-template-columns:1fr;}}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 16px 18px;margin-bottom:16px;}
+  .panel h2{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+  .panel h2::before{content:"";width:5px;height:5px;background:var(--accent);border-radius:1px;display:inline-block;}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .row{margin-bottom:14px;}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  input[type=text],input[type=number],textarea,select{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;}
+  select{cursor:pointer; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b96a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat:no-repeat; background-position:right 8px center; background-size:14px;}
+  input[type=number]{font-family:var(--mono);}input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+  textarea{resize:vertical;min-height:92px;line-height:1.5;}
+  .seed-toggle{display:flex;gap:8px;margin-bottom:8px;}
+  .seg{flex:1;text-align:center;padding:7px 0;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:var(--muted);background:var(--panel-2);user-select:none;}
+  .seg.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  .slider-row{display:flex;align-items:center;gap:10px;}
+  input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--accent);}
+  .slider-val{font-family:var(--mono);font-size:12px;color:var(--accent);width:52px;text-align:right;flex-shrink:0;}
+  .lora{border:1px solid var(--border);border-radius:6px;padding:10px 11px;margin-bottom:8px;background:var(--panel-2);}
+  .lora.off{opacity:.5;}
+  .lora-top{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
+  .switch{width:30px;height:17px;background:var(--border);border-radius:20px;position:relative;cursor:pointer;flex-shrink:0;transition:background .15s;}
+  .switch.on{background:var(--accent-dim);border:1px solid var(--accent);}
+  .switch i{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted-2);transition:left .15s,background .15s;}
+  .switch.on i{left:15px;background:var(--accent);}
+  .btn-row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
+  button{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);padding:11px 16px;cursor:pointer;transition:all .15s;flex:1;min-width:150px;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#08110f;font-weight:700;}
+  button.danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700;}
+  button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allowed;}
+  .statusbar{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:10px 2px 0;min-height:16px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);flex-shrink:0;}
+  .dot.ok{background:var(--accent);box-shadow:0 0 6px var(--accent);}.dot.bad{background:var(--danger);}.dot.busy{background:var(--warn);animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .server-row{display:flex;gap:8px;}.server-row input{flex:1;}
+  .results-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;}
+  .imgbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;flex:1;display:flex;flex-direction:column;}
+  .img-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .img-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
+  .img-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;min-height:24px;}
+  .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
+  .time-tag.live{color:var(--warn);}
+  .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;}
+  img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:1;max-height:60vh;object-fit:contain;}
+  .empty{height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+  .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
+  .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
+  .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
+  .gallery-item{border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:pointer;position:relative;background:var(--panel-2);}
+  .gallery-item img{width:100%;height:auto;display:block;transition:transform .2s;}
+  .gallery-item:hover img{transform:scale(1.04);}
+  .gallery-item.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim);}
+  .gallery-item .info-tag{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;background:linear-gradient(transparent, rgba(0,0,0,.88));font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:.02em;pointer-events:none;}
+  .gallery-item .del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s, background .15s;z-index:2;}
+  .gallery-item:hover .del-btn{opacity:1;}
+  .gallery-item .del-btn:hover{background:var(--danger);border-color:var(--danger);}
+  .panel-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .panel-head-row h2{margin:0;}
+  .btn-mini{padding:5px 9px;font-size:10px;min-width:auto;flex:none;}
+  .prompt-actions{display:flex;gap:8px;margin-top:8px;}
+  .prompt-actions button{padding:6px 10px;font-size:10px;min-width:auto;}
+  .variant-gallery{margin-top:20px;}
+  .variant-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(200px,1fr));gap:12px;}
+  .variant-card{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+  .variant-card img{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;display:block;}
+  .variant-info{padding:8px;font-size:11px;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between;align-items:center;}
+  .variant-seed-display{color:var(--accent);cursor:pointer;user-select:text;display:flex;align-items:center;gap:6px;}
+  .variant-seed-display:hover{color:#fff;}
+  .copy-icon{font-size:12px;opacity:.7;transition:opacity .2s;}
+  .variant-seed-display:hover .copy-icon{opacity:1;}
+  .collapsible-header{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:4px 0;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+  .collapsible-header:hover{color:var(--text);}
+  .collapsible-header .arrow{font-size:9px;transition:transform .2s;}
+  .collapsible-header.open .arrow{transform:rotate(90deg);}
+  .collapsible-body{overflow:hidden;max-height:0;transition:max-height .3s ease;}
+  .collapsible-body.open{max-height:800px;}
+  .enhancer-row{margin-bottom:10px;}
+  .enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
+  .enhancer-row select{width:100%;}
+  .enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
+  .enhancer-output:focus{border-color:var(--accent);}
+  .enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+  .enhancer-actions button{flex:1;min-width:120px;}
+  .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal-content{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;}
+  .modal-content h2{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;}
+  .modal-tabs{display:flex;gap:4px;margin-bottom:14px;}
+  .modal-tab{padding:6px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--panel-2);}
+  .modal-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+  .sysprompt-row{border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:8px;background:var(--panel-2);}
+  .sysprompt-row .spr-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .sysprompt-row .spr-name{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);}
+  .sysprompt-row .spr-del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;min-width:auto;flex:0;}
+  .sysprompt-row .spr-del:hover{background:var(--danger);color:#fff;}
+  .sysprompt-row textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-family:var(--sans);font-size:12px;outline:none;resize:vertical;min-height:50px;line-height:1.4;}
+  .sysprompt-row textarea:focus{border-color:var(--accent);}
+  .modal-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;}
+  .modal-actions button{min-width:100px;flex:0;}
+  @keyframes seedFlash{0%{background-color:var(--panel-2);border-color:var(--border);}50%{background-color:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 10px var(--accent);}100%{background-color:var(--panel-2);border-color:var(--border);}}
+  .seed-updated{animation:seedFlash 1.5s ease-out;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>Krea2 <span>//</span> panel pro</h1><div class="sub">grafo: Krea2_OK</div></div>
+  <div class="grid">
+    <div class="controls-col">
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+
+      <div class="panel">
+        <h2>Biblioteca de Prompts</h2>
+        <div class="row"><select id="promptLibSelect"><option value="">-- Seleccionar Prompt Guardado --</option></select></div>
+        <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
+      </div>
+
+      <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
+
+      <!-- ENHANCER PANEL -->
+      <div class="panel">
+        <div class="collapsible-header" id="enhancerToggle">
+          <span class="arrow">▶</span> Mejorar prompt con IA
+        </div>
+        <div class="collapsible-body" id="enhancerBody">
+          <div class="enhancer-row">
+            <label>Modelo</label>
+            <select id="enhancerModel"><option value="">Cargando modelos...</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="enhancerMode"><option value="text">Texto</option><option value="vision">Visión</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Estilo</label>
+            <select id="enhancerStyle"></select>
+          </div>
+          <div class="enhancer-row">
+            <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
+          </div>
+          <div class="enhancer-row">
+            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado aparecerá aquí..."></textarea>
+          </div>
+          <div class="enhancer-actions">
+            <button id="btnSaveEnhanced">Guardar en biblioteca</button>
+            <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
+
+      <div class="panel"><h2>Resolución</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.1" max="4.0" step="0.1" value="1.0"><div class="slider-val" id="mpVal">1.00</div></div><div class="row"><label>Aspect Ratio</label><select id="aspectRatio"><option value="1:1 (Square)">1:1 (Square)</option><option value="2:3 (Portrait Photo)" selected>2:3 (Portrait Photo)</option><option value="3:2 (Photo)">3:2 (Photo)</option><option value="3:4 (Portrait Standard)">3:4 (Portrait Standard)</option><option value="4:3 (Standard)">4:3 (Standard)</option><option value="9:16 (Portrait Widescreen)">9:16 (Portrait Widescreen)</option><option value="16:9 (Widescreen)">16:9 (Widescreen)</option><option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option></select></div></div>
+
+      <div class="panel"><h2>Krea2 Enhancer</h2>
+        <div class="row"><label>Projector Delta — Preset</label><select id="projectorPreset"><option value="none">none</option><option value="FB2">FB2</option><option value="FB3">FB3</option><option value="FEDOR">FEDOR</option><option value="SKC3VO" selected>SKC3VO</option></select></div>
+        <div class="row slider-row"><label>Projector Delta — Strength</label><input type="range" id="projectorStrength" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="projectorStrengthVal">1.00</div></div>
+        <div class="row" style="display:flex;align-items:center;gap:10px;"><label style="margin:0;flex:0">T-Enhancer</label><div class="switch on" id="enhancerEnabled"><i></i></div><span id="enhancerEnabledLabel" style="font-family:var(--mono);font-size:11px;color:var(--accent);">activado</span></div>
+        <div class="row slider-row"><label>T-Enhancer — Strength</label><input type="range" id="enhancerStrength" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerStrengthVal">0.50</div></div>
+      </div>
+
+      <div class="panel"><h2>RBG Smart Seed Variance</h2>
+        <div class="row"><label>Variance Preset</label><select id="variancePreset"><option value="❌ Disabled">❌ Disabled</option><option value="🌱 Subtle">🌱 Subtle</option><option value="🌿 Balanced">🌿 Balanced</option><option value="🪴 Creative" selected>🪴 Creative</option><option value="🌳 Bold">🌳 Bold</option><option value="🌴 Wild">🌴 Wild</option><option value="⚙️ Custom">⚙️ Custom</option></select></div>
+        <div class="row"><label>Protect Mode</label><select id="protectMode"><option value="🚫 None">🚫 None</option><option value="First Quarter">First Quarter</option><option value="First Half">First Half</option><option value="Last Quarter">Last Quarter</option><option value="Last Half" selected>Last Half</option><option value="⚙️ Custom Regions">⚙️ Custom Regions</option><option value="🎲 Random Regions">🎲 Random Regions</option></select></div>
+        <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segVarianceRandom">Aleatoria</div><div class="seg" id="segVarianceFixed">Fija</div></div><input type="number" id="varianceSeed" value="315489554057974" step="1" disabled></div>
+      </div>
+
+      <div class="panel"><h2>LoRAs</h2><div id="loraList"></div></div>
+
+      <div class="panel"><h2>Sampler</h2>
+        <div class="row slider-row"><label>Eta</label><input type="range" id="etaSlider" min="0" max="2" step="0.01" value="0.5"><div class="slider-val" id="etaVal">0.50</div></div>
+        <div class="row"><label>Steps</label><input type="number" id="steps" value="8" step="1" min="1" max="10000"></div>
+        <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segSamplerRandom">Aleatoria</div><div class="seg" id="segSamplerFixed">Fija</div></div><input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled></div>
+      </div>
+
+      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar video</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
+    </div>
+    <div class="results-col">
+      <!-- REPRODUCTOR IMAGEN FINAL -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3>Imagen <em style="color:var(--accent)">final</em></h3>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <img class="output" id="outputImg" style="display:none">
+        <div class="img-footer">
+          <span class="time-tag" id="time1"></span>
+          <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
+        </div>
+      </div>
+
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="imgbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BASE_GRAPH = {
+  "1": {
+    "inputs": {
+      "unet_name": "flux2/krea2_turbo_convrot_int4_fast.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "5": {
+    "inputs": {
+      "images": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": [
+        "57",
+        0
+      ],
+      "clip": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "conditioning": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "10": {
+    "inputs": {
+      "width": [
+        "69",
+        0
+      ],
+      "height": [
+        "69",
+        1
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "13": {
+    "inputs": {
+      "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
+      "type": "krea2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "35": {
+    "inputs": {
+      "preset": "SKC3VO",
+      "use_custom": false,
+      "custom_values": "-0.05444335938,-0.1611328125,0.37109375,0.50390625,0.70703125,0.39453125,0.3984375,-1.4375,-0.51171875,-0.890625,-0.609375,0.1127929688",
+      "strength": 1,
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "Krea2 Projector Delta",
+    "_meta": {
+      "title": "Krea2 Projector Delta"
+    }
+  },
+  "39": {
+    "inputs": {
+      "enabled": true,
+      "strength": 0.5,
+      "text_scale": 0.5,
+      "debug": false,
+      "model": [
+        "35",
+        0
+      ]
+    },
+    "class_type": "Krea2T-Enhancer-Advanced",
+    "_meta": {
+      "title": "Krea2T Enhancer Advanced"
+    }
+  },
+  "40": {
+    "inputs": {
+      "lora_name": "K2/realism_engine_krea2_v2.safetensors",
+      "strength_model": 0.4,
+      "model": [
+        "39",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "42": {
+    "inputs": {
+      "vae_name": "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors",
+      "disable_offload": true
+    },
+    "class_type": "VAEUtils_CustomVAELoader",
+    "_meta": {
+      "title": "Load VAE (VAE Utils)"
+    }
+  },
+  "43": {
+    "inputs": {
+      "upscale": -1,
+      "tile": false,
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 4096,
+      "temporal_overlap": 64,
+      "samples": [
+        "45",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "VAEUtils_VAEDecodeTiled",
+    "_meta": {
+      "title": "VAE Decode (VAE Utils)"
+    }
+  },
+  "45": {
+    "inputs": {
+      "eta": 0.5,
+      "sampler_name": "exponential/ddim",
+      "scheduler": "beta57",
+      "steps": 8,
+      "steps_to_run": -1,
+      "denoise": 1,
+      "cfg": 1,
+      "seed": 1062442950133633,
+      "sampler_mode": "standard",
+      "bongmath": true,
+      "model": [
+        "68",
+        0
+      ],
+      "positive": [
+        "70",
+        0
+      ],
+      "negative": [
+        "8",
+        0
+      ],
+      "latent_image": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "ClownsharKSampler_Beta",
+    "_meta": {
+      "title": "ClownsharKSampler"
+    }
+  },
+  "55": {
+    "inputs": {
+      "purge_cache": true,
+      "purge_models": true,
+      "anything": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: PurgeVRAM",
+    "_meta": {
+      "title": "LayerUtility: Purge VRAM"
+    }
+  },
+  "57": {
+    "inputs": {
+      "string": "",
+      "strip_newlines": true
+    },
+    "class_type": "StringConstantMultiline",
+    "_meta": {
+      "title": "String Constant Multiline"
+    }
+  },
+  "60": {
+    "inputs": {
+      "lora_name": "K2/ksab/sabK2_merged.safetensors",
+      "strength_model": 0.5,
+      "model": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "68": {
+    "inputs": {
+      "lora_name": "K2/ksab/sabK2_000000500.safetensors",
+      "strength_model": 0.4,
+      "model": [
+        "60",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "69": {
+    "inputs": {
+      "aspect_ratio": "2:3 (Portrait Photo)",
+      "megapixels": 1.5,
+      "multiple": 8
+    },
+    "class_type": "ResolutionSelector",
+    "_meta": {
+      "title": "Resolution Selector"
+    }
+  },
+  "70": {
+    "inputs": {
+      "variance_preset": "🪴 Creative",
+      "fine_tune_variance": 46,
+      "model_type": "📸 Krea2 (SingleStream)",
+      "fade_curve": "Instant",
+      "noise_injection": "Beginning Steps",
+      "protect_mode": "Last Half",
+      "protect_regions": "",
+      "direction_shift": "🚫 None",
+      "shift_strength": 116,
+      "variance_schedule": "constant",
+      "cutoff_step": 8,
+      "total_steps": 20,
+      "cutoff_strength": 0.1,
+      "seed": 315489554057974,
+      "vibe_blend": 0.59,
+      "conditioning": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "RBG_Smart_Seed_Variance",
+    "_meta": {
+      "title": "RBG Smart Seed Variance 🌱"
+    }
+  }
+};
+const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b-nvfp4.safetensors", "flux-2-klein-9b.safetensors", "krea2_raw_int8_convrot.safetensors", "krea2_turbo_convrot_int4_fast.safetensors", "krea2_turbo_fp8_scaled.safetensors"];
+const AVAILABLE_LORAS = ["KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "anal_helper_krea2_loraholic.safetensors", "fedor_bypass.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "z0jglf.safetensors"];
+
+const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"39",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5"};
+const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
+let socket = null;
+let currentBatchIndex = 0;
+let totalBatchSize = 0;
+let pendingSeeds = {};
+let handledPrompts = new Set();
+let processingPrompts = new Set();
+let batchSeedMode = "random";
+let currentPromptId = null;
+let timers = {};
+let loras = [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}];
+
+function fmtMs(ms){
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function startTimer(promptId, slot){
+  if(timers[promptId]) return;
+  const t = { start: Date.now(), iv: null };
+  const el = $("time"+slot);
+  t.iv = setInterval(() => {
+    if(!timers[promptId]) return;
+    const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
+    el.textContent = live;
+    el.classList.add("live");
+  }, 500);
+  timers[promptId] = t;
+}
+
+function stopTimer(promptId){
+  const t = timers[promptId];
+  if(!t) return null;
+  const total = Date.now() - t.start;
+  if(t.iv){ clearInterval(t.iv); t.iv = null; }
+  delete timers[promptId];
+  return { total, text: `⏱ ${fmtMs(total)}` };
+}
+
+function discardTimer(promptId){
+  const t = timers[promptId];
+  if(!t) return;
+  if(t.iv) clearInterval(t.iv);
+  delete timers[promptId];
+}
+
+function extractTimings(entry, N){
+  if(!entry || !entry.status) return null;
+  const msgs = entry.status.messages || [];
+  if(!Array.isArray(msgs) || msgs.length === 0) return null;
+  let tStart = null, tSuccess = null;
+  const nodeTimes = {};
+  for(const m of msgs){
+    if(!Array.isArray(m) || m.length < 2) continue;
+    const type = m[0];
+    const data = m[1] || {};
+    if(type === "execution_start" && data.timestamp != null) tStart = data.timestamp;
+    else if(type === "execution_success" && data.timestamp != null) tSuccess = data.timestamp;
+    else if(type === "executing" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      if(nodeTimes[data.node].start == null) nodeTimes[data.node].start = data.timestamp;
+    } else if(type === "executed" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      nodeTimes[data.node].end = data.timestamp;
+    }
+  }
+  const total = (tStart != null && tSuccess != null) ? (tSuccess - tStart) : null;
+  const t1 = nodeTimes[N.PREVIEW] && nodeTimes[N.PREVIEW].start != null && nodeTimes[N.PREVIEW].end != null
+             ? (nodeTimes[N.PREVIEW].end - nodeTimes[N.PREVIEW].start) : null;
+  const t2 = nodeTimes[N.VAE_DECODE] && nodeTimes[N.VAE_DECODE].start != null && nodeTimes[N.VAE_DECODE].end != null
+             ? (nodeTimes[N.VAE_DECODE].end - nodeTimes[N.VAE_DECODE].start) : null;
+  if(total == null && t1 == null && t2 == null) return null;
+  return { t1, t2, total };
+}
+
+function randomSeed(){
+  return Math.floor(Math.random() * 0xFFFFFFFF);
+}
+
+// --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
+const DEFAULT_BACKEND_PORT = "7821";
+const LEGACY_PORTS = ["7822"];
+const $ = (id) => document.getElementById(id);
+function updateServerHint(){
+  const hint = $("serverHint");
+  if(!hint) return;
+  const v = ($("serverUrl")?.value || "").trim();
+  if(v){
+    hint.textContent = `URL efectiva: ${v}`;
+  } else {
+    const host = (window.location.hostname || "").trim();
+    if(host && !/^(127\.|localhost$|::1$)/i.test(host)){
+      hint.textContent = "proxy activo (same-origin)";
+    } else {
+      hint.textContent = "";
+    }
+  }
+}
+(function autoPickServerUrl(){
+  try {
+    const input = $("serverUrl");
+    if(!input) return;
+    const stored = localStorage.getItem("krea2_serverUrl");
+    if(stored){
+      const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
+      if(storedPort && LEGACY_PORTS.includes(storedPort)){
+        localStorage.removeItem("krea2_serverUrl");
+      } else {
+        input.value = stored;
+        updateServerHint();
+        return;
+      }
+    }
+    updateServerHint();
+  } catch(e) {}
+})();
+$("serverUrl").addEventListener("change", (e) => {
+  try { localStorage.setItem("krea2_serverUrl", e.target.value.trim()); } catch(_){}
+  updateServerHint();
+});
+$("serverUrl").addEventListener("input", updateServerHint);
+
+function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
+function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
+function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+
+// --- WEBSOCKET SETUP ---
+function connectSocket() {
+    if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+    const url = server().replace('http', 'ws') + '/ws?clientId=' + CLIENT_ID;
+    socket = new WebSocket(url);
+    socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
+    socket.onmessage = (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); } catch(e) {
+            console.warn("WS mensaje no-JSON, cerrando:", event.data.slice(0,80));
+            socket.close();
+            return;
+        }
+        if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
+        if(msg.type === 'execution_error') {
+            const pid = msg.data && msg.data.prompt_id;
+            log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
+            if(pid){ handledPrompts.add(pid); delete pendingSeeds[pid]; discardTimer(pid); }
+            currentBatchIndex++;
+            processNextBatch();
+        }
+    };
+    socket.onerror = (err) => console.error("WS Error", err);
+}
+
+// --- HANDLE PROMPT DONE ---
+async function handlePromptDone(promptId) {
+    if(handledPrompts.has(promptId)) return;
+    if(processingPrompts.has(promptId)) return;
+    processingPrompts.add(promptId);
+    let entry;
+    try {
+        const hr = await fetch(server()+"/history/"+promptId);
+        if(!hr.ok) { processingPrompts.delete(promptId); return; }
+        const hist = await hr.json();
+        entry = hist[promptId];
+    } catch(e) { processingPrompts.delete(promptId); return; }
+    if(!entry || !entry.outputs) { processingPrompts.delete(promptId); return; }
+
+    handledPrompts.add(promptId);
+    processingPrompts.delete(promptId);
+
+    const realSeed = (promptId in pendingSeeds) ? pendingSeeds[promptId] : null;
+    if(realSeed !== null) {
+        log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
+    }
+
+    const timings = extractTimings(entry, N);
+    let clientResult = stopTimer(promptId);
+    const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
+                   (clientResult ? fmtMs(clientResult.total) : null);
+    const timeText = tTotal || "";
+
+    // Mostrar imagen final (nodo 43 = VAE_DECODE, o 5 = PreviewImage)
+    const outNode = entry.outputs[N.VAE_DECODE] || entry.outputs[N.PREVIEW];
+    if(outNode) showImage(outNode);
+
+    // Añadir a galería de variantes
+    const media = outNode ? findMedia(outNode) : null;
+    addToVariantGallery(media, realSeed, timeText);
+
+    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
+    delete pendingSeeds[promptId];
+    currentBatchIndex++;
+    processNextBatch();
+}
+
+function pollFallback(promptId) {
+    let tries = 0;
+    const iv = setInterval(async () => {
+        tries++;
+        if(handledPrompts.has(promptId) || tries > 180) { clearInterval(iv); return; }
+        await handlePromptDone(promptId);
+        if(handledPrompts.has(promptId)) clearInterval(iv);
+    }, 4000);
+}
+
+function findMedia(nodeOutput){
+  for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
+  return null;
+}
+
+function showImage(media){
+  if(!media) return;
+  const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
+  const img=$("outputImg"), empty=$("empty1"), dl=$("dl1");
+  img.src=url; img.style.display="block"; empty.style.display="none";
+  dl.href=url; dl.style.display="inline";
+}
+
+function addToVariantGallery(media, seedValue, timeText) {
+    if(!media || !media.filename) {
+        log("⚠️ No se encontró imagen de salida para añadir a la galería de variantes.", "l-err");
+        return;
+    }
+    const box = $("variantGalleryBox");
+    const grid = $("variantGrid");
+    box.style.display = "block";
+
+    const { filename, subfolder, type } = media;
+    const ts = Date.now();
+    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}`;
+
+    const hasSeed = seedValue !== null && seedValue !== undefined;
+    const displayText = hasSeed ? String(seedValue) : `Var. #${currentBatchIndex + 1}`;
+    const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
+    const timeStr = timeText || "";
+
+    const card = document.createElement("div");
+    card.className = "variant-card";
+    card.innerHTML = `
+        <img src="${url}">
+        <div class="variant-info">
+            <span class="variant-seed-display" title="${tooltipText}">
+                <span class="seed-text">${displayText}</span>
+                <span class="copy-icon">📋</span>
+            </span>
+            <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
+            <a href="${url}" download style="color:var(--accent)" onclick="event.stopPropagation();">⬇</a>
+        </div>
+    `;
+
+    if(hasSeed) {
+        const seedSpan = card.querySelector('.variant-seed-display');
+        seedSpan.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await navigator.clipboard.writeText(String(seedValue));
+                const originalHTML = seedSpan.innerHTML;
+                seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
+                setTimeout(() => { seedSpan.innerHTML = originalHTML; }, 1200);
+            } catch(err) { console.error("Error al copiar:", err); }
+        });
+    }
+
+    grid.appendChild(card);
+    $("variantCount").textContent = `(${currentBatchIndex + 1})`;
+}
+
+function processNextBatch() {
+    if(currentBatchIndex < totalBatchSize) {
+        setTimeout(() => runSingleGeneration(currentBatchIndex), 1000);
+    } else {
+        setRun("ok", "Batch finalizado");
+        log("🏁 Todas las variantes han sido procesadas.", "l-ok");
+        $("btnGenerate").disabled=false;
+        enableStopButtons(false);
+    }
+}
+
+// --- GESTIÓN DE PROMPTS ---
+function loadPrompts(){
+  const saved = JSON.parse(localStorage.getItem('krea2_prompts') || '{}');
+  const select = $("promptLibSelect");
+  select.innerHTML = '<option value="">-- Seleccionar Prompt Guardado --</option>';
+  Object.keys(saved).forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key; opt.textContent = key;
+    select.appendChild(opt);
+  });
+}
+function savePrompt(){
+  const name = prompt("Nombre para este prompt:");
+  if(!name) return;
+  const text = $("prompt").value;
+  const saved = JSON.parse(localStorage.getItem('krea2_prompts') || '{}');
+  saved[name] = text;
+  localStorage.setItem('krea2_prompts', JSON.stringify(saved));
+  loadPrompts();
+  log(`Prompt "${name}" guardado.`, "l-ok");
+}
+function deletePrompt(){
+  const select = $("promptLibSelect");
+  const name = select.value;
+  if(!name) return;
+  if(!confirm(`¿Eliminar "${name}"?`)) return;
+  const saved = JSON.parse(localStorage.getItem('krea2_prompts') || '{}');
+  delete saved[name];
+  localStorage.setItem('krea2_prompts', JSON.stringify(saved));
+  loadPrompts();
+}
+$("promptLibSelect").addEventListener("change", (e) => {
+  const saved = JSON.parse(localStorage.getItem('krea2_prompts') || '{}');
+  if(saved[e.target.value]) $("prompt").value = saved[e.target.value];
+});
+$("btnSavePrompt").addEventListener("click", savePrompt);
+$("btnDeletePrompt").addEventListener("click", deletePrompt);
+loadPrompts();
+
+// --- MODELOS ---
+function loadModels(){
+  const sel = $("modelSelect");
+  sel.innerHTML = "";
+  for(const m of AVAILABLE_MODELS){
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    sel.appendChild(opt);
+  }
+}
+loadModels();
+
+// --- LORAS ---
+function saveLoraState() { localStorage.setItem('krea2_loras_state', JSON.stringify(loras)); }
+function loadLoraState() {
+  const saved = localStorage.getItem('krea2_loras_state');
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 3) {
+        parsed.forEach((l, i) => {
+          if (AVAILABLE_LORAS.includes(l.lora) || l.lora === "") loras[i] = l;
+        });
+      }
+    } catch (e) { console.error("Error cargando estado LoRA", e); }
+  }
+}
+function renderLoras(){
+  const wrap=$("loraList"); wrap.innerHTML="";
+  loras.forEach((l,i)=>{
+    const box=document.createElement("div");
+    box.className="lora"+(l.on?"":" off");
+    let optionsHtml = '<option value="">-- Ninguno --</option>';
+    AVAILABLE_LORAS.forEach(path => {
+      const selected = path === l.lora ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+    });
+    box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
+    <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
+    <div class="slider-row"><input type="range" min="0" max="2" step="0.05" value="${l.strength}" data-field="strength" data-i="${i}"><div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div></div>`;
+    wrap.appendChild(box);
+  });
+  wrap.querySelectorAll(".switch").forEach(sw=>sw.addEventListener("click",()=>{loras[+sw.dataset.i].on=!loras[+sw.dataset.i].on;renderLoras();saveLoraState();}));
+  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel=>sel.addEventListener("change",()=>{loras[+sel.dataset.i].lora=sel.value;saveLoraState();}));
+  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
+}
+loadLoraState(); renderLoras();
+
+// --- RESOLUCIÓN ---
+$("mpSlider").addEventListener("input",()=>{$("mpVal").textContent=parseFloat($("mpSlider").value).toFixed(2);});
+
+// --- KREA2 ENHANCER ---
+$("projectorStrength").addEventListener("input",()=>{$("projectorStrengthVal").textContent=parseFloat($("projectorStrength").value).toFixed(2);});
+$("enhancerStrength").addEventListener("input",()=>{$("enhancerStrengthVal").textContent=parseFloat($("enhancerStrength").value).toFixed(2);});
+(function(){
+  const sw=$("enhancerEnabled");
+  sw.addEventListener("click",()=>{
+    sw.classList.toggle("on");
+    $("enhancerEnabledLabel").textContent=sw.classList.contains("on")?"activado":"desactivado";
+    $("enhancerEnabledLabel").style.color=sw.classList.contains("on")?"var(--accent)":"var(--muted-2)";
+  });
+})();
+
+// --- SEMILLAS ---
+$("segVarianceRandom").addEventListener("click",()=>{$("segVarianceRandom").classList.add("on");$("segVarianceFixed").classList.remove("on");$("varianceSeed").disabled=true;});
+$("segVarianceFixed").addEventListener("click",()=>{$("segVarianceFixed").classList.add("on");$("segVarianceRandom").classList.remove("on");$("varianceSeed").disabled=false;});
+$("segSamplerRandom").addEventListener("click",()=>{$("segSamplerRandom").classList.add("on");$("segSamplerFixed").classList.remove("on");$("samplerSeed").disabled=true;});
+$("segSamplerFixed").addEventListener("click",()=>{$("segSamplerFixed").classList.add("on");$("segSamplerRandom").classList.remove("on");$("samplerSeed").disabled=false;});
+
+// --- ETA ---
+$("etaSlider").addEventListener("input",()=>{$("etaVal").textContent=parseFloat($("etaSlider").value).toFixed(2);});
+
+// --- BUILD GRAPH ---
+function buildGraph(){
+  const g=JSON.parse(JSON.stringify(BASE_GRAPH));
+  g[N.UNET].inputs.unet_name = $("modelSelect").value;
+  g[N.PROMPT].inputs.string = $("prompt").value.trim();
+  g[N.RES_SELECTOR].inputs.megapixels = parseFloat($("mpSlider").value);
+  g[N.RES_SELECTOR].inputs.aspect_ratio = $("aspectRatio").value;
+  g[N.PROJECTOR].inputs.preset = $("projectorPreset").value;
+  g[N.PROJECTOR].inputs.strength = parseFloat($("projectorStrength").value);
+  g[N.ENHANCER].inputs.enabled = $("enhancerEnabled").classList.contains("on");
+  g[N.ENHANCER].inputs.strength = parseFloat($("enhancerStrength").value);
+  g[N.SEED_VARIANCE].inputs.variance_preset = $("variancePreset").value;
+  g[N.SEED_VARIANCE].inputs.protect_mode = $("protectMode").value;
+  g[N.SEED_VARIANCE].inputs.seed = $("segVarianceRandom").classList.contains("on") ? -1 : parseInt($("varianceSeed").value, 10);
+  g[N.LORA1].inputs.lora_name = loras[0].lora; g[N.LORA1].inputs.strength_model = loras[0].strength;
+  g[N.LORA2].inputs.lora_name = loras[1].lora; g[N.LORA2].inputs.strength_model = loras[1].strength;
+  g[N.LORA3].inputs.lora_name = loras[2].lora; g[N.LORA3].inputs.strength_model = loras[2].strength;
+  g[N.SAMPLER].inputs.eta = parseFloat($("etaSlider").value);
+  g[N.SAMPLER].inputs.steps = parseInt($("steps").value, 10);
+  g[N.SAMPLER].inputs.seed = $("segSamplerRandom").classList.contains("on") ? -1 : parseInt($("samplerSeed").value, 10);
+  return g;
+}
+
+// --- GENERACIÓN ---
+async function runSingleGeneration(index) {
+    try {
+        const graph = buildGraph();
+        const seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("samplerSeed").value, 10);
+        graph[N.SAMPLER].inputs.seed = seedUsed;
+
+        log(`🚀 Procesando variante ${index + 1}/${totalBatchSize} (seed ${seedUsed})...`);
+        const r = await fetch(server()+"/prompt",{
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
+        });
+        if(!r.ok){
+            const t = await r.text().catch(()=> "");
+            throw new Error("HTTP "+r.status+" "+t.slice(0,300));
+        }
+        const data = await r.json();
+        if(data.error) throw new Error(JSON.stringify(data.error));
+
+        pendingSeeds[data.prompt_id] = seedUsed;
+        currentPromptId = data.prompt_id;
+        startTimer(data.prompt_id, 1);
+        pollFallback(data.prompt_id);
+    } catch(err) {
+        log(`❌ No se pudo encolar la variante ${index + 1}: ${err.message}`, "l-err");
+        currentBatchIndex++;
+        processNextBatch();
+    }
+}
+
+async function queueAndWait(){
+  connectSocket();
+  totalBatchSize = parseInt($("batchSize")?.value || "1", 10);
+  currentBatchIndex = 0;
+  batchSeedMode = "random";
+  $("variantGrid").innerHTML = "";
+  $("variantGalleryBox").style.display = "none";
+  setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
+  $("btnGenerate").disabled=true;
+  enableStopButtons(true);
+  runSingleGeneration(0);
+}
+
+async function runGeneration(){
+  try{ await queueAndWait(); }
+  catch(err){ setRun("bad","error");log("Error: "+err.message,"l-err"); $("btnGenerate").disabled=false; }
+}
+
+// --- BOTONES DE PARAR ---
+function enableStopButtons(v){ $("btnStopVideo").disabled = !v; $("btnStopAll").disabled = !v; }
+
+async function stopCurrentVideo(){
+  if(!currentPromptId) return;
+  const pid = currentPromptId;
+  currentPromptId = null;
+  try {
+    await fetch(server()+"/queue", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"cancel", prompt_id:pid})
+    });
+  } catch(e) {}
+  discardTimer(pid);
+  delete pendingSeeds[pid];
+  handledPrompts.add(pid);
+  log("⏹ Video actual detenido.", "l-err");
+  currentBatchIndex++;
+  processNextBatch();
+}
+
+async function stopAll(){
+  try {
+    await fetch(server()+"/queue", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"cancel_all"})
+    });
+  } catch(e) {}
+  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
+  pendingSeeds = {};
+  handledPrompts.clear();
+  processingPrompts.clear();
+  currentPromptId = null;
+  currentBatchIndex = totalBatchSize;
+  enableStopButtons(false);
+  $("btnGenerate").disabled=false;
+  setRun("bad", "Detenido por usuario");
+  log("🛑 Generación detenida.", "l-err");
+}
+
+$("btnGenerate").addEventListener("click", runGeneration);
+$("btnStopVideo").addEventListener("click", stopCurrentVideo);
+$("btnStopAll").addEventListener("click", stopAll);
+
+// --- ENHANCER OLLAMA ---
+const ENHANCER_DEFAULT_PROMPTS = {
+  text: {
+    A: { name: "Estilo A (photorealistic)", prompt: "You are an expert in prompts for Krea2/Flux2 image generation. Transform the user's idea into a detailed photorealistic prompt. Include: subject, lighting, colors, texture, composition, and atmosphere. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
+    B: { name: "Estilo B (artistic)", prompt: "You are a creative assistant specialized in artistic image prompts. Take the user's idea and turn it into an evocative, artistic prompt. Use descriptive, poetic language. Focus on style, mood, and visual impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+  },
+  vision: {
+    A: { name: "Estilo A (descriptive)", prompt: "You are an expert at describing images for image generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, and style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+    B: { name: "Estilo B (stylized)", prompt: "You are a digital artist. Look at the image and turn it into a stylized artistic description. Focus on the artistic style, color palette, and emotional impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+  },
+};
+
+function loadSysPrompts(){
+  const saved = localStorage.getItem("krea2_enhancer_sysprompts");
+  if(saved){ try { return JSON.parse(saved); } catch(e) {} }
+  return JSON.parse(JSON.stringify(ENHANCER_DEFAULT_PROMPTS));
+}
+function saveSysPrompts(data){ localStorage.setItem("krea2_enhancer_sysprompts", JSON.stringify(data)); }
+function populateStyleSelect(data, mode){
+  const sel = $("enhancerStyle");
+  sel.innerHTML = "";
+  const styles = data[mode] || {};
+  for(const key of Object.keys(styles).sort()){
+    const opt = document.createElement("option");
+    opt.value = key; opt.textContent = styles[key].name || key;
+    sel.appendChild(opt);
+  }
+}
+function getCurrentSysPrompt(data, mode, styleKey){
+  const styles = data[mode] || {};
+  const entry = styles[styleKey];
+  return entry ? entry.prompt : "";
+}
+
+$("enhancerToggle").addEventListener("click", () => {
+  const h = $("enhancerToggle");
+  const b = $("enhancerBody");
+  h.classList.toggle("open");
+  b.classList.toggle("open");
+  const arrow = h.querySelector(".arrow");
+  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+});
+
+async function loadEnhancerModels(){
+  const sel = $("enhancerModel");
+  try {
+    const r = await fetch("/api/tags");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    const models = data.models || [];
+    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
+    for(const m of models){
+      const opt = document.createElement("option");
+      opt.value = m.name; opt.textContent = m.name;
+      sel.appendChild(opt);
+    }
+    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
+    if(defaultModel) sel.value = defaultModel.name;
+  } catch(e) {
+    sel.innerHTML = '<option value="">Ollama no disponible</option>';
+    console.warn("No se pudieron cargar modelos:", e.message);
+  }
+}
+
+$("enhancerMode").addEventListener("change", () => {
+  const data = loadSysPrompts();
+  populateStyleSelect(data, $("enhancerMode").value);
+});
+
+$("btnEnhance").addEventListener("click", async () => {
+  const model = $("enhancerModel").value;
+  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+  const mode = $("enhancerMode").value;
+  const styleKey = $("enhancerStyle").value;
+  const data = loadSysPrompts();
+  const system = getCurrentSysPrompt(data, mode, styleKey);
+  const userPrompt = $("prompt").value.trim();
+  if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+
+  const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
+
+  $("btnEnhance").disabled = true;
+  $("btnEnhance").textContent = "Mejorando...";
+  $("enhancerOutput").value = "";
+  try {
+    const r = await fetch("/api/generate", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload),
+    });
+    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,200)); }
+    const result = await r.json();
+    $("enhancerOutput").value = (result.response || "").trim();
+    log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
+  } catch(e) {
+    log("❌ Error al mejorar: "+e.message, "l-err");
+    $("enhancerOutput").value = "Error: "+e.message;
+  } finally {
+    $("btnEnhance").disabled = false;
+    $("btnEnhance").textContent = "Mejorar prompt";
+  }
+});
+
+$("btnSaveEnhanced").addEventListener("click", () => {
+  const text = $("enhancerOutput").value.trim();
+  if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
+  const name = prompt("Nombre para este prompt mejorado:");
+  if(!name) return;
+  const saved = JSON.parse(localStorage.getItem('krea2_prompts') || '{}');
+  saved[name] = text;
+  localStorage.setItem('krea2_prompts', JSON.stringify(saved));
+  loadPrompts();
+  log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+});
+
+// --- MODAL SYSTEM PROMPTS ---
+let sysPromptEditData = null;
+let sysPromptEditMode = "text";
+
+function renderSysPromptEditor(){
+  const container = $("sysPromptEditor");
+  if(!container) return;
+  const data = sysPromptEditData;
+  const mode = sysPromptEditMode;
+  const styles = data[mode] || {};
+  const keys = Object.keys(styles).sort();
+  container.innerHTML = "";
+  for(const key of keys){
+    const entry = styles[key];
+    const isDefault = (key === "A" || key === "B") && ENHANCER_DEFAULT_PROMPTS[mode] && ENHANCER_DEFAULT_PROMPTS[mode][key];
+    const row = document.createElement("div");
+    row.className = "sysprompt-row";
+    row.innerHTML = `
+      <div class="spr-top">
+        <span class="spr-name">${key}</span>
+        <input type="text" class="spr-name-input" value="${entry.name}" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:11px;">
+        ${isDefault ? "" : '<button class="spr-del" data-key="'+key+'">×</button>'}
+      </div>
+      <textarea data-key="${key}">${entry.prompt}</textarea>
+    `;
+    container.appendChild(row);
+  }
+  container.querySelectorAll(".spr-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      delete sysPromptEditData[mode][key];
+      renderSysPromptEditor();
+    });
+  });
+}
+
+const sysPromptModal = document.createElement("div");
+sysPromptModal.className = "modal-overlay";
+sysPromptModal.id = "sysPromptModal";
+sysPromptModal.innerHTML = '<div class="modal-content">' +
+  '<h2>Editar System Prompts</h2>' +
+  '<div class="modal-tabs" id="sysPromptTabs">' +
+    '<div class="modal-tab active" data-tab="text">Texto</div>' +
+    '<div class="modal-tab" data-tab="vision">Visión</div>' +
+  '</div>' +
+  '<div id="sysPromptEditor"></div>' +
+  '<div class="modal-actions">' +
+    '<button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>' +
+    '<button id="btnSaveSysPrompts" class="primary">Guardar</button>' +
+    '<button id="btnCancelSysPrompts" class="ghost">Cancelar</button>' +
+  '</div>' +
+'</div>';
+document.body.appendChild(sysPromptModal);
+
+$("btnAddSysPrompt").addEventListener("click", () => {
+  const mode = sysPromptEditMode;
+  if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
+  const keys = Object.keys(sysPromptEditData[mode]);
+  let nextKey = "C";
+  for(let i = 67; i < 91; i++){
+    const k = String.fromCharCode(i);
+    if(!keys.includes(k)){ nextKey = k; break; }
+  }
+  sysPromptEditData[mode][nextKey] = { name: "Nuevo estilo", prompt: "" };
+  renderSysPromptEditor();
+});
+$("btnSaveSysPrompts").addEventListener("click", () => {
+  const container = $("sysPromptEditor");
+  container.querySelectorAll(".sysprompt-row").forEach(row => {
+    const key = row.querySelector("textarea").dataset.key;
+    const name = row.querySelector(".spr-name-input").value;
+    const prompt = row.querySelector("textarea").value;
+    if(sysPromptEditData[sysPromptEditMode] && sysPromptEditData[sysPromptEditMode][key]){
+      sysPromptEditData[sysPromptEditMode][key].name = name;
+      sysPromptEditData[sysPromptEditMode][key].prompt = prompt;
+    }
+  });
+  saveSysPrompts(sysPromptEditData);
+  populateStyleSelect(sysPromptEditData, $("enhancerMode").value);
+  $("sysPromptModal").classList.remove("open");
+  log("✅ System prompts guardados.", "l-ok");
+});
+$("btnCancelSysPrompts").addEventListener("click", () => {
+  $("sysPromptModal").classList.remove("open");
+});
+document.querySelectorAll(".modal-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    sysPromptEditMode = tab.dataset.tab;
+    renderSysPromptEditor();
+  });
+});
+
+$("btnEditSysPrompts").addEventListener("click", () => {
+  sysPromptEditData = loadSysPrompts();
+  sysPromptEditMode = "text";
+  renderSysPromptEditor();
+  const tabs = document.querySelectorAll(".modal-tab");
+  tabs.forEach(t => t.classList.remove("active"));
+  const textTab = document.querySelector('.modal-tab[data-tab="text"]');
+  if(textTab) textTab.classList.add("active");
+  $("sysPromptModal").classList.add("open");
+});
+
+// --- INICIALIZAR ---
+(async () => {
+  await loadEnhancerModels();
+  const data = loadSysPrompts();
+  populateStyleSelect(data, $("enhancerMode").value);
+})();
+
+$("btnTest").addEventListener("click", async ()=>{
+    setConn("busy","comprobando...");
+    try{
+        const r=await fetch(server()+"/system_stats");
+        if(!r.ok) throw new Error("HTTP "+r.status);
+        await r.json();
+        setConn("ok","conectado");
+        connectSocket();
+        log("Conexión OK","l-ok");
+    }catch(err){setConn("bad","sin conexión");log("Error: "+err.message,"l-err");}
+});
+</script>
+</body>
+</html>
