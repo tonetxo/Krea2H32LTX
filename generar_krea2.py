@@ -154,6 +154,11 @@ def main():
   .modal-actions button{min-width:100px;flex:0;}
   @keyframes seedFlash{0%{background-color:var(--panel-2);border-color:var(--border);}50%{background-color:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 10px var(--accent);}100%{background-color:var(--panel-2);border-color:var(--border);}}
   .seed-updated{animation:seedFlash 1.5s ease-out;}
+  .dropzone{border:1.5px dashed var(--border);border-radius:7px;padding:10px;background:var(--panel-2);transition:border-color .15s,background .15s;}
+  .dropzone.drag{border-color:var(--accent);background:var(--accent-dim);}
+  .dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
+  .dropzone input{display:none;}
+  .ref-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
