@@ -9,6 +9,19 @@
       "title": "Load Diffusion Model"
     }
   },
+  "100": {
+    "inputs": {
+      "filename_prefix": "krea2/imagen",
+      "images": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
   "5": {
     "inputs": {
       "images": [
