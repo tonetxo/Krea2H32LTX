@@ -204,17 +204,17 @@ def main():
 
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
 
-      <div class="panel"><h2>Resolución</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.1" max="4.0" step="0.1" value="1.0"><div class="slider-val" id="mpVal">1.00</div></div><div class="row"><label>Aspect Ratio</label><select id="aspectRatio"><option value="1:1 (Square)">1:1 (Square)</option><option value="2:3 (Portrait Photo)" selected>2:3 (Portrait Photo)</option><option value="3:2 (Photo)">3:2 (Photo)</option><option value="3:4 (Portrait Standard)">3:4 (Portrait Standard)</option><option value="4:3 (Standard)">4:3 (Standard)</option><option value="9:16 (Portrait Widescreen)">9:16 (Portrait Widescreen)</option><option value="16:9 (Widescreen)">16:9 (Widescreen)</option><option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option></select></div></div>
+      <div class="panel"><h2>Resolución</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.1" max="4.0" step="0.1" value="1.0"><div class="slider-val" id="mpVal">1.00</div></div><div class="row"><label>Aspect Ratio</label><select id="aspectRatio"><option value="1:1 (Square)">1:1 (Square)</option><option value="2:3 (Portrait Photo)">2:3 (Portrait Photo)</option><option value="3:2 (Photo)">3:2 (Photo)</option><option value="3:4 (Portrait Standard)">3:4 (Portrait Standard)</option><option value="4:3 (Standard)">4:3 (Standard)</option><option value="9:16 (Portrait Widescreen)">9:16 (Portrait Widescreen)</option><option value="16:9 (Widescreen)" selected>16:9 (Widescreen)</option><option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option></select></div></div>
 
       <div class="panel"><h2>Krea2 Enhancer</h2>
-        <div class="row"><label>Projector Delta — Preset</label><select id="projectorPreset"><option value="none">none</option><option value="FB2">FB2</option><option value="FB3">FB3</option><option value="FEDOR">FEDOR</option><option value="SKC3VO" selected>SKC3VO</option></select></div>
+        <div class="row"><label>Projector Delta — Preset</label><select id="projectorPreset"><option value="none" selected>none</option><option value="FB2">FB2</option><option value="FB3">FB3</option><option value="FEDOR">FEDOR</option><option value="SKC3VO">SKC3VO</option></select></div>
         <div class="row slider-row"><label>Projector Delta — Strength</label><input type="range" id="projectorStrength" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="projectorStrengthVal">1.00</div></div>
-        <div class="row" style="display:flex;align-items:center;gap:10px;"><label style="margin:0;flex:0">T-Enhancer</label><div class="switch on" id="enhancerEnabled"><i></i></div><span id="enhancerEnabledLabel" style="font-family:var(--mono);font-size:11px;color:var(--accent);">activado</span></div>
+        <div class="row" style="display:flex;align-items:center;gap:10px;"><label style="margin:0;flex:0">T-Enhancer</label><div class="switch" id="enhancerEnabled"><i></i></div><span id="enhancerEnabledLabel" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);">desactivado</span></div>
         <div class="row slider-row"><label>T-Enhancer — Strength</label><input type="range" id="enhancerStrength" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerStrengthVal">0.50</div></div>
       </div>
 
       <div class="panel"><h2>RBG Smart Seed Variance</h2>
-        <div class="row"><label>Variance Preset</label><select id="variancePreset"><option value="❌ Disabled">❌ Disabled</option><option value="🌱 Subtle">🌱 Subtle</option><option value="🌿 Balanced">🌿 Balanced</option><option value="🪴 Creative" selected>🪴 Creative</option><option value="🌳 Bold">🌳 Bold</option><option value="🌴 Wild">🌴 Wild</option><option value="⚙️ Custom">⚙️ Custom</option></select></div>
+        <div class="row"><label>Variance Preset</label><select id="variancePreset"><option value="❌ Disabled" selected>❌ Disabled</option><option value="🌱 Subtle">🌱 Subtle</option><option value="🌿 Balanced">🌿 Balanced</option><option value="🪴 Creative">🪴 Creative</option><option value="🌳 Bold">🌳 Bold</option><option value="🌴 Wild">🌴 Wild</option><option value="⚙️ Custom">⚙️ Custom</option></select></div>
         <div class="row"><label>Protect Mode</label><select id="protectMode"><option value="🚫 None">🚫 None</option><option value="First Quarter">First Quarter</option><option value="First Half">First Half</option><option value="Last Quarter">Last Quarter</option><option value="Last Half" selected>Last Half</option><option value="⚙️ Custom Regions">⚙️ Custom Regions</option><option value="🎲 Random Regions">🎲 Random Regions</option></select></div>
         <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segVarianceRandom">Aleatoria</div><div class="seg" id="segVarianceFixed">Fija</div></div><input type="number" id="varianceSeed" value="315489554057974" step="1" disabled></div>
       </div>
@@ -887,6 +887,7 @@ function loadModels(){
     const opt = document.createElement("option");
     opt.value = m;
     opt.textContent = m;
+    if(m === "krea2_turbo_convrot_int4_fast.safetensors") opt.selected = true;
     sel.appendChild(opt);
   }
 }
