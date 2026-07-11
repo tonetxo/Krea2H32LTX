@@ -123,11 +123,27 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         if self._is_ws():
             self._ws_reject()
         elif self._is_ollama_route():
-            self._proxy("OPTIONS", OLLAMA)
+            # Ollama rechaza preflight CORS desde orígenes no-localhost con 403.
+            # Respondemos nosotros con los headers CORS correctos para que el
+            # navegador deje pasar la POST real.
+            self._cors_preflight()
         elif self._is_proxy_route():
             self._proxy("OPTIONS", BACKEND)
         else:
             self.send_error(405, "Method Not Allowed")
+
+    def _cors_preflight(self):
+        origin = self.headers.get("Origin", "*")
+        req_method = self.headers.get("Access-Control-Request-Method", "POST")
+        req_headers = self.headers.get("Access-Control-Request-Headers", "Content-Type")
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", req_headers)
+        self.send_header("Access-Control-Max-Age", "43200")
+        self.send_header("Access-Control-Allow-Credentials", "true")
+        self.end_headers()
 
     def do_HEAD(self):
         if self._is_ws():
@@ -254,7 +270,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 k: v
                 for k, v in self.headers.items()
                 if k.lower()
-                not in ("host", "connection", "transfer-encoding", "content-length")
+                not in ("host", "connection", "transfer-encoding", "content-length", "origin")
             },
             method=method,
         )
@@ -262,13 +278,25 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         # que Ollama pueda haber reseteado por carga/descarga de modelos.
         req.add_header("Connection", "close")
 
+        # Si reenviamos a Ollama, le mentimos sobre el Origin: Ollama solo
+        # permite CORS desde localhost/127.0.0.1. Ponemos uno que sí acepte.
+        # Los headers CORS correctos para el cliente se añaden en la respuesta.
+        if base == OLLAMA:
+            req.add_header("Origin", "http://127.0.0.1:11434")
+            client_origin = self.headers.get("Origin", "*")
+        else:
+            client_origin = None
+
         try:
             resp = urllib.request.urlopen(req, timeout=600)
             self.send_response(resp.status)
             # Copy response headers (except transfer-encoding / connection)
             for k, v in resp.headers.items():
-                if k.lower() not in ("transfer-encoding", "connection", "content-encoding"):
+                if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
                     self.send_header(k, v)
+            if client_origin:
+                self.send_header("Access-Control-Allow-Origin", client_origin)
+                self.send_header("Vary", "Origin")
             self.end_headers()
             # Stream the body
             chunk = resp.read(65536)
@@ -278,8 +306,11 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         except urllib.error.HTTPError as e:
             self.send_response(e.code)
             for k, v in e.headers.items():
-                if k.lower() not in ("transfer-encoding", "connection", "content-encoding"):
+                if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
                     self.send_header(k, v)
+            if client_origin:
+                self.send_header("Access-Control-Allow-Origin", client_origin)
+                self.send_header("Vary", "Origin")
             self.end_headers()
             chunk = e.read(65536)
             while chunk:
