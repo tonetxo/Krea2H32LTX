@@ -1448,13 +1448,16 @@ $("btnCaption").addEventListener("click", async () => {
   if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
     log("⚠️ Primero carga una imagen de referencia", "l-err"); return;
   }
+  const mode = $("enhancerMode").value;
+  const styleKey = $("enhancerStyle").value;
+  const data = loadSysPrompts();
+  const system = getCurrentSysPrompt(data, mode, styleKey);
 
   $("btnCaption").disabled = true;
   $("btnCaption").textContent = "Analizando imagen...";
   $("enhancerOutput").value = "";
   try {
     const b64 = await imageToResizedBase64(refImgEl.src, 1280);
-    const system = "You are an image captioning specialist. Describe the provided image factually and concisely in 1-3 sentences. No artistic interpretation, no camera instructions, no stylistic flourishes. Just what is visible: main subjects, setting, lighting, and notable details. The user may write in any language; you must ALWAYS respond in English with ONLY the caption, no explanations or preambles.";
     const r = await fetch("/api/generate", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
@@ -1473,7 +1476,7 @@ $("btnCaption").addEventListener("click", async () => {
       const think = text.match(/<think>([\s\S]*?)<\/think>/i);
       if(think) text = text.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
       $("enhancerOutput").value = text;
-      log("🖼️ Caption generado ("+model+", "+text.length+" chars).", "l-ok");
+      log("🖼️ Caption generado ("+model+", "+mode+"/"+styleKey+", "+text.length+" chars).", "l-ok");
     }
   } catch(e) {
     log("❌ Error en caption: "+e.message, "l-err");
