@@ -582,9 +582,41 @@ function applyZoom(){
 })();
 
 $("btnResetZoom").addEventListener("click", resetZoom);
+function enterFullscreenStyles(){
+  const wrap = $("imgWrap");
+  const img = $("outputImg");
+  if(wrap){
+    wrap.dataset.fsPrev = wrap.style.cssText || "";
+    wrap.style.cssText = "position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;margin:0!important;padding:0!important;background:#000;border-radius:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;";
+  }
+  if(img){
+    img.dataset.fsPrev = img.style.cssText || "";
+    img.style.cssText = "display:block!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;transform:none!important;";
+  }
+}
+function exitFullscreenStyles(){
+  const wrap = $("imgWrap");
+  const img = $("outputImg");
+  if(wrap){
+    if(wrap.dataset.fsPrev !== undefined){
+      wrap.style.cssText = wrap.dataset.fsPrev;
+      delete wrap.dataset.fsPrev;
+    } else {
+      wrap.style.cssText = "";
+    }
+  }
+  if(img){
+    if(img.dataset.fsPrev !== undefined){
+      img.style.cssText = img.dataset.fsPrev;
+      delete img.dataset.fsPrev;
+    } else {
+      img.style.cssText = "";
+    }
+  }
+}
 $("btnFullscreenImg").addEventListener("click", () => {
   const wrap = $("imgWrap");
-  if(!document.fullscreenElement){
+  if(!document.fullscreenElement && !document.webkitFullscreenElement){
     if(wrap.requestFullscreen) wrap.requestFullscreen();
     else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
   } else {
@@ -597,21 +629,22 @@ function scheduleResetAfterFullscreen(){
   if(_fsResetTimer) clearTimeout(_fsResetTimer);
   _fsResetTimer = setTimeout(() => {
     _fsResetTimer = null;
-    const img = $("outputImg");
-    if(img){
-      img.style.transform = "none";
-      void img.offsetWidth;
-    }
+    exitFullscreenStyles();
     zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
     const wrap = $("imgWrap");
     if(wrap) wrap.style.cursor = "grab";
-  }, 60);
+  }, 80);
+}
+function onFsEnter(){
+  requestAnimationFrame(() => { void $("outputImg").offsetWidth; enterFullscreenStyles(); });
 }
 document.addEventListener("fullscreenchange", () => {
-  if(!document.fullscreenElement) scheduleResetAfterFullscreen();
+  if(document.fullscreenElement) onFsEnter();
+  else scheduleResetAfterFullscreen();
 });
 document.addEventListener("webkitfullscreenchange", () => {
-  if(!document.webkitFullscreenElement) scheduleResetAfterFullscreen();
+  if(document.webkitFullscreenElement) onFsEnter();
+  else scheduleResetAfterFullscreen();
 });
 
 function addToVariantGallery(media, seedValue, timeText) {
