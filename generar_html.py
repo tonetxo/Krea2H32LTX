@@ -682,6 +682,9 @@ function addToVariantGallery(media, seedValue, timeText) {
     
     const card = document.createElement("div");
     card.className = "variant-card";
+    card.dataset.filename = filename;
+    card.dataset.subfolder = subfolder;
+    card.dataset.type = type;
     
     // Usamos un span limpio solo con el texto y el icono
     card.innerHTML = `
@@ -718,14 +721,34 @@ function addToVariantGallery(media, seedValue, timeText) {
     }
 
     const delBtn = card.querySelector(".variant-del-btn");
-    delBtn.addEventListener("click", (e) => {
+    delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        if(!confirm("¿Eliminar este vídeo de la galería?")) return;
-        card.remove();
-        const remaining = grid.querySelectorAll(".variant-card").length;
-        $("variantCount").textContent = `(${remaining})`;
-        if(remaining === 0) box.style.display = "none";
-        log("🗑️ Vídeo eliminado de la galería.", "l-info");
+        if(!confirm("¿Eliminar este vídeo del disco y de la galería?")) return;
+        const fn = card.dataset.filename;
+        const sf = card.dataset.subfolder;
+        const tp = card.dataset.type;
+        delBtn.disabled = true;
+        try {
+            const r = await fetch("/api/file_delete", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({filename: fn, subfolder: sf, type: tp}),
+            });
+            if(!r.ok){
+                const t = await r.text().catch(()=>"");
+                throw new Error("HTTP "+r.status+" "+(t||"").slice(0,200));
+            }
+            const j = await r.json();
+            if(!j.ok && !j.deleted) throw new Error("Respuesta inesperada del backend");
+            card.remove();
+            const remaining = grid.querySelectorAll(".variant-card").length;
+            $("variantCount").textContent = `(${remaining})`;
+            if(remaining === 0) box.style.display = "none";
+            log("🗑️ Vídeo eliminado del disco: "+fn, "l-ok");
+        } catch(err){
+            log("❌ No se pudo borrar del disco: "+err.message, "l-err");
+            delBtn.disabled = false;
+        }
     });
     
     grid.appendChild(card);

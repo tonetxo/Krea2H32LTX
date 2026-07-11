@@ -32,7 +32,7 @@ BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list",)
+CUSTOM_PREFIXES = ("/api/krea2_list", "/api/file_delete")
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
@@ -55,6 +55,26 @@ def _resolve_krea2_dir():
     return candidates[0]  # fall back; will report empty list
 
 KREA2_OUTPUT_DIR = _resolve_krea2_dir()
+
+# ComfyUI's install root (parent of /output and /temp). Used to validate
+# that file_delete targets are inside the backend's writable areas.
+def _resolve_comfyui_root():
+    candidates = [
+        os.path.expanduser("~/ComfyUI"),
+        os.path.expanduser("~/SwarmUI/dlbackend/ComfyUI"),
+        "/home/tonetxo/ComfyUI",
+        "/home/tonetxo/SwarmUI/dlbackend/ComfyUI",
+    ]
+    for c in candidates:
+        if os.path.isdir(os.path.join(c, "output")):
+            return c
+    return os.path.dirname(KREA2_OUTPUT_DIR) + "/.."  # best-effort
+
+COMFYUI_ROOT = os.path.realpath(_resolve_comfyui_root())
+ALLOWED_DELETE_DIRS = (
+    os.path.realpath(os.path.join(COMFYUI_ROOT, "output")),
+    os.path.realpath(os.path.join(COMFYUI_ROOT, "temp")),
+)
 
 # Routes that should be proxied to the backend instead of served as files.
 PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/view", "/upload/image")
@@ -88,6 +108,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         if self._is_ws():
             self._ws_reject()
+        elif self._is_krea2_list():
+            self._send_json(405, {"error": "method not allowed"})
+        elif self._is_file_delete():
+            self._do_file_delete()
         elif self._is_ollama_route():
             self._proxy("POST", OLLAMA)
         elif self._is_proxy_route():
@@ -126,7 +150,11 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def _is_krea2_list(self):
         path = self.path.split("?")[0]
-        return any(path == p for p in CUSTOM_PREFIXES)
+        return any(path == p for p in CUSTOM_PREFIXES if p == "/api/krea2_list")
+
+    def _is_file_delete(self):
+        path = self.path.split("?")[0]
+        return any(path == p for p in CUSTOM_PREFIXES if p == "/api/file_delete")
 
     def _is_ws(self):
         return self.path.split("?")[0].startswith(WS_PREFIX)
@@ -157,12 +185,54 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 })
         except OSError as e:
             sys.stderr.write(f"[serve] krea2_list error: {e}\n")
-        body = json.dumps({
+        self._send_json(200, {
             "dir": KREA2_OUTPUT_DIR,
             "count": len(items),
             "items": items,
-        }).encode("utf-8")
-        self.send_response(200)
+        })
+
+    def _do_file_delete(self):
+        """Delete a file inside ComfyUI's output/ or temp/. Validates path."""
+        length = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(length) if length > 0 else b""
+        try:
+            payload = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            self._send_json(400, {"error": "JSON inválido"})
+            return
+        filename = payload.get("filename", "")
+        subfolder = payload.get("subfolder", "")
+        ftype = payload.get("type", "output")
+        if not filename or "/" in filename or "\\" in filename or ".." in filename:
+            self._send_json(400, {"error": "filename inválido"})
+            return
+        if "/" in subfolder or "\\" in subfolder or ".." in subfolder:
+            self._send_json(400, {"error": "subfolder inválido"})
+            return
+        if ftype not in ("output", "temp", "input"):
+            self._send_json(400, {"error": "type inválido"})
+            return
+        base = os.path.join(COMFYUI_ROOT, ftype)
+        if subfolder:
+            base = os.path.join(base, subfolder)
+        target = os.path.realpath(os.path.join(base, filename))
+        # Path must resolve inside one of the allowed directories
+        if not any(target.startswith(d + os.sep) or target == d for d in ALLOWED_DELETE_DIRS):
+            self._send_json(403, {"error": "path fuera de zonas permitidas", "target": target})
+            return
+        if not os.path.isfile(target):
+            self._send_json(404, {"error": "no existe", "target": target})
+            return
+        try:
+            os.remove(target)
+            sys.stderr.write(f"[serve] file_delete: {target}\n")
+            self._send_json(200, {"ok": True, "deleted": target})
+        except OSError as e:
+            self._send_json(500, {"error": str(e)})
+
+    def _send_json(self, status, obj):
+        body = json.dumps(obj).encode("utf-8")
+        self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
@@ -225,7 +295,7 @@ class ReusableServer(socketserver.TCPServer):
 def main():
     with ReusableServer(("0.0.0.0", PORT), ProxyHandler) as httpd:
         sys.stderr.write(
-            f"[serve] Sirviendo en 0.0.0.0:{PORT} (proxy -> {BACKEND}, krea2 -> {KREA2_OUTPUT_DIR}, no-cache)\n"
+            f"[serve] Sirviendo en 0.0.0.0:{PORT} (proxy -> {BACKEND}, krea2 -> {KREA2_OUTPUT_DIR}, delete-allowed -> {ALLOWED_DELETE_DIRS}, no-cache)\n"
         )
         sys.stderr.flush()
         try:
