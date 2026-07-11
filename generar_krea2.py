@@ -1341,7 +1341,7 @@ $("btnEnhance").addEventListener("click", async () => {
   $("btnEnhance").textContent = "Mejorando...";
   $("enhancerOutput").value = "";
   try {
-    const r = await fetch("/api/generate", {
+    const r = await fetchWithRetry("/api/generate", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify(payload),
     });
@@ -1357,6 +1357,24 @@ $("btnEnhance").addEventListener("click", async () => {
     $("btnEnhance").textContent = "Mejorar prompt";
   }
 });
+
+async function fetchWithRetry(url, options, attempts=3){
+  let lastErr = null;
+  for(let i=0; i<attempts; i++){
+    try {
+      const r = await fetch(url, options);
+      if(r.status >= 500 || r.status === 0){
+        lastErr = new Error("HTTP "+r.status);
+      } else {
+        return r;
+      }
+    } catch(e){
+      lastErr = e;
+    }
+    if(i < attempts-1) await new Promise(r => setTimeout(r, 1000 * (i+1)));
+  }
+  throw lastErr || new Error("fetch failed");
+}
 
 async function imageToResizedBase64(srcUrl, maxSide){
   const resp = await fetch(srcUrl);
@@ -1389,7 +1407,7 @@ $("btnCaption").addEventListener("click", async () => {
   $("enhancerOutput").value = "";
   try {
     const b64 = await imageToResizedBase64(refImgEl.src, 1280);
-    const r = await fetch("/api/generate", {
+    const r = await fetchWithRetry("/api/generate", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
         model, system, prompt: "Describe this image.", images: [b64], stream: false,

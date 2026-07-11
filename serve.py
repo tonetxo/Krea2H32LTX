@@ -258,6 +258,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             },
             method=method,
         )
+        # Forzar cierre de conexión tras la respuesta: evita reuse de sockets
+        # que Ollama pueda haber reseteado por carga/descarga de modelos.
+        req.add_header("Connection", "close")
 
         try:
             resp = urllib.request.urlopen(req, timeout=600)
@@ -283,7 +286,12 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(chunk)
                 chunk = e.read(65536)
         except urllib.error.URLError as e:
-            self.send_error(502, f"Backend unreachable: {e.reason}")
+            reason = str(e.reason)
+            if "reset" in reason.lower() or "broken pipe" in reason.lower():
+                sys.stderr.write(f"[serve] Backend reset: {reason} -> {target}\n")
+                self.send_error(504, f"Backend cerró la conexión (puede estar cargando el modelo): {reason}")
+            else:
+                self.send_error(502, f"Backend unreachable: {reason}")
         except OSError as e:
             self.send_error(502, f"Backend error: {e}")
 
