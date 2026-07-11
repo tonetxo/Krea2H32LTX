@@ -192,7 +192,7 @@
         <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segSamplerRandom">Aleatoria</div><div class="seg" id="segSamplerFixed">Fija</div></div><input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled></div>
         <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
 
-      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar video</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
+      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar imagen</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
     </div>
     <div class="results-col">
       <!-- REPRODUCTOR IMAGEN FINAL -->
@@ -210,6 +210,7 @@
         </div>
         <div class="img-footer">
           <span class="time-tag" id="time1"></span>
+          <span class="hint" id="imgInfo" style="font-size:10.5px;font-family:var(--mono);color:var(--muted-2);"></span>
           <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
         </div>
       </div>
@@ -728,6 +729,14 @@ function showImage(media){
   const img=$("outputImg"), empty=$("empty1"), dl=$("dl1");
   img.src=url; img.style.display="block"; empty.style.display="none";
   dl.href=url; dl.style.display="inline";
+  img.onload = () => {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if(w && h){
+      function gcd(a,b){ return b ? gcd(b, a % b) : a; }
+      const d = gcd(w, h) || 1;
+      $("imgInfo").textContent = `${w}×${h} · ${w/d}:${h/d}`;
+    }
+  };
   resetZoom();
 }
 
