@@ -1428,15 +1428,16 @@ $("btnEnhance").addEventListener("click", async () => {
 });
 
 async function imageToResizedBase64(srcUrl, maxSide){
-  const im = new Image();
-  im.crossOrigin = "anonymous";
-  await new Promise((res,rej)=>{ im.onload=res; im.onerror=rej; im.src=srcUrl; });
-  const scale = Math.min(1, maxSide / Math.max(im.naturalWidth, im.naturalHeight));
-  const w = Math.max(1, Math.round(im.naturalWidth * scale));
-  const h = Math.max(1, Math.round(im.naturalHeight * scale));
+  const resp = await fetch(srcUrl);
+  const blob = await resp.blob();
+  const bitmap = await createImageBitmap(blob);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
   const c = document.createElement("canvas");
   c.width = w; c.height = h;
-  c.getContext("2d").drawImage(im, 0, 0, w, h);
+  c.getContext("2d").drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
   return c.toDataURL("image/jpeg", 0.85).split(",")[1];
 }
 
@@ -1463,12 +1464,14 @@ $("btnCaption").addEventListener("click", async () => {
     });
     if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,300)); }
     const result = await r.json();
-    const text = (result.response || "").trim();
+    let text = (result.response || "").trim();
     if(!text){
       const err = result.error || "(sin error declarado)";
-      log("⚠️ Modelo devolvió respuesta vacía: "+err+" — ¿es un modelo de visión?", "l-err");
-      $("enhancerOutput").value = "El modelo no devolvió texto. Error: "+err;
+      log("⚠️ Respuesta vacía. Keys: "+Object.keys(result).join(",")+" err="+err, "l-err");
+      $("enhancerOutput").value = "El modelo no devolvió texto. Error: "+err+"\n\nRespuesta cruda: "+JSON.stringify(result).slice(0,500);
     } else {
+      const think = text.match(/<think>([\s\S]*?)<\/think>/i);
+      if(think) text = text.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
       $("enhancerOutput").value = text;
       log("🖼️ Caption generado ("+model+", "+text.length+" chars).", "l-ok");
     }
