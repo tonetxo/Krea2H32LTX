@@ -647,10 +647,8 @@ function loadRefImage(url){
       function gcd(a,b){ return b ? gcd(b, a % b) : a; }
       const d = gcd(w, h) || 1;
       info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
-      // Ajustar resolución y aspect ratio
       const ar = w / h;
       const mp = (w * h) / 1_000_000;
-      // Encontrar el aspect ratio más cercano en el selector
       const ratios = {
         "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
         "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
@@ -662,13 +660,143 @@ function loadRefImage(url){
         if(diff < bestDiff){ bestDiff = diff; best = label; }
       }
       $("aspectRatio").value = best;
-      // Ajustar slider de megapíxeles
       const mpSlider = $("mpSlider");
       mpSlider.value = Math.min(Math.max(mp, parseFloat(mpSlider.min)), parseFloat(mpSlider.max));
       mpSlider.value = Math.round(parseFloat(mpSlider.value) * 10) / 10;
       $("mpVal").textContent = parseFloat(mpSlider.value).toFixed(2);
     }
   };
+  // Intentar extraer workflow de los metadatos de la imagen
+  extractWorkflowFromImage(url);
+}
+
+// --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS PNG ---
+// ComfyUI guarda el workflow completo en el chunk tEXt "prompt" del PNG.
+function extractWorkflowFromImage(url){
+  fetch(url).then(r => r.arrayBuffer()).then(buf => {
+    const bytes = new Uint8Array(buf);
+    const text = new TextDecoder("latin1").decode(bytes);
+    // Buscar el chunk tEXt con keyword "prompt"
+    const idx = text.indexOf("prompt\0");
+    if(idx === -1) return;
+    const chunkStart = text.lastIndexOf("tEXt", idx);
+    if(chunkStart === -1) return;
+    const dataStart = chunkStart + 8;
+    const dataEnd = text.indexOf("\0", dataStart);
+    if(dataEnd === -1) return;
+    const jsonStart = dataEnd + 1;
+    const nextChunk = text.indexOf("tEXt", jsonStart);
+    const iend = text.indexOf("IEND", jsonStart);
+    const jsonEnd = (nextChunk !== -1 && nextChunk < iend) ? nextChunk - 4 : (iend !== -1 ? iend - 4 : text.length);
+    if(jsonEnd <= jsonStart) return;
+    const raw = text.slice(jsonStart, jsonEnd);
+    try {
+      const workflow = JSON.parse(raw);
+      applyWorkflow(workflow);
+    } catch(e) {
+      console.warn("No se pudo parsear workflow de metadatos:", e.message);
+    }
+  }).catch(e => console.warn("No se pudo leer metadatos:", e.message));
+}
+
+function applyWorkflow(workflow){
+  // Mapear nodos del workflow a los controles de la UI
+  const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"39",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5"};
+  const g = workflow;
+
+  // Prompt
+  if(g[N.PROMPT]) $("prompt").value = g[N.PROMPT].inputs.string || "";
+
+  // Modelo
+  if(g[N.UNET]){
+    const name = g[N.UNET].inputs.unet_name || "";
+    const sel = $("modelSelect");
+    for(const opt of sel.options){
+      if(opt.value === name || name.endsWith("/"+opt.value) || opt.value === name.replace("flux2/","")){
+        opt.selected = true; break;
+      }
+    }
+  }
+
+  // Resolution
+  if(g[N.RES_SELECTOR]){
+    const ar = g[N.RES_SELECTOR].inputs.aspect_ratio;
+    if(ar) $("aspectRatio").value = ar;
+    const mp = g[N.RES_SELECTOR].inputs.megapixels;
+    if(mp != null){
+      $("mpSlider").value = Math.min(Math.max(mp, 0.1), 4.0);
+      $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
+    }
+  }
+
+  // Projector Delta
+  if(g[N.PROJECTOR]){
+    if(g[N.PROJECTOR].inputs.preset) $("projectorPreset").value = g[N.PROJECTOR].inputs.preset;
+    if(g[N.PROJECTOR].inputs.strength != null){
+      $("projectorStrength").value = g[N.PROJECTOR].inputs.strength;
+      $("projectorStrengthVal").textContent = parseFloat(g[N.PROJECTOR].inputs.strength).toFixed(2);
+    }
+  }
+
+  // T-Enhancer
+  if(g[N.ENHANCER]){
+    const enabled = g[N.ENHANCER].inputs.enabled;
+    const sw = $("enhancerEnabled");
+    sw.classList.toggle("on", !!enabled);
+    $("enhancerEnabledLabel").textContent = enabled ? "activado" : "desactivado";
+    $("enhancerEnabledLabel").style.color = enabled ? "var(--accent)" : "var(--muted-2)";
+    if(g[N.ENHANCER].inputs.strength != null){
+      $("enhancerStrength").value = g[N.ENHANCER].inputs.strength;
+      $("enhancerStrengthVal").textContent = parseFloat(g[N.ENHANCER].inputs.strength).toFixed(2);
+    }
+  }
+
+  // RBG Smart Seed Variance
+  if(g[N.SEED_VARIANCE]){
+    if(g[N.SEED_VARIANCE].inputs.variance_preset) $("variancePreset").value = g[N.SEED_VARIANCE].inputs.variance_preset;
+    if(g[N.SEED_VARIANCE].inputs.protect_mode) $("protectMode").value = g[N.SEED_VARIANCE].inputs.protect_mode;
+    const seed = g[N.SEED_VARIANCE].inputs.seed;
+    if(seed != null && seed >= 0){
+      $("varianceSeed").value = seed;
+      $("segVarianceFixed").classList.add("on");
+      $("segVarianceRandom").classList.remove("on");
+      $("varianceSeed").disabled = false;
+    }
+  }
+
+  // LoRAs
+  for(let i = 0; i < 3; i++){
+    const nodeId = [N.LORA1, N.LORA2, N.LORA3][i];
+    const node = g[nodeId];
+    if(!node) continue;
+    const loraName = node.inputs.lora_name || "";
+    const strength = node.inputs.strength_model;
+    if(loraName && loraName !== "None"){
+      loras[i].lora = loraName.replace("K2/", "");
+      loras[i].on = (strength != null && strength > 0);
+      loras[i].strength = (strength != null) ? strength : 0;
+    }
+  }
+  renderLoras();
+  saveLoraState();
+
+  // Sampler
+  if(g[N.SAMPLER]){
+    if(g[N.SAMPLER].inputs.eta != null){
+      $("etaSlider").value = g[N.SAMPLER].inputs.eta;
+      $("etaVal").textContent = parseFloat(g[N.SAMPLER].inputs.eta).toFixed(2);
+    }
+    if(g[N.SAMPLER].inputs.steps != null) $("steps").value = g[N.SAMPLER].inputs.steps;
+    const seed = g[N.SAMPLER].inputs.seed;
+    if(seed != null && seed >= 0){
+      $("samplerSeed").value = seed;
+      $("segSamplerFixed").classList.add("on");
+      $("segSamplerRandom").classList.remove("on");
+      $("samplerSeed").disabled = false;
+    }
+  }
+
+  log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
 }
 
 // --- REFERENCE IMAGE DROPZONE ---
