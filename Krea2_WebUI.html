@@ -900,9 +900,9 @@ function buildGraph(){
   g[N.SEED_VARIANCE].inputs.variance_preset = $("variancePreset").value;
   g[N.SEED_VARIANCE].inputs.protect_mode = $("protectMode").value;
   g[N.SEED_VARIANCE].inputs.seed = $("segVarianceRandom").classList.contains("on") ? -1 : parseInt($("varianceSeed").value, 10);
-  g[N.LORA1].inputs.lora_name = (loras[0].on && loras[0].lora) ? loras[0].lora : g[N.LORA1].inputs.lora_name; g[N.LORA1].inputs.strength_model = loras[0].on ? loras[0].strength : 0;
-  g[N.LORA2].inputs.lora_name = (loras[1].on && loras[1].lora) ? loras[1].lora : g[N.LORA2].inputs.lora_name; g[N.LORA2].inputs.strength_model = loras[1].on ? loras[1].strength : 0;
-  g[N.LORA3].inputs.lora_name = (loras[2].on && loras[2].lora) ? loras[2].lora : g[N.LORA3].inputs.lora_name; g[N.LORA3].inputs.strength_model = loras[2].on ? loras[2].strength : 0;
+  g[N.LORA1].inputs.lora_name = (loras[0].on && loras[0].lora) ? "K2/"+loras[0].lora : g[N.LORA1].inputs.lora_name; g[N.LORA1].inputs.strength_model = loras[0].on ? loras[0].strength : 0;
+  g[N.LORA2].inputs.lora_name = (loras[1].on && loras[1].lora) ? "K2/"+loras[1].lora : g[N.LORA2].inputs.lora_name; g[N.LORA2].inputs.strength_model = loras[1].on ? loras[1].strength : 0;
+  g[N.LORA3].inputs.lora_name = (loras[2].on && loras[2].lora) ? "K2/"+loras[2].lora : g[N.LORA3].inputs.lora_name; g[N.LORA3].inputs.strength_model = loras[2].on ? loras[2].strength : 0;
   g[N.SAMPLER].inputs.eta = parseFloat($("etaSlider").value);
   g[N.SAMPLER].inputs.steps = parseInt($("steps").value, 10);
   g[N.SAMPLER].inputs.seed = $("segSamplerRandom").classList.contains("on") ? -1 : parseInt($("samplerSeed").value, 10);
