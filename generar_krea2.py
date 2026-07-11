@@ -255,20 +255,7 @@ def main():
         <div class="img-header">
           <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
         </div>
-        <div class="dropzone" id="refDropzone" style="cursor:pointer;">
-          <input type="file" id="refFileInput" accept="image/*">
-          <div class="ph" id="refPlaceholder">arrastra imagen o clic (para ajustar resolución)</div>
-          <img id="refImg" style="display:none;max-width:100%;max-height:300px;border-radius:5px;display:block;margin:0 auto;">
-        </div>
-        <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
-      </div>
-
-      <!-- IMAGEN DE REFERENCIA (dropzone) -->
-      <div class="imgbox">
-        <div class="img-header">
-          <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
-        </div>
-        <div class="dropzone" id="refDropzone" style="cursor:pointer;">
+        <div class="dropzone" id="refDropzone">
           <input type="file" id="refFileInput" accept="image/*">
           <div class="ph" id="refPlaceholder">arrastra imagen o clic (para ajustar resolución)</div>
           <img id="refImg" style="display:none;max-width:100%;max-height:300px;border-radius:5px;display:block;margin:0 auto;">
@@ -689,9 +676,20 @@ function loadRefImage(url){
   const dz = $("refDropzone"), input = $("refFileInput");
   if(!dz) return;
   dz.addEventListener("click", () => input.click());
-  ["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("drag"); }));
-  ["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("drag"); }));
-  dz.addEventListener("drop", e => { if(e.dataTransfer.files[0]) handleRefFile(e.dataTransfer.files[0]); });
+  // Prevenir que el navegador abra el archivo al soltarlo fuera
+  document.addEventListener("dragover", e => e.preventDefault());
+  document.addEventListener("drop", e => e.preventDefault());
+  // Eventos en el dropzone
+  dz.addEventListener("dragenter", e => { e.preventDefault(); dz.classList.add("drag"); });
+  dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("drag"); });
+  dz.addEventListener("dragleave", () => dz.classList.remove("drag"));
+  dz.addEventListener("drop", e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dz.classList.remove("drag");
+    const files = e.dataTransfer?.files;
+    if(files && files.length > 0) handleRefFile(files[0]);
+  });
   input.addEventListener("change", e => { if(e.target.files[0]) handleRefFile(e.target.files[0]); });
 })();
 
