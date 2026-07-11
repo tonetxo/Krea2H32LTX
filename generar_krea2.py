@@ -250,6 +250,32 @@ def main():
         </div>
       </div>
 
+      <!-- IMAGEN DE REFERENCIA (dropzone) -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
+        </div>
+        <div class="dropzone" id="refDropzone" style="cursor:pointer;">
+          <input type="file" id="refFileInput" accept="image/*">
+          <div class="ph" id="refPlaceholder">arrastra imagen o clic (para ajustar resolución)</div>
+          <img id="refImg" style="display:none;max-width:100%;max-height:300px;border-radius:5px;display:block;margin:0 auto;">
+        </div>
+        <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
+      </div>
+
+      <!-- IMAGEN DE REFERENCIA (dropzone) -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
+        </div>
+        <div class="dropzone" id="refDropzone" style="cursor:pointer;">
+          <input type="file" id="refFileInput" accept="image/*">
+          <div class="ph" id="refPlaceholder">arrastra imagen o clic (para ajustar resolución)</div>
+          <img id="refImg" style="display:none;max-width:100%;max-height:300px;border-radius:5px;display:block;margin:0 auto;">
+        </div>
+        <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
+      </div>
+
       <!-- GALERÍA DE VARIANTES -->
       <div class="imgbox variant-gallery" id="variantGalleryBox" style="display:none;">
         <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
@@ -615,6 +641,66 @@ function addToVariantGallery(media, seedValue, timeText) {
 
     grid.appendChild(card);
     $("variantCount").textContent = `(${currentBatchIndex + 1})`;
+
+    // Click en la miniatura de variante -> cargar como referencia
+    card.addEventListener("click", (e) => {
+      if(e.target.closest(".variant-seed-display") || e.target.closest("a")) return;
+      loadRefImage(url);
+    });
+}
+
+function loadRefImage(url){
+  const img = $("refImg"), ph = $("refPlaceholder"), info = $("refInfo");
+  img.src = url;
+  img.style.display = "block";
+  ph.style.display = "none";
+  img.onload = () => {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if(w && h){
+      function gcd(a,b){ return b ? gcd(b, a % b) : a; }
+      const d = gcd(w, h) || 1;
+      info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
+      // Ajustar resolución y aspect ratio
+      const ar = w / h;
+      const mp = (w * h) / 1_000_000;
+      // Encontrar el aspect ratio más cercano en el selector
+      const ratios = {
+        "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
+        "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
+        "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
+      };
+      let best = "", bestDiff = Infinity;
+      for(const [label, val] of Object.entries(ratios)){
+        const diff = Math.abs(ar - val);
+        if(diff < bestDiff){ bestDiff = diff; best = label; }
+      }
+      $("aspectRatio").value = best;
+      // Ajustar slider de megapíxeles
+      const mpSlider = $("mpSlider");
+      mpSlider.value = Math.min(Math.max(mp, parseFloat(mpSlider.min)), parseFloat(mpSlider.max));
+      mpSlider.value = Math.round(parseFloat(mpSlider.value) * 10) / 10;
+      $("mpVal").textContent = parseFloat(mpSlider.value).toFixed(2);
+    }
+  };
+}
+
+// --- REFERENCE IMAGE DROPZONE ---
+(function(){
+  const dz = $("refDropzone"), input = $("refFileInput");
+  if(!dz) return;
+  dz.addEventListener("click", () => input.click());
+  ["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("drag"); }));
+  ["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove("drag"); }));
+  dz.addEventListener("drop", e => { if(e.dataTransfer.files[0]) handleRefFile(e.dataTransfer.files[0]); });
+  input.addEventListener("change", e => { if(e.target.files[0]) handleRefFile(e.target.files[0]); });
+})();
+
+function handleRefFile(f){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    loadRefImage(e.target.result);
+  };
+  reader.readAsDataURL(f);
 }
 
 function processNextBatch() {
