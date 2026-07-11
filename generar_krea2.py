@@ -271,6 +271,7 @@ def main():
         <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
         <div class="ref-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button id="btnCaption" class="ghost" style="flex:1;min-width:140px;">Caption (imagen referencia)</button>
+          <button id="btnLoadMeta" class="ghost" style="flex:1;min-width:140px;">Cargar metadatos</button>
         </div>
       </div>
 
@@ -1238,6 +1239,54 @@ $("btnCaption").addEventListener("click", async () => {
   } finally {
     $("btnCaption").disabled = false;
     $("btnCaption").textContent = "Caption (imagen referencia)";
+  }
+});
+
+$("btnLoadMeta").addEventListener("click", async () => {
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia", "l-err"); return;
+  }
+  $("btnLoadMeta").disabled = true;
+  $("btnLoadMeta").textContent = "Leyendo metadatos...";
+  try {
+    const r = await fetch(refImgEl.src);
+    const buf = await r.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    const text = new TextDecoder("latin1").decode(bytes);
+    const idx = text.indexOf("prompt\0");
+    if(idx === -1){
+      log("ℹ️ Esta imagen no contiene metadatos de workflow Krea2.", "l-info");
+      return;
+    }
+    const chunkStart = text.lastIndexOf("tEXt", idx);
+    if(chunkStart === -1){
+      log("ℹ️ No se encontró chunk tEXt válido.", "l-info");
+      return;
+    }
+    const dataStart = chunkStart + 8;
+    const dataEnd = text.indexOf("\0", dataStart);
+    if(dataEnd === -1){
+      log("ℹ️ Chunk de metadatos truncado.", "l-info");
+      return;
+    }
+    const jsonStart = dataEnd + 1;
+    const nextChunk = text.indexOf("tEXt", jsonStart);
+    const iend = text.indexOf("IEND", jsonStart);
+    const jsonEnd = (nextChunk !== -1 && nextChunk < iend) ? nextChunk - 4 : (iend !== -1 ? iend - 4 : text.length);
+    if(jsonEnd <= jsonStart){
+      log("ℹ️ No se pudo localizar el JSON de workflow.", "l-info");
+      return;
+    }
+    const raw = text.slice(jsonStart, jsonEnd);
+    const workflow = JSON.parse(raw);
+    applyWorkflow(workflow);
+    log("📋 Metadatos cargados: prompt, semilla, LoRAs y demás parámetros actualizados.", "l-ok");
+  } catch(e) {
+    log("❌ Error leyendo metadatos: "+e.message, "l-err");
+  } finally {
+    $("btnLoadMeta").disabled = false;
+    $("btnLoadMeta").textContent = "Cargar metadatos";
   }
 });
 
