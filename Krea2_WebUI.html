@@ -84,6 +84,8 @@
   .variant-card{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
   .variant-card img{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;display:block;}
   .variant-info{padding:8px;font-size:11px;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between;align-items:center;}
+  .variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 4px;border-radius:3px;transition:color .15s,background .15s;}
+  .variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
   .variant-seed-display{color:var(--accent);cursor:pointer;user-select:text;display:flex;align-items:center;gap:6px;}
   .variant-seed-display:hover{color:#fff;}
   .copy-icon{font-size:12px;opacity:.7;transition:opacity .2s;}
@@ -957,6 +959,7 @@ function addToVariantGallery(media, seedValue, timeText) {
             </span>
             <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
             <a href="${url}" download style="color:var(--accent)" onclick="event.stopPropagation();">⬇</a>
+            <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
         </div>
     `;
 
@@ -973,12 +976,23 @@ function addToVariantGallery(media, seedValue, timeText) {
         });
     }
 
+    const delBtn = card.querySelector(".variant-del-btn");
+    delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(!confirm("¿Eliminar esta variante de la galería?")) return;
+        card.remove();
+        const remaining = grid.querySelectorAll(".variant-card").length;
+        $("variantCount").textContent = `(${remaining})`;
+        if(remaining === 0) box.style.display = "none";
+        log("🗑️ Variante eliminada de la galería.", "l-info");
+    });
+
     grid.appendChild(card);
     $("variantCount").textContent = `(${currentBatchIndex + 1})`;
 
     // Click en la miniatura de variante -> cargar como referencia
     card.addEventListener("click", (e) => {
-      if(e.target.closest(".variant-seed-display") || e.target.closest("a")) return;
+      if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
       loadRefImage(url);
     });
 }
