@@ -98,7 +98,7 @@ def main():
   .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; min-height: 24px;}
   .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
   .time-tag.live{color:var(--warn);}
-  .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;}
+  .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   
   video{width:100%;border-radius:5px;background:#000;display:block;flex-grow:1;max-height:50vh;}
   .empty{height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
@@ -148,8 +148,9 @@ def main():
   .variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
   .variant-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
   .variant-card video { width: 100%; height: auto; max-height: 240px; object-fit: contain; background: #000; }
-  .variant-info { padding: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); display: flex; justify-content: space-between; align-items: center; }
-  .variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 4px;border-radius:3px;transition:color .15s,background .15s;}
+  .variant-info { padding: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
+  .variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
   .variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
   .variant-seed-display { color: var(--accent); cursor: pointer; user-select: text; display: flex; align-items: center; gap: 6px; }
   .variant-seed-display:hover { color: #fff; }
@@ -691,8 +692,10 @@ function addToVariantGallery(media, seedValue, timeText) {
                 <span class="copy-icon">📋</span>
             </span>
             <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
-            <a href="${url}" download style="color:var(--accent)" onclick="event.stopPropagation();">⬇</a>
-            <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
+            <span class="variant-icons">
+                <a href="${url}" download style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation();">⬇</a>
+                <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
+            </span>
         </div>
     `;
     
