@@ -181,7 +181,7 @@ def main():
       <!-- ENHANCER PANEL -->
       <div class="panel">
         <div class="collapsible-header" id="enhancerToggle">
-          <span class="arrow">▶</span> Mejorar prompt con IA / Caption
+          <span class="arrow">▶</span> MEJORAR PROMPT CON IA / CAPTION
         </div>
         <div class="collapsible-body" id="enhancerBody">
           <div class="enhancer-row">
