@@ -89,7 +89,9 @@ def main():
   .img-header-actions button:hover{color:var(--text);border-color:var(--accent);}
   .img-wrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:#000;min-height:200px;max-height:60vh;}
   .img-wrap:active{cursor:grabbing;}
-  .img-wrap img{display:block;width:100%;height:auto;max-height:60vh;object-fit:contain;transform-origin:0 0;transition:transform .15s ease;user-select:none;-webkit-user-drag:none;}
+  .img-wrap img{display:block;width:100%;height:auto;max-height:60vh;object-fit:contain;user-select:none;-webkit-user-drag:none;pointer-events:none;}
+  .img-wrap.fullscreen{position:fixed;top:0;left:0;width:100vw;height:100vh;max-height:none;border-radius:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#000;}
+  .img-wrap.fullscreen img{max-height:100vh;width:auto;max-width:100vw;}
   .img-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;min-height:24px;}
   .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
   .time-tag.live{color:var(--warn);}
@@ -484,18 +486,19 @@ function showImage(media){
 }
 
 // --- ZOOM / PAN / FULLSCREEN ---
-let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY;
+let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY, zoomIsFullscreen = false;
 
 function resetZoom(){
   zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
   const img = $("outputImg");
-  img.style.transform = "scale(1) translate(0,0)";
-  img.style.width = ""; img.style.maxHeight = "";
+  img.style.transform = "";
+  img.style.width = "";
+  img.style.maxHeight = "";
 }
 
 function applyZoom(){
   const img = $("outputImg");
-  img.style.transform = `scale(${zoomLevel}) translate(${zoomPanX}px,${zoomPanY}px)`;
+  img.style.transform = `translate(${zoomPanX}px,${zoomPanY}px) scale(${zoomLevel})`;
 }
 
 (function(){
@@ -511,15 +514,15 @@ function applyZoom(){
     const old = zoomLevel;
     zoomLevel *= (e.deltaY < 0) ? 1.12 : 0.88;
     zoomLevel = Math.max(1, Math.min(20, zoomLevel));
-    // Zoom hacia el cursor
-    const ratio = 1 - zoomLevel / old;
-    zoomPanX += (mx - zoomPanX) * ratio;
-    zoomPanY += (my - zoomPanY) * ratio;
+    const ratio = zoomLevel / old;
+    zoomPanX = mx - (mx - zoomPanX) * ratio;
+    zoomPanY = my - (my - zoomPanY) * ratio;
     applyZoom();
   });
 
   wrap.addEventListener("mousedown", (e) => {
     if(img.style.display === "none" || zoomLevel <= 1) return;
+    e.preventDefault();
     zoomDragging = true;
     zoomStartX = e.clientX; zoomStartY = e.clientY;
     zoomStartPanX = zoomPanX; zoomStartPanY = zoomPanY;
@@ -528,6 +531,7 @@ function applyZoom(){
 
   window.addEventListener("mousemove", (e) => {
     if(!zoomDragging) return;
+    e.preventDefault();
     zoomPanX = zoomStartPanX + (e.clientX - zoomStartX);
     zoomPanY = zoomStartPanY + (e.clientY - zoomStartY);
     applyZoom();
@@ -542,14 +546,11 @@ function applyZoom(){
 
 $("btnResetZoom").addEventListener("click", resetZoom);
 $("btnFullscreenImg").addEventListener("click", () => {
-  const el = $("imgWrap");
-  if(!document.fullscreenElement){
-    if(el.requestFullscreen) el.requestFullscreen();
-    else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-  } else {
-    if(document.exitFullscreen) document.exitFullscreen();
-    else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
-  }
+  const wrap = $("imgWrap");
+  zoomIsFullscreen = !zoomIsFullscreen;
+  wrap.classList.toggle("fullscreen", zoomIsFullscreen);
+  $("btnFullscreenImg").textContent = zoomIsFullscreen ? "✕" : "⛶";
+  if(!zoomIsFullscreen) resetZoom();
 });
 
 function addToVariantGallery(media, seedValue, timeText) {
