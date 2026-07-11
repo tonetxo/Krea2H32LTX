@@ -49,6 +49,12 @@
   .imgbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;flex:1;display:flex;flex-direction:column;}
   .img-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .img-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
+  .img-header-actions{display:flex;gap:4px;}
+  .img-header-actions button{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);padding:4px 8px;cursor:pointer;min-width:auto;flex:none;transition:all .15s;}
+  .img-header-actions button:hover{color:var(--text);border-color:var(--accent);}
+  .img-wrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:#000;min-height:200px;max-height:60vh;}
+  .img-wrap:active{cursor:grabbing;}
+  .img-wrap img{display:block;width:100%;height:auto;max-height:60vh;object-fit:contain;transform-origin:0 0;transition:transform .15s ease;user-select:none;-webkit-user-drag:none;}
   .img-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;min-height:24px;}
   .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
   .time-tag.live{color:var(--warn);}
@@ -191,9 +197,15 @@
       <div class="imgbox">
         <div class="img-header">
           <h3>Imagen <em style="color:var(--accent)">final</em></h3>
+          <div class="img-header-actions">
+            <button id="btnResetZoom" title="Tamaño original">⊡</button>
+            <button id="btnFullscreenImg" title="Pantalla completa">⛶</button>
+          </div>
         </div>
         <div class="empty" id="empty1">sin generar</div>
-        <img class="output" id="outputImg" style="display:none">
+        <div class="img-wrap" id="imgWrap">
+          <img class="output" id="outputImg" style="display:none">
+        </div>
         <div class="img-footer">
           <span class="time-tag" id="time1"></span>
           <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
@@ -714,7 +726,77 @@ function showImage(media){
   const img=$("outputImg"), empty=$("empty1"), dl=$("dl1");
   img.src=url; img.style.display="block"; empty.style.display="none";
   dl.href=url; dl.style.display="inline";
+  resetZoom();
 }
+
+// --- ZOOM / PAN / FULLSCREEN ---
+let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY;
+
+function resetZoom(){
+  zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
+  const img = $("outputImg");
+  img.style.transform = "scale(1) translate(0,0)";
+  img.style.width = ""; img.style.maxHeight = "";
+}
+
+function applyZoom(){
+  const img = $("outputImg");
+  img.style.transform = `scale(${zoomLevel}) translate(${zoomPanX}px,${zoomPanY}px)`;
+}
+
+(function(){
+  const wrap = $("imgWrap");
+  if(!wrap) return;
+  const img = $("outputImg");
+
+  wrap.addEventListener("wheel", (e) => {
+    if(img.style.display === "none") return;
+    e.preventDefault();
+    const rect = wrap.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const old = zoomLevel;
+    zoomLevel *= (e.deltaY < 0) ? 1.12 : 0.88;
+    zoomLevel = Math.max(1, Math.min(20, zoomLevel));
+    // Zoom hacia el cursor
+    const ratio = 1 - zoomLevel / old;
+    zoomPanX += (mx - zoomPanX) * ratio;
+    zoomPanY += (my - zoomPanY) * ratio;
+    applyZoom();
+  });
+
+  wrap.addEventListener("mousedown", (e) => {
+    if(img.style.display === "none" || zoomLevel <= 1) return;
+    zoomDragging = true;
+    zoomStartX = e.clientX; zoomStartY = e.clientY;
+    zoomStartPanX = zoomPanX; zoomStartPanY = zoomPanY;
+    wrap.style.cursor = "grabbing";
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if(!zoomDragging) return;
+    zoomPanX = zoomStartPanX + (e.clientX - zoomStartX);
+    zoomPanY = zoomStartPanY + (e.clientY - zoomStartY);
+    applyZoom();
+  });
+
+  window.addEventListener("mouseup", () => {
+    if(!zoomDragging) return;
+    zoomDragging = false;
+    wrap.style.cursor = zoomLevel > 1 ? "grab" : "grab";
+  });
+})();
+
+$("btnResetZoom").addEventListener("click", resetZoom);
+$("btnFullscreenImg").addEventListener("click", () => {
+  const el = $("imgWrap");
+  if(!document.fullscreenElement){
+    if(el.requestFullscreen) el.requestFullscreen();
+    else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } else {
+    if(document.exitFullscreen) document.exitFullscreen();
+    else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+  }
+});
 
 function addToVariantGallery(media, seedValue, timeText) {
     if(!media || !media.filename) {
