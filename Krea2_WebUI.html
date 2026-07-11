@@ -124,6 +124,8 @@
   .dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
   .dropzone input{display:none;}
   .ref-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .enhancer-caption-row{margin-top:8px;}
+  .enhancer-caption-row button{flex:1;min-width:120px;}
 </style>
 </head>
 <body>
@@ -168,6 +170,9 @@
           <div class="enhancer-actions">
             <button id="btnSaveEnhanced">Guardar en biblioteca</button>
             <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
+          </div>
+          <div class="enhancer-caption-row">
+            <button id="btnCaption" class="ghost">Caption (imagen referencia)</button>
           </div>
         </div>
       </div>
@@ -1328,6 +1333,7 @@ const ENHANCER_DEFAULT_PROMPTS = {
   vision: {
     A: { name: "Estilo A (descriptive)", prompt: "You are an expert at describing images for image generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, and style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
     B: { name: "Estilo B (stylized)", prompt: "You are a digital artist. Look at the image and turn it into a stylized artistic description. Focus on the artistic style, color palette, and emotional impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+    C: { name: "Estilo C (literal caption)", prompt: "You are an image captioning specialist. Describe the provided image factually and concisely in 1-3 sentences. No artistic interpretation, no camera instructions, no stylistic flourishes. Just what is visible: main subjects, setting, lighting, and notable details. The user may write in any language; you must ALWAYS respond in English with ONLY the caption, no explanations or preambles." },
   },
 };
 
@@ -1418,6 +1424,59 @@ $("btnEnhance").addEventListener("click", async () => {
   } finally {
     $("btnEnhance").disabled = false;
     $("btnEnhance").textContent = "Mejorar prompt";
+  }
+});
+
+async function imageToResizedBase64(srcUrl, maxSide){
+  const im = new Image();
+  im.crossOrigin = "anonymous";
+  await new Promise((res,rej)=>{ im.onload=res; im.onerror=rej; im.src=srcUrl; });
+  const scale = Math.min(1, maxSide / Math.max(im.naturalWidth, im.naturalHeight));
+  const w = Math.max(1, Math.round(im.naturalWidth * scale));
+  const h = Math.max(1, Math.round(im.naturalHeight * scale));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  c.getContext("2d").drawImage(im, 0, 0, w, h);
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+
+$("btnCaption").addEventListener("click", async () => {
+  const model = $("enhancerModel").value;
+  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia", "l-err"); return;
+  }
+
+  $("enhancerMode").value = "vision";
+  $("enhancerMode").dispatchEvent(new Event("change"));
+  $("enhancerStyle").value = "C";
+  const data = loadSysPrompts();
+  const system = getCurrentSysPrompt(data, "vision", "C");
+
+  $("btnCaption").disabled = true;
+  $("btnCaption").textContent = "Analizando imagen...";
+  $("enhancerOutput").value = "";
+  try {
+    const b64 = await imageToResizedBase64(refImgEl.src, 1280);
+    const r = await fetch("/api/generate", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        model, system, prompt: "", images: [b64], stream: false,
+        options: { num_ctx: 8192, temperature: 0.4 }
+      }),
+    });
+    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,200)); }
+    const result = await r.json();
+    const text = (result.response || "").trim();
+    $("enhancerOutput").value = text;
+    log("🖼️ Caption generado ("+model+", "+text.length+" chars).", "l-ok");
+  } catch(e) {
+    log("❌ Error en caption: "+e.message, "l-err");
+    $("enhancerOutput").value = "Error: "+e.message;
+  } finally {
+    $("btnCaption").disabled = false;
+    $("btnCaption").textContent = "Caption (imagen referencia)";
   }
 });
 
