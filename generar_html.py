@@ -207,7 +207,17 @@ def main():
       </div>
 
       <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*"><div class="ph" id="dzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="dzInfo"></div></div>
-      
+
+      <div class="panel">
+        <div class="collapsible-header" id="krea2RecentToggle">
+          <span class="arrow">▶</span> Imágenes Krea2 recientes
+        </div>
+        <div class="collapsible-body" id="krea2RecentBody">
+          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="gallery-grid" id="krea2RecentGrid"></div>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel-head-row"><h2>Historial de Imágenes</h2><button id="btnClearGallery" class="ghost btn-mini">Vaciar</button></div>
         <div class="gallery-grid" id="galleryGrid"></div>
@@ -973,6 +983,95 @@ async function clearGallery(){
   log("🗑️ Historial de imágenes vaciado.", "l-ok");
 }
 $("btnClearGallery").addEventListener("click", clearGallery);
+
+
+// --- KREA2 RECENT IMAGES PANEL ---
+$("krea2RecentToggle").addEventListener("click", () => {
+  const h = $("krea2RecentToggle");
+  const b = $("krea2RecentBody");
+  const isOpen = h.classList.toggle("open");
+  b.classList.toggle("open", isOpen);
+  h.querySelector(".arrow").textContent = isOpen ? "▼" : "▶";
+  if(isOpen && !$("krea2RecentGrid").dataset.loaded) loadKrea2Recent();
+});
+
+async function loadKrea2Recent(){
+  const grid = $("krea2RecentGrid");
+  const status = $("krea2RecentStatus");
+  status.textContent = "Cargando...";
+  try {
+    const r = await fetch("/api/krea2_list");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    const items = data.items || [];
+    grid.innerHTML = "";
+    if(items.length === 0){
+      status.textContent = "Sin imágenes en "+data.dir+". Genera alguna en Krea2 primero.";
+      return;
+    }
+    status.textContent = `${items.length} imagen(es) (${data.dir}):`;
+    for(const it of items){
+      const url = `${server()}/view?filename=${encodeURIComponent(it.filename)}&subfolder=${encodeURIComponent(it.subfolder)}&type=${encodeURIComponent(it.type)}&t=${it.mtime}`;
+      const ts = new Date(it.mtime*1000);
+      const tsTxt = ts.toLocaleString();
+      const sizeKB = Math.round(it.size/1024);
+      const div = document.createElement("div");
+      div.className = "gallery-item";
+      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${tsTxt} · ${sizeKB}KB</div>`;
+      div.addEventListener("click", () => loadKrea2ImageAsInput(url, it.filename));
+      grid.appendChild(div);
+    }
+    grid.dataset.loaded = "1";
+  } catch(e){
+    status.textContent = "Error cargando: "+e.message;
+  }
+}
+
+async function loadKrea2ImageAsInput(url, filename){
+  try {
+    log("⏳ Descargando "+filename+" desde Krea2...", "l-info");
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const blob = await r.blob();
+    const file = new File([blob], filename, {type: blob.type || "image/png"});
+    handleFile(file, true);
+    log("✅ Imagen Krea2 cargada: "+filename, "l-ok");
+  } catch(e){
+    log("❌ No se pudo cargar la imagen Krea2: "+e.message, "l-err");
+  }
+}
+
+// Al cargar la página: si viene ?ref=filename, abrir el panel y cargar esa imagen
+(function maybeLoadFromQuery(){
+  const qs = new URLSearchParams(window.location.search);
+  const ref = qs.get("ref");
+  if(!ref) return;
+  const filename = decodeURIComponent(ref);
+  // Asegurar que el panel está abierto
+  const h = $("krea2RecentToggle");
+  const b = $("krea2RecentBody");
+  if(h && b && !h.classList.contains("open")){
+    h.classList.add("open");
+    b.classList.add("open");
+    const arr = h.querySelector(".arrow"); if(arr) arr.textContent = "▼";
+  }
+  // Esperar a que el grid cargue y luego hacer click en el item
+  loadKrea2Recent().then(() => {
+    const grid = $("krea2RecentGrid");
+    const items = grid.querySelectorAll(".gallery-item");
+    let found = null;
+    for(const it of items){
+      if(it.querySelector("img")?.src.includes(encodeURIComponent(filename))){
+        found = it; break;
+      }
+    }
+    if(found){
+      found.click();
+    } else {
+      log("⚠️ La imagen '"+filename+"' no está en la lista de Krea2 recientes.", "l-err");
+    }
+  });
+})();
 
 
 // --- GESTIÓN DE LORAS CON MEMORIA ---

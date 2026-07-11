@@ -209,6 +209,7 @@
           <div class="img-header-actions">
             <button id="btnResetZoom" title="Tamaño original">⊡</button>
             <button id="btnFullscreenImg" title="Pantalla completa">⛶</button>
+            <button id="btnSendLtxv" title="Enviar a LTXV">→ LTXV</button>
           </div>
         </div>
         <div class="empty" id="empty1">sin generar</div>
@@ -761,8 +762,11 @@ function findMedia(nodeOutput){
   return null;
 }
 
+let currentOutputMedia = null;
+
 function showImage(media){
   if(!media) return;
+  currentOutputMedia = media;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
   const img=$("outputImg"), empty=$("empty1"), dl=$("dl1");
   img.src=url; img.style.display="block"; empty.style.display="none";
@@ -882,6 +886,22 @@ $("btnFullscreenImg").addEventListener("click", () => {
     if(document.exitFullscreen) document.exitFullscreen();
     else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
   }
+});
+
+$("btnSendLtxv").addEventListener("click", () => {
+  if(!currentOutputMedia || !currentOutputMedia.filename){
+    log("⚠️ Primero genera una imagen para poder enviarla a LTXV.", "l-err");
+    return;
+  }
+  const filename = currentOutputMedia.filename;
+  const ref = encodeURIComponent(filename);
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = "8000";
+  const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
+  const win = window.open(url, "_blank");
+  if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
+  else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
 });
 let _fsResetTimer = null;
 function scheduleResetAfterFullscreen(){
