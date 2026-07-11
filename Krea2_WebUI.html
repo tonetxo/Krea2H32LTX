@@ -730,8 +730,8 @@ async function handlePromptDone(promptId) {
                    (clientResult ? fmtMs(clientResult.total) : null);
     const timeText = tTotal || "";
 
-    // Mostrar imagen final (nodo 5 = PreviewImage, o 43 = VAE_DECODE)
-    const outNode = entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
+    // Mostrar imagen final (prioridad: SaveImage para persistencia > PreviewImage > VAE_DECODE)
+    const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
     if(outNode) {
         const media = findMedia(outNode);
         showImage(media);
