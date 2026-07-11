@@ -183,6 +183,8 @@
         <div class="row slider-row"><label>Projector Delta — Strength</label><input type="range" id="projectorStrength" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="projectorStrengthVal">1.00</div></div>
         <div class="row" style="display:flex;align-items:center;gap:16px;flex-wrap:nowrap;"><label style="margin:0;flex-shrink:0;font-size:11px;">T-Enhancer</label><div class="switch" id="enhancerEnabled"><i></i></div><span id="enhancerEnabledLabel" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);flex-shrink:0;">desactivado</span></div>
         <div class="row slider-row"><label>T-Enhancer — Strength</label><input type="range" id="enhancerStrength" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerStrengthVal">0.50</div></div>
+        <div class="row slider-row" id="textScaleRow" style="display:none;"><label>T-Enhancer — Text Scale</label><input type="range" id="enhancerTextScale" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerTextScaleVal">0.50</div></div>
+        <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:-6px;"><input type="checkbox" id="enhancerLinkTextScale" checked style="margin:0;"><label for="enhancerLinkTextScale" style="margin:0;font-size:11px;color:var(--muted-2);">Vincular text_scale</label></div>
       </div>
 
       <div class="panel"><h2>RBG Smart Seed Variance</h2>
@@ -1108,6 +1110,15 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
       $("enhancerStrength").value = g[N.ENHANCER].inputs.strength;
       $("enhancerStrengthVal").textContent = parseFloat(g[N.ENHANCER].inputs.strength).toFixed(2);
     }
+    if(g[N.ENHANCER].inputs.text_scale != null){
+      $("enhancerTextScale").value = g[N.ENHANCER].inputs.text_scale;
+      $("enhancerTextScaleVal").textContent = parseFloat(g[N.ENHANCER].inputs.text_scale).toFixed(2);
+    }
+    if(g[N.ENHANCER].inputs.strength != null && g[N.ENHANCER].inputs.text_scale != null){
+      const linked = parseFloat(g[N.ENHANCER].inputs.strength) === parseFloat(g[N.ENHANCER].inputs.text_scale);
+      $("enhancerLinkTextScale").checked = linked;
+      $("textScaleRow").style.display = linked ? "none" : "";
+    }
   }
 
   // RBG Smart Seed Variance
@@ -1294,7 +1305,43 @@ $("mpSlider").addEventListener("input",()=>{$("mpVal").textContent=parseFloat($(
 
 // --- KREA2 ENHANCER ---
 $("projectorStrength").addEventListener("input",()=>{$("projectorStrengthVal").textContent=parseFloat($("projectorStrength").value).toFixed(2);});
-$("enhancerStrength").addEventListener("input",()=>{$("enhancerStrengthVal").textContent=parseFloat($("enhancerStrength").value).toFixed(2);});
+
+function syncEnhancerLink(fromSlider){
+  const linked = $("enhancerLinkTextScale").checked;
+  if(!linked) return;
+  if(fromSlider === "strength"){
+    $("enhancerTextScale").value = $("enhancerStrength").value;
+    $("enhancerTextScaleVal").textContent = parseFloat($("enhancerTextScale").value).toFixed(2);
+  } else {
+    $("enhancerStrength").value = $("enhancerTextScale").value;
+    $("enhancerStrengthVal").textContent = parseFloat($("enhancerStrength").value).toFixed(2);
+  }
+}
+$("enhancerStrength").addEventListener("input",()=>{
+  $("enhancerStrengthVal").textContent=parseFloat($("enhancerStrength").value).toFixed(2);
+  syncEnhancerLink("strength");
+});
+$("enhancerTextScale").addEventListener("input",()=>{
+  $("enhancerTextScaleVal").textContent=parseFloat($("enhancerTextScale").value).toFixed(2);
+  syncEnhancerLink("textscale");
+});
+$("enhancerLinkTextScale").addEventListener("change",()=>{
+  const linked = $("enhancerLinkTextScale").checked;
+  $("textScaleRow").style.display = linked ? "none" : "";
+  if(linked){
+    $("enhancerTextScale").value = $("enhancerStrength").value;
+    $("enhancerTextScaleVal").textContent = parseFloat($("enhancerStrength").value).toFixed(2);
+  }
+  try { localStorage.setItem("krea2_enhancer_link_text_scale", linked ? "1" : "0"); } catch(_){}
+});
+// Restaurar estado del link
+try {
+  const saved = localStorage.getItem("krea2_enhancer_link_text_scale");
+  if(saved === "0"){
+    $("enhancerLinkTextScale").checked = false;
+    $("textScaleRow").style.display = "";
+  }
+} catch(_){}
 (function(){
   const sw=$("enhancerEnabled");
   sw.addEventListener("click",()=>{
@@ -1324,6 +1371,7 @@ function buildGraph(){
   g[N.PROJECTOR].inputs.strength = parseFloat($("projectorStrength").value);
   g[N.ENHANCER].inputs.enabled = $("enhancerEnabled").classList.contains("on");
   g[N.ENHANCER].inputs.strength = parseFloat($("enhancerStrength").value);
+  g[N.ENHANCER].inputs.text_scale = parseFloat($("enhancerTextScale").value);
   g[N.SEED_VARIANCE].inputs.variance_preset = $("variancePreset").value;
   g[N.SEED_VARIANCE].inputs.protect_mode = $("protectMode").value;
   g[N.SEED_VARIANCE].inputs.seed = $("segVarianceRandom").classList.contains("on") ? -1 : parseInt($("varianceSeed").value, 10);
