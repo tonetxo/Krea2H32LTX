@@ -245,7 +245,7 @@ def main():
         <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
       </div>
 
-      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*"><div class="ph" id="dzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="ref-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><button id="btnLoadMeta" class="ghost" style="flex:1;min-width:140px;">Cargar metadatos</button></div></div>
+      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*"><div class="ph" id="dzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="dzInfo"></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="krea2RecentToggle">
@@ -727,7 +727,7 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
 
     // Usamos un span limpio solo con el texto y el icono
     card.innerHTML = `
-        <video src="${url}" type="video/mp4" controls muted preload="metadata"></video>
+        <div class="variant-thumb"><video src="${url}" type="video/mp4" muted preload="metadata" playsinline></video></div>
         <div class="variant-info">
             <span class="variant-seed-display" title="${tooltipText}">
                 <span class="seed-text">${displayText}</span>
@@ -735,7 +735,8 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
             </span>
             <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
             <span class="variant-icons">
-                <a href="${url}" download style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation();">⬇</a>
+                <a href="${url}" download style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation();" title="Descargar">⬇</a>
+                <button class="variant-meta-btn" title="Cargar metadatos de este vídeo" onclick="event.stopPropagation();">📋</button>
                 <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
             </span>
         </div>
@@ -790,15 +791,76 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
         }
     });
 
+    // Botón Cargar metadatos (📋) del card -> extrae workflow del MP4
+    const metaBtn = card.querySelector(".variant-meta-btn");
+    metaBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const metaBtnEl = e.currentTarget;
+        const originalHTML = metaBtnEl.innerHTML;
+        metaBtnEl.disabled = true;
+        metaBtnEl.textContent = "⏳";
+        try {
+            const workflow = await extractWorkflowFromMP4(url);
+            if(workflow) applyWorkflow(workflow);
+            else log("ℹ️ Este vídeo no contiene metadatos de workflow.", "l-info");
+        } catch(err){
+            log("❌ Error leyendo metadatos del vídeo: "+err.message, "l-err");
+        } finally {
+            metaBtnEl.disabled = false;
+            metaBtnEl.innerHTML = originalHTML;
+        }
+    });
+
     // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
     card.addEventListener("click", (e) => {
-        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
+        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn") || e.target.closest("video") || e.target.closest(".variant-meta-btn")) return;
         showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type });
         log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
     });
 
     grid.appendChild(card);
     $("variantCount").textContent = `(${currentBatchIndex + 1})`;
+}
+
+// --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS MP4 ---
+// ComfyUI guarda el workflow en el JSON "extra" del MP4 con clave "prompt".
+// Buscamos la cadena literal "prompt": { y parseamos el JSON con un
+// parser de brackets que respeta strings.
+async function extractWorkflowFromMP4(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  const buf = await r.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  // Decodificar como latin1 para encontrar el patrón (los bytes son ASCII)
+  const txt = new TextDecoder("latin1").decode(bytes);
+  const patIdx = txt.indexOf('"prompt": {');
+  if(patIdx < 0) return null;
+  // Encontrar el { raíz (justo después de ": ")
+  const braceIdx = txt.indexOf('{', patIdx);
+  if(braceIdx < 0) return null;
+  // Parser de brackets que respeta strings y secuencias de escape
+  let depth = 0, i = braceIdx, inString = false, escape = false;
+  while(i < txt.length){
+    const c = txt[i];
+    if(inString){
+      if(escape){ escape = false; }
+      else if(c === '\\'){ escape = true; }
+      else if(c === '"'){ inString = false; }
+    } else {
+      if(c === '"'){ inString = true; }
+      else if(c === '{'){ depth++; }
+      else if(c === '}'){ depth--; if(depth === 0){ i++; break; } }
+    }
+    i++;
+  }
+  if(depth !== 0) return null;
+  const jsonStr = txt.substring(braceIdx, i);
+  try {
+    return JSON.parse(jsonStr);
+  } catch(e){
+    console.warn("No se pudo parsear workflow del MP4:", e.message);
+    return null;
+  }
 }
 
 function processNextBatch() {
@@ -1335,72 +1397,6 @@ function applyWorkflow(workflow){
 
   log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
 }
-
-// --- BOTÓN CARGAR METADATOS ---
-$("btnLoadMeta").addEventListener("click", async () => {
-  if(!uploadedImage || !uploadedImage.name){
-    log("⚠️ Primero carga una imagen de entrada", "l-err"); return;
-  }
-  $("btnLoadMeta").disabled = true;
-  $("btnLoadMeta").textContent = "Leyendo metadatos...";
-  try {
-    const url = `${server()}/view?filename=${encodeURIComponent(uploadedImage.name)}&subfolder=${encodeURIComponent(uploadedImage.subfolder||"")}&type=${encodeURIComponent(uploadedImage.type||"input")}&t=${Date.now()}`;
-    const r = await fetch(url);
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const buf = await r.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50){
-      log("ℹ️ No es un PNG válido, no puede contener metadatos.", "l-info");
-      return;
-    }
-    let pos = 8;
-    let workflowRaw = null;
-    while(pos < bytes.length - 8){
-      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
-      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
-      if(type === "tEXt"){
-        const dataStart = pos + 8;
-        let nullPos = dataStart;
-        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
-        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
-        if(keyword === "prompt"){
-          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
-          break;
-        }
-      }
-      if(type === "IEND") break;
-      pos = pos + 12 + len;
-    }
-    if(workflowRaw == null){
-      log("ℹ️ Esta imagen no contiene metadatos de workflow.", "l-info");
-      return;
-    }
-    let workflow;
-    try {
-      workflow = JSON.parse(workflowRaw);
-    } catch(e1){
-      const first = workflowRaw.indexOf("{");
-      const last = workflowRaw.lastIndexOf("}");
-      if(first !== -1 && last > first){
-        try {
-          workflow = JSON.parse(workflowRaw.slice(first, last + 1));
-          log("⚠️ Metadatos tenían basura tras el JSON; se recortó.", "l-warn");
-        } catch(e2){
-          throw new Error("JSON inválido tras recortar: "+e2.message);
-        }
-      } else {
-        throw e1;
-      }
-    }
-    applyWorkflow(workflow);
-    log("📋 Metadatos cargados: prompt, semilla, modelo, LoRAs y demás parámetros actualizados.", "l-ok");
-  } catch(e) {
-    log("❌ Error leyendo metadatos: "+e.message, "l-err");
-  } finally {
-    $("btnLoadMeta").disabled = false;
-    $("btnLoadMeta").textContent = "Cargar metadatos";
-  }
-});
 
 // --- RESTO DEL CÓDIGO ---
 $("segRandom").addEventListener("click",()=>{seedMode="random";$("segRandom").classList.add("on");$("segFixed").classList.remove("on");$("seedVal").disabled=true;});
