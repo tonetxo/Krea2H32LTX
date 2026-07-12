@@ -128,20 +128,20 @@ def main():
   .results-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;}
   
   /* Estructura vidbox corregida */
-  .vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;flex:1;display:flex;flex-direction:column; position: relative;}
+  .vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column; position: relative;}
   .vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; gap: 10px;}
   .vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px; flex:1;}
   .vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
   .vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;}
   .vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
-  .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; min-height: 24px; gap: 10px;}
+  .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; gap: 10px; flex-wrap:wrap;}
   .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
   .time-tag.live{color:var(--warn);}
   .res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
   .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   
-  video{width:100%;border-radius:5px;background:#000;display:block;flex-grow:1;max-height:50vh;}
-  .empty{height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+  video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh;}
+  .empty{height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
   .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
   .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
   
@@ -1387,74 +1387,62 @@ function applyWorkflow(workflow){
     }
   }
 
-  // Resolución y frames: priorizar EmptyLTXVLatentVideo, fallback a mxSlider
+  // Resolución, frames, fidelidad y movimiento: leer directamente los mxSlider por título.
+  // No usamos EmptyLTXVLatentVideo porque sus inputs son referencias a nodos ([791,1], [798,1]...)
+  // y el parser anterior las confundía con valores numéricos (p.ej. frames=798 en lugar de 600).
   function parseFrameValue(v){
     if(typeof v === "number") return v;
-    if(Array.isArray(v)) return parseFloat(String(v[0])) || null;
+    // Las referencias a nodos son arrays [nodeId, outputIndex]; no son valores
+    if(Array.isArray(v)) return null;
     if(typeof v === "string") return parseFloat(v) || null;
     return null;
   }
   function parseMxValue(node){
-    // Los mxSlider de este workflow guardan el valor en inputs.Xi / Xf, no en inputs.value
     if(!node || !node.inputs) return null;
     if(node.inputs.Xi != null) return parseFrameValue(node.inputs.Xi);
     if(node.inputs.Xf != null) return parseFrameValue(node.inputs.Xf);
     if(node.inputs.value != null) return parseFrameValue(node.inputs.value);
     return null;
   }
-  const emptyLatent = findByClass("EmptyLTXVLatentVideo");
-  if(emptyLatent && emptyLatent.inputs && (emptyLatent.inputs.width != null || emptyLatent.inputs.length != null)){
-    const w = parseFrameValue(emptyLatent.inputs.width);
-    const h = parseFrameValue(emptyLatent.inputs.height);
-    if(w != null) $("width").value = Math.round(w);
-    if(h != null) $("height").value = Math.round(h);
-    const len = parseFrameValue(emptyLatent.inputs.length);
-    if(len != null) $("frames").value = Math.round(len);
-    if(w && h){
-      currentAspectRatio = w / h;
-      // No hay select de aspect ratio en esta UI; recalcular megapíxeles para mantener coherencia
-      const mp = (w * h) / 1_000_000;
-      $("mpSlider").value = Math.min(Math.max(mp, 0.3), 2.0).toFixed(2);
-      $("mpVal").textContent = $("mpSlider").value;
-    }
-  } else {
-    // Fallback: mxSlider por título
-    const mxSliders = findAllByClass("mxSlider");
-    let w = null, h = null;
-    for(const {node} of mxSliders){
-      const title = node._meta?.title || "";
-      if(/width/i.test(title)) w = parseMxValue(node);
-      if(/height/i.test(title)) h = parseMxValue(node);
-      if(/length|frame/i.test(title) && !/rate/i.test(title)){
-        const len = parseMxValue(node);
-        if(len != null) $("frames").value = Math.round(len);
-      }
-    }
-    if(w != null) $("width").value = Math.round(w);
-    if(h != null) $("height").value = Math.round(h);
-    if(w && h){
-      currentAspectRatio = w / h;
-      const mp = (w * h) / 1_000_000;
-      $("mpSlider").value = Math.min(Math.max(mp, 0.3), 2.0).toFixed(2);
-      $("mpVal").textContent = $("mpSlider").value;
-    }
+  function applyAspectRatio(w, h){
+    if(!w || !h) return;
+    currentAspectRatio = w / h;
+    const mp = (w * h) / 1_000_000;
+    const clamped = Math.min(Math.max(mp, parseFloat($("mpSlider").min)||0.3), parseFloat($("mpSlider").max)||2.0);
+    $("mpSlider").value = clamped.toFixed(2);
+    $("mpVal").textContent = $("mpSlider").value;
   }
-  updateDuration();
 
-  // Fidelidad y Movimiento: mxSlider por título
   const mxSlidersAll = findAllByClass("mxSlider");
+  let w = null, h = null, len = null, fid = null, mot = null;
   for(const {node} of mxSlidersAll){
     const title = (node._meta?.title || "").toLowerCase();
     const val = parseMxValue(node);
-    if(/fidelity|conditioning/.test(title) && val != null){
-      $("fidelitySlider").value = val;
-      $("fidelityVal").textContent = parseFloat(val).toFixed(2);
-    }
-    if(/motion|preprocess/.test(title) && val != null){
-      $("motionSlider").value = val;
-      $("motionVal").textContent = parseFloat(val).toFixed(1);
+    if(val == null) continue;
+    if(/width/i.test(title) && !/mask|crop/i.test(title)) w = val;
+    else if(/height/i.test(title) && !/mask|crop/i.test(title)) h = val;
+    else if(/length|frame/i.test(title) && !/rate/i.test(title)) len = val;
+    else if(/fidelity|conditioning/i.test(title)) fid = val;
+    else if(/motion|preprocess/i.test(title)) mot = val;
+  }
+  // Fallback a EmptyLTXVLatentVideo solo si no encontramos por título
+  if(w == null || h == null){
+    const emptyLatent = findByClass("EmptyLTXVLatentVideo");
+    if(emptyLatent && emptyLatent.inputs){
+      const ew = parseFrameValue(emptyLatent.inputs.width);
+      const eh = parseFrameValue(emptyLatent.inputs.height);
+      if(ew != null) w = ew;
+      if(eh != null) h = eh;
+      if(len == null) len = parseFrameValue(emptyLatent.inputs.length);
     }
   }
+  if(w != null) $("width").value = Math.round(w);
+  if(h != null) $("height").value = Math.round(h);
+  if(len != null) $("frames").value = Math.round(len);
+  if(fid != null){ $("fidelitySlider").value = fid; $("fidelityVal").textContent = parseFloat(fid).toFixed(2); }
+  if(mot != null){ $("motionSlider").value = mot; $("motionVal").textContent = parseFloat(mot).toFixed(1); }
+  if(w && h) applyAspectRatio(w, h);
+  updateDuration();
 
   // LoRAs: Power Lora Loader (rgthree)
   const powerLora = findByClass("Power Lora Loader (rgthree)");
