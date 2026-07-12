@@ -1711,7 +1711,7 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
 
     // Usamos un span limpio solo con el texto y el icono
     card.innerHTML = `
-        <div class="variant-thumb"><video src="${url}" type="video/mp4" muted preload="metadata" playsinline></video></div>
+        <video src="${url}" type="video/mp4" controls muted preload="metadata" playsinline></video>
         <div class="variant-info">
             <span class="variant-seed-display" title="${tooltipText}">
                 <span class="seed-text">${displayText}</span>
@@ -1797,7 +1797,7 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
 
     // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
     card.addEventListener("click", (e) => {
-        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn") || e.target.closest(".variant-meta-btn")) return;
+        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn") || e.target.closest(".variant-meta-btn") || e.target.closest("video")) return;
         showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type });
         log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
     });
