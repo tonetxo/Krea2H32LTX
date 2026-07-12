@@ -800,7 +800,11 @@ function loadRefImage(url){
   newImg.style.display = "block";
   wrap.style.display = "block";
   ph.style.display = "none";
-  dz.style.display = "none";
+  // Mantener dropzone como barra compacta para poder reemplazar la imagen
+  dz.style.display = "flex";
+  dz.style.padding = "4px 8px";
+  dz.style.minHeight = "auto";
+  dz.querySelector(".ph").textContent = "arrastra otra imagen para reemplazar";
   newImg.onload = () => {
     const w = newImg.naturalWidth, h = newImg.naturalHeight;
     if(w && h){
@@ -984,23 +988,33 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
 
 // --- REFERENCE IMAGE DROPZONE ---
 (function(){
-  const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef");
+  const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef"), wrap = $("refWrap");
   if(!dz) return;
   btn.addEventListener("click", (e) => { e.stopPropagation(); input.click(); });
   // Prevenir que el navegador abra el archivo al soltarlo fuera
   document.addEventListener("dragover", e => e.preventDefault());
   document.addEventListener("drop", e => e.preventDefault());
-  // Eventos en el dropzone
-  dz.addEventListener("dragenter", e => { e.preventDefault(); dz.classList.add("drag"); });
-  dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("drag"); });
-  dz.addEventListener("dragleave", () => dz.classList.remove("drag"));
-  dz.addEventListener("drop", e => {
+  // Eventos en el dropzone y en el wrap (por si la imagen tapa el dropzone)
+  function onDragEnter(e){ e.preventDefault(); dz.classList.add("drag"); }
+  function onDragOver(e){ e.preventDefault(); dz.classList.add("drag"); }
+  function onDragLeave(){ dz.classList.remove("drag"); }
+  function onDrop(e){
     e.preventDefault();
     e.stopPropagation();
     dz.classList.remove("drag");
     const files = e.dataTransfer?.files;
     if(files && files.length > 0) handleRefFile(files[0]);
-  });
+  }
+  dz.addEventListener("dragenter", onDragEnter);
+  dz.addEventListener("dragover", onDragOver);
+  dz.addEventListener("dragleave", onDragLeave);
+  dz.addEventListener("drop", onDrop);
+  if(wrap){
+    wrap.addEventListener("dragenter", onDragEnter);
+    wrap.addEventListener("dragover", onDragOver);
+    wrap.addEventListener("dragleave", onDragLeave);
+    wrap.addEventListener("drop", onDrop);
+  }
   input.addEventListener("change", e => { if(e.target.files[0]) handleRefFile(e.target.files[0]); });
 })();
 
