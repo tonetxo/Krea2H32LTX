@@ -757,10 +757,11 @@ function addToVariantGallery(media, seedValue, timeText) {
     grid.appendChild(card);
     $("variantCount").textContent = `(${currentBatchIndex + 1})`;
 
-    // Click en la miniatura de variante -> cargar como referencia
+    // Click en la miniatura de variante -> cargar como referencia y como output actual
     card.addEventListener("click", (e) => {
       if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
       loadRefImage(url);
+      currentOutputMedia = { filename, subfolder, type };
     });
 }
 

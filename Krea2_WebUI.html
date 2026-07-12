@@ -551,7 +551,7 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b-nvfp4.safetensors", "flux-2-klein-9b.safetensors", "krea2_raw_int8_convrot.safetensors", "krea2_turbo_convrot_int4_fast.safetensors", "krea2_turbo_fp8_scaled.safetensors"];
+const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-int4_convrot.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b-nvfp4.safetensors", "flux-2-klein-9b.safetensors", "krea2_raw_int8_convrot.safetensors", "krea2_turbo_convrot_int4_fast.safetensors", "krea2_turbo_fp8_scaled.safetensors", "krea2_turbo_int4_tensorwise_mixed.safetensors"];
 const AVAILABLE_LORAS = ["KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "anal_helper_krea2_loraholic.safetensors", "fedor_bypass.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "z0jglf.safetensors"];
 
 const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"39",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"};
@@ -1016,10 +1016,11 @@ function addToVariantGallery(media, seedValue, timeText) {
     grid.appendChild(card);
     $("variantCount").textContent = `(${currentBatchIndex + 1})`;
 
-    // Click en la miniatura de variante -> cargar como referencia
+    // Click en la miniatura de variante -> cargar como referencia y como output actual
     card.addEventListener("click", (e) => {
       if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
       loadRefImage(url);
+      currentOutputMedia = { filename, subfolder, type };
     });
 }
 
