@@ -5,7 +5,7 @@ import os
 JSON_FILE = 'LTXV_DMD_OK.json'
 OUTPUT_HTML = 'LTXV_WebUI.html'
 LORAS_DIR = '/home/tonetxo/SwarmUI/Models/Lora/ltxv'
-MODELS_DIR = '/home/tonetxo/SwarmUI/Models/Stable-Diffusion'
+MODELS_DIR = '/media/tonetxo/datos/ltxv'
 # ---------------------
 
 def get_file_list(directory, ext='.safetensors', fallback=None):
