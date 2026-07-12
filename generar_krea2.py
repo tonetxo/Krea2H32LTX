@@ -89,7 +89,7 @@ def main():
   .img-header-actions button:hover{color:var(--text);border-color:var(--accent);}
   .img-wrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:#000;min-height:120px;max-height:45vh;display:flex;align-items:center;justify-content:center;}
   .img-wrap:active{cursor:grabbing;}
-  .img-wrap img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;}
+  .img-wrap img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:0 0;}
   .img-wrap:fullscreen, .img-wrap:-webkit-full-screen{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;background:#000;border-radius:0;display:flex;align-items:center;justify-content:center;padding:0;margin:0;z-index:99999;}
   .img-wrap:fullscreen img, .img-wrap:-webkit-full-screen img{max-width:100vw!important;max-height:100vh!important;width:auto!important;height:auto!important;object-fit:contain!important;display:block;}
   #refDropzone{min-height:80px;}
@@ -557,9 +557,9 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
   wrap.addEventListener("wheel", (e) => {
     if(img.style.display === "none") return;
     e.preventDefault();
-    const wrapRect = wrap.getBoundingClientRect();
-    const mx = e.clientX - wrapRect.left;
-    const my = e.clientY - wrapRect.top;
+    const imgRect = img.getBoundingClientRect();
+    const mx = e.clientX - imgRect.left;
+    const my = e.clientY - imgRect.top;
     const old = zoomLevel;
     zoomLevel *= (e.deltaY < 0) ? 1.12 : 0.88;
     zoomLevel = Math.max(1, Math.min(20, zoomLevel));
