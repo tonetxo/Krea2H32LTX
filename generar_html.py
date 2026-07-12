@@ -254,7 +254,7 @@ def main():
         <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
       </div>
 
-      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*"><div class="ph" id="dzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="dzInfo"></div></div>
+      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="krea2RecentToggle">
@@ -1347,7 +1347,12 @@ function extractWorkflowFromImage(url){
   }).catch(e => console.warn("No se pudo leer metadatos:", e.message));
 }
 
-function applyWorkflow(workflow){
+function applyWorkflow(workflow, opts={}){
+  const applied = [];
+  const missing = [];
+  const setApplied = (label) => applied.push(label);
+  const setMissing = (label) => missing.push(label);
+
   // Buscar nodos por class_type (más robusto que por ID, que cambia entre workflows)
   function findByClass(gt){
     for(const k of Object.keys(workflow)){
@@ -1373,23 +1378,27 @@ function applyWorkflow(workflow){
     const manyNegWords = (t.match(/\b(blurry|low quality|distorted|ugly|watermark|worst|overexposed|underexposed|grainy|deformed|mutation|artifacts)\b/gi) || []).length >= 3;
     return startsNeg || manyNegWords;
   }
+  let promptSet = false;
   for(const {node} of textEncoders){
     const t = (node.inputs && node.inputs.text) || "";
     if(!isNegativePrompt(t) && t.length > 50){
       $("prompt").value = t;
-      break;
+      promptSet = true; break;
     }
   }
   // Si no encontramos, usar el CLIPTextEncode con texto más largo
-  if(!$("prompt").value && textEncoders.length){
+  if(!promptSet && textEncoders.length){
     let longest = textEncoders[0].node;
     for(const {node} of textEncoders){
       if((node.inputs?.text || "").length > (longest.inputs?.text || "").length) longest = node;
     }
     $("prompt").value = longest.inputs?.text || "";
+    promptSet = !!$("prompt").value;
   }
+  if(promptSet) setApplied("prompt"); else setMissing("prompt");
 
   // Modelo: CheckpointLoaderSimple con ckpt_name
+  let modelSet = false;
   const checkpoint = findByClass("CheckpointLoaderSimple");
   if(checkpoint && checkpoint.inputs && checkpoint.inputs.ckpt_name){
     const name = checkpoint.inputs.ckpt_name;
@@ -1397,18 +1406,16 @@ function applyWorkflow(workflow){
     if(sel){
       for(const opt of sel.options){
         if(opt.value === name || name.endsWith("/"+opt.value) || opt.value === name.replace("ltxv/","") || opt.value === name.replace("Stable-Diffusion/","")){
-          opt.selected = true; break;
+          opt.selected = true; modelSet = true; break;
         }
       }
     }
   }
+  if(modelSet) setApplied("modelo"); else setMissing("modelo");
 
   // Resolución, frames, fidelidad y movimiento: leer directamente los mxSlider por título.
-  // No usamos EmptyLTXVLatentVideo porque sus inputs son referencias a nodos ([791,1], [798,1]...)
-  // y el parser anterior las confundía con valores numéricos (p.ej. frames=798 en lugar de 600).
   function parseFrameValue(v){
     if(typeof v === "number") return v;
-    // Las referencias a nodos son arrays [nodeId, outputIndex]; no son valores
     if(Array.isArray(v)) return null;
     if(typeof v === "string") return parseFloat(v) || null;
     return null;
@@ -1452,11 +1459,11 @@ function applyWorkflow(workflow){
       if(len == null) len = parseFrameValue(emptyLatent.inputs.length);
     }
   }
-  if(w != null) $("width").value = Math.round(w);
-  if(h != null) $("height").value = Math.round(h);
-  if(len != null) $("frames").value = Math.round(len);
-  if(fid != null){ $("fidelitySlider").value = fid; $("fidelityVal").textContent = parseFloat(fid).toFixed(2); }
-  if(mot != null){ $("motionSlider").value = mot; $("motionVal").textContent = parseFloat(mot).toFixed(1); }
+  if(w != null){ $("width").value = Math.round(w); setApplied("anchura"); } else setMissing("anchura");
+  if(h != null){ $("height").value = Math.round(h); setApplied("altura"); } else setMissing("altura");
+  if(len != null){ $("frames").value = Math.round(len); setApplied("frames"); } else setMissing("frames");
+  if(fid != null){ $("fidelitySlider").value = fid; $("fidelityVal").textContent = parseFloat(fid).toFixed(2); setApplied("fidelidad"); } else setMissing("fidelidad");
+  if(mot != null){ $("motionSlider").value = mot; $("motionVal").textContent = parseFloat(mot).toFixed(1); setApplied("movimiento"); } else setMissing("movimiento");
   if(w && h) applyAspectRatio(w, h);
   updateDuration();
 
@@ -1479,12 +1486,12 @@ function applyWorkflow(workflow){
     }
     renderLoras();
     saveLoraState();
+    setApplied("LoRAs");
+  } else {
+    setMissing("LoRAs");
   }
 
-  // Semilla: buscar por varios nodos posibles
-  // 1. Seed (rgthree) — en este workflow tiene inputs.seed
-  // 2. widgets_values[0] (otros workflows)
-  // 3. RandomNoise — inputs.noise_seed
+  // Semilla
   let seedVal = null;
   const seedNode = findByClass("Seed (rgthree)");
   if(seedNode){
@@ -1502,9 +1509,20 @@ function applyWorkflow(workflow){
     $("segFixed").classList.add("on");
     $("segRandom").classList.remove("on");
     $("seedVal").disabled = false;
+    setApplied("semilla");
+  } else {
+    setMissing("semilla");
   }
 
-  log("📋 Parámetros restaurados desde metadatos.", "l-ok");
+  const appliedMsg = applied.length ? "✅ Usados: " + applied.join(", ") : "";
+  const missingMsg = missing.length ? "⚠️ Sin coincidencia: " + missing.join(", ") : "";
+  if(opts.silent) return { applied, missing };
+  if(appliedMsg) log(appliedMsg, "l-ok");
+  if(missingMsg) log(missingMsg, "l-warn");
+  if(applied.length) log("📋 Parámetros restaurados desde metadatos.", "l-ok");
+  else log("ℹ️ No se encontraron parámetros aplicables en los metadatos.", "l-warn");
+
+  return { applied, missing };
 }
 
 // --- RESTO DEL CÓDIGO ---
@@ -1523,24 +1541,31 @@ dz.addEventListener("click",()=>fileInput.click());
 dz.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
 fileInput.addEventListener("change",e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 
-// FUNCIÓN DE CARGA DE IMAGEN CORREGIDA Y ROBUSTA
+// FUNCIÓN DE CARGA DE IMAGEN / VÍDEO CORREGIDA Y ROBUSTA
 function handleFile(f, shouldSaveToGallery = true){
   uploadedImage = null;
   localFile = null;
-  
+
+  const isVideo = f.type.startsWith("video/") || /\.(mp4|webm|mov|mkv|avi)$/i.test(f.name);
+
+  if(isVideo){
+    handleVideoFile(f, shouldSaveToGallery);
+    return;
+  }
+
   const uniqueName = `temp_${Date.now()}_${f.name}`;
   localFile = new File([f], uniqueName, {type: f.type});
-  
+
   const reader = new FileReader();
   reader.onload = (e) => {
     // Solo guardar si es una carga nueva (drag/drop o input), no si es selección de galería
     if (shouldSaveToGallery) {
         addToGallery(e.target.result);
     }
-    
+
     const ph = dz.querySelector(".ph");
     if(ph) ph.remove();
-    
+
     let img = dz.querySelector("img");
     if(!img){
       img = document.createElement("img");
@@ -1548,10 +1573,78 @@ function handleFile(f, shouldSaveToGallery = true){
     }
     img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
     img.src = e.target.result;
-    
+
     log(`🖼️ Imagen cargada: ${f.name}`, "l-ok");
   };
   reader.readAsDataURL(f);
+}
+
+// Cargar vídeo: extraer primer frame como imagen de entrada, intentar recuperar workflow
+function handleVideoFile(file, shouldSaveToGallery = true){
+  const videoUrl = URL.createObjectURL(file);
+  const vid = document.createElement("video");
+  vid.muted = true;
+  vid.playsInline = true;
+  vid.crossOrigin = "anonymous";
+  vid.preload = "auto";
+
+  vid.addEventListener("loadeddata", () => {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = vid.videoWidth || 640;
+      canvas.height = vid.videoHeight || 360;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+      // Convertir el dataURL a Blob/File para upload
+      fetch(dataUrl).then(r => r.blob()).then(blob => {
+        const frameName = `temp_${Date.now()}_${file.name.replace(/\.[^.]+$/, '')}_frame.jpg`;
+        localFile = new File([blob], frameName, {type: "image/jpeg"});
+
+        const ph = dz.querySelector(".ph");
+        if(ph) ph.remove();
+        let img = dz.querySelector("img");
+        if(!img){
+          img = document.createElement("img");
+          dz.appendChild(img);
+        }
+        img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
+        img.src = dataUrl;
+
+        if(shouldSaveToGallery) addToGallery(dataUrl);
+        log(`🎬 Vídeo cargado: ${file.name} (frame inicial como imagen de entrada)`, "l-ok");
+
+        // Intentar recuperar workflow desde los metadatos del vídeo original
+        recoverWorkflowFromVideoFile(videoUrl, file.name);
+      });
+    } catch(err) {
+      log("❌ Error extrayendo frame del vídeo: " + err.message, "l-err");
+    } finally {
+      URL.revokeObjectURL(videoUrl);
+    }
+  }, { once: true });
+
+  vid.addEventListener("error", () => {
+    log("❌ No se pudo reproducir el vídeo para extraer el frame", "l-err");
+    URL.revokeObjectURL(videoUrl);
+  }, { once: true });
+
+  vid.src = videoUrl;
+}
+
+async function recoverWorkflowFromVideoFile(videoUrl, fileName){
+  try {
+    const workflow = await extractWorkflowFromMP4(videoUrl);
+    if(workflow){
+      log(`📋 Workflow encontrado en ${fileName}`, "l-ok");
+      applyWorkflow(workflow);
+    } else {
+      log(`ℹ️ ${fileName} no contiene metadatos de workflow.`, "l-warn");
+    }
+  } catch(err){
+    log("⚠️ No se pudieron leer metadatos del vídeo: " + err.message, "l-warn");
+  }
 }
 
 $("btnTest").addEventListener("click", async ()=>{
