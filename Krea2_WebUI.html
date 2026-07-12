@@ -1093,14 +1093,16 @@ function loadRefImage(url){
   extractWorkflowFromImage(url);
 }
 
-// --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS PNG ---
+// --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS PNG / SWARMUI ---
 // ComfyUI guarda el workflow completo en el chunk tEXt "prompt" del PNG.
+// SwarmUI guarda params en chunks "sui_image_params" y "sui_extra_data".
 function extractWorkflowFromImage(url){
   fetch(url).then(r => r.arrayBuffer()).then(buf => {
     const bytes = new Uint8Array(buf);
     if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return;
     let pos = 8;
     let workflowRaw = null;
+    let swarmRaw = null;
     while(pos < bytes.length - 8){
       const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
       const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
@@ -1111,11 +1113,22 @@ function extractWorkflowFromImage(url){
         const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
         if(keyword === "prompt"){
           workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
-          break;
         }
+        if(keyword === "sui_image_params"){
+          swarmRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
+        }
+        if(workflowRaw && swarmRaw) break;
       }
       if(type === "IEND") break;
       pos = pos + 12 + len;
+    }
+    if(swarmRaw){
+      let swarm;
+      try { swarm = JSON.parse(swarmRaw); } catch(e){ console.warn("No se pudo parsear metadatos SwarmUI:", e.message); }
+      if(swarm){
+        applySwarmParams(swarm);
+        return;
+      }
     }
     if(workflowRaw == null) return;
     let workflow;
@@ -1134,6 +1147,87 @@ function extractWorkflowFromImage(url){
     }
     applyWorkflow(workflow);
   }).catch(e => console.warn("No se pudo leer metadatos:", e.message));
+}
+
+function applySwarmParams(swarm){
+  const p = swarm.sui_image_params || swarm;
+  const applied = [];
+  const missing = [];
+
+  // Prompt
+  if(p.prompt){
+    $("prompt").value = p.prompt;
+    applied.push("prompt");
+  } else { missing.push("prompt"); }
+
+  // Seed
+  if(p.seed != null && p.seed >= 0){
+    $("samplerSeed").value = p.seed;
+    $("segSamplerFixed").classList.add("on");
+    $("segSamplerRandom").classList.remove("on");
+    $("samplerSeed").disabled = false;
+    applied.push("semilla");
+  } else { missing.push("semilla"); }
+
+  // Resolución
+  if(p.width != null && p.height != null){
+    const w = +p.width, h = +p.height;
+    const mpSlider = $("mpSlider");
+    const mp = Math.min(Math.max((w*h)/1_000_000, parseFloat(mpSlider.min)), parseFloat(mpSlider.max));
+    mpSlider.value = Math.round(mp * 10) / 10;
+    $("mpVal").textContent = parseFloat(mpSlider.value).toFixed(2);
+    const ar = w / h;
+    const ratios = {
+      "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
+      "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
+      "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
+    };
+    let best = "", bestDiff = Infinity;
+    for(const [label, val] of Object.entries(ratios)){
+      const diff = Math.abs(ar - val);
+      if(diff < bestDiff){ bestDiff = diff; best = label; }
+    }
+    $("aspectRatio").value = best;
+    applied.push("resolución");
+  } else { missing.push("resolución"); }
+
+  // Modelo
+  if(p.model){
+    const sel = $("modelSelect");
+    let found = false;
+    for(const opt of sel.options){
+      if(opt.value === p.model || p.model.endsWith("/"+opt.value) || opt.value === p.model.replace("flux2/","")){
+        opt.selected = true; found = true; break;
+      }
+    }
+    if(found) applied.push("modelo"); else missing.push("modelo");
+  } else { missing.push("modelo"); }
+
+  // LoRAs
+  if(Array.isArray(p.loras) && p.loras.length){
+    const weights = Array.isArray(p.loraweights) ? p.loraweights : [];
+    for(let i = 0; i < 3; i++){
+      if(i < p.loras.length){
+        const ln = p.loras[i];
+        const lw = parseFloat(weights[i] != null ? weights[i] : 1);
+        loras[i].lora = ln.replace(/^K2\//, "").replace(/^.*\//, "");
+        loras[i].on = true;
+        loras[i].strength = isNaN(lw) ? 1 : lw;
+      } else {
+        loras[i].on = false;
+      }
+    }
+    renderLoras();
+    saveLoraState();
+    applied.push("LoRAs");
+  } else { missing.push("LoRAs"); }
+
+  const appliedMsg = applied.length ? "✅ Usados: " + applied.join(", ") : "";
+  const missingMsg = missing.length ? "⚠️ Sin coincidencia: " + missing.join(", ") : "";
+  if(appliedMsg) log(appliedMsg, "l-ok");
+  if(missingMsg) log(missingMsg, "l-warn");
+  if(applied.length) log("📋 Parámetros SwarmUI restaurados desde metadatos.", "l-ok");
+  else log("ℹ️ No se encontraron parámetros SwarmUI aplicables.", "l-warn");
 }
 
 function applyWorkflow(workflow){
