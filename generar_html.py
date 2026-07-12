@@ -132,7 +132,7 @@ def main():
   .vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; gap: 10px;}
   .vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px; flex:1;}
   .vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
-  .vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;}
+  .vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
   .vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
   .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; gap: 10px; flex-wrap:wrap;}
   .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
@@ -316,6 +316,7 @@ def main():
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
           <div class="vid-actions">
+            <a class="vid-action-btn" id="btnDownload1" href="#" download onclick="event.stopPropagation();" title="Descargar vídeo" style="display:none;">⬇ Descargar</a>
             <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
         </div>
@@ -324,7 +325,6 @@ def main():
         <div class="vid-footer">
           <span class="time-tag" id="time1"></span>
           <span class="res-tag" id="res1"></span>
-          <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
         </div>
       </div>
 
@@ -333,6 +333,7 @@ def main():
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
           <div class="vid-actions">
+            <a class="vid-action-btn" id="btnDownload2" href="#" download onclick="event.stopPropagation();" title="Descargar vídeo" style="display:none;">⬇ Descargar</a>
             <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
         </div>
@@ -341,7 +342,6 @@ def main():
         <div class="vid-footer">
           <span class="time-tag" id="time2"></span>
           <span class="res-tag" id="res2"></span>
-          <a class="dl" id="dl2" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
         </div>
       </div>
       
@@ -770,7 +770,6 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
             </span>
             <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
             <span class="variant-icons">
-                <a href="${url}" download style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation();" title="Descargar">⬇</a>
                 <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
             </span>
         </div>
@@ -827,7 +826,7 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
 
     // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
     card.addEventListener("click", (e) => {
-        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
+        if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn")) return;
         // Si se hace click en el propio video, también se carga en la ventana principal
         showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type });
         log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
@@ -1599,10 +1598,10 @@ function findMedia(nodeOutput){
 function showVideo(slot, media){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
-  const v=$("video"+slot), empty=$("empty"+slot), dl=$("dl"+slot), btn=$("btnLoadMeta"+slot);
+  const v=$("video"+slot), empty=$("empty"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot);
   v.src=url; v.style.display="block"; empty.style.display="none";
-  dl.href=url; dl.style.display="inline";
   if(btn) btn.disabled = false;
+  if(dl){ dl.href=url; dl.style.display="inline-flex"; }
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   // Mostrar resolución real del vídeo cuando cargue los metadatos
   const resEl=$("res"+slot);
