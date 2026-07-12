@@ -1035,6 +1035,9 @@ function addToVariantGallery(media, seedValue, timeText) {
 
 function loadRefImage(url){
   const img = $("refImg"), wrap = $("refWrap"), ph = $("refPlaceholder"), dz = $("refDropzone"), info = $("refInfo");
+  // Forzar recarga limpia: quitar src, resetear zoom y limpiar metadatos previos
+  img.removeAttribute("src");
+  refZoom.resetZoom();
   img.src = url;
   img.style.display = "block";
   wrap.style.display = "block";
