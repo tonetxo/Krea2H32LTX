@@ -9,22 +9,30 @@ MODELS_DIR = '/media/tonetxo/datos/ltxv'
 # ---------------------
 
 def get_file_list(directory, ext='.safetensors', fallback=None):
-    """Acepta un directorio (str) o una lista de directorios."""
-    dirs = [directory] if isinstance(directory, str) else list(directory)
+    """Acepta un directorio (str) o una lista de tuplas (directorio, prefijo_relativo).
+    El prefijo_relativo se antepone a los nombres de archivo para que ComfyUI
+    pueda encontrarlos en su carpeta de checkpoints.
+    """
+    if isinstance(directory, str):
+        entries = [(directory, '')]
+    else:
+        entries = list(directory)
     files = []
-    for d in dirs:
+    for d, prefix in entries:
         if not os.path.exists(d):
             continue
         for root, _, file_list in os.walk(d):
             for f in file_list:
                 if f.endswith(ext):
                     rel = os.path.relpath(os.path.join(root, f), d)
-                    # Si está en el directorio raíz, no prefija; si está en subdir, sí.
                     if rel.startswith('..'):
                         rel = f
-                    entry = f if os.path.dirname(rel) == '' else rel.replace('\\', '/')
-                    files.append(entry)
-    # Deduplicar
+                    rel = rel.replace('\\', '/')
+                    # Quitar subdirectorios intermedios que coincidan con el prefix
+                    if prefix and rel.startswith(prefix + '/'):
+                        rel = rel[len(prefix) + 1:]
+                    full_name = (prefix + '/' + rel) if prefix else rel
+                    files.append(full_name)
     files = sorted(set(files))
     return files if files else ([fallback] if fallback else [])
 
@@ -52,7 +60,10 @@ def main():
 
     lora_files = get_lora_list(LORAS_DIR)
     lora_js_array = json.dumps(lora_files)
-    model_files = get_file_list(['/media/tonetxo/datos/ltxv', '/home/tonetxo/SwarmUI/Models/Stable-Diffusion'], fallback="10Eros_v1.3_fp8mixed_learned.safetensors")
+    model_files = get_file_list([
+        ('/media/tonetxo/datos/ltxv', 'ltxv'),
+        ('/home/tonetxo/SwarmUI/Models/Stable-Diffusion', ''),
+    ], fallback="10Eros_v1.3_fp8mixed_learned.safetensors")
     model_js_array = json.dumps(model_files)
 
     html_template = r'''<!DOCTYPE html>
