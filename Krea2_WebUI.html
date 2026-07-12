@@ -57,6 +57,8 @@
   .img-wrap img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:0 0;}
   .img-wrap:fullscreen, .img-wrap:-webkit-full-screen{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;background:#000;border-radius:0;display:flex;align-items:center;justify-content:center;padding:0;margin:0;z-index:99999;}
   .img-wrap:fullscreen img, .img-wrap:-webkit-full-screen img{width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;display:block;}
+  #refDropzone{min-height:80px;}
+  #refWrap{background:var(--panel-2);border:1px solid var(--border);border-radius:5px;}
   .img-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;min-height:24px;}
   .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
   .time-tag.live{color:var(--warn);}
@@ -232,12 +234,18 @@
       <div class="imgbox">
         <div class="img-header">
           <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
+          <div class="img-header-actions">
+            <button id="btnResetZoomRef" title="Tamaño original">⊡</button>
+            <button id="btnFullscreenRef" title="Pantalla completa">⛶</button>
+          </div>
         </div>
         <div class="dropzone" id="refDropzone" style="padding:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
           <input type="file" id="refFileInput" accept="image/*">
           <div class="seg" id="btnBrowseRef" style="flex:0;padding:5px 12px;font-size:10px;cursor:pointer;user-select:none;">Navegar...</div>
           <div class="ph" id="refPlaceholder" style="flex:1;min-width:120px;font-size:10.5px;color:var(--muted-2);padding:0;text-align:left;">arrastra imagen o clic en Navegar</div>
-          <img id="refImg" style="display:none;max-width:100%;max-height:300px;border-radius:5px;margin:0 auto;">
+        </div>
+        <div class="img-wrap" id="refWrap" style="display:none;background:var(--panel-2);margin-top:10px;">
+          <img id="refImg" style="display:none;width:100%;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:0 0;">
         </div>
         <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
         <div class="ref-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -785,31 +793,25 @@ function showImage(media){
       $("imgInfo").textContent = `${w}×${h} · ${w/d}:${h/d}`;
     }
   };
-  resetZoom();
+  outputZoom.resetZoom();
 }
 
 // --- ZOOM / PAN / FULLSCREEN ---
-let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY;
+function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
+  let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY;
+  const wrap = $(wrapId), img = $(imgId);
+  if(!wrap || !img) return { resetZoom: ()=>{} };
 
-function resetZoom(){
-  zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
-  const img = $("outputImg");
-  if(img){
+  function resetZoom(){
+    zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
     img.style.transform = "none";
     void img.offsetWidth;
+    wrap.style.cursor = "grab";
   }
-  const wrap = $("imgWrap");
-  if(wrap) wrap.style.cursor = "grab";
-}
 
-function applyZoom(){
-  $("outputImg").style.transform = `translate(${zoomPanX}px,${zoomPanY}px) scale(${zoomLevel})`;
-}
-
-(function(){
-  const wrap = $("imgWrap");
-  if(!wrap) return;
-  const img = $("outputImg");
+  function applyZoom(){
+    img.style.transform = `translate(${zoomPanX}px,${zoomPanY}px) scale(${zoomLevel})`;
+  }
 
   wrap.addEventListener("wheel", (e) => {
     if(img.style.display === "none") return;
@@ -848,51 +850,55 @@ function applyZoom(){
     zoomDragging = false;
     wrap.style.cursor = "grab";
   });
-})();
 
-$("btnResetZoom").addEventListener("click", resetZoom);
-function enterFullscreenStyles(){
-  const wrap = $("imgWrap");
-  const img = $("outputImg");
-  if(wrap){
+  if(resetBtnId){
+    const btn = $(resetBtnId);
+    if(btn) btn.addEventListener("click", resetZoom);
+  }
+
+  function enterFs(){
     wrap.dataset.fsPrev = wrap.style.cssText || "";
     wrap.style.cssText = "position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;margin:0!important;padding:0!important;background:#000;border-radius:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;";
-  }
-  if(img){
     img.dataset.fsPrev = img.style.cssText || "";
     img.style.cssText = "display:block!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;transform:none!important;";
   }
-}
-function exitFullscreenStyles(){
-  const wrap = $("imgWrap");
-  const img = $("outputImg");
-  if(wrap){
-    if(wrap.dataset.fsPrev !== undefined){
-      wrap.style.cssText = wrap.dataset.fsPrev;
-      delete wrap.dataset.fsPrev;
-    } else {
-      wrap.style.cssText = "";
+  function exitFs(){
+    if(wrap.dataset.fsPrev !== undefined){ wrap.style.cssText = wrap.dataset.fsPrev; delete wrap.dataset.fsPrev; }
+    else { wrap.style.cssText = ""; }
+    if(img.dataset.fsPrev !== undefined){ img.style.cssText = img.dataset.fsPrev; delete img.dataset.fsPrev; }
+    else { img.style.cssText = ""; }
+    applyZoom();
+  }
+
+  if(fullscreenBtnId){
+    const btn = $(fullscreenBtnId);
+    if(btn){
+      btn.addEventListener("click", () => {
+        if(!document.fullscreenElement && !document.webkitFullscreenElement){
+          if(wrap.requestFullscreen) wrap.requestFullscreen();
+          else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
+        } else {
+          if(document.exitFullscreen) document.exitFullscreen();
+          else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+      });
     }
   }
-  if(img){
-    if(img.dataset.fsPrev !== undefined){
-      img.style.cssText = img.dataset.fsPrev;
-      delete img.dataset.fsPrev;
-    } else {
-      img.style.cssText = "";
-    }
-  }
+
+  wrap.addEventListener("fullscreenchange", () => {
+    if(document.fullscreenElement || document.webkitFullscreenElement) enterFs();
+    else exitFs();
+  });
+  wrap.addEventListener("webkitfullscreenchange", () => {
+    if(document.fullscreenElement || document.webkitFullscreenElement) enterFs();
+    else exitFs();
+  });
+
+  return { resetZoom };
 }
-$("btnFullscreenImg").addEventListener("click", () => {
-  const wrap = $("imgWrap");
-  if(!document.fullscreenElement && !document.webkitFullscreenElement){
-    if(wrap.requestFullscreen) wrap.requestFullscreen();
-    else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
-  } else {
-    if(document.exitFullscreen) document.exitFullscreen();
-    else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
-  }
-});
+
+const outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
+const refZoom = setupZoomPan("refWrap", "refImg", "btnResetZoomRef", "btnFullscreenRef");
 
 $("btnSendLtxv").addEventListener("click", () => {
   if(!currentOutputMedia || !currentOutputMedia.filename){
@@ -1026,10 +1032,12 @@ function addToVariantGallery(media, seedValue, timeText) {
 }
 
 function loadRefImage(url){
-  const img = $("refImg"), ph = $("refPlaceholder"), info = $("refInfo");
+  const img = $("refImg"), wrap = $("refWrap"), ph = $("refPlaceholder"), dz = $("refDropzone"), info = $("refInfo");
   img.src = url;
   img.style.display = "block";
+  wrap.style.display = "block";
   ph.style.display = "none";
+  dz.style.display = "none";
   img.onload = () => {
     const w = img.naturalWidth, h = img.naturalHeight;
     if(w && h){
