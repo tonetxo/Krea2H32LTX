@@ -1615,10 +1615,23 @@ function showVideo(slot, media){
   const v=$("video"+slot), empty=$("empty"+slot), dl=$("dl"+slot);
   v.src=url; v.style.display="block"; empty.style.display="none";
   dl.href=url; dl.style.display="inline";
-  // Mostrar resolución y aspect ratio configurados
-  const w=parseInt($("width").value,10)||0, h=parseInt($("height").value,10)||0;
+  // Mostrar resolución real del vídeo cuando cargue los metadatos
   const resEl=$("res"+slot);
-  if(resEl && w && h) resEl.textContent=`${w}×${h} · ${aspectRatioStr(w,h)}`;
+  if(resEl){
+    resEl.textContent="";
+    const onMeta=()=>{
+      const vw=v.videoWidth||0, vh=v.videoHeight||0;
+      if(vw && vh){
+        resEl.textContent=`${vw}×${vh} · ${aspectRatioStr(vw,vh)}`;
+      }
+      v.removeEventListener("loadedmetadata", onMeta);
+    };
+    if(v.videoWidth && v.videoHeight){
+      onMeta();
+    } else {
+      v.addEventListener("loadedmetadata", onMeta);
+    }
+  }
 }
 
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
