@@ -61,9 +61,10 @@
   .vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;flex:1;display:flex;flex-direction:column; position: relative;}
   .vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
-  .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; min-height: 24px;}
+  .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; min-height: 24px; gap: 10px;}
   .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
   .time-tag.live{color:var(--warn);}
+  .res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
   .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   
   video{width:100%;border-radius:5px;background:#000;display:block;flex-grow:1;max-height:50vh;}
@@ -246,6 +247,7 @@
         <video id="video1" controls allowfullscreen playsinline style="display:none"></video>
         <div class="vid-footer">
           <span class="time-tag" id="time1"></span>
+          <span class="res-tag" id="res1"></span>
           <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
         </div>
       </div>
@@ -259,6 +261,7 @@
         <video id="video2" controls allowfullscreen playsinline style="display:none"></video>
         <div class="vid-footer">
           <span class="time-tag" id="time2"></span>
+          <span class="res-tag" id="res2"></span>
           <a class="dl" id="dl2" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
         </div>
       </div>
@@ -2594,6 +2597,10 @@ function showVideo(slot, media){
   const v=$("video"+slot), empty=$("empty"+slot), dl=$("dl"+slot);
   v.src=url; v.style.display="block"; empty.style.display="none";
   dl.href=url; dl.style.display="inline";
+  // Mostrar resolución y aspect ratio configurados
+  const w=parseInt($("width").value,10)||0, h=parseInt($("height").value,10)||0;
+  const resEl=$("res"+slot);
+  if(resEl && w && h) resEl.textContent=`${w}×${h} · ${aspectRatioStr(w,h)}`;
 }
 
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
