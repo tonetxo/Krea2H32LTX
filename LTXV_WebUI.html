@@ -175,7 +175,7 @@
         <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
       </div>
 
-      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*"><div class="ph" id="dzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="dzInfo"></div></div>
+      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*"><div class="ph" id="dzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="ref-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;"><button id="btnLoadMeta" class="ghost" style="flex:1;min-width:140px;">Cargar metadatos</button></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="krea2RecentToggle">
@@ -1637,10 +1637,9 @@ async function handlePromptDone(promptId) {
     if(entry.outputs[N.FIRST_SAVE]) showVideo(1, findMedia(entry.outputs[N.FIRST_SAVE]));
     if(entry.outputs[N.FINAL_SAVE]) showVideo(2, findMedia(entry.outputs[N.FINAL_SAVE]));
 
-    // Añadir a la galería de variantes (usando siempre findMedia para extraer filename/subfolder/type)
-    const outNode = entry.outputs[N.FIRST_SAVE] || entry.outputs[N.FINAL_SAVE];
-    const media = outNode ? findMedia(outNode) : null;
-    addToVariantGallery(media, realSeed, timeText);
+    // Añadir cada pase a la galería de variantes con su slot correspondiente
+    if(entry.outputs[N.FIRST_SAVE]) addToVariantGallery(findMedia(entry.outputs[N.FIRST_SAVE]), realSeed, timeText, 1);
+    if(entry.outputs[N.FINAL_SAVE]) addToVariantGallery(findMedia(entry.outputs[N.FINAL_SAVE]), realSeed, timeText, 2);
 
     log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
     delete pendingSeeds[promptId];
@@ -1681,7 +1680,7 @@ function updateSeedUI(seedValue) {
 // {filename, subfolder, type} — antes se reimplementaba el parseo aquí con
 // claves equivocadas (media.images) y casi nunca encontraba el archivo real,
 // cayendo siempre en el fallback "video.mp4" (inexistente -> vídeo roto).
-function addToVariantGallery(media, seedValue, timeText) {
+function addToVariantGallery(media, seedValue, timeText, slot) {
     if(!media || !media.filename) {
         log("⚠️ No se encontró vídeo de salida para añadir a la galería de variantes.", "l-err");
         return;
@@ -1693,19 +1692,21 @@ function addToVariantGallery(media, seedValue, timeText) {
     const { filename, subfolder, type } = media;
     const ts = Date.now();
     const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}`;
-    
+
     // Determinar qué texto mostrar
     const hasSeed = seedValue !== null && seedValue !== undefined;
-    const displayText = hasSeed ? String(seedValue) : `Var. #${currentBatchIndex + 1}`;
+    const slotLabel = slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${currentBatchIndex + 1}`);
+    const displayText = hasSeed ? String(seedValue) : slotLabel;
     const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
     const timeStr = timeText || "";
-    
+
     const card = document.createElement("div");
     card.className = "variant-card";
     card.dataset.filename = filename;
     card.dataset.subfolder = subfolder;
     card.dataset.type = type;
-    
+    card.dataset.slot = String(slot);
+
     // Usamos un span limpio solo con el texto y el icono
     card.innerHTML = `
         <video src="${url}" type="video/mp4" controls muted preload="metadata"></video>
@@ -1721,7 +1722,7 @@ function addToVariantGallery(media, seedValue, timeText) {
             </span>
         </div>
     `;
-    
+
     // Añadir evento de copia SOLO si hay semilla
     if(hasSeed) {
         const seedSpan = card.querySelector('.variant-seed-display');
@@ -1731,8 +1732,8 @@ function addToVariantGallery(media, seedValue, timeText) {
                 await navigator.clipboard.writeText(String(seedValue));
                 const originalHTML = seedSpan.innerHTML;
                 seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
-                setTimeout(() => { 
-                    seedSpan.innerHTML = originalHTML; 
+                setTimeout(() => {
+                    seedSpan.innerHTML = originalHTML;
                 }, 1200);
             } catch(err) {
                 console.error("Error al copiar:", err);
@@ -1770,7 +1771,14 @@ function addToVariantGallery(media, seedValue, timeText) {
             delBtn.disabled = false;
         }
     });
-    
+
+    // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
+    card.addEventListener("click", (e) => {
+        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
+        showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type });
+        log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
+    });
+
     grid.appendChild(card);
     $("variantCount").textContent = `(${currentBatchIndex + 1})`;
 }
@@ -2183,6 +2191,198 @@ function renderLoras(){
   wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
 }
 loadLoraState(); renderLoras();
+
+// --- EXTRACCIÓN Y APLICACIÓN DE WORKFLOW DESDE METADATOS PNG/MP4 ---
+function extractWorkflowFromImage(url){
+  fetch(url).then(r => r.arrayBuffer()).then(buf => {
+    const bytes = new Uint8Array(buf);
+    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return;
+    let pos = 8;
+    let workflowRaw = null;
+    while(pos < bytes.length - 8){
+      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      if(type === "tEXt"){
+        const dataStart = pos + 8;
+        let nullPos = dataStart;
+        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
+        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
+        if(keyword === "prompt"){
+          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
+          break;
+        }
+      }
+      if(type === "IEND") break;
+      pos = pos + 12 + len;
+    }
+    if(workflowRaw == null) return;
+    let workflow;
+    try {
+      workflow = JSON.parse(workflowRaw);
+    } catch(e1){
+      const first = workflowRaw.indexOf("{");
+      const last = workflowRaw.lastIndexOf("}");
+      if(first !== -1 && last > first){
+        try { workflow = JSON.parse(workflowRaw.slice(first, last + 1)); }
+        catch(e2){ console.warn("No se pudo parsear workflow de metadatos:", e2.message); return; }
+      } else {
+        console.warn("No se pudo parsear workflow de metadatos:", e1.message);
+        return;
+      }
+    }
+    applyWorkflow(workflow);
+  }).catch(e => console.warn("No se pudo leer metadatos:", e.message));
+}
+
+function applyWorkflow(workflow){
+  // Mapear nodos del workflow a los controles de la UI
+  const N = {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646"};
+  const g = workflow;
+
+  // Prompt
+  if(g[N.PROMPT]) $("prompt").value = g[N.PROMPT].inputs.text || "";
+
+  // Modelo
+  if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs && g[N.CHECKPOINT].inputs.ckpt_name){
+    const name = g[N.CHECKPOINT].inputs.ckpt_name;
+    const sel = $("modelSelect");
+    if(sel){
+      for(const opt of sel.options){
+        if(opt.value === name || name.endsWith("/"+opt.value) || opt.value === name.replace("ltxv/","") || opt.value === name.replace("Stable-Diffusion/","")){
+          opt.selected = true; break;
+        }
+      }
+    }
+  }
+
+  // Resolución (ancho / alto)
+  if(g[N.WIDTH] && g[N.WIDTH].inputs.Xi != null) $("width").value = Math.round(g[N.WIDTH].inputs.Xi);
+  if(g[N.HEIGHT] && g[N.HEIGHT].inputs.Xi != null) $("height").value = Math.round(g[N.HEIGHT].inputs.Xi);
+  if(g[N.WIDTH] || g[N.HEIGHT]){
+    const w = parseInt($("width").value, 10), h = parseInt($("height").value, 10);
+    const ar = w / h;
+    const ratios = {
+      "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
+      "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
+      "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
+    };
+    let best = "", bestDiff = Infinity;
+    for(const [label, val] of Object.entries(ratios)){
+      const diff = Math.abs(ar - val);
+      if(diff < bestDiff){ bestDiff = diff; best = label; }
+    }
+    if(best && $("aspectRatio")) $("aspectRatio").value = best;
+  }
+
+  // Frames
+  if(g[N.FRAMES] && g[N.FRAMES].inputs.Xi != null) $("frames").value = Math.round(g[N.FRAMES].inputs.Xi);
+
+  // Fidelidad y Movimiento
+  if(g[N.FIDELITY] && g[N.FIDELITY].inputs.Xi != null){
+    $("fidelitySlider").value = g[N.FIDELITY].inputs.Xi;
+    $("fidelityVal").textContent = parseFloat(g[N.FIDELITY].inputs.Xi).toFixed(2);
+  }
+  if(g[N.MOTION] && g[N.MOTION].inputs.Xi != null){
+    $("motionSlider").value = g[N.MOTION].inputs.Xi;
+    $("motionVal").textContent = parseFloat(g[N.MOTION].inputs.Xi).toFixed(1);
+  }
+
+  // LoRAs (Power Lora Loader rgthree, nodo 853)
+  if(g[N.LORA]){
+    for(let i = 0; i < 3; i++){
+      const slot = ["lora_1","lora_2","lora_3"][i];
+      const lora = g[N.LORA].inputs[slot];
+      if(!lora) continue;
+      const loraName = lora.lora || "";
+      const strength = lora.strength;
+      if(loraName && loraName !== "None"){
+        loras[i].lora = loraName.replace(/^ltxv\//, "");
+        loras[i].on = (strength != null && strength > 0);
+        loras[i].strength = (strength != null) ? strength : 0;
+      } else {
+        loras[i].on = false;
+      }
+    }
+    renderLoras();
+    saveLoraState();
+  }
+
+  // Semilla
+  if(g[N.SEED] && g[N.SEED].inputs.seed != null && g[N.SEED].inputs.seed >= 0){
+    $("seedVal").value = g[N.SEED].inputs.seed;
+    $("segFixed").classList.add("on");
+    $("segRandom").classList.remove("on");
+    $("seedVal").disabled = false;
+  }
+
+  log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
+}
+
+// --- BOTÓN CARGAR METADATOS ---
+$("btnLoadMeta").addEventListener("click", async () => {
+  if(!uploadedImage || !uploadedImage.name){
+    log("⚠️ Primero carga una imagen de entrada", "l-err"); return;
+  }
+  $("btnLoadMeta").disabled = true;
+  $("btnLoadMeta").textContent = "Leyendo metadatos...";
+  try {
+    const url = `${server()}/view?filename=${encodeURIComponent(uploadedImage.name)}&subfolder=${encodeURIComponent(uploadedImage.subfolder||"")}&type=${encodeURIComponent(uploadedImage.type||"input")}&t=${Date.now()}`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const buf = await r.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50){
+      log("ℹ️ No es un PNG válido, no puede contener metadatos.", "l-info");
+      return;
+    }
+    let pos = 8;
+    let workflowRaw = null;
+    while(pos < bytes.length - 8){
+      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      if(type === "tEXt"){
+        const dataStart = pos + 8;
+        let nullPos = dataStart;
+        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
+        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
+        if(keyword === "prompt"){
+          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
+          break;
+        }
+      }
+      if(type === "IEND") break;
+      pos = pos + 12 + len;
+    }
+    if(workflowRaw == null){
+      log("ℹ️ Esta imagen no contiene metadatos de workflow.", "l-info");
+      return;
+    }
+    let workflow;
+    try {
+      workflow = JSON.parse(workflowRaw);
+    } catch(e1){
+      const first = workflowRaw.indexOf("{");
+      const last = workflowRaw.lastIndexOf("}");
+      if(first !== -1 && last > first){
+        try {
+          workflow = JSON.parse(workflowRaw.slice(first, last + 1));
+          log("⚠️ Metadatos tenían basura tras el JSON; se recortó.", "l-warn");
+        } catch(e2){
+          throw new Error("JSON inválido tras recortar: "+e2.message);
+        }
+      } else {
+        throw e1;
+      }
+    }
+    applyWorkflow(workflow);
+    log("📋 Metadatos cargados: prompt, semilla, modelo, LoRAs y demás parámetros actualizados.", "l-ok");
+  } catch(e) {
+    log("❌ Error leyendo metadatos: "+e.message, "l-err");
+  } finally {
+    $("btnLoadMeta").disabled = false;
+    $("btnLoadMeta").textContent = "Cargar metadatos";
+  }
+});
 
 // --- RESTO DEL CÓDIGO ---
 $("segRandom").addEventListener("click",()=>{seedMode="random";$("segRandom").classList.add("on");$("segFixed").classList.remove("on");$("seedVal").disabled=true;});
