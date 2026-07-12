@@ -1362,9 +1362,18 @@ let processingPrompts = new Set(); // prompt_id cuyo history se está consultand
 let batchSeedMode = "random"; // modo capturado al lanzar el batch (independiente del toggle en vivo)
 let currentPromptId = null;   // prompt_id de la variante que se está ejecutando ahora
 let timers = {};               // prompt_id -> { start, iv }
-// Cronómetros por prompt_id. Un único tiempo total por prompt: desde POST /prompt
-// hasta execution_success. El backend no notifica por nodo, así que separar '1er pase'
-// y 'final' no es posible desde el cliente (mismo execution_success cubre ambos).
+let promptSteps = {};          // prompt_id -> "1" (first-only / step-1) | "2" (step-2)
+// --- Modo "Generar completo" en 2 pasos ---
+// El backend solo emite execution_success al final de TODO el grafo. Si mandamos
+// el grafo completo de golpe, el 1er pase y el final aparecen a la vez y con el
+// mismo tiempo. Solución: en modo "completo" lanzamos dos prompts secuenciales.
+// Paso 1: grafo sin FINAL_SAVE ni PURGE_VRAM (igual que "Solo 1er pase").
+//   ComfyUI ejecuta el 1er pase y guarda el resultado en caché.
+//   Mostramos vídeo en slot 1 con su tiempo.
+// Paso 2: grafo completo. ComfyUI reutiliza el caché del 1er pase y solo ejecuta
+//   el 2º pase (upscale + final). Mostramos vídeo en slot 2 con su tiempo.
+let generationStep = 0;       // 0 = inactivo; 1 = paso 1; 2 = paso 2
+let firstPromptId = null;     // prompt_id del paso 1 (para mostrar su vídeo al acabar)
 
 function fmtMs(ms){
   const s = Math.floor(ms / 1000);
@@ -1532,7 +1541,9 @@ function connectSocket() {
         if(msg.type === 'execution_error') {
             const pid = msg.data && msg.data.prompt_id;
             log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
-            if(pid){ handledPrompts.add(pid); delete pendingSeeds[pid]; discardTimer(pid); }
+            if(pid){ handledPrompts.add(pid); delete pendingSeeds[pid]; delete promptSteps[pid]; discardTimer(pid); }
+            // Si falla el paso 1 del completo, no continuar al paso 2
+            if(generationStep === 1) generationStep = 0;
             currentBatchIndex++;
             processNextBatch();
         }
@@ -1582,20 +1593,10 @@ async function handlePromptDone(promptId) {
     // oficial del tiempo que tardó la API y no incluye latencia de red ni parseo.
     // Fallback: cronómetro del cliente (startTimer) si el backend no trae los
     // timestamps (versiones muy viejas o builds sin status.messages).
-    //
-    // Split por fase: si el backend emite eventos 'executing'/'executed' por nodo
-    // (status.messages con pares executing->executed para los nodos FIRST_SAVE y
-    // FINAL_SAVE), sacamos t1 y t2 por separado. En builds con muchos nodos cached
-    // (este caso: todos los nodos están en execution_cached), esos eventos no
-    // existen y caemos al tiempo total.
-    const hasFirst = !!entry.outputs[N.FIRST_SAVE];
-    const hasFinal = !!entry.outputs[N.FINAL_SAVE];
     const timings = extractTimings(entry, N);
     let clientResult = stopTimer(promptId); // limpia el interval y devuelve el fallback
 
-    const tFirst  = (timings && timings.t1 != null) ? fmtMs(timings.t1) : null;
-    const tFinal  = (timings && timings.t2 != null) ? fmtMs(timings.t2) : null;
-    const tTotal  = (timings && timings.total != null) ? fmtMs(timings.total) :
+    const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
                     (clientResult ? fmtMs(clientResult.total) : null);
 
     function paint(slot, label, value){
@@ -1610,41 +1611,51 @@ async function handlePromptDone(promptId) {
         }
     }
 
-    if(hasFirst || hasFinal){
-        if(hasFirst && hasFinal && tFirst && tFinal && tFirst !== tFinal){
-            // split real: el backend dio eventos por nodo y los tiempos son distintos
-            paint(1, "1er", tFirst);
-            paint(2, "final", tFinal);
-        } else {
-            // un solo total para los dos (o solo hay uno)
-            const v = tTotal || tFirst || tFinal || "—";
-            if(hasFirst) paint(1, "1er", v); else paint(1, null, null);
-            if(hasFinal) paint(2, "final", v); else paint(2, null, null);
+    // --- Mostrar resultados según el paso (1 = 1er pase, 2 = final) ---
+    const step = promptSteps[promptId] || "1";
+    const isFirstOnly = (step === "1");  // paso 1 (o "Solo 1er pase")
+    const media1 = entry.outputs[N.FIRST_SAVE] ? findMedia(entry.outputs[N.FIRST_SAVE]) : null;
+    const media2 = entry.outputs[N.FINAL_SAVE] ? findMedia(entry.outputs[N.FINAL_SAVE]) : null;
+
+    if(isFirstOnly){
+        // Solo 1er pase (botón "Solo 1er pase" o paso 1 del completo)
+        if(media1){
+            showVideo(1, media1);
+            paint(1, "1er", tTotal || "—");
+            addToVariantGallery(media1, realSeed, tTotal || "", 1);
         }
     } else {
-        discardTimer(promptId);
-        paint(1, null, null);
-        paint(2, null, null);
+        // Paso 2 del completo (o grafo completo sin pasos): el final está listo
+        if(media2){
+            showVideo(2, media2);
+            paint(2, "final", tTotal || "—");
+            addToVariantGallery(media2, realSeed, tTotal || "", 2);
+        }
+        // Si por casualidad el paso 2 también trae FIRST_SAVE (no debería si lo
+        // cacheó), no lo mostramos de nuevo en slot 1.
     }
-
-    // Texto para la miniatura de variante: priorizamos split si está disponible
-    let timeText = "";
-    if(hasFirst && hasFinal && tFirst && tFinal && tFirst !== tFinal){
-        timeText = `1er ${tFirst} · final ${tFinal}`;
-    } else {
-        timeText = tTotal || "";
-    }
-
-    // Mostrar en reproductores principales
-    if(entry.outputs[N.FIRST_SAVE]) showVideo(1, findMedia(entry.outputs[N.FIRST_SAVE]));
-    if(entry.outputs[N.FINAL_SAVE]) showVideo(2, findMedia(entry.outputs[N.FINAL_SAVE]));
-
-    // Añadir cada pase a la galería de variantes con su slot correspondiente
-    if(entry.outputs[N.FIRST_SAVE]) addToVariantGallery(findMedia(entry.outputs[N.FIRST_SAVE]), realSeed, timeText, 1);
-    if(entry.outputs[N.FINAL_SAVE]) addToVariantGallery(findMedia(entry.outputs[N.FINAL_SAVE]), realSeed, timeText, 2);
 
     log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
+    delete promptSteps[promptId];
+
+    // --- ¿Continuamos con el paso 2? ---
+    if(generationStep === 1 && step === "1" && window.currentBatchMode === false){
+        // Acaba el paso 1 del "Generar completo" -> lanzar paso 2
+        log(`➡️ Paso 1 completado, iniciando paso 2 (2º pase)...`, "l-ok");
+        generationStep = 2;
+        // Guardar la semilla del paso 1 para reutilizarla en el paso 2 ANTES de borrarla
+        const step1Seed = pendingSeeds[promptId];
+        delete pendingSeeds[promptId];
+        // Reinyectar la semilla del paso 1 para que runSingleGeneration la reutilice
+        pendingSeeds[firstPromptId] = step1Seed;
+        runSingleGeneration(currentBatchIndex);  // MISMO índice, paso 2
+        return;  // NO avanzar currentBatchIndex todavía
+    }
+
+    // Si llegamos aquí, el proceso ha terminado completamente (1er pase puro o paso 2 completo)
     delete pendingSeeds[promptId];
+    generationStep = 0;
+    firstPromptId = null;
     currentBatchIndex++;
     processNextBatch();
 }
@@ -1854,7 +1865,13 @@ async function extractWorkflowFromMP4(url){
 
 function processNextBatch() {
     if(currentBatchIndex < totalBatchSize) {
-        setTimeout(() => runSingleGeneration(currentBatchIndex), 1000);
+        setTimeout(() => {
+            // Al iniciar una nueva variante del batch, resetear el paso
+            // "Solo 1er pase" => 0; "Generar completo" => 1 (empezar por paso 1)
+            generationStep = window.currentBatchMode ? 0 : 1;
+            firstPromptId = null;
+            runSingleGeneration(currentBatchIndex);
+        }, 1000);
     } else {
         setRun("ok", "Batch finalizado");
         log("🏁 Todas las variantes han sido procesadas.", "l-ok");
@@ -2582,13 +2599,29 @@ function showVideo(slot, media){
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
 async function runSingleGeneration(index) {
     try {
-        const graph = buildGraph(window.currentBatchMode);
+        // --- Determinar qué grafo enviar según el paso ---
+        // generationStep:
+        //   0 = modo "Solo 1er pase" (firstPassOnly=true) — solo paso 1, no continúa
+        //   1 = paso 1 del "Generar completo" — continúa a paso 2 al acabar
+        //   2 = paso 2 del "Generar completo" — grafo completo (2º pase)
+        const isStep2 = (generationStep === 2);
+        // firstPassOnly=true => grafo sin FINAL_SAVE (paso 1)
+        // firstPassOnly=false => grafo completo (paso 2 del completo, o modo "completo" directo)
+        const firstPassOnly = isStep2 ? false : true;
+        const graph = buildGraph(firstPassOnly);
         // Seed(rgthree) con -1 solo se randomiza en el editor de ComfyUI (JS del nodo);
         // por la API llega tal cual. Generamos aquí la semilla real para cada variante.
-        const seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("seedVal").value, 10);
+        // En el paso 2 del completo, hay que reusar la misma semilla del paso 1.
+        let seedUsed;
+        if(isStep2 && firstPromptId && pendingSeeds[firstPromptId] != null){
+            seedUsed = pendingSeeds[firstPromptId];
+        } else {
+            seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("seedVal").value, 10);
+        }
         graph[N.SEED].inputs.seed = seedUsed;
 
-        log(`🚀 Procesando variante ${index + 1}/${totalBatchSize} (seed ${seedUsed})...`);
+        const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${index + 1}/${totalBatchSize}`);
+        log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
@@ -2602,12 +2635,23 @@ async function runSingleGeneration(index) {
 
         pendingSeeds[data.prompt_id] = seedUsed;
         currentPromptId = data.prompt_id;
-        startTimer(data.prompt_id, window.currentBatchMode ? 1 : 2);
+        // Registrar el paso de este prompt
+        promptSteps[data.prompt_id] = isStep2 ? "2" : "1";
+        if(!isStep2 && generationStep === 1){
+            // Paso 1 del "completo": guardar el prompt_id para el paso 2
+            firstPromptId = data.prompt_id;
+        }
+        // Cronómetro en el slot correspondiente: paso 1 -> slot 1, paso 2 -> slot 2
+        startTimer(data.prompt_id, isStep2 ? 2 : 1);
         pollFallback(data.prompt_id); // respaldo por si el WS no avisa
     } catch(err) {
         // Si el envío falla (p.ej. validación del grafo), no se queda colgado:
         // se registra el fallo y se pasa a la siguiente variante del batch.
-        log(`❌ No se pudo encolar la variante ${index + 1}: ${err.message}`, "l-err");
+        log(`❌ No se pudo encolar: ${err.message}`, "l-err");
+        if(generationStep === 1){
+            // Fallo en paso 1 del completo: no continuamos al paso 2
+            generationStep = 0;
+        }
         currentBatchIndex++;
         processNextBatch();
     }
@@ -2620,6 +2664,10 @@ async function queueAndWait(firstPassOnly){
   currentBatchIndex = 0;
   batchSeedMode = seedMode; // capturado aquí: el toggle en vivo puede cambiar tras cada variante
   window.currentBatchMode = firstPassOnly;
+  // Inicializar el estado de pasos del modo "Generar completo"
+  // generationStep: 1 = paso 1 en curso (continuará a paso 2); 0 = "Solo 1er pase" (no hay paso 2)
+  generationStep = firstPassOnly ? 0 : 1;
+  firstPromptId = null;
   setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
   $("btnFirstPass").disabled=true;
   $("btnFull").disabled=true;
@@ -2919,7 +2967,10 @@ async function stopCurrentVideo(){
   } catch(e) { /* si falla, igual limpiamos local */ }
   discardTimer(pid);
   delete pendingSeeds[pid];
+  delete promptSteps[pid];
   handledPrompts.add(pid);
+  // Si se cancela el paso 1 del completo, no continuar al paso 2
+  if(generationStep === 1) generationStep = 0;
   log("⏹ Video actual detenido.", "l-err");
   currentBatchIndex++;
   processNextBatch();
@@ -2934,9 +2985,12 @@ async function stopAll(){
   } catch(e) { /* si falla, igual limpiamos local */ }
   for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   pendingSeeds = {};
+  promptSteps = {};
   handledPrompts.clear();
   processingPrompts.clear();
   currentPromptId = null;
+  firstPromptId = null;
+  generationStep = 0;
   currentBatchIndex = totalBatchSize;
   enableStopButtons(false);
   $("btnFirstPass").disabled=false;
