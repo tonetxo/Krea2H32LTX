@@ -129,8 +129,11 @@ def main():
   
   /* Estructura vidbox corregida */
   .vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;flex:1;display:flex;flex-direction:column; position: relative;}
-  .vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-  .vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
+  .vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; gap: 10px;}
+  .vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px; flex:1;}
+  .vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
+  .vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;}
+  .vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
   .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; min-height: 24px; gap: 10px;}
   .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
   .time-tag.live{color:var(--warn);}
@@ -312,6 +315,9 @@ def main():
       <div class="vidbox">
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
         </div>
         <div class="empty" id="empty1">sin generar</div>
         <video id="video1" controls allowfullscreen playsinline style="display:none"></video>
@@ -326,6 +332,9 @@ def main():
       <div class="vidbox">
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
         </div>
         <div class="empty" id="empty2">sin generar</div>
         <video id="video2" controls allowfullscreen playsinline style="display:none"></video>
@@ -384,6 +393,7 @@ let batchSeedMode = "random"; // modo capturado al lanzar el batch (independient
 let currentPromptId = null;   // prompt_id de la variante que se está ejecutando ahora
 let timers = {};               // prompt_id -> { start, iv }
 let promptSteps = {};          // prompt_id -> "1" (first-only / step-1) | "2" (step-2)
+let currentMedia = {};         // slot -> {filename, subfolder, type} del vídeo cargado en ventana principal
 // --- Modo "Generar completo" en 2 pasos ---
 // El backend solo emite execution_success al final de TODO el grafo. Si mandamos
 // el grafo completo de golpe, el 1er pase y el final aparecen a la vez y con el
@@ -752,7 +762,6 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
             <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
             <span class="variant-icons">
                 <a href="${url}" download style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation();" title="Descargar">⬇</a>
-                <button class="variant-meta-btn" title="Cargar metadatos de este vídeo" onclick="event.stopPropagation();">📋</button>
                 <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
             </span>
         </div>
@@ -807,29 +816,10 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
         }
     });
 
-    // Botón Cargar metadatos (📋) del card -> extrae workflow del MP4
-    const metaBtn = card.querySelector(".variant-meta-btn");
-    metaBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const metaBtnEl = e.currentTarget;
-        const originalHTML = metaBtnEl.innerHTML;
-        metaBtnEl.disabled = true;
-        metaBtnEl.textContent = "⏳";
-        try {
-            const workflow = await extractWorkflowFromMP4(url);
-            if(workflow) applyWorkflow(workflow);
-            else log("ℹ️ Este vídeo no contiene metadatos de workflow.", "l-info");
-        } catch(err){
-            log("❌ Error leyendo metadatos del vídeo: "+err.message, "l-err");
-        } finally {
-            metaBtnEl.disabled = false;
-            metaBtnEl.innerHTML = originalHTML;
-        }
-    });
-
     // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
     card.addEventListener("click", (e) => {
-        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn") || e.target.closest(".variant-meta-btn") || e.target.closest("video")) return;
+        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
+        // Si se hace click en el propio video, también se carga en la ventana principal
         showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type });
         log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
     });
@@ -1404,68 +1394,65 @@ function applyWorkflow(workflow){
     if(typeof v === "string") return parseFloat(v) || null;
     return null;
   }
+  function parseMxValue(node){
+    // Los mxSlider de este workflow guardan el valor en inputs.Xi / Xf, no en inputs.value
+    if(!node || !node.inputs) return null;
+    if(node.inputs.Xi != null) return parseFrameValue(node.inputs.Xi);
+    if(node.inputs.Xf != null) return parseFrameValue(node.inputs.Xf);
+    if(node.inputs.value != null) return parseFrameValue(node.inputs.value);
+    return null;
+  }
   const emptyLatent = findByClass("EmptyLTXVLatentVideo");
-  if(emptyLatent && emptyLatent.inputs && emptyLatent.inputs.width != null){
-    $("width").value = Math.round(parseFrameValue(emptyLatent.inputs.width));
-    $("height").value = Math.round(parseFrameValue(emptyLatent.inputs.height));
+  if(emptyLatent && emptyLatent.inputs && (emptyLatent.inputs.width != null || emptyLatent.inputs.length != null)){
+    const w = parseFrameValue(emptyLatent.inputs.width);
+    const h = parseFrameValue(emptyLatent.inputs.height);
+    if(w != null) $("width").value = Math.round(w);
+    if(h != null) $("height").value = Math.round(h);
     const len = parseFrameValue(emptyLatent.inputs.length);
     if(len != null) $("frames").value = Math.round(len);
-    const w = parseFrameValue(emptyLatent.inputs.width), h = parseFrameValue(emptyLatent.inputs.height);
     if(w && h){
-      const ar = w / h;
-      const ratios = {
-        "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
-        "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
-        "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
-      };
-      let best = "", bestDiff = Infinity;
-      for(const [label, val] of Object.entries(ratios)){
-        const diff = Math.abs(ar - val);
-        if(diff < bestDiff){ bestDiff = diff; best = label; }
-      }
-      if(best && $("aspectRatio")) $("aspectRatio").value = best;
+      currentAspectRatio = w / h;
+      // No hay select de aspect ratio en esta UI; recalcular megapíxeles para mantener coherencia
+      const mp = (w * h) / 1_000_000;
+      $("mpSlider").value = Math.min(Math.max(mp, 0.3), 2.0).toFixed(2);
+      $("mpVal").textContent = $("mpSlider").value;
     }
   } else {
-    // Fallback: mxSlider con title "Video Width/Height/Length"
+    // Fallback: mxSlider por título
     const mxSliders = findAllByClass("mxSlider");
     let w = null, h = null;
     for(const {node} of mxSliders){
       const title = node._meta?.title || "";
-      if(/width/i.test(title)) w = parseFrameValue(node.inputs?.value);
-      if(/height/i.test(title)) h = parseFrameValue(node.inputs?.value);
+      if(/width/i.test(title)) w = parseMxValue(node);
+      if(/height/i.test(title)) h = parseMxValue(node);
       if(/length|frame/i.test(title) && !/rate/i.test(title)){
-        $("frames").value = parseFrameValue(node.inputs?.value);
+        const len = parseMxValue(node);
+        if(len != null) $("frames").value = Math.round(len);
       }
     }
     if(w != null) $("width").value = Math.round(w);
     if(h != null) $("height").value = Math.round(h);
     if(w && h){
-      const ar = w / h;
-      const ratios = {
-        "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
-        "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
-        "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
-      };
-      let best = "", bestDiff = Infinity;
-      for(const [label, val] of Object.entries(ratios)){
-        const diff = Math.abs(ar - val);
-        if(diff < bestDiff){ bestDiff = diff; best = label; }
-      }
-      if(best && $("aspectRatio")) $("aspectRatio").value = best;
+      currentAspectRatio = w / h;
+      const mp = (w * h) / 1_000_000;
+      $("mpSlider").value = Math.min(Math.max(mp, 0.3), 2.0).toFixed(2);
+      $("mpVal").textContent = $("mpSlider").value;
     }
   }
+  updateDuration();
 
   // Fidelidad y Movimiento: mxSlider por título
   const mxSlidersAll = findAllByClass("mxSlider");
   for(const {node} of mxSlidersAll){
     const title = (node._meta?.title || "").toLowerCase();
-    if(/fidelity|conditioning/.test(title) && node.inputs?.value != null){
-      $("fidelitySlider").value = node.inputs.value;
-      $("fidelityVal").textContent = parseFloat(node.inputs.value).toFixed(2);
+    const val = parseMxValue(node);
+    if(/fidelity|conditioning/.test(title) && val != null){
+      $("fidelitySlider").value = val;
+      $("fidelityVal").textContent = parseFloat(val).toFixed(2);
     }
-    if(/motion|preprocess/.test(title) && node.inputs?.value != null){
-      $("motionSlider").value = node.inputs.value;
-      $("motionVal").textContent = parseFloat(node.inputs.value).toFixed(1);
+    if(/motion|preprocess/.test(title) && val != null){
+      $("motionSlider").value = val;
+      $("motionVal").textContent = parseFloat(val).toFixed(1);
     }
   }
 
@@ -1491,13 +1478,16 @@ function applyWorkflow(workflow){
   }
 
   // Semilla: buscar por varios nodos posibles
-  // 1. Seed (rgthree) — tiene widgets_values[0]
-  // 2. RandomNoise — tiene inputs.noise_seed
+  // 1. Seed (rgthree) — en este workflow tiene inputs.seed
+  // 2. widgets_values[0] (otros workflows)
+  // 3. RandomNoise — inputs.noise_seed
   let seedVal = null;
   const seedNode = findByClass("Seed (rgthree)");
-  if(seedNode && seedNode.widgets_values && typeof seedNode.widgets_values[0] === "number"){
-    seedVal = seedNode.widgets_values[0];
-  } else {
+  if(seedNode){
+    if(typeof seedNode.inputs?.seed === "number") seedVal = seedNode.inputs.seed;
+    else if(seedNode.widgets_values && typeof seedNode.widgets_values[0] === "number") seedVal = seedNode.widgets_values[0];
+  }
+  if(seedVal == null){
     const randomNoise = findByClass("RandomNoise");
     if(randomNoise && typeof randomNoise.inputs?.noise_seed === "number"){
       seedVal = randomNoise.inputs.noise_seed;
@@ -1612,9 +1602,11 @@ function findMedia(nodeOutput){
 function showVideo(slot, media){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
-  const v=$("video"+slot), empty=$("empty"+slot), dl=$("dl"+slot);
+  const v=$("video"+slot), empty=$("empty"+slot), dl=$("dl"+slot), btn=$("btnLoadMeta"+slot);
   v.src=url; v.style.display="block"; empty.style.display="none";
   dl.href=url; dl.style.display="inline";
+  if(btn) btn.disabled = false;
+  currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   // Mostrar resolución real del vídeo cuando cargue los metadatos
   const resEl=$("res"+slot);
   if(resEl){
@@ -1633,6 +1625,36 @@ function showVideo(slot, media){
     }
   }
 }
+
+// --- Botones "Recuperar workflow" en los reproductores principales ---
+function setupMetaButton(slot){
+  const btn = $("btnLoadMeta"+slot);
+  if(!btn) return;
+  btn.addEventListener("click", async () => {
+    const media = currentMedia[slot];
+    if(!media) { log("⚠️ No hay vídeo cargado en esta ventana", "l-err"); return; }
+    const url = `${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder)}&type=${encodeURIComponent(media.type)}`;
+    btn.disabled = true;
+    const originalHTML = btn.innerHTML;
+    btn.textContent = "⏳";
+    try {
+      const workflow = await extractWorkflowFromMP4(url);
+      if(workflow) {
+        applyWorkflow(workflow);
+        log(`📋 Workflow del slot ${slot} restaurado desde ${media.filename}`, "l-ok");
+      } else {
+        log("ℹ️ Este vídeo no contiene metadatos de workflow.", "l-info");
+      }
+    } catch(err){
+      log("❌ Error leyendo metadatos del vídeo: "+err.message, "l-err");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+    }
+  });
+}
+setupMetaButton(1);
+setupMetaButton(2);
 
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
 async function runSingleGeneration(index) {
