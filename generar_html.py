@@ -4,8 +4,21 @@ import os
 # --- CONFIGURACIÓN ---
 JSON_FILE = 'LTXV_DMD_OK.json'
 OUTPUT_HTML = 'LTXV_WebUI.html'
-LORAS_DIR = '/home/tonetxo/SwarmUI/Models/Lora/ltxv' 
+LORAS_DIR = '/home/tonetxo/SwarmUI/Models/Lora/ltxv'
+MODELS_DIR = '/home/tonetxo/SwarmUI/Models/Stable-Diffusion'
 # ---------------------
+
+def get_file_list(directory, ext='.safetensors', fallback=None):
+    files = []
+    if not os.path.exists(directory):
+        return [fallback] if fallback else []
+    for root, _, file_list in os.walk(directory):
+        for f in file_list:
+            if f.endswith(ext):
+                rel = os.path.relpath(os.path.join(root, f), directory)
+                files.append(rel.replace('\\', '/'))
+    files.sort()
+    return files if files else ([fallback] if fallback else [])
 
 def get_lora_list(directory):
     loras = []
@@ -31,6 +44,8 @@ def main():
 
     lora_files = get_lora_list(LORAS_DIR)
     lora_js_array = json.dumps(lora_files)
+    model_files = get_file_list(MODELS_DIR, fallback="10Eros_v1.3_fp8mixed_learned.safetensors")
+    model_js_array = json.dumps(model_files)
 
     html_template = r'''<!DOCTYPE html>
 <html lang="es">
@@ -260,6 +275,7 @@ def main():
       </div>
 
       <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
+      <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
       <div class="panel"><h2>LoRAs</h2><div id="loraList"></div></div>
       <div class="panel"><h2>Resolución & duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
       <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
@@ -305,9 +321,10 @@ def main():
 
 <script>
 const BASE_GRAPH = __GRAPH_JSON__;
+const AVAILABLE_MODELS = __MODEL_LIST__;
 const AVAILABLE_LORAS = __LORA_LIST__;
 
-const N = {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923"};
+const N = {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646"};
 const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
 let uploadedImage=null, localFile=null, seedMode="random";
 let currentAspectRatio = 16/9; // ratio w/h de la imagen cargada (por defecto 16:9)
@@ -1129,6 +1146,19 @@ function loadLoraState() {
     } catch (e) { console.error("Error cargando estado LoRA", e); }
   }
 }
+function loadModels(){
+  const sel = $("modelSelect");
+  if(!sel) return;
+  sel.innerHTML = "";
+  for(const m of AVAILABLE_MODELS){
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    if(m === "10Eros_v1.3_fp8mixed_learned.safetensors") opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+loadModels();
 function renderLoras(){
   const wrap=$("loraList"); wrap.innerHTML="";
   loras.forEach((l,i)=>{
@@ -1237,6 +1267,7 @@ function buildGraph(firstPassOnly){
   g[N.LORA].inputs.lora_1={on:loras[0].on,lora:loras[0].lora,strength:loras[0].strength};
   g[N.LORA].inputs.lora_2={on:loras[1].on,lora:loras[1].lora,strength:loras[1].strength};
   g[N.LORA].inputs.lora_3={on:loras[2].on,lora:loras[2].lora,strength:loras[2].strength};
+  if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs) g[N.CHECKPOINT].inputs.ckpt_name = $("modelSelect").value;
   if(firstPassOnly){delete g[N.FINAL_SAVE]; delete g[N.PURGE_VRAM];}
   return g;
 }
@@ -1631,6 +1662,7 @@ updateDuration();
 '''
 
     final_html = html_template.replace("__GRAPH_JSON__", graph_json)
+    final_html = final_html.replace("__MODEL_LIST__", model_js_array)
     final_html = final_html.replace("__LORA_LIST__", lora_js_array)
 
     with open(OUTPUT_HTML, 'w', encoding='utf-8') as f:
