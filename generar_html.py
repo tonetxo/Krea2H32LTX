@@ -848,11 +848,8 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
 // ComfyUI guarda el workflow en el JSON "extra" del MP4 con clave "prompt".
 // Buscamos la cadena literal "prompt": { y parseamos el JSON con un
 // parser de brackets que respeta strings.
-async function extractWorkflowFromMP4(url){
-  const r = await fetch(url);
-  if(!r.ok) throw new Error("HTTP "+r.status);
-  const buf = await r.arrayBuffer();
-  const bytes = new Uint8Array(buf);
+async function extractWorkflowFromMP4Buffer(arrayBuffer){
+  const bytes = new Uint8Array(arrayBuffer);
   const txt = new TextDecoder("latin1").decode(bytes);
   // Buscar el patrón del workflow: puede ser "prompt": { o directamente {"274": (workflow del MP4)
   let braceIdx = -1;
@@ -860,7 +857,6 @@ async function extractWorkflowFromMP4(url){
   if(patIdx >= 0){
     braceIdx = txt.indexOf('{', patIdx);
   } else {
-    // Buscar el primer { que parezca un workflow ({"NUMERO": {"inputs": ...)
     const m = txt.match(/\{"\d+":\s*\{/);
     if(m) braceIdx = m.index;
   }
@@ -888,6 +884,12 @@ async function extractWorkflowFromMP4(url){
     console.warn("No se pudo parsear workflow del MP4:", e.message);
     return null;
   }
+}
+
+async function extractWorkflowFromMP4(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return extractWorkflowFromMP4Buffer(await r.arrayBuffer());
 }
 
 function processNextBatch() {
@@ -1588,6 +1590,12 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   vid.crossOrigin = "anonymous";
   vid.preload = "auto";
 
+  // Leer metadatos del vídeo directamente desde el File (evita problemas CORS/timing del blob URL)
+  const metaPromise = file.arrayBuffer().then(buf => extractWorkflowFromMP4Buffer(buf)).catch(err => {
+    console.warn("Error leyendo metadatos del vídeo:", err);
+    return null;
+  });
+
   vid.addEventListener("loadeddata", () => {
     try {
       const canvas = document.createElement("canvas");
@@ -1616,7 +1624,14 @@ function handleVideoFile(file, shouldSaveToGallery = true){
         log(`🎬 Vídeo cargado: ${file.name} (frame inicial como imagen de entrada)`, "l-ok");
 
         // Intentar recuperar workflow desde los metadatos del vídeo original
-        recoverWorkflowFromVideoFile(videoUrl, file.name);
+        metaPromise.then(workflow => {
+          if(workflow){
+            log(`📋 Workflow encontrado en ${file.name}`, "l-ok");
+            applyWorkflow(workflow);
+          } else {
+            log(`ℹ️ ${file.name} no contiene metadatos de workflow.`, "l-warn");
+          }
+        });
       });
     } catch(err) {
       log("❌ Error extrayendo frame del vídeo: " + err.message, "l-err");
@@ -1631,20 +1646,6 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   }, { once: true });
 
   vid.src = videoUrl;
-}
-
-async function recoverWorkflowFromVideoFile(videoUrl, fileName){
-  try {
-    const workflow = await extractWorkflowFromMP4(videoUrl);
-    if(workflow){
-      log(`📋 Workflow encontrado en ${fileName}`, "l-ok");
-      applyWorkflow(workflow);
-    } else {
-      log(`ℹ️ ${fileName} no contiene metadatos de workflow.`, "l-warn");
-    }
-  } catch(err){
-    log("⚠️ No se pudieron leer metadatos del vídeo: " + err.message, "l-warn");
-  }
 }
 
 $("btnTest").addEventListener("click", async ()=>{
