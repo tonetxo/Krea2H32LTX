@@ -316,7 +316,7 @@ def main():
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
           <div class="vid-actions">
-            <a class="vid-action-btn" id="btnDownload1" href="#" download onclick="event.stopPropagation();" title="Descargar vídeo" style="display:none;">⬇ Descargar</a>
+            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
             <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
         </div>
@@ -333,7 +333,7 @@ def main():
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
           <div class="vid-actions">
-            <a class="vid-action-btn" id="btnDownload2" href="#" download onclick="event.stopPropagation();" title="Descargar vídeo" style="display:none;">⬇ Descargar</a>
+            <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
             <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
         </div>
@@ -1601,7 +1601,7 @@ function showVideo(slot, media){
   const v=$("video"+slot), empty=$("empty"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot);
   v.src=url; v.style.display="block"; empty.style.display="none";
   if(btn) btn.disabled = false;
-  if(dl){ dl.href=url; dl.style.display="inline-flex"; }
+  if(dl) dl.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   // Mostrar resolución real del vídeo cuando cargue los metadatos
   const resEl=$("res"+slot);
@@ -1651,6 +1651,40 @@ function setupMetaButton(slot){
 }
 setupMetaButton(1);
 setupMetaButton(2);
+
+// --- Botones "Descargar" en los reproductores principales ---
+function setupDownloadButton(slot){
+  const btn = $("btnDownload"+slot);
+  if(!btn) return;
+  btn.addEventListener("click", async () => {
+    const media = currentMedia[slot];
+    if(!media) { log("⚠️ No hay vídeo cargado en esta ventana", "l-err"); return; }
+    const url = `${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder)}&type=${encodeURIComponent(media.type)}`;
+    btn.disabled = true;
+    const originalHTML = btn.innerHTML;
+    btn.textContent = "⏳";
+    try {
+      const r = await fetch(url);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = media.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+      log(`⬇ Descargado ${media.filename}`, "l-ok");
+    } catch(err){
+      log("❌ Error descargando vídeo: "+err.message, "l-err");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+    }
+  });
+}
+setupDownloadButton(1);
+setupDownloadButton(2);
 
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
 async function runSingleGeneration(index) {
