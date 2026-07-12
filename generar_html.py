@@ -60,10 +60,12 @@ def main():
 
     lora_files = get_lora_list(LORAS_DIR)
     lora_js_array = json.dumps(lora_files)
-    model_files = get_file_list([
+    raw_models = get_file_list([
         ('/media/tonetxo/datos/ltxv', 'ltxv'),
         ('/home/tonetxo/SwarmUI/Models/Stable-Diffusion', ''),
     ], fallback="10Eros_v1.3_fp8mixed_learned.safetensors")
+    exclude = ("StableAudio/", "HiDream/", "sam3.1_multiplex_fp16", "lens_turbo_bf16")
+    model_files = [m for m in raw_models if not any(m.startswith(x) for x in exclude)]
     model_js_array = json.dumps(model_files)
 
     html_template = r'''<!DOCTYPE html>
