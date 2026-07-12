@@ -277,6 +277,7 @@ def main():
         <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
         <div class="ref-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
           <button id="btnCaption" class="ghost" style="flex:1;min-width:140px;">Caption (imagen referencia)</button>
+          <button id="btnSendRefLtxv" class="ghost" style="flex:1;min-width:140px;">→ LTXV</button>
           <button id="btnLoadMeta" class="ghost" style="flex:1;min-width:140px;">Cargar metadatos</button>
         </div>
       </div>
@@ -1434,6 +1435,30 @@ $("btnCaption").addEventListener("click", async () => {
   } finally {
     $("btnCaption").disabled = false;
     $("btnCaption").textContent = "Caption (imagen referencia)";
+  }
+});
+
+$("btnSendRefLtxv").addEventListener("click", () => {
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia.", "l-err");
+    return;
+  }
+  const src = refImgEl.src;
+  // Si es una URL de /view?filename=..., extraer el filename
+  const m = src.match(/[?&]filename=([^&]+)/);
+  if(m){
+    const filename = decodeURIComponent(m[1]);
+    const ref = encodeURIComponent(filename);
+    const here = window.location;
+    const targetHost = here.hostname;
+    const targetPort = "8000";
+    const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
+    const win = window.open(url, "_blank");
+    if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
+    else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
+  } else {
+    log("⚠️ La imagen de referencia no está en disco (es data:URL). Guárdala primero o usa la galería de variantes.", "l-err");
   }
 });
 
