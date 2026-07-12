@@ -186,6 +186,8 @@ def main():
   .variant-card video { width: 100%; height: auto; max-height: 240px; object-fit: contain; background: #000; }
   .variant-info { padding: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
+  .variant-meta-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
+  .variant-meta-btn:hover{color:var(--accent);background:rgba(87,232,201,.12);}
   .variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
   .variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
   .variant-seed-display { color: var(--accent); cursor: pointer; user-select: text; display: flex; align-items: center; gap: 6px; }
@@ -831,12 +833,17 @@ async function extractWorkflowFromMP4(url){
   if(!r.ok) throw new Error("HTTP "+r.status);
   const buf = await r.arrayBuffer();
   const bytes = new Uint8Array(buf);
-  // Decodificar como latin1 para encontrar el patrón (los bytes son ASCII)
   const txt = new TextDecoder("latin1").decode(bytes);
+  // Buscar el patrón del workflow: puede ser "prompt": { o directamente {"274": (workflow del MP4)
+  let braceIdx = -1;
   const patIdx = txt.indexOf('"prompt": {');
-  if(patIdx < 0) return null;
-  // Encontrar el { raíz (justo después de ": ")
-  const braceIdx = txt.indexOf('{', patIdx);
+  if(patIdx >= 0){
+    braceIdx = txt.indexOf('{', patIdx);
+  } else {
+    // Buscar el primer { que parezca un workflow ({"NUMERO": {"inputs": ...)
+    const m = txt.match(/\{"\d+":\s*\{/);
+    if(m) braceIdx = m.index;
+  }
   if(braceIdx < 0) return null;
   // Parser de brackets que respeta strings y secuencias de escape
   let depth = 0, i = braceIdx, inString = false, escape = false;
