@@ -608,6 +608,15 @@ async function handlePromptDone(promptId) {
         return; // aún no ha terminado
     }
 
+    // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
+    // descartamos silenciosamente cualquier execution_success tardío del backend.
+    // Esto evita que una generación anterior interrumpida dispare el paso 2 de la actual.
+    if(!(promptId in pendingSeeds)){
+        handledPrompts.add(promptId);
+        processingPrompts.delete(promptId);
+        return;
+    }
+
     handledPrompts.add(promptId);
     processingPrompts.delete(promptId);
 
@@ -666,7 +675,6 @@ async function handlePromptDone(promptId) {
         // cacheó), no lo mostramos de nuevo en slot 1.
     }
 
-    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
     delete promptSteps[promptId];
 
     // --- ¿Continuamos con el paso 2? ---
@@ -684,6 +692,7 @@ async function handlePromptDone(promptId) {
     }
 
     // Si llegamos aquí, el proceso ha terminado completamente (1er pase puro o paso 2 completo)
+    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
     delete pendingSeeds[promptId];
     generationStep = 0;
     firstPromptId = null;
@@ -2018,7 +2027,10 @@ async function stopCurrentVideo(){
   delete promptSteps[pid];
   handledPrompts.add(pid);
   // Si se cancela el paso 1 del completo, no continuar al paso 2
-  if(generationStep === 1) generationStep = 0;
+  if(generationStep === 1){
+    generationStep = 0;
+    if(firstPromptId) handledPrompts.add(firstPromptId);
+  }
   log("⏹ Video actual detenido.", "l-err");
   currentBatchIndex++;
   processNextBatch();
@@ -2031,10 +2043,16 @@ async function stopAll(){
       body:JSON.stringify({action:"cancel_all"})
     });
   } catch(e) { /* si falla, igual limpiamos local */ }
+  // Marcar como "handled" todos los prompts pendientes antes de limpiarlos, así
+  // si el backend sigue ejecutando una generación cancelada y luego emite
+  // execution_success, handlePromptDone la descarta en lugar de mezclarla
+  // con la siguiente generación.
+  for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);
+  if(currentPromptId) handledPrompts.add(currentPromptId);
+  if(firstPromptId) handledPrompts.add(firstPromptId);
   for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   pendingSeeds = {};
   promptSteps = {};
-  handledPrompts.clear();
   processingPrompts.clear();
   currentPromptId = null;
   firstPromptId = null;
