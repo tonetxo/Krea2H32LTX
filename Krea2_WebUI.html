@@ -894,7 +894,9 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
     else exitFs();
   });
 
-  return { resetZoom };
+  function getState(){ return { zoomLevel, zoomPanX, zoomPanY }; }
+
+  return { resetZoom, getState };
 }
 
 const outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
@@ -1659,6 +1661,53 @@ async function imageToResizedBase64(srcUrl, maxSide){
   return c.toDataURL("image/jpeg", 0.85).split(",")[1];
 }
 
+async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
+  const wrap = $(wrapId);
+  const img = wrap ? wrap.querySelector("img") : null;
+  if(!wrap || !img) return imageToResizedBase64(srcUrl, maxSide);
+  const transform = getComputedStyle(img).transform;
+  let scale = 1, tx = 0, ty = 0;
+  if(transform && transform !== "none"){
+    const m = new DOMMatrix(transform);
+    scale = m.a;
+    tx = m.m41;
+    ty = m.m42;
+  }
+  const resp = await fetch(srcUrl);
+  const blob = await resp.blob();
+  const bitmap = await createImageBitmap(blob);
+  const natW = bitmap.width;
+  const natH = bitmap.height;
+  const wrapRect = wrap.getBoundingClientRect();
+  const imgRect = img.getBoundingClientRect();
+  const renderedW = imgRect.width / scale;
+  const renderedH = imgRect.height / scale;
+  const baseScaleX = natW / renderedW;
+  const baseScaleY = natH / renderedH;
+  const viewportX = -tx;
+  const viewportY = -ty;
+  const sx = viewportX / scale;
+  const sy = viewportY / scale;
+  const sw = wrapRect.width / scale;
+  const sh = wrapRect.height / scale;
+  let sxNat = sx * baseScaleX;
+  let syNat = sy * baseScaleY;
+  let swNat = sw * baseScaleX;
+  let shNat = sh * baseScaleY;
+  sxNat = Math.max(0, Math.min(natW, sxNat));
+  syNat = Math.max(0, Math.min(natH, syNat));
+  swNat = Math.max(0, Math.min(natW - sxNat, swNat));
+  shNat = Math.max(0, Math.min(natH - syNat, shNat));
+  const outScale = Math.min(1, maxSide / Math.max(swNat, shNat));
+  const outW = Math.max(1, Math.round(swNat * outScale));
+  const outH = Math.max(1, Math.round(shNat * outScale));
+  const c = document.createElement("canvas");
+  c.width = outW; c.height = outH;
+  c.getContext("2d").drawImage(bitmap, sxNat, syNat, swNat, shNat, 0, 0, outW, outH);
+  bitmap.close();
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+
 $("btnCaption").addEventListener("click", async () => {
   const model = $("enhancerModel").value;
   if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
@@ -1675,7 +1724,7 @@ $("btnCaption").addEventListener("click", async () => {
   $("btnCaption").textContent = "Analizando imagen...";
   $("enhancerOutput").value = "";
   try {
-    const b64 = await imageToResizedBase64(refImgEl.src, 1280);
+    const b64 = await getVisibleRegionBase64(refImgEl.src, "refWrap", 1280);
     const r = await fetchWithRetry("/api/generate", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
