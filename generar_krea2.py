@@ -81,7 +81,7 @@ def main():
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
   .server-row{display:flex;gap:8px;}.server-row input{flex:1;}
   .results-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;}
-  .imgbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;flex:1;display:flex;flex-direction:column;}
+  .imgbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;}
   .img-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
   .img-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
   .img-header-actions{display:flex;gap:4px;}
