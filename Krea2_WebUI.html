@@ -1114,7 +1114,7 @@ function extractWorkflowFromImage(url){
         if(keyword === "prompt"){
           workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
         }
-        if(keyword === "sui_image_params"){
+        if(keyword === "sui_image_params" || keyword === "parameters"){
           swarmRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
         }
         if(workflowRaw && swarmRaw) break;
