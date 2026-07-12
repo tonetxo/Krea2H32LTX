@@ -141,6 +141,8 @@ def main():
   .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   
   video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh;}
+  .video-wrap{position:relative;}
+  .video-badge{position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid var(--accent);pointer-events:none;z-index:3;}
   .empty{height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
   .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
   .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
@@ -186,8 +188,9 @@ def main():
   /* Estilos Galería Variantes */
   .variant-gallery { margin-top: 20px; }
   .variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-  .variant-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; cursor: pointer; }
+  .variant-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; cursor: pointer; position: relative; }
   .variant-card video { width: 100%; height: auto; max-height: 240px; object-fit: contain; background: #000; pointer-events: none; }
+  .variant-badge { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.75); color: var(--accent); font-family: var(--mono); font-size: 10px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--accent); pointer-events: none; z-index: 3; }
   .variant-info { padding: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
   .variant-meta-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
@@ -321,7 +324,10 @@ def main():
           </div>
         </div>
         <div class="empty" id="empty1">sin generar</div>
-        <video id="video1" controls allowfullscreen playsinline style="display:none"></video>
+        <div class="video-wrap" id="wrap1" style="display:none;">
+          <span class="video-badge" id="badge1"></span>
+          <video id="video1" controls allowfullscreen playsinline></video>
+        </div>
         <div class="vid-footer">
           <span class="time-tag" id="time1"></span>
           <span class="res-tag" id="res1"></span>
@@ -338,7 +344,10 @@ def main():
           </div>
         </div>
         <div class="empty" id="empty2">sin generar</div>
-        <video id="video2" controls allowfullscreen playsinline style="display:none"></video>
+        <div class="video-wrap" id="wrap2" style="display:none;">
+          <span class="video-badge" id="badge2"></span>
+          <video id="video2" controls allowfullscreen playsinline></video>
+        </div>
         <div class="vid-footer">
           <span class="time-tag" id="time2"></span>
           <span class="res-tag" id="res2"></span>
@@ -660,16 +669,16 @@ async function handlePromptDone(promptId) {
     if(isFirstOnly){
         // Solo 1er pase (botón "Solo 1er pase" o paso 1 del completo)
         if(media1){
-            showVideo(1, media1);
+            showVideo(1, media1, { variantIndex: currentBatchIndex + 1 });
             paint(1, "1er", tTotal || "—");
-            addToVariantGallery(media1, realSeed, tTotal || "", 1);
+            addToVariantGallery(media1, realSeed, tTotal || "", 1, currentBatchIndex + 1);
         }
     } else {
         // Paso 2 del completo (o grafo completo sin pasos): el final está listo
         if(media2){
-            showVideo(2, media2);
+            showVideo(2, media2, { variantIndex: currentBatchIndex + 1 });
             paint(2, "final", tTotal || "—");
-            addToVariantGallery(media2, realSeed, tTotal || "", 2);
+            addToVariantGallery(media2, realSeed, tTotal || "", 2, currentBatchIndex + 1);
         }
         // Si por casualidad el paso 2 también trae FIRST_SAVE (no debería si lo
         // cacheó), no lo mostramos de nuevo en slot 1.
@@ -733,7 +742,7 @@ function updateSeedUI(seedValue) {
 // {filename, subfolder, type} — antes se reimplementaba el parseo aquí con
 // claves equivocadas (media.images) y casi nunca encontraba el archivo real,
 // cayendo siempre en el fallback "video.mp4" (inexistente -> vídeo roto).
-function addToVariantGallery(media, seedValue, timeText, slot) {
+function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     if(!media || !media.filename) {
         log("⚠️ No se encontró vídeo de salida para añadir a la galería de variantes.", "l-err");
         return;
@@ -748,10 +757,12 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
 
     // Determinar qué texto mostrar
     const hasSeed = seedValue !== null && seedValue !== undefined;
-    const slotLabel = slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${currentBatchIndex + 1}`);
+    const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
+    const slotLabel = slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${idx}`);
     const displayText = hasSeed ? String(seedValue) : slotLabel;
     const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
     const timeStr = timeText || "";
+    const typeShort = slot === 1 ? "1er" : (slot === 2 ? "final" : "var");
 
     const card = document.createElement("div");
     card.className = "variant-card";
@@ -759,9 +770,11 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
     card.dataset.subfolder = subfolder;
     card.dataset.type = type;
     card.dataset.slot = String(slot);
+    card.dataset.variantIndex = String(idx);
 
     // Usamos un span limpio solo con el texto y el icono
     card.innerHTML = `
+        <span class="variant-badge">Var ${idx} · ${typeShort}</span>
         <video src="${url}" type="video/mp4" controls muted preload="metadata" playsinline></video>
         <div class="variant-info">
             <span class="variant-seed-display" title="${tooltipText}">
@@ -827,7 +840,7 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
     // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
     card.addEventListener("click", (e) => {
         if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn")) return;
-        showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type });
+        showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type }, { variantIndex: parseInt(card.dataset.variantIndex, 10) || (currentBatchIndex + 1) });
         log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
     });
 
@@ -1594,14 +1607,22 @@ function findMedia(nodeOutput){
   return null;
 }
 
-function showVideo(slot, media){
+function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
-  const v=$("video"+slot), empty=$("empty"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot);
-  v.src=url; v.style.display="block"; empty.style.display="none";
+  const v=$("video"+slot), empty=$("empty"+slot), wrap=$("wrap"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot);
+  v.src=url;
+  empty.style.display="none";
+  if(wrap) wrap.style.display="block";
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
+  // Etiqueta de variante + tipo encima del vídeo
+  if(badge){
+    const varIndex = options.variantIndex != null ? options.variantIndex : (currentBatchIndex + 1);
+    const typeLabel = slot === 1 ? "1er" : "final";
+    badge.textContent = `Var ${varIndex} · ${typeLabel}`;
+  }
   // Mostrar resolución real del vídeo cuando cargue los metadatos
   const resEl=$("res"+slot);
   if(resEl){
