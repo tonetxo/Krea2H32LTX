@@ -1460,7 +1460,7 @@ function applyWorkflow(workflow){
       const strength = lora.strength;
       if(loraName && loraName !== "None"){
         loras[i].lora = loraName.replace(/^ltxv\//, "");
-        loras[i].on = (strength != null && strength > 0);
+        loras[i].on = lora.on === true;
         loras[i].strength = (strength != null) ? strength : 0;
       } else {
         loras[i].on = false;
