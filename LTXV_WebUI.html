@@ -1795,7 +1795,7 @@ function addToVariantGallery(media, seedValue, timeText, slot) {
 
     // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
     card.addEventListener("click", (e) => {
-        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn") || e.target.closest("video") || e.target.closest(".variant-meta-btn")) return;
+        if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn") || e.target.closest(".variant-meta-btn")) return;
         showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type });
         log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
     });
@@ -2297,16 +2297,51 @@ function extractWorkflowFromImage(url){
 }
 
 function applyWorkflow(workflow){
-  // Mapear nodos del workflow a los controles de la UI
-  const N = {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646"};
-  const g = workflow;
+  // Buscar nodos por class_type (más robusto que por ID, que cambia entre workflows)
+  function findByClass(gt){
+    for(const k of Object.keys(workflow)){
+      if(workflow[k] && workflow[k].class_type === gt) return workflow[k];
+    }
+    return null;
+  }
+  function findAllByClass(gt){
+    const out = [];
+    for(const k of Object.keys(workflow)){
+      if(workflow[k] && workflow[k].class_type === gt) out.push({id: k, node: workflow[k]});
+    }
+    return out;
+  }
 
-  // Prompt
-  if(g[N.PROMPT]) $("prompt").value = g[N.PROMPT].inputs.text || "";
+  // Prompt: buscar CLIPTextEncode cuyo text no sea un negative prompt.
+  // El negative prompt suele empezar con palabras negativas y ser corto-mediano.
+  // El positivo es narrativo y largo.
+  const textEncoders = findAllByClass("CLIPTextEncode");
+  function isNegativePrompt(t){
+    // Empieza con palabras negativas típicas O es corto con muchas negativas
+    const startsNeg = /^\s*(blurry|low quality|distorted|ugly|watermark|worst|overexposed|underexposed|grainy|noise|out of focus|deformed|jpeg|nsfw|mutation|cropped)/i.test(t);
+    const manyNegWords = (t.match(/\b(blurry|low quality|distorted|ugly|watermark|worst|overexposed|underexposed|grainy|deformed|mutation|artifacts)\b/gi) || []).length >= 3;
+    return startsNeg || manyNegWords;
+  }
+  for(const {node} of textEncoders){
+    const t = (node.inputs && node.inputs.text) || "";
+    if(!isNegativePrompt(t) && t.length > 50){
+      $("prompt").value = t;
+      break;
+    }
+  }
+  // Si no encontramos, usar el CLIPTextEncode con texto más largo
+  if(!$("prompt").value && textEncoders.length){
+    let longest = textEncoders[0].node;
+    for(const {node} of textEncoders){
+      if((node.inputs?.text || "").length > (longest.inputs?.text || "").length) longest = node;
+    }
+    $("prompt").value = longest.inputs?.text || "";
+  }
 
-  // Modelo
-  if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs && g[N.CHECKPOINT].inputs.ckpt_name){
-    const name = g[N.CHECKPOINT].inputs.ckpt_name;
+  // Modelo: CheckpointLoaderSimple con ckpt_name
+  const checkpoint = findByClass("CheckpointLoaderSimple");
+  if(checkpoint && checkpoint.inputs && checkpoint.inputs.ckpt_name){
+    const name = checkpoint.inputs.ckpt_name;
     const sel = $("modelSelect");
     if(sel){
       for(const opt of sel.options){
@@ -2317,43 +2352,84 @@ function applyWorkflow(workflow){
     }
   }
 
-  // Resolución (ancho / alto)
-  if(g[N.WIDTH] && g[N.WIDTH].inputs.Xi != null) $("width").value = Math.round(g[N.WIDTH].inputs.Xi);
-  if(g[N.HEIGHT] && g[N.HEIGHT].inputs.Xi != null) $("height").value = Math.round(g[N.HEIGHT].inputs.Xi);
-  if(g[N.WIDTH] || g[N.HEIGHT]){
-    const w = parseInt($("width").value, 10), h = parseInt($("height").value, 10);
-    const ar = w / h;
-    const ratios = {
-      "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
-      "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
-      "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
-    };
-    let best = "", bestDiff = Infinity;
-    for(const [label, val] of Object.entries(ratios)){
-      const diff = Math.abs(ar - val);
-      if(diff < bestDiff){ bestDiff = diff; best = label; }
+  // Resolución y frames: priorizar EmptyLTXVLatentVideo, fallback a mxSlider
+  function parseFrameValue(v){
+    if(typeof v === "number") return v;
+    if(Array.isArray(v)) return parseFloat(String(v[0])) || null;
+    if(typeof v === "string") return parseFloat(v) || null;
+    return null;
+  }
+  const emptyLatent = findByClass("EmptyLTXVLatentVideo");
+  if(emptyLatent && emptyLatent.inputs && emptyLatent.inputs.width != null){
+    $("width").value = Math.round(parseFrameValue(emptyLatent.inputs.width));
+    $("height").value = Math.round(parseFrameValue(emptyLatent.inputs.height));
+    const len = parseFrameValue(emptyLatent.inputs.length);
+    if(len != null) $("frames").value = Math.round(len);
+    const w = parseFrameValue(emptyLatent.inputs.width), h = parseFrameValue(emptyLatent.inputs.height);
+    if(w && h){
+      const ar = w / h;
+      const ratios = {
+        "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
+        "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
+        "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
+      };
+      let best = "", bestDiff = Infinity;
+      for(const [label, val] of Object.entries(ratios)){
+        const diff = Math.abs(ar - val);
+        if(diff < bestDiff){ bestDiff = diff; best = label; }
+      }
+      if(best && $("aspectRatio")) $("aspectRatio").value = best;
     }
-    if(best && $("aspectRatio")) $("aspectRatio").value = best;
+  } else {
+    // Fallback: mxSlider con title "Video Width/Height/Length"
+    const mxSliders = findAllByClass("mxSlider");
+    let w = null, h = null;
+    for(const {node} of mxSliders){
+      const title = node._meta?.title || "";
+      if(/width/i.test(title)) w = parseFrameValue(node.inputs?.value);
+      if(/height/i.test(title)) h = parseFrameValue(node.inputs?.value);
+      if(/length|frame/i.test(title) && !/rate/i.test(title)){
+        $("frames").value = parseFrameValue(node.inputs?.value);
+      }
+    }
+    if(w != null) $("width").value = Math.round(w);
+    if(h != null) $("height").value = Math.round(h);
+    if(w && h){
+      const ar = w / h;
+      const ratios = {
+        "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
+        "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
+        "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
+      };
+      let best = "", bestDiff = Infinity;
+      for(const [label, val] of Object.entries(ratios)){
+        const diff = Math.abs(ar - val);
+        if(diff < bestDiff){ bestDiff = diff; best = label; }
+      }
+      if(best && $("aspectRatio")) $("aspectRatio").value = best;
+    }
   }
 
-  // Frames
-  if(g[N.FRAMES] && g[N.FRAMES].inputs.Xi != null) $("frames").value = Math.round(g[N.FRAMES].inputs.Xi);
-
-  // Fidelidad y Movimiento
-  if(g[N.FIDELITY] && g[N.FIDELITY].inputs.Xi != null){
-    $("fidelitySlider").value = g[N.FIDELITY].inputs.Xi;
-    $("fidelityVal").textContent = parseFloat(g[N.FIDELITY].inputs.Xi).toFixed(2);
+  // Fidelidad y Movimiento: mxSlider por título
+  const mxSlidersAll = findAllByClass("mxSlider");
+  for(const {node} of mxSlidersAll){
+    const title = (node._meta?.title || "").toLowerCase();
+    if(/fidelity|conditioning/.test(title) && node.inputs?.value != null){
+      $("fidelitySlider").value = node.inputs.value;
+      $("fidelityVal").textContent = parseFloat(node.inputs.value).toFixed(2);
+    }
+    if(/motion|preprocess/.test(title) && node.inputs?.value != null){
+      $("motionSlider").value = node.inputs.value;
+      $("motionVal").textContent = parseFloat(node.inputs.value).toFixed(1);
+    }
   }
-  if(g[N.MOTION] && g[N.MOTION].inputs.Xi != null){
-    $("motionSlider").value = g[N.MOTION].inputs.Xi;
-    $("motionVal").textContent = parseFloat(g[N.MOTION].inputs.Xi).toFixed(1);
-  }
 
-  // LoRAs (Power Lora Loader rgthree, nodo 853)
-  if(g[N.LORA]){
+  // LoRAs: Power Lora Loader (rgthree)
+  const powerLora = findByClass("Power Lora Loader (rgthree)");
+  if(powerLora && powerLora.inputs){
     for(let i = 0; i < 3; i++){
       const slot = ["lora_1","lora_2","lora_3"][i];
-      const lora = g[N.LORA].inputs[slot];
+      const lora = powerLora.inputs[slot];
       if(!lora) continue;
       const loraName = lora.lora || "";
       const strength = lora.strength;
@@ -2369,15 +2445,27 @@ function applyWorkflow(workflow){
     saveLoraState();
   }
 
-  // Semilla
-  if(g[N.SEED] && g[N.SEED].inputs.seed != null && g[N.SEED].inputs.seed >= 0){
-    $("seedVal").value = g[N.SEED].inputs.seed;
+  // Semilla: buscar por varios nodos posibles
+  // 1. Seed (rgthree) — tiene widgets_values[0]
+  // 2. RandomNoise — tiene inputs.noise_seed
+  let seedVal = null;
+  const seedNode = findByClass("Seed (rgthree)");
+  if(seedNode && seedNode.widgets_values && typeof seedNode.widgets_values[0] === "number"){
+    seedVal = seedNode.widgets_values[0];
+  } else {
+    const randomNoise = findByClass("RandomNoise");
+    if(randomNoise && typeof randomNoise.inputs?.noise_seed === "number"){
+      seedVal = randomNoise.inputs.noise_seed;
+    }
+  }
+  if(seedVal != null && seedVal >= 0){
+    $("seedVal").value = seedVal;
     $("segFixed").classList.add("on");
     $("segRandom").classList.remove("on");
     $("seedVal").disabled = false;
   }
 
-  log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
+  log("📋 Parámetros restaurados desde metadatos.", "l-ok");
 }
 
 // --- RESTO DEL CÓDIGO ---
