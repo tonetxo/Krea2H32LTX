@@ -38,6 +38,9 @@
   .dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
   .dropzone .ph{padding:22px 0;font-family:var(--mono);font-size:11px;letter-spacing:.04em;}
   .dropzone input{display:none;}
+  .frame-selector{display:flex;gap:8px;margin-top:8px;}
+  .frame-selector button{flex:1;min-width:auto;}
+  .frame-selector button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
   .lora{border:1px solid var(--border);border-radius:6px;padding:10px 11px;margin-bottom:8px;background:var(--panel-2);}
   .lora.off{opacity:.5;}
   .lora-top{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
@@ -184,7 +187,7 @@
         <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
       </div>
 
-      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div></div>
+      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="krea2RecentToggle">
@@ -2540,6 +2543,10 @@ function handleFile(f, shouldSaveToGallery = true){
   const uniqueName = `temp_${Date.now()}_${f.name}`;
   localFile = new File([f], uniqueName, {type: f.type});
 
+  // Ocultar selector de frames si se cargó imagen
+  const frameSel = $("frameSelector");
+  if(frameSel) frameSel.style.display = "none";
+
   const reader = new FileReader();
   reader.onload = (e) => {
     // Solo guardar si es una carga nueva (drag/drop o input), no si es selección de galería
@@ -2563,8 +2570,11 @@ function handleFile(f, shouldSaveToGallery = true){
   reader.readAsDataURL(f);
 }
 
-// Cargar vídeo: extraer primer frame como imagen de entrada, intentar recuperar workflow
+let currentVideoFile = null;
+
+// Cargar vídeo: mostrar selector de 1er/último frame y usar el elegido como imagen de entrada
 function handleVideoFile(file, shouldSaveToGallery = true){
+  currentVideoFile = file;
   const videoUrl = URL.createObjectURL(file);
   const vid = document.createElement("video");
   vid.muted = true;
@@ -2572,58 +2582,90 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   vid.crossOrigin = "anonymous";
   vid.preload = "auto";
 
-  // Leer metadatos del vídeo directamente desde el File (evita problemas CORS/timing del blob URL)
+  // Leer metadatos del vídeo directamente desde el File
   const metaPromise = file.arrayBuffer().then(buf => extractWorkflowFromMP4Buffer(buf)).catch(err => {
     console.warn("Error leyendo metadatos del vídeo:", err);
     return null;
   });
 
-  vid.addEventListener("loadeddata", () => {
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = vid.videoWidth || 640;
-      canvas.height = vid.videoHeight || 360;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+  function extractFrameAt(time, callback){
+    vid.currentTime = time;
+    vid.addEventListener("seeked", function onSeeked(){
+      vid.removeEventListener("seeked", onSeeked);
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = vid.videoWidth || 640;
+        canvas.height = vid.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+        callback(null, dataUrl);
+      } catch(err) { callback(err); }
+    }, { once: true });
+  }
 
-      // Convertir el dataURL a Blob/File para upload
-      fetch(dataUrl).then(r => r.blob()).then(blob => {
-        const frameName = `temp_${Date.now()}_${file.name.replace(/\.[^.]+$/, '')}_frame.jpg`;
-        localFile = new File([blob], frameName, {type: "image/jpeg"});
+  function setFrameAsInput(dataUrl, frameLabel){
+    fetch(dataUrl).then(r => r.blob()).then(blob => {
+      const frameName = `temp_${Date.now()}_${file.name.replace(/\.[^.]+$/, '')}_${frameLabel}.jpg`;
+      localFile = new File([blob], frameName, {type: "image/jpeg"});
 
-        const ph = dz.querySelector(".ph");
-        if(ph) ph.remove();
-        let img = dz.querySelector("img");
-        if(!img){
-          img = document.createElement("img");
-          dz.appendChild(img);
+      const ph = dz.querySelector(".ph");
+      if(ph) ph.remove();
+      let img = dz.querySelector("img");
+      if(!img){ img = document.createElement("img"); dz.appendChild(img); }
+      img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
+      img.src = dataUrl;
+
+      if(shouldSaveToGallery) addToGallery(dataUrl);
+      log(`🎬 Vídeo cargado: ${file.name} (${frameLabel} frame como imagen de entrada)`, "l-ok");
+
+      metaPromise.then(workflow => {
+        if(workflow){
+          log(`📋 Workflow encontrado en ${file.name}`, "l-ok");
+          applyWorkflow(workflow);
+        } else {
+          log(`ℹ️ ${file.name} no contiene metadatos de workflow.`, "l-warn");
         }
-        img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
-        img.src = dataUrl;
-
-        if(shouldSaveToGallery) addToGallery(dataUrl);
-        log(`🎬 Vídeo cargado: ${file.name} (frame inicial como imagen de entrada)`, "l-ok");
-
-        // Intentar recuperar workflow desde los metadatos del vídeo original
-        metaPromise.then(workflow => {
-          if(workflow){
-            log(`📋 Workflow encontrado en ${file.name}`, "l-ok");
-            applyWorkflow(workflow);
-          } else {
-            log(`ℹ️ ${file.name} no contiene metadatos de workflow.`, "l-warn");
-          }
-        });
       });
-    } catch(err) {
-      log("❌ Error extrayendo frame del vídeo: " + err.message, "l-err");
-    } finally {
-      URL.revokeObjectURL(videoUrl);
-    }
+    });
+  }
+
+  function showFrameSelector(){
+    const sel = $("frameSelector");
+    sel.style.display = "flex";
+    sel.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+
+    const useFirst = () => {
+      sel.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+      sel.querySelector('[data-frame="first"]').classList.add("active");
+      extractFrameAt(0, (err, dataUrl) => {
+        if(err) return log("❌ Error extrayendo 1er frame: " + err.message, "l-err");
+        setFrameAsInput(dataUrl, "1er");
+      });
+    };
+
+    const useLast = () => {
+      sel.querySelectorAll("button").forEach(b => b.classList.remove("active"));
+      sel.querySelector('[data-frame="last"]').classList.add("active");
+      const t = Math.max(0, vid.duration - 0.1);
+      extractFrameAt(t, (err, dataUrl) => {
+        if(err) return log("❌ Error extrayendo último frame: " + err.message, "l-err");
+        setFrameAsInput(dataUrl, "último");
+      });
+    };
+
+    sel.querySelector('[data-frame="first"]').onclick = useFirst;
+    sel.querySelector('[data-frame="last"]').onclick = useLast;
+    useFirst(); // por defecto 1er frame
+  }
+
+  vid.addEventListener("loadedmetadata", () => {
+    showFrameSelector();
+    URL.revokeObjectURL(videoUrl);
   }, { once: true });
 
   vid.addEventListener("error", () => {
-    log("❌ No se pudo reproducir el vídeo para extraer el frame", "l-err");
+    log("❌ No se pudo reproducir el vídeo para extraer frames", "l-err");
     URL.revokeObjectURL(videoUrl);
   }, { once: true });
 
