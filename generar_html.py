@@ -413,6 +413,7 @@ let currentMedia = {};         // slot -> {filename, subfolder, type} del vídeo
 //   el 2º pase (upscale + final). Mostramos vídeo en slot 2 con su tiempo.
 let generationStep = 0;       // 0 = inactivo; 1 = paso 1; 2 = paso 2
 let firstPromptId = null;     // prompt_id del paso 1 (para mostrar su vídeo al acabar)
+let finalVariantIndex = null; // índice de la variante original cuando se genera el final desde un 1er pase
 
 function fmtMs(ms){
   const s = Math.floor(ms / 1000);
@@ -675,9 +676,10 @@ async function handlePromptDone(promptId) {
     } else {
         // Paso 2 del completo (o grafo completo sin pasos): el final está listo
         if(media2){
-            showVideo(2, media2, { variantIndex: currentBatchIndex + 1 });
+            const finalIdx = finalVariantIndex != null ? (finalVariantIndex + 1) : (currentBatchIndex + 1);
+            showVideo(2, media2, { variantIndex: finalIdx });
             paint(2, "final", tTotal || "—");
-            addToVariantGallery(media2, realSeed, tTotal || "", 2, currentBatchIndex + 1);
+            addToVariantGallery(media2, realSeed, tTotal || "", 2, finalIdx);
         }
         // Si por casualidad el paso 2 también trae FIRST_SAVE (no debería si lo
         // cacheó), no lo mostramos de nuevo en slot 1.
@@ -695,6 +697,8 @@ async function handlePromptDone(promptId) {
         delete pendingSeeds[promptId];
         // Reinyectar la semilla del paso 1 para que runSingleGeneration la reutilice
         pendingSeeds[firstPromptId] = step1Seed;
+        // Recordar el índice de la variante original para etiquetar bien el vídeo final
+        finalVariantIndex = currentBatchIndex;
         runSingleGeneration(currentBatchIndex);  // MISMO índice, paso 2
         return;  // NO avanzar currentBatchIndex todavía
     }
@@ -704,6 +708,7 @@ async function handlePromptDone(promptId) {
     delete pendingSeeds[promptId];
     generationStep = 0;
     firstPromptId = null;
+    finalVariantIndex = null;
     currentBatchIndex++;
     processNextBatch();
 }
@@ -907,6 +912,7 @@ function processNextBatch() {
             // "Solo 1er pase" => 0; "Generar completo" => 1 (empezar por paso 1)
             generationStep = window.currentBatchMode ? 0 : 1;
             firstPromptId = null;
+            finalVariantIndex = null;
             runSingleGeneration(currentBatchIndex);
         }, 1000);
     } else {
