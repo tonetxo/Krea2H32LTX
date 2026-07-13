@@ -839,7 +839,12 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
     card.addEventListener("click", (e) => {
         if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn")) return;
-        showVideo(parseInt(card.dataset.slot, 10), { filename, subfolder, type }, { variantIndex: parseInt(card.dataset.variantIndex, 10) || (currentBatchIndex + 1) });
+        const varIndex = parseInt(card.dataset.variantIndex, 10) || (currentBatchIndex + 1);
+        // Los vídeos de slot 1 (1er pase) se cargan en el reproductor 1.
+        // Los vídeos de slot 2 (final) se cargan en el reproductor 2.
+        // Si el usuario quiere convertir un 1er pase en final, debe usar el workflow,
+        // no el click de la galería. Aquí respetamos el slot original de la variante.
+        showVideo(slot, { filename, subfolder, type }, { variantIndex: varIndex });
         log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
     });
 
