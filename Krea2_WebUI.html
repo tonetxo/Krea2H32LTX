@@ -800,7 +800,7 @@ function showImage(media){
 function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
   let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY;
   const wrap = $(wrapId);
-  if(!wrap) return { resetZoom: ()=>{} };
+  if(!wrap) return { resetZoom: ()=>{}, isFullscreen: ()=>false };
 
   function getImg(){ return $(imgId); }
 
@@ -884,6 +884,8 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
     }
   }
 
+  function isFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+
   if(fullscreenBtnId){
     const btn = $(fullscreenBtnId);
     if(btn){
@@ -910,11 +912,34 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
 
   function getState(){ return { zoomLevel, zoomPanX, zoomPanY }; }
 
-  return { resetZoom, getState };
+  return { resetZoom, getState, isFullscreen };
 }
 
 const outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
 const refZoom = setupZoomPan("refWrap", "refImg", "btnResetZoomRef", "btnFullscreenRef");
+
+// Navegación de la imagen de referencia en pantalla completa con flechas
+function navigateRefVariant(dir){
+  const grid = $("variantGrid");
+  if(!grid) return;
+  const cards = Array.from(grid.querySelectorAll(".variant-card"));
+  if(!cards.length) return;
+  if(currentRefVariantIndex < 0) currentRefVariantIndex = 0;
+  let newIdx = currentRefVariantIndex + dir;
+  if(newIdx < 0) newIdx = cards.length - 1;
+  if(newIdx >= cards.length) newIdx = 0;
+  currentRefVariantIndex = newIdx;
+  const card = cards[newIdx];
+  const url = `${server()}/view?filename=${encodeURIComponent(card.dataset.filename)}&subfolder=${encodeURIComponent(card.dataset.subfolder)}&type=${encodeURIComponent(card.dataset.type)}`;
+  loadRefImage(url);
+  currentOutputMedia = { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type };
+}
+
+document.addEventListener("keydown", (e) => {
+  if(!refZoom.isFullscreen()) return;
+  if(e.key === "ArrowLeft"){ e.preventDefault(); navigateRefVariant(-1); }
+  if(e.key === "ArrowRight"){ e.preventDefault(); navigateRefVariant(1); }
+});
 
 $("btnSendLtxv").addEventListener("click", () => {
   if(!currentOutputMedia || !currentOutputMedia.filename){
@@ -1044,8 +1069,11 @@ function addToVariantGallery(media, seedValue, timeText) {
       if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
       loadRefImage(url);
       currentOutputMedia = { filename, subfolder, type };
+      currentRefVariantIndex = Array.from(grid.children).indexOf(card);
     });
 }
+
+let currentRefVariantIndex = -1;
 
 function loadRefImage(url){
   const img = $("refImg"), wrap = $("refWrap"), ph = $("refPlaceholder"), dz = $("refDropzone"), info = $("refInfo");
