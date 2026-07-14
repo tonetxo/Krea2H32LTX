@@ -208,6 +208,7 @@ def main():
             <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado aparecerá aquí..."></textarea>
           </div>
           <div class="enhancer-actions">
+            <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
             <button id="btnSaveEnhanced">Guardar en biblioteca</button>
             <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
           </div>
@@ -1774,6 +1775,13 @@ $("btnSaveEnhanced").addEventListener("click", () => {
   localStorage.setItem('krea2_prompts', JSON.stringify(saved));
   loadPrompts();
   log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+});
+
+$("btnUseAsPrompt").addEventListener("click", () => {
+  const text = $("enhancerOutput").value.trim();
+  if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
+  $("prompt").value = text;
+  log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
 });
 
 // --- MODAL SYSTEM PROMPTS ---
