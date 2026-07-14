@@ -846,7 +846,7 @@ function loadRefImage(url){
   // Crear un nuevo elemento img para evitar que el navegador cachee la imagen anterior
   const newImg = document.createElement("img");
   newImg.id = "refImg";
-  newImg.style.cssText = "display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:0 0;";
+  newImg.style.cssText = "display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;";
   img.parentNode.replaceChild(newImg, img);
   refZoom.resetZoom();
   newImg.src = url;
