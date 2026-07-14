@@ -1377,6 +1377,7 @@ let loras = [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{
 let socket = null;
 let currentBatchIndex = 0;
 let totalBatchSize = 0;
+let variantCounter = 0;  // contador global de variantes en la sesión (no se resetea entre batches)
 let pendingSeeds = {};      // prompt_id -> semilla realmente usada en ese envío
 let handledPrompts = new Set(); // prompt_id ya procesados (evita duplicados WS+polling)
 let processingPrompts = new Set(); // prompt_id cuyo history se está consultando ahora
@@ -1652,14 +1653,14 @@ async function handlePromptDone(promptId) {
     if(isFirstOnly){
         // Solo 1er pase (botón "Solo 1er pase" o paso 1 del completo)
         if(media1){
-            showVideo(1, media1, { variantIndex: currentBatchIndex + 1 });
+            showVideo(1, media1, { variantIndex: variantCounter + 1 });
             paint(1, "1er", tTotal || "—");
-            addToVariantGallery(media1, realSeed, tTotal || "", 1, currentBatchIndex + 1);
+            addToVariantGallery(media1, realSeed, tTotal || "", 1, variantCounter + 1);
         }
     } else {
         // Paso 2 del completo (o grafo completo sin pasos): el final está listo
         if(media2){
-            const finalIdx = finalVariantIndex != null ? (finalVariantIndex + 1) : (currentBatchIndex + 1);
+            const finalIdx = finalVariantIndex != null ? (finalVariantIndex + 1) : (variantCounter + 1);
             showVideo(2, media2, { variantIndex: finalIdx });
             paint(2, "final", tTotal || "—");
             addToVariantGallery(media2, realSeed, tTotal || "", 2, finalIdx);
@@ -1681,7 +1682,7 @@ async function handlePromptDone(promptId) {
         // Reinyectar la semilla del paso 1 para que runSingleGeneration la reutilice
         pendingSeeds[firstPromptId] = step1Seed;
         // Recordar el índice de la variante original para etiquetar bien el vídeo final
-        finalVariantIndex = currentBatchIndex;
+        finalVariantIndex = variantCounter;
         runSingleGeneration(currentBatchIndex);  // MISMO índice, paso 2
         return;  // NO avanzar currentBatchIndex todavía
     }
@@ -1692,6 +1693,7 @@ async function handlePromptDone(promptId) {
     generationStep = 0;
     firstPromptId = null;
     finalVariantIndex = null;
+    variantCounter++;
     currentBatchIndex++;
     processNextBatch();
 }
@@ -1837,7 +1839,7 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     });
 
     grid.appendChild(card);
-    $("variantCount").textContent = `(${currentBatchIndex + 1})`;
+    $("variantCount").textContent = `(${variantCounter + 1})`;
 }
 
 // --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS MP4 ---
@@ -2854,7 +2856,7 @@ async function runSingleGeneration(index) {
         }
         graph[N.SEED].inputs.seed = seedUsed;
 
-        const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${index + 1}/${totalBatchSize}`);
+        const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize})`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
