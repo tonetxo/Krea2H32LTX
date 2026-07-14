@@ -310,6 +310,7 @@ const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random(
 let socket = null;
 let currentBatchIndex = 0;
 let totalBatchSize = 0;
+let variantCounter = 0;  // contador global de variantes en la sesión (no se resetea entre batches)
 let pendingSeeds = {};
 let handledPrompts = new Set();
 let processingPrompts = new Set();
@@ -499,6 +500,7 @@ async function handlePromptDone(promptId) {
 
     log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
     delete pendingSeeds[promptId];
+    variantCounter++;
     currentBatchIndex++;
     processNextBatch();
 }
@@ -760,7 +762,7 @@ function addToVariantGallery(media, seedValue, timeText) {
     const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}`;
 
     const hasSeed = seedValue !== null && seedValue !== undefined;
-    const displayText = hasSeed ? String(seedValue) : `Var. #${currentBatchIndex + 1}`;
+    const displayText = hasSeed ? String(seedValue) : `Var. #${variantCounter + 1}`;
     const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
     const timeStr = timeText || "";
 
@@ -829,7 +831,7 @@ function addToVariantGallery(media, seedValue, timeText) {
     });
 
     grid.appendChild(card);
-    $("variantCount").textContent = `(${currentBatchIndex + 1})`;
+    $("variantCount").textContent = `(${variantCounter + 1})`;
 
     // Click en la miniatura de variante -> cargar como referencia y como output actual
     card.addEventListener("click", (e) => {
@@ -1366,7 +1368,7 @@ async function runSingleGeneration(index) {
         const seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("samplerSeed").value, 10);
         graph[N.SAMPLER].inputs.seed = seedUsed;
 
-        log(`🚀 Procesando variante ${index + 1}/${totalBatchSize} (seed ${seedUsed})...`);
+        log(`🚀 Procesando variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize}) (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
