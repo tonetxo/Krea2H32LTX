@@ -1877,12 +1877,28 @@ if(btnSaveFrame2){
     const originalHTML = btnSaveFrame2.innerHTML;
     btnSaveFrame2.textContent = "⏳";
     try {
-      // Ir al último frame
-      await new Promise((resolve) => {
-        if(v.readyState >= 2){ v.currentTime = Math.max(0, (v.duration || 0) - 0.05); resolve(); }
-        else { v.addEventListener("loadeddata", () => { v.currentTime = Math.max(0, (v.duration || 0) - 0.05); resolve(); }, { once: true }); }
+      // Esperar metadatos del vídeo
+      await new Promise((resolve, reject) => {
+        if(v.readyState >= 2) resolve();
+        else {
+          const onLoaded = () => { v.removeEventListener("loadeddata", onLoaded); v.removeEventListener("error", onError); resolve(); };
+          const onError = () => { v.removeEventListener("loadeddata", onLoaded); v.removeEventListener("error", onError); reject(new Error("error cargando vídeo")); };
+          v.addEventListener("loadeddata", onLoaded, { once: true });
+          v.addEventListener("error", onError, { once: true });
+        }
       });
-      await new Promise((resolve) => v.addEventListener("seeked", resolve, { once: true }));
+      const dur = v.duration || 0;
+      if(!dur || !isFinite(dur)){ throw new Error("duración del vídeo no disponible"); }
+      // Ir al último frame de forma fiable
+      await new Promise((resolve, reject) => {
+        let resolved = false;
+        const target = Math.max(0, dur - 0.04);
+        v.currentTime = target;
+        const onSeeked = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; resolve(); } };
+        const onError = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; reject(new Error("error durante seek")); } };
+        v.addEventListener("seeked", onSeeked, { once: true });
+        v.addEventListener("error", onError, { once: true });
+      });
       // Capturar el frame en un canvas con la resolución real del vídeo
       const canvas = document.createElement("canvas");
       canvas.width = v.videoWidth || 640;
@@ -1890,12 +1906,8 @@ if(btnSaveFrame2){
       const ctx = canvas.getContext("2d");
       ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
       let dataUrl;
-      try {
-        dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-      } catch(secErr){
-        log("❌ Canvas tainted (CORS). No se puede capturar el frame del vídeo.", "l-err");
-        return;
-      }
+      try { dataUrl = canvas.toDataURL("image/jpeg", 0.92); }
+      catch(secErr){ log("❌ Canvas tainted (CORS). No se puede capturar el frame del vídeo.", "l-err"); return; }
       const baseName = (currentMedia[2]?.filename || "video").replace(/\.[^.]+$/, "");
       const ph = dz.querySelector(".ph");
       if(ph) ph.remove();
@@ -1907,7 +1919,7 @@ if(btnSaveFrame2){
       const frameFile = new File([blob], `${baseName}_last_frame.jpg`, { type: "image/jpeg" });
       localFile = frameFile;
       uploadedImage = null;
-      log(`📸 Último frame cargado como imagen de entrada: ${baseName}_last_frame.jpg (${canvas.width}×${canvas.height})`, "l-ok");
+      log(`📸 Último frame cargado como imagen de entrada: ${baseName}_last_frame.jpg (${canvas.width}×${canvas.height}) @ ${v.currentTime.toFixed(2)}s`, "l-ok");
     } catch(err){
       log("❌ Error guardando frame: "+err.message, "l-err");
     } finally {
