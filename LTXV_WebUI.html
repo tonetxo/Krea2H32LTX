@@ -200,8 +200,12 @@
       </div>
 
       <div class="panel">
-        <div class="panel-head-row"><h2>Historial de Imágenes</h2><button id="btnClearGallery" class="ghost btn-mini">Vaciar</button></div>
-        <div class="gallery-grid" id="galleryGrid"></div>
+        <div class="collapsible-header" id="galleryToggle">
+          <span class="arrow">▶</span> Historial de Imágenes <button id="btnClearGallery" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();">Vaciar</button>
+        </div>
+        <div class="collapsible-body" id="galleryBody">
+          <div class="gallery-grid" id="galleryGrid"></div>
+        </div>
       </div>
 
       <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
@@ -2962,6 +2966,15 @@ function getCurrentSysPrompt(data, mode, styleKey){
 $("enhancerToggle").addEventListener("click", () => {
   const h = $("enhancerToggle");
   const b = $("enhancerBody");
+  h.classList.toggle("open");
+  b.classList.toggle("open");
+  const arrow = h.querySelector(".arrow");
+  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+});
+
+$("galleryToggle").addEventListener("click", () => {
+  const h = $("galleryToggle");
+  const b = $("galleryBody");
   h.classList.toggle("open");
   b.classList.toggle("open");
   const arrow = h.querySelector(".arrow");
