@@ -1867,15 +1867,26 @@ function setupDownloadButton(slot){
 setupDownloadButton(1);
 setupDownloadButton(2);
 
-// --- Botón "Extraer frame" en el reproductor final ---
-const btnSaveFrame2 = $("btnSaveFrame2");
-if(btnSaveFrame2){
-  btnSaveFrame2.addEventListener("click", async () => {
-    const v = $("video2");
-    if(!v || !v.src || v.style.display === "none"){ log("⚠️ No hay vídeo final cargado", "l-err"); return; }
-    btnSaveFrame2.disabled = true;
-    const originalHTML = btnSaveFrame2.innerHTML;
-    btnSaveFrame2.textContent = "⏳";
+// --- Controles de frame en el reproductor final ---
+const FRAME_STEP = 1 / 25; // salto de ~1 frame a 25 fps
+
+function nudgeFrame(delta){
+  const v = $("video2");
+  if(!v || !v.src || v.style.display === "none") return;
+  const dur = v.duration || 0;
+  if(!dur || !isFinite(dur)) return;
+  v.pause();
+  const t = Math.min(Math.max(0, (v.currentTime || 0) + delta * FRAME_STEP), dur);
+  v.currentTime = t;
+}
+
+function captureFrameFromPlayer(){
+  const v = $("video2");
+  if(!v || !v.src || v.style.display === "none"){ log("⚠️ No hay vídeo final cargado", "l-err"); return; }
+  btnSaveFrame2.disabled = true;
+  const originalHTML = btnSaveFrame2.innerHTML;
+  btnSaveFrame2.textContent = "⏳";
+  (async () => {
     try {
       // Esperar metadatos del vídeo
       await new Promise((resolve, reject) => {
@@ -1927,7 +1938,25 @@ if(btnSaveFrame2){
       btnSaveFrame2.disabled = false;
       btnSaveFrame2.innerHTML = originalHTML;
     }
+  })();
+}
+
+const btnSaveFrame2 = $("btnSaveFrame2");
+if(btnSaveFrame2){
+  btnSaveFrame2.addEventListener("click", captureFrameFromPlayer);
+}
+
+const vidbox2 = document.querySelector("#video2")?.closest(".vidbox");
+if(vidbox2){
+  vidbox2.addEventListener("keydown", (e) => {
+    if(!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && ["ArrowLeft", "ArrowRight"].includes(e.key)){
+      e.preventDefault();
+      nudgeFrame(e.key === "ArrowRight" ? 1 : -1);
+    } else if(e.key === "f" || e.key === "F"){
+      captureFrameFromPlayer();
+    }
   });
+  vidbox2.setAttribute("tabindex", "0");
 }
 
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
