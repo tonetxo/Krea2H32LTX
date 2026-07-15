@@ -2871,11 +2871,24 @@ if(btnSaveFrame2){
       canvas.height = v.videoHeight || 360;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-      // Convertir a blob y subir como imagen de entrada
+      let dataUrl;
+      try {
+        dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+      } catch(secErr){
+        log("❌ Canvas tainted (CORS). No se puede capturar el frame del vídeo.", "l-err");
+        return;
+      }
       const baseName = (currentMedia[2]?.filename || "video").replace(/\.[^.]+$/, "");
+      const ph = dz.querySelector(".ph");
+      if(ph) ph.remove();
+      let img = dz.querySelector("img");
+      if(!img){ img = document.createElement("img"); dz.appendChild(img); }
+      img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
+      img.src = dataUrl;
       const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.92));
       const frameFile = new File([blob], `${baseName}_last_frame.jpg`, { type: "image/jpeg" });
-      handleFile(frameFile, false);
+      localFile = frameFile;
+      uploadedImage = null;
       log(`📸 Último frame cargado como imagen de entrada: ${baseName}_last_frame.jpg (${canvas.width}×${canvas.height})`, "l-ok");
     } catch(err){
       log("❌ Error guardando frame: "+err.message, "l-err");
