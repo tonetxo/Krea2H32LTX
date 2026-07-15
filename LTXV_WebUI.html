@@ -2871,16 +2871,12 @@ if(btnSaveFrame2){
       canvas.height = v.videoHeight || 360;
       const ctx = canvas.getContext("2d");
       ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-      // Descargar como PNG
-      const dataUrl = canvas.toDataURL("image/png");
-      const a = document.createElement("a");
+      // Convertir a blob y subir como imagen de entrada
       const baseName = (currentMedia[2]?.filename || "video").replace(/\.[^.]+$/, "");
-      a.href = dataUrl;
-      a.download = `${baseName}_last_frame.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      log(`📸 Último frame guardado: ${a.download} (${canvas.width}×${canvas.height})`, "l-ok");
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.92));
+      const frameFile = new File([blob], `${baseName}_last_frame.jpg`, { type: "image/jpeg" });
+      handleFile(frameFile, false);
+      log(`📸 Último frame cargado como imagen de entrada: ${baseName}_last_frame.jpg (${canvas.width}×${canvas.height})`, "l-ok");
     } catch(err){
       log("❌ Error guardando frame: "+err.message, "l-err");
     } finally {
