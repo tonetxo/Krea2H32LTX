@@ -346,6 +346,7 @@ def main():
           <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
           <div class="vid-actions">
             <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnSaveFrame2" title="Guardar último frame como imagen" style="display:none;" type="button">📸 Último frame</button>
             <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
         </div>
@@ -1760,10 +1761,11 @@ function findMedia(nodeOutput){
 function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
-  const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot);
+  const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
   v.src=url; v.style.display="block"; empty.style.display="none";
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
+  if(sf) sf.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   // Etiqueta de variante + tipo encima del vídeo
   if(badge){
@@ -1853,6 +1855,47 @@ function setupDownloadButton(slot){
 }
 setupDownloadButton(1);
 setupDownloadButton(2);
+
+// --- Botón "Guardar último frame" en el reproductor final ---
+const btnSaveFrame2 = $("btnSaveFrame2");
+if(btnSaveFrame2){
+  btnSaveFrame2.addEventListener("click", async () => {
+    const v = $("video2");
+    if(!v || !v.src || v.style.display === "none"){ log("⚠️ No hay vídeo final cargado", "l-err"); return; }
+    btnSaveFrame2.disabled = true;
+    const originalHTML = btnSaveFrame2.innerHTML;
+    btnSaveFrame2.textContent = "⏳";
+    try {
+      // Ir al último frame
+      await new Promise((resolve) => {
+        if(v.readyState >= 2){ v.currentTime = Math.max(0, (v.duration || 0) - 0.05); resolve(); }
+        else { v.addEventListener("loadeddata", () => { v.currentTime = Math.max(0, (v.duration || 0) - 0.05); resolve(); }, { once: true }); }
+      });
+      await new Promise((resolve) => v.addEventListener("seeked", resolve, { once: true }));
+      // Capturar el frame en un canvas con la resolución real del vídeo
+      const canvas = document.createElement("canvas");
+      canvas.width = v.videoWidth || 640;
+      canvas.height = v.videoHeight || 360;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      // Descargar como PNG
+      const dataUrl = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      const baseName = (currentMedia[2]?.filename || "video").replace(/\.[^.]+$/, "");
+      a.href = dataUrl;
+      a.download = `${baseName}_last_frame.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      log(`📸 Último frame guardado: ${a.download} (${canvas.width}×${canvas.height})`, "l-ok");
+    } catch(err){
+      log("❌ Error guardando frame: "+err.message, "l-err");
+    } finally {
+      btnSaveFrame2.disabled = false;
+      btnSaveFrame2.innerHTML = originalHTML;
+    }
+  });
+}
 
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
 async function runSingleGeneration(index) {

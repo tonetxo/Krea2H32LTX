@@ -276,6 +276,7 @@
           <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
           <div class="vid-actions">
             <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnSaveFrame2" title="Guardar último frame como imagen" style="display:none;" type="button">📸 Último frame</button>
             <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
         </div>
@@ -1352,7 +1353,7 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = ["10Eros_v1.3_fp8mixed_learned.safetensors", "ltx-2.3-22b-distilled-1.1.safetensors", "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors", "ltxv/ltx-2.3-22b-distilled-1.1-nvfp4mixed.safetensors", "ltxv/sulphur_distil_bf16.safetensors"];
-const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "anal-insertion-i2v.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-distilled-lora-1.1_rank96_energy.safetensors", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors", "ltx-2.3-22b-distilled-lora-fro90_ceil72.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi2ltxv.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001250.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_000001750.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
+const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "anal-insertion-i2v.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-distilled-lora-1.1_rank96_energy.safetensors", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors", "ltx-2.3-22b-distilled-lora-fro90_ceil72.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi2ltxv.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001250.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_000001750.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
 
 const N = {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646"};
 const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
@@ -2742,10 +2743,11 @@ function findMedia(nodeOutput){
 function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
-  const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot);
+  const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
   v.src=url; v.style.display="block"; empty.style.display="none";
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
+  if(sf) sf.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   // Etiqueta de variante + tipo encima del vídeo
   if(badge){
@@ -2835,6 +2837,47 @@ function setupDownloadButton(slot){
 }
 setupDownloadButton(1);
 setupDownloadButton(2);
+
+// --- Botón "Guardar último frame" en el reproductor final ---
+const btnSaveFrame2 = $("btnSaveFrame2");
+if(btnSaveFrame2){
+  btnSaveFrame2.addEventListener("click", async () => {
+    const v = $("video2");
+    if(!v || !v.src || v.style.display === "none"){ log("⚠️ No hay vídeo final cargado", "l-err"); return; }
+    btnSaveFrame2.disabled = true;
+    const originalHTML = btnSaveFrame2.innerHTML;
+    btnSaveFrame2.textContent = "⏳";
+    try {
+      // Ir al último frame
+      await new Promise((resolve) => {
+        if(v.readyState >= 2){ v.currentTime = Math.max(0, (v.duration || 0) - 0.05); resolve(); }
+        else { v.addEventListener("loadeddata", () => { v.currentTime = Math.max(0, (v.duration || 0) - 0.05); resolve(); }, { once: true }); }
+      });
+      await new Promise((resolve) => v.addEventListener("seeked", resolve, { once: true }));
+      // Capturar el frame en un canvas con la resolución real del vídeo
+      const canvas = document.createElement("canvas");
+      canvas.width = v.videoWidth || 640;
+      canvas.height = v.videoHeight || 360;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      // Descargar como PNG
+      const dataUrl = canvas.toDataURL("image/png");
+      const a = document.createElement("a");
+      const baseName = (currentMedia[2]?.filename || "video").replace(/\.[^.]+$/, "");
+      a.href = dataUrl;
+      a.download = `${baseName}_last_frame.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      log(`📸 Último frame guardado: ${a.download} (${canvas.width}×${canvas.height})`, "l-ok");
+    } catch(err){
+      log("❌ Error guardando frame: "+err.message, "l-err");
+    } finally {
+      btnSaveFrame2.disabled = false;
+      btnSaveFrame2.innerHTML = originalHTML;
+    }
+  });
+}
 
 // FUNCIÓN PANTALLA COMPLETA ROBUSTA
 async function runSingleGeneration(index) {
