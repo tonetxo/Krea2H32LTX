@@ -294,6 +294,17 @@
         <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
         <div class="variant-grid" id="variantGrid"></div>
       </div>
+
+      <!-- HISTORIAL DE VÍDEOS -->
+      <div class="vidbox">
+        <div class="collapsible-header" id="videoHistoryToggle">
+          <span class="arrow">▶</span> Historial de Vídeos <button id="btnRefreshVideoHistory" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();">↻</button>
+        </div>
+        <div class="collapsible-body" id="videoHistoryBody">
+          <div class="hint" id="videoHistoryStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="variant-grid" id="videoHistoryGrid"></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -3023,6 +3034,117 @@ $("galleryToggle").addEventListener("click", () => {
   const arrow = h.querySelector(".arrow");
   arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
 });
+
+$("videoHistoryToggle").addEventListener("click", () => {
+  const h = $("videoHistoryToggle");
+  const b = $("videoHistoryBody");
+  h.classList.toggle("open");
+  b.classList.toggle("open");
+  const arrow = h.querySelector(".arrow");
+  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+  if(h.classList.contains("open")) loadVideoHistory();
+});
+
+$("btnRefreshVideoHistory").addEventListener("click", (e) => {
+  e.stopPropagation();
+  loadVideoHistory();
+});
+
+async function loadVideoHistory(){
+  const status = $("videoHistoryStatus");
+  const grid = $("videoHistoryGrid");
+  status.textContent = "Cargando...";
+  grid.innerHTML = "";
+  try {
+    const r = await fetch("/api/ltxv_list");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    if(!data.items || !data.items.length){
+      status.textContent = "No hay vídeos en el historial.";
+      return;
+    }
+    status.textContent = `${data.count} vídeos encontrados.`;
+    for(const item of data.items){
+      const card = document.createElement("div");
+      card.className = "variant-card";
+      const url = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}&t=${item.mtime}`;
+      const dateStr = new Date(item.mtime * 1000).toLocaleString("es-ES", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+      card.innerHTML = `
+        <video src="${url}" type="video/mp4" muted preload="metadata" playsinline></video>
+        <div class="variant-info">
+          <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
+          <span class="variant-icons">
+            <button class="variant-meta-btn" title="Reproducir" data-action="play">▶</button>
+            <button class="variant-meta-btn" title="Copiar workflow" data-action="workflow">📋</button>
+            <button class="variant-del-btn" title="Eliminar" data-action="delete">×</button>
+          </span>
+        </div>
+        <div style="padding:2px 8px 6px;font-size:9px;color:var(--muted-2);font-family:var(--mono);">${dateStr}</div>
+      `;
+      card.dataset.filename = item.filename;
+      card.dataset.subfolder = item.subfolder;
+      card.dataset.type = item.type;
+
+      card.querySelector('[data-action="play"]').addEventListener("click", (e) => {
+        e.stopPropagation();
+        const slot = item.filename.includes("_prev") ? 1 : 2;
+        showVideo(slot, { filename: item.filename, subfolder: item.subfolder, type: item.type }, { variantIndex: 0 });
+        log("▶ Reproduciendo: "+item.filename, "l-ok");
+      });
+
+      card.querySelector('[data-action="workflow"]').addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const btn = e.target;
+        btn.disabled = true;
+        const orig = btn.textContent;
+        btn.textContent = "⏳";
+        try {
+          const wfUrl = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
+          const workflow = await extractWorkflowFromMP4(wfUrl);
+          if(workflow){
+            applyWorkflow(workflow);
+            log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
+          } else {
+            log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
+          }
+        } catch(err){
+          log("❌ Error leyendo workflow: "+err.message, "l-err");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = orig;
+        }
+      });
+
+      card.querySelector('[data-action="delete"]').addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if(!confirm("¿Eliminar este vídeo del disco?")) return;
+        const btn = e.target;
+        btn.disabled = true;
+        try {
+          const r = await fetch("/api/file_delete", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({filename: item.filename, subfolder: item.subfolder, type: item.type}),
+          });
+          if(!r.ok) throw new Error("HTTP "+r.status);
+          const j = await r.json();
+          if(!j.ok && !j.deleted) throw new Error("Error del backend");
+          card.remove();
+          log("🗑️ Vídeo eliminado: "+item.filename, "l-ok");
+          const remaining = grid.querySelectorAll(".variant-card").length;
+          status.textContent = remaining ? `${remaining} vídeos.` : "No hay vídeos en el historial.";
+        } catch(err){
+          log("❌ No se pudo borrar: "+err.message, "l-err");
+          btn.disabled = false;
+        }
+      });
+
+      grid.appendChild(card);
+    }
+  } catch(err){
+    status.textContent = "Error: "+err.message;
+  }
+}
 
 // Poblar modelos desde Ollama
 async function loadEnhancerModels(){

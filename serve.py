@@ -32,7 +32,7 @@ BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list", "/api/file_delete")
+CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/file_delete")
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
@@ -98,6 +98,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._ws_reject()
         elif self._is_krea2_list():
             self._do_krea2_list()
+        elif self._is_ltxv_list():
+            self._do_ltxv_list()
         elif self._is_ollama_route():
             self._proxy("GET", OLLAMA)
         elif self._is_proxy_route():
@@ -109,6 +111,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         if self._is_ws():
             self._ws_reject()
         elif self._is_krea2_list():
+            self._send_json(405, {"error": "method not allowed"})
+        elif self._is_ltxv_list():
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_file_delete():
             self._do_file_delete()
@@ -166,11 +170,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def _is_krea2_list(self):
         path = self.path.split("?")[0]
-        return any(path == p for p in CUSTOM_PREFIXES if p == "/api/krea2_list")
+        return path == "/api/krea2_list"
+
+    def _is_ltxv_list(self):
+        path = self.path.split("?")[0]
+        return path == "/api/ltxv_list"
 
     def _is_file_delete(self):
         path = self.path.split("?")[0]
-        return any(path == p for p in CUSTOM_PREFIXES if p == "/api/file_delete")
+        return path == "/api/file_delete"
 
     def _is_ws(self):
         return self.path.split("?")[0].startswith(WS_PREFIX)
@@ -203,6 +211,37 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             sys.stderr.write(f"[serve] krea2_list error: {e}\n")
         self._send_json(200, {
             "dir": KREA2_OUTPUT_DIR,
+            "count": len(items),
+            "items": items,
+        })
+
+    def _do_ltxv_list(self):
+        """List MP4s in ComfyUI output dir (recursive), newest first, max 100."""
+        items = []
+        output_dir = os.path.join(COMFYUI_ROOT, "output")
+        try:
+            paths = sorted(
+                glob.glob(os.path.join(output_dir, "**", "*.mp4"), recursive=True),
+                key=lambda p: os.path.getmtime(p),
+                reverse=True,
+            )[:100]
+            for p in paths:
+                st = os.stat(p)
+                rel = os.path.relpath(p, output_dir)
+                parts = rel.split(os.sep)
+                filename = parts[-1]
+                subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
+                items.append({
+                    "filename": filename,
+                    "subfolder": subfolder,
+                    "type": "output",
+                    "mtime": int(st.st_mtime),
+                    "size": st.st_size,
+                })
+        except OSError as e:
+            sys.stderr.write(f"[serve] ltxv_list error: {e}\n")
+        self._send_json(200, {
+            "dir": output_dir,
             "count": len(items),
             "items": items,
         })
