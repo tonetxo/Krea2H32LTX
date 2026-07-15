@@ -2107,7 +2107,6 @@ async function loadVideoHistory(){
         e.stopPropagation();
         const slot = item.filename.includes("_prev") ? 1 : 2;
         const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
-        console.log("DEBUG play:", slot, media);
         showVideo(slot, media, { variantIndex: 0 });
         log("▶ Reproduciendo: "+item.filename, "l-ok");
       });
