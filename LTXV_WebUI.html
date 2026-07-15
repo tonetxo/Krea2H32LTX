@@ -263,7 +263,7 @@
         </div>
         <div class="empty" id="empty1">sin generar</div>
         <span class="video-badge" id="badge1"></span>
-        <video id="video1" controls allowfullscreen playsinline style="display:none"></video>
+        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none"></video>
         <div class="vid-footer">
           <span class="time-tag" id="time1"></span>
           <span class="res-tag" id="res1"></span>
@@ -282,7 +282,7 @@
         </div>
         <div class="empty" id="empty2">sin generar</div>
         <span class="video-badge" id="badge2"></span>
-        <video id="video2" controls allowfullscreen playsinline style="display:none"></video>
+        <video id="video2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none"></video>
         <div class="vid-footer">
           <span class="time-tag" id="time2"></span>
           <span class="res-tag" id="res2"></span>
@@ -2755,7 +2755,7 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
-  v.src=url; v.style.display="block"; empty.style.display="none";
+  v.crossOrigin = "anonymous"; v.src=url; v.style.display="block"; empty.style.display="none";
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
