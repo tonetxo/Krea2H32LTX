@@ -17,7 +17,7 @@ do not hand-edit the HTML for things the generator controls.
 | File | Role | Edit by hand? |
 |------|------|---------------|
 | `LTXV_WebUI.html` | LTXV video UI. Self-contained (inline CSS + JS). | **No** for template content. |
-| `generar_html.py` | Reads `LTXV_DMD_OK.json`, walks `ltxv/` LoRAs, emits `LTXV_WebUI.html`. | Yes — source of truth for LTXV UI. |
+| `generar_ltxv.py` | Reads `LTXV_DMD_OK.json`, walks `ltxv/` LoRAs, emits `LTXV_WebUI.html`. | Yes — source of truth for LTXV UI. |
 | `LTXV_DMD_OK.json` | LTXV workflow graph. | Rarely. |
 | `Krea2_WebUI.html` | Krea2 image UI. Self-contained (inline CSS + JS). | **No** for template content. |
 | `generar_krea2.py` | Reads `Krea2_OK.json`, walks `flux2/` models and `K2/` LoRAs, emits `Krea2_WebUI.html`. | Yes — source of truth for Krea2 UI. |
@@ -30,7 +30,7 @@ do not hand-edit the HTML for things the generator controls.
 
 ```bash
 # LTXV (video)
-python3 generar_html.py
+python3 generar_ltxv.py
 ./lanzar_ltxv.sh          # port 8000
 
 # Krea2 (image)
@@ -42,7 +42,7 @@ Opening via `file://` will not work — always go through the local server.
 
 ## Generator gotchas
 
-- `generar_html.py:7` — `LORAS_DIR` hardcoded to `/home/tonetxo/SwarmUI/Models/Lora/ltxv`.
+- `generar_ltxv.py:7` — `LORAS_DIR` hardcoded to `/home/tonetxo/SwarmUI/Models/Lora/ltxv`.
 - `generar_krea2.py:7-8` — `MODELS_DIR` hardcoded to `.../diffusion_models/flux2`, `LORAS_DIR` to `.../Lora/K2`.
 - Both generators use a raw `r'''...'''` string with placeholders (`__GRAPH_JSON__`, `__LORA_LIST__`, `__MODEL_LIST__`).
 - Directory walks are recursive; results sorted; backslashes normalised to forward slashes.

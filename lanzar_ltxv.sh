@@ -15,7 +15,7 @@ fi
 # Aviso: el backend de inferencia (ComfyUI en :7821) debe estar escuchando en la
 # LAN también. Por defecto ComfyUI solo escucha en 127.0.0.1; si quieres
 # controlarlo desde el móvil u otro PC, lánzalo con --listen 0.0.0.0.
-# (Si cambias el puerto, edita DEFAULT_BACKEND_PORT en generar_html.py.)
+# (Si cambias el puerto, edita DEFAULT_BACKEND_PORT en generar_ltxv.py.)
 if command -v ss >/dev/null 2>&1; then
   BACKEND_BIND=$(ss -tlnp 2>/dev/null | awk '/:7821 /{print $4; exit}')
   if [ -n "$BACKEND_BIND" ] && echo "$BACKEND_BIND" | grep -q '^127\.'; then
