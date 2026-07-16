@@ -2655,6 +2655,10 @@ function updateDzInfo(w, h){
   function gcd(a,b){ return b ? gcd(b, a % b) : a; }
   const d = gcd(w, h) || 1;
   info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
+  if(w && h){
+    currentAspectRatio = w / h;
+    recalcResolution();
+  }
 }
 
 $("segRandom").addEventListener("click",()=>{seedMode="random";$("segRandom").classList.add("on");$("segFixed").classList.remove("on");$("seedVal").disabled=true;});
