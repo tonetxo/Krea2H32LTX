@@ -192,7 +192,7 @@ def main():
   .variant-gallery { margin-top: 20px; }
   .variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
   .variant-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; cursor: pointer; position: relative; }
-  .variant-card video { width: 100%; height: auto; max-height: 240px; object-fit: contain; background: #000; pointer-events: none; }
+  .variant-card video { width: 100%; height: auto; max-height: 240px; object-fit: contain; background: #000; }
   .variant-badge { background: rgba(0,0,0,0.75); color: var(--accent); font-family: var(--mono); font-size: 10px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--accent); display: inline-block; margin: 4px 6px 0; pointer-events: none; }
   .variant-info { padding: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
