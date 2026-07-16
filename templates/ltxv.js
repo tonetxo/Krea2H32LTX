@@ -30,6 +30,9 @@ let uploadedImage=null, localFile=null, seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
+let dmdBypass = false;
+const DMD_LORA_NODE = "906";
+const DMD_MODEL_SOURCE = "868";
 let firstPromptId = null;
 let finalVariantIndex = null;
 let promptSteps = {};
@@ -529,6 +532,13 @@ $("mpSlider").addEventListener("input",()=>{recalcResolution();});
 $("frames").addEventListener("input",updateDuration);
 function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint").textContent=`(${f}/24fps=${(f/24).toFixed(1)}s)`;}
 
+// DMD bypass switch
+$("dmdBypassSwitch").addEventListener("click",()=>{
+  dmdBypass = !dmdBypass;
+  $("dmdBypassSwitch").classList.toggle("on", !dmdBypass);
+  log(dmdBypass ? "DMD LoRA bypassed (using model without DMD distillation)" : "DMD LoRA restored", "l-ok");
+});
+
 const dz=$("dropzone"),fileInput=$("fileInput");
 dz.addEventListener("click",()=>fileInput.click());
 ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
@@ -697,6 +707,10 @@ function buildGraph(firstPassOnly){
   g[N.LORA].inputs.lora_2={on:loras[1].on,lora:loras[1].lora,strength:loras[1].strength};
   g[N.LORA].inputs.lora_3={on:loras[2].on,lora:loras[2].lora,strength:loras[2].strength};
   if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs) g[N.CHECKPOINT].inputs.ckpt_name = $("modelSelect").value;
+  // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
+  if(dmdBypass && g[N.LORA] && g[N.LORA].inputs.model){
+    g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
+  }
   if(firstPassOnly){delete g[N.FINAL_SAVE]; delete g[N.PURGE_VRAM];}
   return g;
 }
