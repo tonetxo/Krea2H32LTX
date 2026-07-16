@@ -1573,6 +1573,8 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
       else { img.style.cssText = ""; }
       applyZoom();
     }
+    // Ensure display is block if it was before fullscreen
+    if(wrap.style.display === "") wrap.style.display = "block";
   }
 
   function isFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
@@ -1649,30 +1651,7 @@ $("btnSendLtxv").addEventListener("click", () => {
 });
 
 let _fsResetTimer = null;
-function scheduleResetAfterFullscreen(){
-  if(_fsResetTimer) clearTimeout(_fsResetTimer);
-  _fsResetTimer = setTimeout(() => {
-    _fsResetTimer = null;
-    const wrap = $("imgWrap");
-    if(wrap){
-      wrap.style.cssText = "";
-      const img = $("outputImg");
-      if(img) img.style.transform = "none";
-      wrap.style.cursor = "grab";
-    }
-  }, 80);
-}
-function onFsEnter(){
-  requestAnimationFrame(() => { void $("outputImg").offsetWidth; const wrap = $("imgWrap"); if(wrap){ wrap.style.cssText = "position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;margin:0!important;padding:0!important;background:#000;border-radius:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;"; const img=$("outputImg"); if(img){ img.style.cssText="display:block!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;transform:none!important;transform-origin:center center!important;"; } } });
-}
-document.addEventListener("fullscreenchange", () => {
-  if(document.fullscreenElement) onFsEnter();
-  else scheduleResetAfterFullscreen();
-});
-document.addEventListener("webkitfullscreenchange", () => {
-  if(document.webkitFullscreenElement) onFsEnter();
-  else scheduleResetAfterFullscreen();
-});
+// Global fullscreen handler removed — setupZoomPan handles enter/exit per wrap.
 
 // --- VARIANT GALLERY (Krea2 image version with IndexedDB) ---
 function addToVariantGallery(media, seedValue, timeText) {
