@@ -127,6 +127,8 @@ def generate_html(config):
 
     common_html = common_html.replace('__ENHANCER_TITLE__', config['enhancer_title'])
 
+    ui_html = ui_html.replace('__COMMON_PANELS__', common_html)
+
     html = f"""<!DOCTYPE html>
 <html lang="es">
 <head>

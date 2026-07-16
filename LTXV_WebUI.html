@@ -204,6 +204,52 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
   </div>
   <div class="grid">
     <div class="controls-col">
+            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="promptLibToggle">
+          <span class="arrow">▶</span> Biblioteca de Prompts
+        </div>
+        <div class="collapsible-body" id="promptLibBody">
+          <div id="promptTree" class="prompt-tree"></div>
+          <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnMovePrompt" class="ghost">Mover</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
+          <div class="hint" style="font-size:10px;margin-top:4px;">Usa <code style="color:var(--accent)">/</code> para clasificar: <code>casa/pasillo/noche</code> (los dos primeros son carpetas)</div>
+        </div>
+      </div>
+
+      <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
+
+      <!-- ENHANCER PANEL -->
+      <div class="panel">
+        <div class="collapsible-header" id="enhancerToggle">
+          <span class="arrow">▶</span> Mejorar prompt con IA
+        </div>
+        <div class="collapsible-body" id="enhancerBody">
+          <div class="enhancer-row">
+            <label>Modelo</label>
+            <select id="enhancerModel"><option value="">Cargando modelos...</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="enhancerMode"><option value="text">Texto</option><option value="vision">Visión</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Estilo</label>
+            <select id="enhancerStyle"></select>
+          </div>
+          <div class="enhancer-row">
+            <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
+          </div>
+          <div class="enhancer-row">
+            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado aparecerá aquí..."></textarea>
+          </div>
+          <div class="enhancer-actions">
+            <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
+            <button id="btnSaveEnhanced">Guardar en biblioteca</button>
+            <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
+          </div>
+        </div>
+      </div>
       <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
 
       <div class="panel">
