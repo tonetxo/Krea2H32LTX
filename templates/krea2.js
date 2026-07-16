@@ -46,11 +46,14 @@ CONFIG.onBatchComplete = function(){
 };
 CONFIG.onStopCurrent = function(pid){};
 CONFIG.onStopAll = function(){
+  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   pendingSeeds = {};
   handledPrompts.clear();
   processingPrompts.clear();
   currentPromptId = null;
   currentBatchIndex = totalBatchSize;
+  const t1 = $("time1");
+  if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
   enableStopButtons(false);
   $("btnGenerate").disabled=false;
 };

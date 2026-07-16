@@ -563,6 +563,7 @@ async function stopAll(){
       body:JSON.stringify({action:"cancel_all"})
     });
   } catch(e) { /* si falla, igual limpiamos local */ }
+  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");

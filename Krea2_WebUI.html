@@ -1191,6 +1191,7 @@ async function stopAll(){
       body:JSON.stringify({action:"cancel_all"})
     });
   } catch(e) { /* si falla, igual limpiamos local */ }
+  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");
@@ -1421,11 +1422,14 @@ CONFIG.onBatchComplete = function(){
 };
 CONFIG.onStopCurrent = function(pid){};
 CONFIG.onStopAll = function(){
+  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   pendingSeeds = {};
   handledPrompts.clear();
   processingPrompts.clear();
   currentPromptId = null;
   currentBatchIndex = totalBatchSize;
+  const t1 = $("time1");
+  if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
   enableStopButtons(false);
   $("btnGenerate").disabled=false;
 };
