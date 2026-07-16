@@ -848,6 +848,11 @@ function addToVariantGallery(media, seedValue, timeText) {
     card.addEventListener("click", (e) => {
       if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
       loadRefImage(url);
+      fetch(url).then(r => r.blob()).then(blob => {
+        const reader = new FileReader();
+        reader.onload = (ev) => addToGallery(ev.target.result);
+        reader.readAsDataURL(blob);
+      });
       currentOutputMedia = { filename, subfolder, type };
       currentRefVariantIndex = Array.from(grid.children).indexOf(card);
     });
