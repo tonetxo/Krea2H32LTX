@@ -980,7 +980,7 @@ async function queueAndWait(){
   connectSocket();
   totalBatchSize = parseInt($("batchSize")?.value || "1", 10);
   currentBatchIndex = 0;
-  batchSeedMode = "random";
+  batchSeedMode = $("segSamplerRandom").classList.contains("on") ? "random" : "fixed";
   setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
   $("btnGenerate").disabled=true;
   enableStopButtons(true);
