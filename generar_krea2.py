@@ -111,6 +111,7 @@ def main():
   .gallery-item .del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s, background .15s;z-index:2;}
   .gallery-item:hover .del-btn{opacity:1;}
   .gallery-item .del-btn:hover{background:var(--danger);border-color:var(--danger);}
+  .gallery-item .lq-badge{position:absolute;top:4px;left:4px;background:rgba(255,180,84,.9);color:#1a1200;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;z-index:2;letter-spacing:.03em;}
   .panel-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
   .panel-head-row h2{margin:0;}
   .btn-mini{padding:5px 9px;font-size:10px;min-width:auto;flex:none;}
@@ -288,6 +289,16 @@ def main():
           <button id="btnCaption" class="ghost" style="flex:1;min-width:140px;">Caption (imagen referencia)</button>
           <button id="btnSendRefLtxv" class="ghost" style="flex:1;min-width:140px;">→ LTXV</button>
           <button id="btnLoadMeta" class="ghost" style="flex:1;min-width:140px;">Cargar metadatos</button>
+        </div>
+      </div>
+
+      <!-- HISTORIAL DE IMÁGENES -->
+      <div class="imgbox">
+        <div class="collapsible-header" id="galleryToggle">
+          <span class="arrow">▶</span> Historial de Imágenes <button id="btnClearGallery" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();">Vaciar</button>
+        </div>
+        <div class="collapsible-body" id="galleryBody">
+          <div class="gallery-grid" id="galleryGrid"></div>
         </div>
       </div>
 
@@ -1136,6 +1147,180 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
   log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
 }
 
+// --- GESTIÓN DE GALERÍA DE IMÁGENES (IndexedDB: miniatura + original a resolución completa) ---
+const GALLERY_DB_NAME = 'krea2_gallery_db';
+const GALLERY_STORE = 'images';
+
+function openGalleryDB(){
+  return new Promise((resolve, reject) => {
+    if(!window.indexedDB){ reject(new Error("IndexedDB no disponible en este navegador")); return; }
+    const req = indexedDB.open(GALLERY_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if(!db.objectStoreNames.contains(GALLERY_STORE)){
+        db.createObjectStore(GALLERY_STORE, { keyPath: 'hash' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function dbPutImage(record){
+  const db = await openGalleryDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(GALLERY_STORE, 'readwrite');
+    tx.objectStore(GALLERY_STORE).put(record);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function dbGetAllImages(){
+  const db = await openGalleryDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(GALLERY_STORE, 'readonly');
+    const req = tx.objectStore(GALLERY_STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function dbDeleteImage(hash){
+  const db = await openGalleryDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(GALLERY_STORE, 'readwrite');
+    tx.objectStore(GALLERY_STORE).delete(hash);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function dbClearImages(){
+  const db = await openGalleryDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(GALLERY_STORE, 'readwrite');
+    tx.objectStore(GALLERY_STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function aspectRatioStr(w, h){
+  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+  const d = gcd(w, h) || 1;
+  return `${w / d}:${h / d}`;
+}
+
+async function getImageHash(base64Str) {
+    try {
+        if(!crypto?.subtle?.digest) throw new Error("crypto.subtle no disponible (HTTP)");
+        const msgBuffer = new TextEncoder().encode(base64Str.substring(0, 500) + base64Str.length);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
+    } catch(e) {
+        return "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+}
+
+function resizeImageForStorage(base64Str, maxWidth = 260) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const scale = maxWidth / img.width;
+            canvas.width = maxWidth;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve({
+                dataUrl: canvas.toDataURL('image/jpeg', 0.78),
+                width: img.width,
+                height: img.height
+            });
+        };
+        img.src = base64Str;
+    });
+}
+
+async function addToGallery(base64Data) {
+    try {
+        const { dataUrl: thumb, width, height } = await resizeImageForStorage(base64Data, 260);
+        const hash = await getImageHash(thumb);
+        await dbPutImage({ hash, thumb, full: base64Data, width, height, ts: Date.now() });
+        await renderGallery();
+    } catch (err) {
+        console.warn("No se pudo guardar en galería:", err);
+        log("⚠️ No se pudo guardar la imagen en el historial: " + err.message, "l-err");
+    }
+}
+
+async function renderGallery(){
+  const grid = $("galleryGrid");
+  let history = [];
+  try { history = await dbGetAllImages(); }
+  catch(e) { console.warn("No se pudo leer el historial de imágenes:", e); }
+
+  history.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  grid.innerHTML = "";
+
+  if(history.length === 0){
+    grid.innerHTML = `<div class="hint" style="grid-column:1/-1;">sin imágenes guardadas</div>`;
+    return;
+  }
+
+  history.forEach((item) => {
+    const div = document.createElement("div");
+    div.className = "gallery-item";
+
+    const hasRes = !!(item.width && item.height);
+    const infoHtml = hasRes
+      ? `<div class="info-tag">${item.width}×${item.height} · ${aspectRatioStr(item.width, item.height)}</div>`
+      : "";
+    const lqBadge = item.legacy
+      ? `<div class="lq-badge" title="Guardada antes de la actualización: solo hay disponible en baja resolución">LQ</div>`
+      : "";
+
+    div.innerHTML = `<button class="del-btn" title="Eliminar del historial">×</button>${lqBadge}<img src="${item.thumb}">${infoHtml}`;
+
+    div.querySelector(".del-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      deleteFromGallery(item.hash);
+    });
+
+    div.addEventListener("click", () => {
+      const sourceData = item.full || item.thumb;
+      loadRefImage(sourceData);
+      document.querySelectorAll(".gallery-item").forEach(i => i.classList.remove("selected"));
+      div.classList.add("selected");
+    });
+    grid.appendChild(div);
+  });
+}
+
+(async () => {
+  await renderGallery();
+})();
+
+async function deleteFromGallery(hash){
+  try { await dbDeleteImage(hash); } catch(e) { console.warn(e); }
+  await renderGallery();
+}
+
+async function clearGallery(){
+  if(!confirm("¿Vaciar todo el historial de imágenes? No se puede deshacer.")) return;
+  try { await dbClearImages(); } catch(e) { console.warn(e); }
+  await renderGallery();
+  log("🗑️ Historial de imágenes vaciado.", "l-ok");
+}
+$("btnClearGallery").addEventListener("click", clearGallery);
+
+$("galleryToggle").addEventListener("click", () => {
+  const h = $("galleryToggle");
+  const b = $("galleryBody");
+  h.classList.toggle("open");
+  b.classList.toggle("open");
+  const arrow = h.querySelector(".arrow");
+  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+});
+
 // --- REFERENCE IMAGE DROPZONE ---
 (function(){
   const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef"), wrap = $("refWrap");
@@ -1171,6 +1356,7 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
 function handleRefFile(f){
   const reader = new FileReader();
   reader.onload = (e) => {
+    addToGallery(e.target.result);
     loadRefImage(e.target.result);
   };
   reader.readAsDataURL(f);

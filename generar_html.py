@@ -269,15 +269,6 @@ def main():
         </div>
       </div>
 
-      <div class="panel">
-        <div class="collapsible-header" id="galleryToggle">
-          <span class="arrow">▶</span> Historial de Imágenes <button id="btnClearGallery" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();">Vaciar</button>
-        </div>
-        <div class="collapsible-body" id="galleryBody">
-          <div class="gallery-grid" id="galleryGrid"></div>
-        </div>
-      </div>
-
       <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
 
       <!-- ENHANCER PANEL -->
@@ -980,224 +971,6 @@ $("btnSavePrompt").addEventListener("click", savePrompt);
 $("btnDeletePrompt").addEventListener("click", deletePrompt);
 loadPrompts();
 
-// --- GESTIÓN DE GALERÍA DE IMÁGENES (IndexedDB: miniatura + original a resolución completa) ---
-// Antes se guardaba solo la miniatura comprimida (260px) en localStorage y se descartaba
-// el original -> al reseleccionar una imagen del historial, se reinyectaba la miniatura
-// de baja resolución como si fuera la imagen de entrada. localStorage tiene ~5-10MB de
-// cuota, insuficiente para guardar originales, así que usamos IndexedDB (sin ese límite
-// práctico) y guardamos AMBAS: 'thumb' (para pintar la miniatura rápido) y 'full' (el
-// original intacto, que es lo que se reinyecta al seleccionar).
-const GALLERY_DB_NAME = 'ltxv_gallery_db';
-const GALLERY_STORE = 'images';
-
-function openGalleryDB(){
-  return new Promise((resolve, reject) => {
-    if(!window.indexedDB){ reject(new Error("IndexedDB no disponible en este navegador")); return; }
-    const req = indexedDB.open(GALLERY_DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if(!db.objectStoreNames.contains(GALLERY_STORE)){
-        db.createObjectStore(GALLERY_STORE, { keyPath: 'hash' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function dbPutImage(record){
-  const db = await openGalleryDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(GALLERY_STORE, 'readwrite');
-    tx.objectStore(GALLERY_STORE).put(record);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-async function dbGetAllImages(){
-  const db = await openGalleryDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(GALLERY_STORE, 'readonly');
-    const req = tx.objectStore(GALLERY_STORE).getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function dbDeleteImage(hash){
-  const db = await openGalleryDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(GALLERY_STORE, 'readwrite');
-    tx.objectStore(GALLERY_STORE).delete(hash);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-async function dbClearImages(){
-  const db = await openGalleryDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(GALLERY_STORE, 'readwrite');
-    tx.objectStore(GALLERY_STORE).clear();
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-function aspectRatioStr(w, h){
-  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
-  const d = gcd(w, h) || 1;
-  return `${w / d}:${h / d}`;
-}
-
-function updateDzInfo(w, h){
-  const el = $("dzInfo");
-  if(!el) return;
-  el.textContent = (w && h) ? `${w}×${h} · ${aspectRatioStr(w, h)}` : "";
-  if(w && h){
-    currentAspectRatio = w / h;
-    recalcResolution();
-  }
-}
-
-async function getImageHash(base64Str) {
-    try {
-        if(!crypto?.subtle?.digest) throw new Error("crypto.subtle no disponible (HTTP)");
-        const msgBuffer = new TextEncoder().encode(base64Str.substring(0, 500) + base64Str.length);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
-    } catch(e) {
-        // Fallback: hash simple basado en timestamp + random (suficiente para evitar
-        // colisiones en la galería local, donde el hash solo sirve como key de IndexedDB).
-        return "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    }
-}
-
-function resizeImageForStorage(base64Str, maxWidth = 260) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const scale = maxWidth / img.width;
-            canvas.width = maxWidth;
-            canvas.height = img.height * scale;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve({
-                dataUrl: canvas.toDataURL('image/jpeg', 0.78),
-                width: img.width,
-                height: img.height
-            });
-        };
-        img.src = base64Str;
-    });
-}
-
-async function addToGallery(base64Data) {
-    try {
-        // base64Data es el ORIGINAL sin tocar (viene de handleFile); 'thumb' es solo
-        // para pintar rápido en el grid, pero se guarda también el original completo.
-        const { dataUrl: thumb, width, height } = await resizeImageForStorage(base64Data, 260);
-        const hash = await getImageHash(thumb);
-        await dbPutImage({ hash, thumb, full: base64Data, width, height, ts: Date.now() });
-        await renderGallery();
-    } catch (err) {
-        console.warn("No se pudo guardar en galería:", err);
-        log("⚠️ No se pudo guardar la imagen en el historial: " + err.message, "l-err");
-    }
-}
-
-// Migra una sola vez las entradas antiguas de localStorage (solo tenían miniatura,
-// el original ya se había descartado -> quedan marcadas como 'legacy' y seguirán
-// siendo de baja resolución hasta que se vuelvan a arrastrar).
-async function migrateLegacyGalleryIfNeeded(){
-  const raw = localStorage.getItem('ltxv_gallery');
-  if(!raw) return;
-  try {
-    const old = JSON.parse(raw);
-    for(const raw_item of old){
-      const item = typeof raw_item === 'string' ? { data: raw_item, hash: null } : raw_item;
-      const hash = item.hash || await getImageHash(item.data);
-      await dbPutImage({
-        hash, thumb: item.data, full: item.data,
-        width: item.width || null, height: item.height || null,
-        ts: Date.now(), legacy: true
-      });
-    }
-    log(`↪️ Migradas ${old.length} imágenes del historial antiguo (quedan como baja resolución, arrástralas de nuevo para tenerlas a resolución completa).`, "l-ok");
-  } catch(e) {
-    console.warn("No se pudo migrar el historial antiguo:", e);
-  } finally {
-    localStorage.removeItem('ltxv_gallery'); // no volver a intentar migrar
-  }
-}
-
-async function renderGallery(){
-  const grid = $("galleryGrid");
-  let history = [];
-  try { history = await dbGetAllImages(); }
-  catch(e) { console.warn("No se pudo leer el historial de imágenes:", e); }
-
-  history.sort((a, b) => (b.ts || 0) - (a.ts || 0));
-  grid.innerHTML = "";
-
-  if(history.length === 0){
-    grid.innerHTML = `<div class="hint" style="grid-column:1/-1;">sin imágenes guardadas</div>`;
-    return;
-  }
-
-  history.forEach((item) => {
-    const div = document.createElement("div");
-    div.className = "gallery-item";
-
-    const hasRes = !!(item.width && item.height);
-    const infoHtml = hasRes
-      ? `<div class="info-tag">${item.width}×${item.height} · ${aspectRatioStr(item.width, item.height)}</div>`
-      : "";
-    const lqBadge = item.legacy
-      ? `<div class="lq-badge" title="Guardada antes de la actualización: solo hay disponible en baja resolución">LQ</div>`
-      : "";
-
-    div.innerHTML = `<button class="del-btn" title="Eliminar del historial">×</button>${lqBadge}<img src="${item.thumb}">${infoHtml}`;
-
-    div.querySelector(".del-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      deleteFromGallery(item.hash);
-    });
-
-    div.addEventListener("click", () => {
-      // 'full' es el original a resolución completa; solo cae a 'thumb' en entradas legacy sin original.
-      const sourceData = item.full || item.thumb;
-      fetch(sourceData).then(res => res.blob()).then(blob => {
-        const uniqueName = `historial_${Date.now()}.png`;
-        const file = new File([blob], uniqueName, {type: blob.type || "image/png"});
-        // Pasamos false para indicar que no debe re-guardarse en el historial
-        handleFile(file, false);
-
-        document.querySelectorAll(".gallery-item").forEach(i => i.classList.remove("selected"));
-        div.classList.add("selected");
-      });
-    });
-    grid.appendChild(div);
-  });
-}
-
-(async () => {
-  await migrateLegacyGalleryIfNeeded();
-  await renderGallery();
-})();
-
-async function deleteFromGallery(hash){
-  try { await dbDeleteImage(hash); } catch(e) { console.warn(e); }
-  await renderGallery();
-}
-
-async function clearGallery(){
-  if(!confirm("¿Vaciar todo el historial de imágenes de entrada? No se puede deshacer.")) return;
-  try { await dbClearImages(); } catch(e) { console.warn(e); }
-  await renderGallery();
-  log("🗑️ Historial de imágenes vaciado.", "l-ok");
-}
-$("btnClearGallery").addEventListener("click", clearGallery);
-
 
 // --- KREA2 RECENT IMAGES PANEL ---
 $("krea2RecentToggle").addEventListener("click", () => {
@@ -1595,11 +1368,6 @@ function handleFile(f, shouldSaveToGallery = true){
 
   const reader = new FileReader();
   reader.onload = (e) => {
-    // Solo guardar si es una carga nueva (drag/drop o input), no si es selección de galería
-    if (shouldSaveToGallery) {
-        addToGallery(e.target.result);
-    }
-
     const ph = dz.querySelector(".ph");
     if(ph) ph.remove();
 
@@ -1662,7 +1430,6 @@ function handleVideoFile(file, shouldSaveToGallery = true){
       img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
       img.src = dataUrl;
 
-      if(shouldSaveToGallery) addToGallery(dataUrl);
       log(`🎬 Vídeo cargado: ${file.name} (${frameLabel} frame como imagen de entrada)`, "l-ok");
 
       metaPromise.then(workflow => {
@@ -2087,15 +1854,6 @@ function getCurrentSysPrompt(data, mode, styleKey){
 $("enhancerToggle").addEventListener("click", () => {
   const h = $("enhancerToggle");
   const b = $("enhancerBody");
-  h.classList.toggle("open");
-  b.classList.toggle("open");
-  const arrow = h.querySelector(".arrow");
-  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
-});
-
-$("galleryToggle").addEventListener("click", () => {
-  const h = $("galleryToggle");
-  const b = $("galleryBody");
   h.classList.toggle("open");
   b.classList.toggle("open");
   const arrow = h.querySelector(".arrow");
