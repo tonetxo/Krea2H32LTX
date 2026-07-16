@@ -2640,6 +2640,7 @@ function applyWorkflow(workflow, opts={}){
     $("segFixed").classList.add("on");
     $("segRandom").classList.remove("on");
     $("seedVal").disabled = false;
+    seedMode = "fixed";
     setApplied("semilla");
   } else {
     setMissing("semilla");
@@ -3314,7 +3315,7 @@ async function queueAndWait(firstPassOnly){
   await ensureImageUploaded();
   totalBatchSize = parseInt($("batchSize").value || "1", 10);
   currentBatchIndex = 0;
-  batchSeedMode = seedMode;
+  batchSeedMode = $("segRandom").classList.contains("on") ? "random" : "fixed";
   window.currentBatchMode = firstPassOnly;
   generationStep = firstPassOnly ? 0 : 1;
   firstPromptId = null;
