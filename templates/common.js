@@ -1,7 +1,8 @@
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
 //
-// This file is injected AFTER the UI-specific CONFIG and N definitions.
-// CONFIG must be set by the UI (ltxv.js / krea2.js) BEFORE this script runs.
+// This file is injected BEFORE the UI-specific JS (ltxv.js / krea2.js).
+// All top-level code that uses CONFIG or $ is deferred to initCommon(),
+// which the UI-specific JS calls after defining CONFIG.
 //
 // Required CONFIG fields:
 //   PROMPTS_KEY, LORA_STATE_KEY, ENHANCER_SYSKEY, SERVERURL_KEY,
@@ -25,10 +26,13 @@ let processingPrompts = new Set();
 let batchSeedMode = "random";
 let currentPromptId = null;
 let timers = {};
-let loras = CONFIG.loras;
+let loras = [];
+let selectedPromptKey = null;
+let sysPromptEditData = null;
+let sysPromptEditMode = "text";
 
 const LEGACY_PORTS = ["7822"];
-const DEFAULT_BACKEND_PORT = CONFIG.DEFAULT_BACKEND_PORT;
+let DEFAULT_BACKEND_PORT = "7821";
 const $ = (id) => document.getElementById(id);
 
 // --- TIMERS ---
@@ -66,7 +70,6 @@ function discardTimer(promptId){
   delete timers[promptId];
 }
 
-// Saca tiempos del history JSON de ComfyUI. Devuelve {t1, t2, total} en ms o null.
 function extractTimings(entry, N){
   if(!entry || !entry.status) return null;
   const msgs = entry.status.messages || [];
@@ -106,7 +109,12 @@ function randomSeed(){
   return Math.floor(Math.random() * 0xFFFFFFFF);
 }
 
-// --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
+// --- SERVER / LOG ---
+function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
+function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
+function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+
 function updateServerHint(){
   const hint = $("serverHint");
   if(!hint) return;
@@ -122,36 +130,8 @@ function updateServerHint(){
     }
   }
 }
-(function autoPickServerUrl(){
-  try {
-    const input = $("serverUrl");
-    if(!input) return;
-    const stored = localStorage.getItem(CONFIG.SERVERURL_KEY);
-    if(stored){
-      const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
-      if(storedPort && LEGACY_PORTS.includes(storedPort)){
-        localStorage.removeItem(CONFIG.SERVERURL_KEY);
-      } else {
-        input.value = stored;
-        updateServerHint();
-        return;
-      }
-    }
-    updateServerHint();
-  } catch(e) { /* si falla, queda el placeholder */ }
-})();
-$("serverUrl").addEventListener("change", (e) => {
-  try { localStorage.setItem(CONFIG.SERVERURL_KEY, e.target.value.trim()); } catch(_){}
-  updateServerHint();
-});
-$("serverUrl").addEventListener("input", updateServerHint);
 
-function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
-function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
-function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
-function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
-
-// --- WEBSOCKET SETUP ---
+// --- WEBSOCKET ---
 function connectSocket() {
     if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
     const url = server().replace('http', 'ws') + '/ws?clientId=' + CLIENT_ID;
@@ -182,8 +162,6 @@ function connectSocket() {
 }
 
 // --- HANDLE PROMPT DONE ---
-// Procesa un prompt_id terminado, venga del WS o del polling de respaldo.
-// Idempotente: si ya se ha procesado, no hace nada.
 async function handlePromptDone(promptId) {
     if(handledPrompts.has(promptId)) return;
     if(processingPrompts.has(promptId)) return;
@@ -208,8 +186,6 @@ async function handlePromptDone(promptId) {
         return;
     }
 
-    // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
-    // descartamos silenciosamente cualquier execution_success tardío del backend.
     if(!(promptId in pendingSeeds)){
         handledPrompts.add(promptId);
         processingPrompts.delete(promptId);
@@ -230,8 +206,6 @@ async function handlePromptDone(promptId) {
     const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
                    (clientResult ? fmtMs(clientResult.total) : null);
 
-    // UI-specific media display + continuation logic.
-    // Returns true to skip finalize (e.g. LTXV step 1 → step 2).
     const cont = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
     if(cont) return;
 
@@ -242,7 +216,6 @@ async function handlePromptDone(promptId) {
     processNextBatch();
 }
 
-// Red de seguridad: si el WS no entrega 'execution_success', recupera el resultado por polling.
 function pollFallback(promptId) {
     let tries = 0;
     const iv = setInterval(async () => {
@@ -263,9 +236,7 @@ function processNextBatch() {
     }
 }
 
-// --- GESTIÓN DE PROMPTS (árbol de carpetas jerárquico con /) ---
-let selectedPromptKey = null;
-
+// --- PROMPT LIBRARY ---
 function loadPrompts(){
   let saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
   let dirty = false;
@@ -418,12 +389,7 @@ function deletePrompt(){
   log(`Prompt eliminado.`, "l-ok");
 }
 
-$("btnSavePrompt").addEventListener("click", savePrompt);
-$("btnMovePrompt").addEventListener("click", movePrompt);
-$("btnDeletePrompt").addEventListener("click", deletePrompt);
-loadPrompts();
-
-// --- GESTIÓN DE LORAS CON MEMORIA ---
+// --- LORA STATE ---
 function saveLoraState() { localStorage.setItem(CONFIG.LORA_STATE_KEY, JSON.stringify(loras)); }
 function loadLoraState() {
   const saved = localStorage.getItem(CONFIG.LORA_STATE_KEY);
@@ -470,9 +436,8 @@ function renderLoras(){
   wrap.querySelectorAll('select[data-field="lora"]').forEach(sel=>sel.addEventListener("change",()=>{loras[+sel.dataset.i].lora=sel.value;saveLoraState();}));
   wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
 }
-loadLoraState(); renderLoras(); loadModels();
 
-// --- PROMPT ENHANCER (Ollama) — shared skeleton ---
+// --- ENHANCER ---
 function loadSysPrompts(){
   const saved = localStorage.getItem(CONFIG.ENHANCER_SYSKEY);
   if(saved){
@@ -537,48 +502,6 @@ async function loadEnhancerModels(){
   }
 }
 
-// --- Enhancer shared listeners ---
-$("enhancerToggle").addEventListener("click", () => {
-  const h = $("enhancerToggle");
-  const b = $("enhancerBody");
-  h.classList.toggle("open");
-  b.classList.toggle("open");
-  const arrow = h.querySelector(".arrow");
-  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
-});
-
-$("enhancerMode").addEventListener("change", () => {
-  const data = loadSysPrompts();
-  populateStyleSelect(data, $("enhancerMode").value);
-});
-
-$("btnUseAsPrompt").addEventListener("click", () => {
-  const text = $("enhancerOutput").value.trim();
-  if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
-  $("prompt").value = text;
-  log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
-});
-
-$("btnSaveEnhanced").addEventListener("click", () => {
-  const text = $("enhancerOutput").value.trim();
-  if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
-  const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):");
-  if(!name) return;
-  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
-  if(saved[name]){
-    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
-  }
-  saved[name] = text;
-  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
-  selectedPromptKey = name;
-  loadPrompts();
-  log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
-});
-
-// --- Editor de system prompts (modal) ---
-let sysPromptEditData = null;
-let sysPromptEditMode = "text";
-
 function renderSysPromptEditor(){
   const container = $("sysPromptEditor");
   if(!container) return;
@@ -611,87 +534,7 @@ function renderSysPromptEditor(){
   });
 }
 
-const sysPromptModal = document.createElement("div");
-sysPromptModal.className = "modal-overlay";
-sysPromptModal.id = "sysPromptModal";
-sysPromptModal.innerHTML = '<div class="modal-content">' +
-  '<h2>Editar System Prompts</h2>' +
-  '<div class="modal-tabs" id="sysPromptTabs">' +
-    '<div class="modal-tab active" data-tab="text">Texto</div>' +
-    '<div class="modal-tab" data-tab="vision">Visión</div>' +
-  '</div>' +
-  '<div id="sysPromptEditor"></div>' +
-  '<div class="modal-actions">' +
-    '<button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>' +
-    '<button id="btnSaveSysPrompts" class="primary">Guardar</button>' +
-    '<button id="btnCancelSysPrompts" class="ghost">Cancelar</button>' +
-  '</div>' +
-'</div>';
-document.body.appendChild(sysPromptModal);
-
-$("btnAddSysPrompt").addEventListener("click", () => {
-  const mode = sysPromptEditMode;
-  if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
-  const keys = Object.keys(sysPromptEditData[mode]);
-  let nextKey = "C";
-  for(let i = 67; i < 91; i++){
-    const k = String.fromCharCode(i);
-    if(!keys.includes(k)){ nextKey = k; break; }
-  }
-  sysPromptEditData[mode][nextKey] = { name: "Nuevo estilo", prompt: "" };
-  renderSysPromptEditor();
-});
-$("btnSaveSysPrompts").addEventListener("click", () => {
-  const container = $("sysPromptEditor");
-  container.querySelectorAll(".sysprompt-row").forEach(row => {
-    const key = row.querySelector("textarea").dataset.key;
-    const name = row.querySelector(".spr-name-input").value;
-    const prompt = row.querySelector("textarea").value;
-    if(sysPromptEditData[sysPromptEditMode] && sysPromptEditData[sysPromptEditMode][key]){
-      sysPromptEditData[sysPromptEditMode][key].name = name;
-      sysPromptEditData[sysPromptEditMode][key].prompt = prompt;
-    }
-  });
-  saveSysPrompts(sysPromptEditData);
-  populateStyleSelect(sysPromptEditData, $("enhancerMode").value);
-  $("sysPromptModal").classList.remove("open");
-  log("✅ System prompts guardados.", "l-ok");
-});
-$("btnCancelSysPrompts").addEventListener("click", () => {
-  $("sysPromptModal").classList.remove("open");
-});
-document.querySelectorAll(".modal-tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
-    tab.classList.add("active");
-    sysPromptEditMode = tab.dataset.tab;
-    renderSysPromptEditor();
-  });
-});
-
-$("btnEditSysPrompts").addEventListener("click", () => {
-  sysPromptEditData = loadSysPrompts();
-  sysPromptEditMode = "text";
-  renderSysPromptEditor();
-  const tabs = document.querySelectorAll(".modal-tab");
-  tabs.forEach(t => t.classList.remove("active"));
-  const textTab = document.querySelector('.modal-tab[data-tab="text"]');
-  if(textTab) textTab.classList.add("active");
-  $("sysPromptModal").classList.add("open");
-});
-
-// Collapsibles shared
-makeCollapsible("promptLibToggle", "promptLibBody");
-makeCollapsible("loraToggle", "loraBody");
-
-// Inicializar enhancer
-(async () => {
-  await loadEnhancerModels();
-  const data = loadSysPrompts();
-  populateStyleSelect(data, $("enhancerMode").value);
-})();
-
-// --- BOTONES DE PARAR ---
+// --- STOP ---
 function enableStopButtons(v){ $("btnStopVideo").disabled = !v; $("btnStopAll").disabled = !v; }
 
 async function stopCurrentVideo(){
@@ -725,18 +568,180 @@ async function stopAll(){
   log("🛑 Generación detenida.", "l-err");
 }
 
-$("btnStopVideo").addEventListener("click", stopCurrentVideo);
-$("btnStopAll").addEventListener("click", stopAll);
+// --- INIT: all top-level code that uses $ or CONFIG ---
+// Called by the UI-specific JS after CONFIG is defined.
+function initCommon(){
+  loras = CONFIG.loras;
+  DEFAULT_BACKEND_PORT = CONFIG.DEFAULT_BACKEND_PORT;
 
-// --- TEST CONEXIÓN ---
-$("btnTest").addEventListener("click", async ()=>{
-    setConn("busy","comprobando...");
-    try{
-        const r=await fetch(server()+"/system_stats");
-        if(!r.ok) throw new Error("HTTP "+r.status);
-        await r.json();
-        setConn("ok","conectado");
-        connectSocket();
-        log("Conexión OK","l-ok");
-    }catch(err){setConn("bad","sin conexión");log("Error: "+err.message,"l-err");}
-});
+  // Auto-pick server URL
+  (function autoPickServerUrl(){
+    try {
+      const input = $("serverUrl");
+      if(!input) return;
+      const stored = localStorage.getItem(CONFIG.SERVERURL_KEY);
+      if(stored){
+        const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
+        if(storedPort && LEGACY_PORTS.includes(storedPort)){
+          localStorage.removeItem(CONFIG.SERVERURL_KEY);
+        } else {
+          input.value = stored;
+          updateServerHint();
+          return;
+        }
+      }
+      updateServerHint();
+    } catch(e) { /* si falla, queda el placeholder */ }
+  })();
+
+  $("serverUrl").addEventListener("change", (e) => {
+    try { localStorage.setItem(CONFIG.SERVERURL_KEY, e.target.value.trim()); } catch(_){}
+    updateServerHint();
+  });
+  $("serverUrl").addEventListener("input", updateServerHint);
+
+  // Prompt library buttons
+  $("btnSavePrompt").addEventListener("click", savePrompt);
+  $("btnMovePrompt").addEventListener("click", movePrompt);
+  $("btnDeletePrompt").addEventListener("click", deletePrompt);
+  loadPrompts();
+
+  // LoRA state
+  loadLoraState(); renderLoras(); loadModels();
+
+  // Enhancer shared listeners
+  $("enhancerToggle").addEventListener("click", () => {
+    const h = $("enhancerToggle");
+    const b = $("enhancerBody");
+    h.classList.toggle("open");
+    b.classList.toggle("open");
+    const arrow = h.querySelector(".arrow");
+    arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+  });
+
+  $("enhancerMode").addEventListener("change", () => {
+    const data = loadSysPrompts();
+    populateStyleSelect(data, $("enhancerMode").value);
+  });
+
+  $("btnUseAsPrompt").addEventListener("click", () => {
+    const text = $("enhancerOutput").value.trim();
+    if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
+    $("prompt").value = text;
+    log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
+  });
+
+  $("btnSaveEnhanced").addEventListener("click", () => {
+    const text = $("enhancerOutput").value.trim();
+    if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
+    const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):");
+    if(!name) return;
+    const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+    if(saved[name]){
+      if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
+    }
+    saved[name] = text;
+    localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+    selectedPromptKey = name;
+    loadPrompts();
+    log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+  });
+
+  // Sysprompt modal
+  const sysPromptModal = document.createElement("div");
+  sysPromptModal.className = "modal-overlay";
+  sysPromptModal.id = "sysPromptModal";
+  sysPromptModal.innerHTML = '<div class="modal-content">' +
+    '<h2>Editar System Prompts</h2>' +
+    '<div class="modal-tabs" id="sysPromptTabs">' +
+      '<div class="modal-tab active" data-tab="text">Texto</div>' +
+      '<div class="modal-tab" data-tab="vision">Visión</div>' +
+    '</div>' +
+    '<div id="sysPromptEditor"></div>' +
+    '<div class="modal-actions">' +
+      '<button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>' +
+      '<button id="btnSaveSysPrompts" class="primary">Guardar</button>' +
+      '<button id="btnCancelSysPrompts" class="ghost">Cancelar</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(sysPromptModal);
+
+  $("btnAddSysPrompt").addEventListener("click", () => {
+    const mode = sysPromptEditMode;
+    if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
+    const keys = Object.keys(sysPromptEditData[mode]);
+    let nextKey = "C";
+    for(let i = 67; i < 91; i++){
+      const k = String.fromCharCode(i);
+      if(!keys.includes(k)){ nextKey = k; break; }
+    }
+    sysPromptEditData[mode][nextKey] = { name: "Nuevo estilo", prompt: "" };
+    renderSysPromptEditor();
+  });
+  $("btnSaveSysPrompts").addEventListener("click", () => {
+    const container = $("sysPromptEditor");
+    container.querySelectorAll(".sysprompt-row").forEach(row => {
+      const key = row.querySelector("textarea").dataset.key;
+      const name = row.querySelector(".spr-name-input").value;
+      const prompt = row.querySelector("textarea").value;
+      if(sysPromptEditData[sysPromptEditMode] && sysPromptEditData[sysPromptEditMode][key]){
+        sysPromptEditData[sysPromptEditMode][key].name = name;
+        sysPromptEditData[sysPromptEditMode][key].prompt = prompt;
+      }
+    });
+    saveSysPrompts(sysPromptEditData);
+    populateStyleSelect(sysPromptEditData, $("enhancerMode").value);
+    $("sysPromptModal").classList.remove("open");
+    log("✅ System prompts guardados.", "l-ok");
+  });
+  $("btnCancelSysPrompts").addEventListener("click", () => {
+    $("sysPromptModal").classList.remove("open");
+  });
+  document.querySelectorAll(".modal-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      sysPromptEditMode = tab.dataset.tab;
+      renderSysPromptEditor();
+    });
+  });
+
+  $("btnEditSysPrompts").addEventListener("click", () => {
+    sysPromptEditData = loadSysPrompts();
+    sysPromptEditMode = "text";
+    renderSysPromptEditor();
+    const tabs = document.querySelectorAll(".modal-tab");
+    tabs.forEach(t => t.classList.remove("active"));
+    const textTab = document.querySelector('.modal-tab[data-tab="text"]');
+    if(textTab) textTab.classList.add("active");
+    $("sysPromptModal").classList.add("open");
+  });
+
+  // Collapsibles
+  makeCollapsible("promptLibToggle", "promptLibBody");
+  makeCollapsible("loraToggle", "loraBody");
+
+  // Init enhancer
+  (async () => {
+    await loadEnhancerModels();
+    const data = loadSysPrompts();
+    populateStyleSelect(data, $("enhancerMode").value);
+  })();
+
+  // Stop buttons
+  $("btnStopVideo").addEventListener("click", stopCurrentVideo);
+  $("btnStopAll").addEventListener("click", stopAll);
+
+  // Test connection
+  $("btnTest").addEventListener("click", async ()=>{
+      setConn("busy","comprobando...");
+      try{
+          const r=await fetch(server()+"/system_stats");
+          if(!r.ok) throw new Error("HTTP "+r.status);
+          await r.json();
+          setConn("ok","conectado");
+          connectSocket();
+          log("Conexión OK","l-ok");
+      }catch(err){setConn("bad","sin conexión");log("Error: "+err.message,"l-err");}
+  });
+}

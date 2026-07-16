@@ -1,5 +1,5 @@
 // krea2.js — Krea2-specific JavaScript.
-// Injected AFTER common.js. Sets CONFIG BEFORE common.js runs.
+// Injected AFTER common.js. CONFIG must be defined before initCommon().
 
 const CONFIG = {
   PROMPTS_KEY: 'krea2_prompts',
@@ -25,6 +25,8 @@ const CONFIG = {
 };
 
 const N = CONFIG.N;
+initCommon();
+
 let currentOutputMedia = null;
 let currentRefVariantIndex = -1;
 

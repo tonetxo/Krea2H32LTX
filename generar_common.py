@@ -105,10 +105,9 @@ def generate_html(config):
     ui_html = _read_template(config['ui_html'])
 
     # --- Assemble JS ---
-    # The UI-specific JS defines CONFIG and N, then common.js uses them.
     # Order: BASE_GRAPH + AVAILABLE_MODELS + AVAILABLE_LORAS (placeholders),
-    #         then UI-specific JS (defines CONFIG, N, callbacks, UI functions),
-    #         then common.js (shared functions that reference CONFIG).
+    #         then common.js (defines $, log, server, initCommon, etc. — no CONFIG access at top level),
+    #         then UI-specific JS (defines CONFIG, N, calls initCommon(), UI functions).
     ui_js = _read_template(config['ui_js'])
     common_js = _read_template('common.js')
 
@@ -116,8 +115,8 @@ def generate_html(config):
         "const BASE_GRAPH = __GRAPH_JSON__;\n"
         "const AVAILABLE_MODELS = __MODEL_LIST__;\n"
         "const AVAILABLE_LORAS = __LORA_LIST__;\n"
-        + ui_js + "\n"
-        + common_js
+        + common_js + "\n"
+        + ui_js
     )
 
     # --- Assemble full HTML ---

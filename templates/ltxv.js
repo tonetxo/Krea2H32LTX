@@ -1,5 +1,5 @@
 // ltxv.js — LTXV-specific JavaScript.
-// Injected AFTER common.js. Sets CONFIG BEFORE common.js runs.
+// Injected AFTER common.js. CONFIG must be defined before initCommon().
 
 const CONFIG = {
   PROMPTS_KEY: 'ltxv_prompts',
@@ -24,6 +24,8 @@ const CONFIG = {
 };
 
 const N = CONFIG.N;
+initCommon();
+
 let uploadedImage=null, localFile=null, seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
