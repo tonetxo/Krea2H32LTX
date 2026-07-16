@@ -86,6 +86,9 @@
   .pt-folder{margin-left:14px;}
   .pt-folder-label{cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:10.5px;padding:2px 0;display:flex;align-items:center;gap:4px;}
   .pt-folder-label:hover{color:var(--text);}
+  .pt-folder-del{margin-left:auto;opacity:0;cursor:pointer;color:var(--danger);font-size:14px;line-height:1;padding:0 2px;border-radius:3px;}
+  .pt-folder-label:hover .pt-folder-del{opacity:1;}
+  .pt-folder-del:hover{background:rgba(255,106,106,.15);}
   .pt-folder-arrow{font-size:9px;width:10px;display:inline-block;transition:transform .15s;}
   .pt-folder.open > .pt-folder-arrow{transform:rotate(90deg);}
   .pt-children{display:none;margin-left:12px;border-left:1px solid var(--border);padding-left:4px;}
@@ -1655,7 +1658,16 @@ const PROMPTS_KEY = 'krea2_prompts';
 let selectedPromptKey = null;
 
 function loadPrompts(){
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
+  let saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
+  // Limpiar claves con último segmento vacío (trailing slash)
+  let dirty = false;
+  for(const key of Object.keys(saved)){
+    if(key.endsWith('/') || !key.split('/').pop()){
+      delete saved[key]; dirty = true;
+    }
+  }
+  if(dirty) localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
+
   const tree = $("promptTree");
   tree.innerHTML = '';
 
@@ -1695,8 +1707,29 @@ function loadPrompts(){
       const nameSpan = document.createElement('span');
       nameSpan.textContent = folderName;
       label.appendChild(nameSpan);
+      const delFolder = document.createElement('span');
+      delFolder.className = 'pt-folder-del';
+      delFolder.textContent = '×';
+      delFolder.title = 'Eliminar carpeta y todo su contenido';
+      label.appendChild(delFolder);
 
-      label.addEventListener("click", () => {
+      delFolder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
+        const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
+        let count = 0;
+        for(const key of Object.keys(saved)){
+          if(key === folderPath || key.startsWith(folderPath + '/')){
+            delete saved[key]; count++;
+          }
+        }
+        localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
+        loadPrompts();
+        log(`Carpeta "${folderPath}" eliminada (${count} prompt(s)).`, "l-ok");
+      });
+
+      label.addEventListener("click", (e) => {
+        if(e.target === delFolder) return;
         folderDiv.classList.toggle("open");
         openState[folderPath] = folderDiv.classList.contains("open");
         localStorage.setItem(PROMPTS_KEY + '_open', JSON.stringify(openState));
