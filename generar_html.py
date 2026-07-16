@@ -254,7 +254,8 @@ def main():
       <div class="panel">
         <h2>Biblioteca de Prompts</h2>
         <div class="row"><select id="promptLibSelect"><option value="">-- Seleccionar Prompt Guardado --</option></select></div>
-        <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
+        <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnMovePrompt" class="ghost">Mover</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
+        <div class="hint" style="font-size:10px;margin-top:4px;">Usa <code style="color:var(--accent)">/</code> para agrupar: <code>casa/pasillo/noche</code></div>
       </div>
 
       <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
@@ -932,42 +933,89 @@ function processNextBatch() {
     }
 }
 
-// --- GESTIÓN DE PROMPTS ---
+// --- GESTIÓN DE PROMPTS (jerárquica con /) ---
+const PROMPTS_KEY = 'ltxv_prompts';
+
 function loadPrompts(){
-  const saved = JSON.parse(localStorage.getItem('ltxv_prompts') || '{}');
+  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
   const select = $("promptLibSelect");
   select.innerHTML = '<option value="">-- Seleccionar Prompt Guardado --</option>';
-  Object.keys(saved).forEach(key => {
+  // Ordenar por nombre para agrupar jerárquicamente
+  const keys = Object.keys(saved).sort();
+  // Construir árbol visual
+  for(const key of keys){
     const opt = document.createElement('option');
-    opt.value = key; opt.textContent = key;
+    opt.value = key;
+    // Mostrar con indentación visual según nivel (split por /)
+    const parts = key.split('/');
+    const depth = parts.length - 1;
+    const lastPart = parts[parts.length - 1];
+    const indent = depth > 0 ? '  '.repeat(depth) : '';
+    const prefix = depth > 0 ? '└─ ' : '';
+    opt.textContent = `${indent}${prefix}${lastPart}`;
+    opt.title = key;
     select.appendChild(opt);
-  });
+  }
 }
+
 function savePrompt(){
-  const name = prompt("Nombre para este prompt:");
+  const name = prompt("Nombre/ruta para este prompt (usa / para agrupar, ej: casa/pasillo/noche):");
   if(!name) return;
   const text = $("prompt").value;
-  const saved = JSON.parse(localStorage.getItem('ltxv_prompts') || '{}');
+  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
+  if(saved[name]){
+    const preview = saved[name].slice(0, 80);
+    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
+  }
   saved[name] = text;
-  localStorage.setItem('ltxv_prompts', JSON.stringify(saved));
+  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
   loadPrompts();
+  selectPrompt(name);
   log(`Prompt "${name}" guardado.`, "l-ok");
 }
+
+function movePrompt(){
+  const select = $("promptLibSelect");
+  const oldName = select.value;
+  if(!oldName){ log("⚠️ Selecciona un prompt para mover.", "l-err"); return; }
+  const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
+  if(!newName || newName === oldName) return;
+  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
+  if(saved[newName]){
+    if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
+  }
+  saved[newName] = saved[oldName];
+  delete saved[oldName];
+  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
+  loadPrompts();
+  selectPrompt(newName);
+  log(`Prompt movido: "${oldName}" → "${newName}"`, "l-ok");
+}
+
+function selectPrompt(name){
+  const select = $("promptLibSelect");
+  for(const opt of select.options){
+    if(opt.value === name){ select.value = name; break; }
+  }
+}
+
 function deletePrompt(){
   const select = $("promptLibSelect");
   const name = select.value;
   if(!name) return;
   if(!confirm(`¿Eliminar "${name}"?`)) return;
-  const saved = JSON.parse(localStorage.getItem('ltxv_prompts') || '{}');
+  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
   delete saved[name];
-  localStorage.setItem('ltxv_prompts', JSON.stringify(saved));
+  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
   loadPrompts();
+  log(`Prompt "${name}" eliminado.`, "l-ok");
 }
 $("promptLibSelect").addEventListener("change", (e) => {
-  const saved = JSON.parse(localStorage.getItem('ltxv_prompts') || '{}');
+  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
   if(saved[e.target.value]) $("prompt").value = saved[e.target.value];
 });
 $("btnSavePrompt").addEventListener("click", savePrompt);
+$("btnMovePrompt").addEventListener("click", movePrompt);
 $("btnDeletePrompt").addEventListener("click", deletePrompt);
 loadPrompts();
 
@@ -2064,12 +2112,16 @@ $("btnEnhance").addEventListener("click", async () => {
 $("btnSaveEnhanced").addEventListener("click", () => {
   const text = $("enhancerOutput").value.trim();
   if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
-  const name = prompt("Nombre para este prompt mejorado:");
+  const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):");
   if(!name) return;
-  const saved = JSON.parse(localStorage.getItem('ltxv_prompts') || '{}');
+  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
+  if(saved[name]){
+    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
+  }
   saved[name] = text;
-  localStorage.setItem('ltxv_prompts', JSON.stringify(saved));
+  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
   loadPrompts();
+  selectPrompt(name);
   log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
 });
 
