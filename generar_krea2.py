@@ -192,10 +192,14 @@ def main():
       <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
 
       <div class="panel">
-        <h2>Biblioteca de Prompts</h2>
-        <div id="promptTree" class="prompt-tree"></div>
-        <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnMovePrompt" class="ghost">Mover</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
-        <div class="hint" style="font-size:10px;margin-top:4px;">Usa <code style="color:var(--accent)">/</code> para clasificar: <code>casa/pasillo/noche</code> (los dos primeros son carpetas)</div>
+        <div class="collapsible-header" id="promptLibToggle">
+          <span class="arrow">▶</span> Biblioteca de Prompts
+        </div>
+        <div class="collapsible-body" id="promptLibBody">
+          <div id="promptTree" class="prompt-tree"></div>
+          <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnMovePrompt" class="ghost">Mover</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
+          <div class="hint" style="font-size:10px;margin-top:4px;">Usa <code style="color:var(--accent)">/</code> para clasificar: <code>casa/pasillo/noche</code> (los dos primeros son carpetas)</div>
+        </div>
       </div>
 
       <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
@@ -251,7 +255,14 @@ def main():
         <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segVarianceRandom">Aleatoria</div><div class="seg" id="segVarianceFixed">Fija</div></div><input type="number" id="varianceSeed" value="315489554057974" step="1" disabled></div>
       </div>
 
-      <div class="panel"><h2>LoRAs</h2><div id="loraList"></div></div>
+      <div class="panel">
+        <div class="collapsible-header" id="loraToggle">
+          <span class="arrow">▶</span> LoRAs
+        </div>
+        <div class="collapsible-body" id="loraBody">
+          <div id="loraList"></div>
+        </div>
+      </div>
 
       <div class="panel"><h2>Sampler</h2>
         <div class="row slider-row"><label>Eta</label><input type="range" id="etaSlider" min="0" max="2" step="0.01" value="0.5"><div class="slider-val" id="etaVal">0.50</div></div>
@@ -1824,6 +1835,21 @@ $("enhancerToggle").addEventListener("click", () => {
   const arrow = h.querySelector(".arrow");
   arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
 });
+
+function makeCollapsible(toggleId, bodyId, onOpen){
+  const h = $(toggleId), b = $(bodyId);
+  if(!h || !b) return;
+  h.addEventListener("click", () => {
+    h.classList.toggle("open");
+    b.classList.toggle("open");
+    const arrow = h.querySelector(".arrow");
+    if(arrow) arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+    if(h.classList.contains("open") && onOpen) onOpen();
+  });
+}
+
+makeCollapsible("promptLibToggle", "promptLibBody");
+makeCollapsible("loraToggle", "loraBody");
 
 async function loadEnhancerModels(){
   const sel = $("enhancerModel");
