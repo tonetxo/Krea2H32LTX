@@ -1,0 +1,102 @@
+  <div class="grid">
+    <div class="controls-col">
+      <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
+
+      <div class="panel"><h2>Resolución</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.1" max="4.0" step="0.1" value="1.0"><div class="slider-val" id="mpVal">1.00</div></div><div class="row"><label>Aspect Ratio</label><select id="aspectRatio"><option value="1:1 (Square)">1:1 (Square)</option><option value="2:3 (Portrait Photo)">2:3 (Portrait Photo)</option><option value="3:2 (Photo)">3:2 (Photo)</option><option value="3:4 (Portrait Standard)">3:4 (Portrait Standard)</option><option value="4:3 (Standard)">4:3 (Standard)</option><option value="9:16 (Portrait Widescreen)">9:16 (Portrait Widescreen)</option><option value="16:9 (Widescreen)" selected>16:9 (Widescreen)</option><option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option></select></div></div>
+
+      <div class="panel"><h2>Krea2 Enhancer</h2>
+        <div class="row"><label>Projector Delta — Preset</label><select id="projectorPreset"><option value="none" selected>none</option><option value="FB2">FB2</option><option value="FB3">FB3</option><option value="FEDOR">FEDOR</option><option value="SKC3VO">SKC3VO</option></select></div>
+        <div class="row slider-row"><label>Projector Delta — Strength</label><input type="range" id="projectorStrength" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="projectorStrengthVal">1.00</div></div>
+        <div class="row" style="display:flex;align-items:center;gap:16px;flex-wrap:nowrap;"><label style="margin:0;flex-shrink:0;font-size:11px;">T-Enhancer</label><div class="switch" id="enhancerEnabled"><i></i></div><span id="enhancerEnabledLabel" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);flex-shrink:0;">desactivado</span></div>
+        <div class="row slider-row"><label>T-Enhancer — Strength</label><input type="range" id="enhancerStrength" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerStrengthVal">0.50</div></div>
+        <div class="row slider-row" id="textScaleRow" style="display:none;"><label>T-Enhancer — Text Scale</label><input type="range" id="enhancerTextScale" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerTextScaleVal">0.50</div></div>
+        <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:-6px;"><input type="checkbox" id="enhancerLinkTextScale" checked style="margin:0;"><label for="enhancerLinkTextScale" style="margin:0;font-size:11px;color:var(--muted-2);">Vincular text_scale</label></div>
+      </div>
+
+      <div class="panel"><h2>RBG Smart Seed Variance</h2>
+        <div class="row"><label>Variance Preset</label><select id="variancePreset"><option value="❌ Disabled" selected>❌ Disabled</option><option value="🌱 Subtle">🌱 Subtle</option><option value="🌿 Balanced">🌿 Balanced</option><option value="🪴 Creative">🪴 Creative</option><option value="🌳 Bold">🌳 Bold</option><option value="🌴 Wild">🌴 Wild</option><option value="⚙️ Custom">⚙️ Custom</option></select></div>
+        <div class="row"><label>Protect Mode</label><select id="protectMode"><option value="🚫 None">🚫 None</option><option value="First Quarter">First Quarter</option><option value="First Half">First Half</option><option value="Last Quarter">Last Quarter</option><option value="Last Half" selected>Last Half</option><option value="⚙️ Custom Regions">⚙️ Custom Regions</option><option value="🎲 Random Regions">🎲 Random Regions</option></select></div>
+        <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segVarianceRandom">Aleatoria</div><div class="seg" id="segVarianceFixed">Fija</div></div><input type="number" id="varianceSeed" value="315489554057974" step="1" disabled></div>
+      </div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="loraToggle">
+          <span class="arrow">▶</span> LoRAs
+        </div>
+        <div class="collapsible-body" id="loraBody">
+          <div id="loraList"></div>
+        </div>
+      </div>
+
+      <div class="panel"><h2>Sampler</h2>
+        <div class="row slider-row"><label>Eta</label><input type="range" id="etaSlider" min="0" max="2" step="0.01" value="0.5"><div class="slider-val" id="etaVal">0.50</div></div>
+        <div class="row"><label>Steps</label><input type="number" id="steps" value="8" step="1" min="1" max="10000"></div>
+        <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segSamplerRandom">Aleatoria</div><div class="seg" id="segSamplerFixed">Fija</div></div><input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled></div>
+        <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
+
+      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar imagen</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
+    </div>
+    <div class="results-col">
+      <!-- REPRODUCTOR IMAGEN FINAL -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3>Imagen <em style="color:var(--accent)">final</em></h3>
+          <div class="img-header-actions">
+            <button id="btnResetZoom" title="Tamaño original">⊡</button>
+            <button id="btnFullscreenImg" title="Pantalla completa">⛶</button>
+            <button id="btnSendLtxv" title="Enviar a LTXV">→ LTXV</button>
+          </div>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <div class="img-wrap" id="imgWrap">
+          <img class="output" id="outputImg" style="display:none">
+        </div>
+        <div class="img-footer">
+          <span class="time-tag" id="time1"></span>
+          <span class="hint" id="imgInfo" style="font-size:10.5px;font-family:var(--mono);color:var(--muted-2);"></span>
+          <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
+        </div>
+      </div>
+
+      <!-- IMAGEN DE REFERENCIA (dropzone) -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
+          <div class="img-header-actions">
+            <button id="btnResetZoomRef" title="Tamaño original">⊡</button>
+            <button id="btnFullscreenRef" title="Pantalla completa">⛶</button>
+          </div>
+        </div>
+        <div class="dropzone" id="refDropzone" style="padding:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input type="file" id="refFileInput" accept="image/*">
+          <div class="seg" id="btnBrowseRef" style="flex:0;padding:5px 12px;font-size:10px;cursor:pointer;user-select:none;">Navegar...</div>
+          <div class="ph" id="refPlaceholder" style="flex:1;min-width:120px;font-size:10.5px;color:var(--muted-2);padding:0;text-align:left;">arrastra imagen o clic en Navegar</div>
+        </div>
+        <div class="img-wrap" id="refWrap" style="display:none;background:var(--panel-2);margin-top:10px;">
+          <img id="refImg" style="display:none;width:100%;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;">
+        </div>
+        <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
+        <div class="ref-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="btnCaption" class="ghost" style="flex:1;min-width:140px;">Caption (imagen referencia)</button>
+          <button id="btnSendRefLtxv" class="ghost" style="flex:1;min-width:140px;">→ LTXV</button>
+          <button id="btnLoadMeta" class="ghost" style="flex:1;min-width:140px;">Cargar metadatos</button>
+        </div>
+      </div>
+
+      <!-- HISTORIAL DE IMÁGENES -->
+      <div class="imgbox">
+        <div class="collapsible-header" id="galleryToggle">
+          <span class="arrow">▶</span> Historial de Imágenes <button id="btnClearGallery" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();">Vaciar</button>
+        </div>
+        <div class="collapsible-body" id="galleryBody">
+          <div class="gallery-grid" id="galleryGrid"></div>
+        </div>
+      </div>
+
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="imgbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+    </div>
+  </div>

@@ -1,0 +1,63 @@
+/* ============================================================
+   ltxv.css — CSS específico de LTXV (generar_ltxv.py)
+   ============================================================ */
+
+/* Cadena de nodos del pipeline (imagen → cond → pases → final) */
+.chain{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 22px;flex-wrap:wrap;}
+.chain .node{padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--panel);}
+.chain .node.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent-dim) inset;}
+.chain .arrow{color:var(--muted-2);}
+
+/* input.ro (readonly) solo existe en LTXV */
+input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
+
+/* Dropzone LTXV (con texto centrado y cursor pointer) */
+.dropzone{border:1.5px dashed var(--border);border-radius:7px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;color:var(--muted);font-size:12px;position:relative;overflow:hidden;}
+.dropzone.drag{border-color:var(--accent);background:var(--accent-dim);}
+.dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
+.dropzone .ph{padding:22px 0;font-family:var(--mono);font-size:11px;letter-spacing:.04em;}
+.dropzone input{display:none;}
+
+/* Selector de frame (1er / último) para vídeos cargados como entrada */
+.frame-selector{display:flex;gap:8px;margin-top:8px;}
+.frame-selector button{flex:1;min-width:auto;}
+.frame-selector button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+
+/* Estructura vidbox (reproductor de vídeo) */
+.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column; position: relative;}
+.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; gap: 10px;}
+.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px; flex:1;}
+.vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
+.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
+.vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; gap: 10px; flex-wrap:wrap;}
+.res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
+
+/* Vídeo principal y badges */
+video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh;}
+.video-wrap{}
+.video-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin-bottom:6px;pointer-events:none;}
+
+/* Empty LTXV (altura 140) */
+.empty{height:140px;}
+
+/* Pantalla completa del vidbox */
+.vidbox:fullscreen, .vidbox:-webkit-full-screen, .vidbox:-moz-full-screen {
+  width: 100vw !important; height: 100vh !important; max-height: none !important;
+  background: #000; border: none; border-radius: 0; padding: 0; position: fixed; top: 0; left: 0; z-index: 9999;
+}
+.vidbox:fullscreen video, .vidbox:-webkit-full-screen video, .vidbox:-moz-full-screen video {
+  width: 100%; height: 100%; object-fit: contain; max-height: none; border-radius: 0;
+}
+.vidbox:fullscreen .vid-header, .vidbox:fullscreen .vid-footer, .vidbox:fullscreen .empty {
+  display: none !important;
+}
+
+/* Variantes LTXV (vídeo) */
+.variant-card video{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;}
+.variant-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:10px;padding:3px 6px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin:4px 6px 0;pointer-events:none;}
+.variant-meta-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
+.variant-meta-btn:hover{color:var(--accent);background:rgba(87,232,201,.12);}
+
+/* dz-info solo en LTXV (versión original) */
+.dz-info{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:8px;letter-spacing:.03em;}

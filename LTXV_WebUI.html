@@ -5,183 +5,193 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>LTXV · Panel Pro</title>
 <style>
-  :root{--bg:#0a0c0e;--panel:#12161a;--panel-2:#171c21;--border:#242b31;--text:#e7ecef;--muted:#8b96a0;--muted-2:#5b6670;--accent:#57e8c9;--accent-dim:#2a4d47;--warn:#ffb454;--danger:#ff6a6a;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Roboto,sans-serif;}
-  *{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;}
-  .wrap{max-width:1400px;margin:0 auto;padding:22px 18px 60px;}
-  .head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
-  .head h1{font-family:var(--mono);font-size:15px;letter-spacing:.12em;text-transform:uppercase;margin:0;color:var(--text);font-weight:600;}
-  .head h1 span{color:var(--accent);}.head .sub{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.04em;}
-  .chain{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 22px;flex-wrap:wrap;}
-  .chain .node{padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--panel);}
-  .chain .node.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent-dim) inset;}
-  .chain .arrow{color:var(--muted-2);}
-  .grid{display:grid;grid-template-columns:1fr 1.2fr;gap:20px;}@media(max-width:1000px){.grid{grid-template-columns:1fr;}}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 16px 18px;margin-bottom:16px;}
-  .panel h2{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:8px;}
-  .panel h2::before{content:"";width:5px;height:5px;background:var(--accent);border-radius:1px;display:inline-block;}
-  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
-  .row{margin-bottom:14px;}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  input[type=text],input[type=number],textarea,select{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;}
-  select{cursor:pointer; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b96a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat:no-repeat; background-position:right 8px center; background-size:14px;}
-  input[type=number]{font-family:var(--mono);}input:focus,textarea:focus,select:focus{border-color:var(--accent);}
-  input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
-  textarea{resize:vertical;min-height:92px;line-height:1.5;}
-  .seed-toggle{display:flex;gap:8px;margin-bottom:8px;}
-  .seg{flex:1;text-align:center;padding:7px 0;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:var(--muted);background:var(--panel-2);user-select:none;}
-  .seg.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
-  .slider-row{display:flex;align-items:center;gap:10px;}
-  input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--accent);}
-  .slider-val{font-family:var(--mono);font-size:12px;color:var(--accent);width:52px;text-align:right;flex-shrink:0;}
-  .dropzone{border:1.5px dashed var(--border);border-radius:7px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;color:var(--muted);font-size:12px;position:relative;overflow:hidden;}
-  .dropzone.drag{border-color:var(--accent);background:var(--accent-dim);}
-  .dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
-  .dropzone .ph{padding:22px 0;font-family:var(--mono);font-size:11px;letter-spacing:.04em;}
-  .dropzone input{display:none;}
-  .frame-selector{display:flex;gap:8px;margin-top:8px;}
-  .frame-selector button{flex:1;min-width:auto;}
-  .frame-selector button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
-  .lora{border:1px solid var(--border);border-radius:6px;padding:10px 11px;margin-bottom:8px;background:var(--panel-2);}
-  .lora.off{opacity:.5;}
-  .lora-top{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
-  .switch{width:30px;height:17px;background:var(--border);border-radius:20px;position:relative;cursor:pointer;flex-shrink:0;transition:background .15s;}
-  .switch.on{background:var(--accent-dim);border:1px solid var(--accent);}
-  .switch i{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted-2);transition:left .15s,background .15s;}
-  .switch.on i{left:15px;background:var(--accent);}
-  .btn-row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
-  button{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);padding:11px 16px;cursor:pointer;transition:all .15s;flex:1;min-width:150px;}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#08110f;font-weight:700;}
-  button.danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700;}
-  button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allowed;}
-  .statusbar{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:10px 2px 0;min-height:16px;}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);flex-shrink:0;}
-  .dot.ok{background:var(--accent);box-shadow:0 0 6px var(--accent);}.dot.bad{background:var(--danger);}.dot.busy{background:var(--warn);animation:pulse 1s infinite;}
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
-  .server-row{display:flex;gap:8px;}.server-row input{flex:1;}
-  .results-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;}
-  
-  /* Estructura vidbox corregida */
-  .vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column; position: relative;}
-  .vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; gap: 10px;}
-  .vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px; flex:1;}
-  .vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
-  .vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
-  .vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
-  .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; gap: 10px; flex-wrap:wrap;}
-  .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
-  .time-tag.live{color:var(--warn);}
-  .res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
-  .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  
-  video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh;}
-  .video-wrap{}
-  .video-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin-bottom:6px;pointer-events:none;}
-  .empty{height:140px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
-  .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
-  .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
-  
-  .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
-  .gallery-item{border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:pointer;position:relative;background:var(--panel-2);}
-  .gallery-item img{width:100%;height:auto;display:block;transition:transform .2s;}
-  .gallery-item:hover img{transform:scale(1.04);}
-  .gallery-item.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim);}
-  .gallery-item .info-tag{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;background:linear-gradient(transparent, rgba(0,0,0,.88));font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:.02em;pointer-events:none;}
-  .gallery-item .del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s, background .15s;z-index:2;}
-  .gallery-item:hover .del-btn{opacity:1;}
-  .gallery-item .del-btn:hover{background:var(--danger);border-color:var(--danger);}
-  .gallery-item .lq-badge{position:absolute;top:4px;left:4px;background:rgba(255,180,84,.9);color:#1a1200;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;z-index:2;letter-spacing:.03em;}
-  .panel-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
-  .panel-head-row h2{margin:0;}
-  .btn-mini{padding:5px 9px;font-size:10px;min-width:auto;flex:none;}
-  .dz-info{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:8px;letter-spacing:.03em;}
-  .prompt-actions{display:flex;gap:8px;margin-top:8px;}
-  .prompt-actions button{padding:6px 10px;font-size:10px;min-width:auto;}
-  .prompt-tree{max-height:260px;overflow-y:auto;font-size:12px;user-select:none;}
-  .pt-folder{margin-left:14px;}
-  .pt-folder-label{cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:10.5px;padding:2px 0;display:flex;align-items:center;gap:4px;}
-  .pt-folder-label:hover{color:var(--text);}
-  .pt-folder-del{margin-left:auto;opacity:0;cursor:pointer;color:var(--danger);font-size:14px;line-height:1;padding:0 2px;border-radius:3px;}
-  .pt-folder-label:hover .pt-folder-del{opacity:1;}
-  .pt-folder-del:hover{background:rgba(255,106,106,.15);}
-  .pt-folder-arrow{font-size:9px;width:10px;display:inline-block;transition:transform .15s;}
-  .pt-folder.open > .pt-folder-arrow{transform:rotate(90deg);}
-  .pt-children{display:none;margin-left:12px;border-left:1px solid var(--border);padding-left:4px;}
-  .pt-folder.open > .pt-children{display:block;}
-  .pt-item{cursor:pointer;padding:3px 6px;border-radius:4px;color:var(--text);font-size:12px;}
-  .pt-item:hover{background:var(--panel-2);}
-  .pt-item.selected{background:var(--accent-dim);color:var(--accent);}
-  .pt-empty{color:var(--muted-2);font-size:10px;padding:6px 0;}
+/* ============================================================
+   base.css — CSS compartido entre LTXV y Krea2
+   Extraído de generar_ltxv.py y generar_krea2.py
+   ============================================================ */
 
-  /* Estilos Pantalla Completa */
-  /* Asegurar que el contenido persista en fullscreen */
-  .vidbox:fullscreen, .vidbox:-webkit-full-screen, .vidbox:-moz-full-screen {
-    width: 100vw !important; height: 100vh !important; max-height: none !important;
-    background: #000; border: none; border-radius: 0; padding: 0; position: fixed; top: 0; left: 0; z-index: 9999;
-  }
-  .vidbox:fullscreen video, .vidbox:-webkit-full-screen video, .vidbox:-moz-full-screen video {
-    width: 100%; height: 100%; object-fit: contain; max-height: none; border-radius: 0;
-  }
-  .vidbox:fullscreen .vid-header, .vidbox:fullscreen .vid-footer, .vidbox:fullscreen .empty {
-    display: none !important;
-  }
+:root{--bg:#0a0c0e;--panel:#12161a;--panel-2:#171c21;--border:#242b31;--text:#e7ecef;--muted:#8b96a0;--muted-2:#5b6670;--accent:#57e8c9;--accent-dim:#2a4d47;--warn:#ffb454;--danger:#ff6a6a;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Roboto,sans-serif;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;}
+.wrap{max-width:1400px;margin:0 auto;padding:22px 18px 60px;}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+.head h1{font-family:var(--mono);font-size:15px;letter-spacing:.12em;text-transform:uppercase;margin:0;color:var(--text);font-weight:600;}
+.head h1 span{color:var(--accent);}.head .sub{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.04em;}
+.grid{display:grid;grid-template-columns:1fr 1.2fr;gap:20px;}@media(max-width:1000px){.grid{grid-template-columns:1fr;}}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 16px 18px;margin-bottom:16px;}
+.panel h2{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+.panel h2::before{content:"";width:5px;height:5px;background:var(--accent);border-radius:1px;display:inline-block;}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.row{margin-bottom:14px;}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+input[type=text],input[type=number],textarea,select{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;}
+select{cursor:pointer; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b96a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat:no-repeat; background-position:right 8px center; background-size:14px;}
+input[type=number]{font-family:var(--mono);}input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+textarea{resize:vertical;min-height:92px;line-height:1.5;}
+.seed-toggle{display:flex;gap:8px;margin-bottom:8px;}
+.seg{flex:1;text-align:center;padding:7px 0;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:var(--muted);background:var(--panel-2);user-select:none;}
+.seg.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.slider-row{display:flex;align-items:center;gap:10px;}
+input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--accent);}
+.slider-val{font-family:var(--mono);font-size:12px;color:var(--accent);width:52px;text-align:right;flex-shrink:0;}
+.lora{border:1px solid var(--border);border-radius:6px;padding:10px 11px;margin-bottom:8px;background:var(--panel-2);}
+.lora.off{opacity:.5;}
+.lora-top{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
+.switch{width:30px;height:17px;background:var(--border);border-radius:20px;position:relative;cursor:pointer;flex-shrink:0;transition:background .15s;}
+.switch.on{background:var(--accent-dim);border:1px solid var(--accent);}
+.switch i{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted-2);transition:left .15s,background .15s;}
+.switch.on i{left:15px;background:var(--accent);}
+.btn-row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
+button{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);padding:11px 16px;cursor:pointer;transition:all .15s;flex:1;min-width:150px;}
+button.primary{background:var(--accent);border-color:var(--accent);color:#08110f;font-weight:700;}
+button.danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700;}
+button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allowed;}
+.statusbar{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:10px 2px 0;min-height:16px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);flex-shrink:0;}
+.dot.ok{background:var(--accent);box-shadow:0 0 6px var(--accent);}.dot.bad{background:var(--danger);}.dot.busy{background:var(--warn);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.server-row{display:flex;gap:8px;}.server-row input{flex:1;}
+.results-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;}
+.time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
+.time-tag.live{color:var(--warn);}
+.variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.empty{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+.log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
+.hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
+.gallery-item{border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:pointer;position:relative;background:var(--panel-2);}
+.gallery-item img{width:100%;height:auto;display:block;transition:transform .2s;}
+.gallery-item:hover img{transform:scale(1.04);}
+.gallery-item.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim);}
+.gallery-item .info-tag{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;background:linear-gradient(transparent, rgba(0,0,0,.88));font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:.02em;pointer-events:none;}
+.gallery-item .del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s, background .15s;z-index:2;}
+.gallery-item:hover .del-btn{opacity:1;}
+.gallery-item .del-btn:hover{background:var(--danger);border-color:var(--danger);}
+.gallery-item .lq-badge{position:absolute;top:4px;left:4px;background:rgba(255,180,84,.9);color:#1a1200;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;z-index:2;letter-spacing:.03em;}
+.panel-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.panel-head-row h2{margin:0;}
+.btn-mini{padding:5px 9px;font-size:10px;min-width:auto;flex:none;}
+.prompt-actions{display:flex;gap:8px;margin-top:8px;}
+.prompt-actions button{padding:6px 10px;font-size:10px;min-width:auto;}
+.prompt-tree{max-height:260px;overflow-y:auto;font-size:12px;user-select:none;}
+.pt-folder{margin-left:14px;}
+.pt-folder-label{cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:10.5px;padding:2px 0;display:flex;align-items:center;gap:4px;}
+.pt-folder-label:hover{color:var(--text);}
+.pt-folder-del{margin-left:auto;opacity:0;cursor:pointer;color:var(--danger);font-size:14px;line-height:1;padding:0 2px;border-radius:3px;}
+.pt-folder-label:hover .pt-folder-del{opacity:1;}
+.pt-folder-del:hover{background:rgba(255,106,106,.15);}
+.pt-folder-arrow{font-size:9px;width:10px;display:inline-block;transition:transform .15s;}
+.pt-folder.open > .pt-folder-arrow{transform:rotate(90deg);}
+.pt-children{display:none;margin-left:12px;border-left:1px solid var(--border);padding-left:4px;}
+.pt-folder.open > .pt-children{display:block;}
+.pt-item{cursor:pointer;padding:3px 6px;border-radius:4px;color:var(--text);font-size:12px;}
+.pt-item:hover{background:var(--panel-2);}
+.pt-item.selected{background:var(--accent-dim);color:var(--accent);}
+.pt-empty{color:var(--muted-2);font-size:10px;padding:6px 0;}
+.variant-gallery{margin-top:20px;}
+.variant-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(200px,1fr));gap:12px;}
+.variant-card{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.variant-info{padding:8px;font-size:11px;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between;align-items:center;gap:6px;}
+.variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
+.variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
+.variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
+.variant-seed-display{color:var(--accent);cursor:pointer;user-select:text;display:flex;align-items:center;gap:6px;}
+.variant-seed-display:hover{color:#fff;}
+.copy-icon{font-size:12px;opacity:.7;transition:opacity .2s;}
+.variant-seed-display:hover .copy-icon{opacity:1;}
+.collapsible-header{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:4px 0;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.collapsible-header:hover{color:var(--text);}
+.collapsible-header .arrow{font-size:9px;transition:transform .2s;}
+.collapsible-header.open .arrow{transform:rotate(90deg);}
+.collapsible-body{overflow:hidden;max-height:0;transition:max-height .3s ease;}
+.collapsible-body.open{max-height:800px;}
+.enhancer-row{margin-bottom:10px;}
+.enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
+.enhancer-row select{width:100%;}
+.enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
+.enhancer-output:focus{border-color:var(--accent);}
+.enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+.enhancer-actions button{flex:1;min-width:120px;}
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-content{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;}
+.modal-content h2{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;}
+.modal-tabs{display:flex;gap:4px;margin-bottom:14px;}
+.modal-tab{padding:6px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--panel-2);}
+.modal-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.sysprompt-row{border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:8px;background:var(--panel-2);}
+.sysprompt-row .spr-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.sysprompt-row .spr-name{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);}
+.sysprompt-row .spr-del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;min-width:auto;flex:0;}
+.sysprompt-row .spr-del:hover{background:var(--danger);color:#fff;}
+.sysprompt-row textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-family:var(--sans);font-size:12px;outline:none;resize:vertical;min-height:50px;line-height:1.4;}
+.sysprompt-row textarea:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;}
+.modal-actions button{min-width:100px;flex:0;}
+@keyframes seedFlash{0%{background-color:var(--panel-2);border-color:var(--border);}50%{background-color:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 10px var(--accent);}100%{background-color:var(--panel-2);border-color:var(--border);}}
+.seed-updated{animation:seedFlash 1.5s ease-out;}
+/* ============================================================
+   ltxv.css — CSS específico de LTXV (generar_ltxv.py)
+   ============================================================ */
 
-  /* Animación para actualización de semilla */
-  @keyframes seedFlash {
-    0% { background-color: var(--panel-2); border-color: var(--border); }
-    50% { background-color: var(--accent-dim); border-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
-    100% { background-color: var(--panel-2); border-color: var(--border); }
-  }
-  .seed-updated { animation: seedFlash 1.5s ease-out; }
+/* Cadena de nodos del pipeline (imagen → cond → pases → final) */
+.chain{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 22px;flex-wrap:wrap;}
+.chain .node{padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--panel);}
+.chain .node.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent-dim) inset;}
+.chain .arrow{color:var(--muted-2);}
 
-  /* Estilos Galería Variantes */
-  .variant-gallery { margin-top: 20px; }
-  .variant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-  .variant-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; cursor: pointer; position: relative; }
-  .variant-card video { width: 100%; height: auto; max-height: 240px; object-fit: contain; background: #000; }
-  .variant-badge { background: rgba(0,0,0,0.75); color: var(--accent); font-family: var(--mono); font-size: 10px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--accent); display: inline-block; margin: 4px 6px 0; pointer-events: none; }
-  .variant-info { padding: 8px; font-size: 11px; color: var(--muted); font-family: var(--mono); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-  .variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
-  .variant-meta-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
-  .variant-meta-btn:hover{color:var(--accent);background:rgba(87,232,201,.12);}
-  .variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
-  .variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
-  .variant-seed-display { color: var(--accent); cursor: pointer; user-select: text; display: flex; align-items: center; gap: 6px; }
-  .variant-seed-display:hover { color: #fff; }
-  .copy-icon { font-size: 12px; opacity: 0.7; transition: opacity 0.2s; }
-  .variant-seed-display:hover .copy-icon { opacity: 1; }
+/* input.ro (readonly) solo existe en LTXV */
+input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
 
-  /* Collapsible enhancer panel */
-  .collapsible-header{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:4px 0;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
-  .collapsible-header:hover{color:var(--text);}
-  .collapsible-header .arrow{font-size:9px;transition:transform .2s;}
-  .collapsible-header.open .arrow{transform:rotate(90deg);}
-  .collapsible-body{overflow:hidden;max-height:0;transition:max-height .3s ease;}
-  .collapsible-body.open{max-height:800px;}
-  .enhancer-row{margin-bottom:10px;}
-  .enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
-  .enhancer-row select{width:100%;}
-  .enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
-  .enhancer-output:focus{border-color:var(--accent);}
-  .enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
-  .enhancer-actions button{flex:1;min-width:120px;}
+/* Dropzone LTXV (con texto centrado y cursor pointer) */
+.dropzone{border:1.5px dashed var(--border);border-radius:7px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;color:var(--muted);font-size:12px;position:relative;overflow:hidden;}
+.dropzone.drag{border-color:var(--accent);background:var(--accent-dim);}
+.dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
+.dropzone .ph{padding:22px 0;font-family:var(--mono);font-size:11px;letter-spacing:.04em;}
+.dropzone input{display:none;}
 
-  /* Modal for system prompt editor */
-  .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;}
-  .modal-overlay.open{display:flex;}
-  .modal-content{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;}
-  .modal-content h2{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;}
-  .modal-tabs{display:flex;gap:4px;margin-bottom:14px;}
-  .modal-tab{padding:6px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--panel-2);}
-  .modal-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
-  .sysprompt-row{border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:8px;background:var(--panel-2);}
-  .sysprompt-row .spr-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-  .sysprompt-row .spr-name{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);}
-  .sysprompt-row .spr-del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;min-width:auto;flex:0;}
-  .sysprompt-row .spr-del:hover{background:var(--danger);color:#fff;}
-  .sysprompt-row textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-family:var(--sans);font-size:12px;outline:none;resize:vertical;min-height:50px;line-height:1.4;}
-  .sysprompt-row textarea:focus{border-color:var(--accent);}
-  .modal-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;}
-  .modal-actions button{min-width:100px;flex:0;}
+/* Selector de frame (1er / último) para vídeos cargados como entrada */
+.frame-selector{display:flex;gap:8px;margin-top:8px;}
+.frame-selector button{flex:1;min-width:auto;}
+.frame-selector button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+
+/* Estructura vidbox (reproductor de vídeo) */
+.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column; position: relative;}
+.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; gap: 10px;}
+.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px; flex:1;}
+.vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
+.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
+.vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; gap: 10px; flex-wrap:wrap;}
+.res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
+
+/* Vídeo principal y badges */
+video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh;}
+.video-wrap{}
+.video-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin-bottom:6px;pointer-events:none;}
+
+/* Empty LTXV (altura 140) */
+.empty{height:140px;}
+
+/* Pantalla completa del vidbox */
+.vidbox:fullscreen, .vidbox:-webkit-full-screen, .vidbox:-moz-full-screen {
+  width: 100vw !important; height: 100vh !important; max-height: none !important;
+  background: #000; border: none; border-radius: 0; padding: 0; position: fixed; top: 0; left: 0; z-index: 9999;
+}
+.vidbox:fullscreen video, .vidbox:-webkit-full-screen video, .vidbox:-moz-full-screen video {
+  width: 100%; height: 100%; object-fit: contain; max-height: none; border-radius: 0;
+}
+.vidbox:fullscreen .vid-header, .vidbox:fullscreen .vid-footer, .vidbox:fullscreen .empty {
+  display: none !important;
+}
+
+/* Variantes LTXV (vídeo) */
+.variant-card video{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;}
+.variant-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:10px;padding:3px 6px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin:4px 6px 0;pointer-events:none;}
+.variant-meta-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
+.variant-meta-btn:hover{color:var(--accent);background:rgba(87,232,201,.12);}
+
+/* dz-info solo en LTXV (versión original) */
+.dz-info{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:8px;letter-spacing:.03em;}
 </style>
 </head>
 <body>
@@ -194,19 +204,6 @@
   </div>
   <div class="grid">
     <div class="controls-col">
-      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
-      
-      <div class="panel">
-        <div class="collapsible-header" id="promptLibToggle">
-          <span class="arrow">▶</span> Biblioteca de Prompts
-        </div>
-        <div class="collapsible-body" id="promptLibBody">
-          <div id="promptTree" class="prompt-tree"></div>
-          <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnMovePrompt" class="ghost">Mover</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
-          <div class="hint" style="font-size:10px;margin-top:4px;">Usa <code style="color:var(--accent)">/</code> para clasificar: <code>casa/pasillo/noche</code> (los dos primeros son carpetas)</div>
-        </div>
-      </div>
-
       <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
 
       <div class="panel">
@@ -216,40 +213,6 @@
         <div class="collapsible-body" id="krea2RecentBody">
           <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
           <div class="gallery-grid" id="krea2RecentGrid"></div>
-        </div>
-      </div>
-
-      <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
-
-      <!-- ENHANCER PANEL -->
-      <div class="panel">
-        <div class="collapsible-header" id="enhancerToggle">
-          <span class="arrow">▶</span> Mejorar prompt con IA
-        </div>
-        <div class="collapsible-body" id="enhancerBody">
-          <div class="enhancer-row">
-            <label>Modelo</label>
-            <select id="enhancerModel"><option value="">Cargando modelos...</option></select>
-          </div>
-          <div class="enhancer-row">
-            <label>Modo</label>
-            <select id="enhancerMode"><option value="text">Texto</option><option value="vision">Visión</option></select>
-          </div>
-          <div class="enhancer-row">
-            <label>Estilo</label>
-            <select id="enhancerStyle"></select>
-          </div>
-          <div class="enhancer-row">
-            <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
-          </div>
-          <div class="enhancer-row">
-            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado aparecerá aquí..."></textarea>
-          </div>
-          <div class="enhancer-actions">
-            <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
-            <button id="btnSaveEnhanced">Guardar en biblioteca</button>
-            <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
-          </div>
         </div>
       </div>
 
@@ -326,7 +289,6 @@
     </div>
   </div>
 </div>
-
 <script>
 const BASE_GRAPH = {
   "274": {
@@ -1381,378 +1343,171 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["10Eros_v1.3_fp8mixed_learned.safetensors", "ltx-2.3-22b-distilled-1.1.safetensors", "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors", "ltxv/ltx-2.3-22b-distilled-1.1-nvfp4mixed.safetensors", "ltxv/sulphur_distil_bf16.safetensors"];
+const AVAILABLE_MODELS = ["10Eros_v1.3_fp8mixed_learned.safetensors", "10Eros_v1.4_DMD_int8_convrot.safetensors", "ltx-2.3-22b-distilled-1.1.safetensors", "ltxv/10Eros_v1.3_fp8mixed_learned.safetensors", "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors", "ltxv/sulphur_distil_bf16.safetensors"];
 const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "anal-insertion-i2v.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-distilled-lora-1.1_rank96_energy.safetensors", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors", "ltx-2.3-22b-distilled-lora-fro90_ceil72.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi2ltxv.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001250.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_000001750.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
+// ltxv.js — LTXV-specific JavaScript.
+// Injected AFTER common.js. Sets CONFIG BEFORE common.js runs.
 
-const N = {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646"};
-const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
+const CONFIG = {
+  PROMPTS_KEY: 'ltxv_prompts',
+  LORA_STATE_KEY: 'ltxv_loras_state',
+  ENHANCER_SYSKEY: 'ltxv_enhancer_sysprompts',
+  SERVERURL_KEY: 'ltxv_serverUrl',
+  DEFAULT_BACKEND_PORT: "7821",
+  UI_TYPE: "ltxv",
+  DEFAULT_MODEL: "10Eros_v1.3_fp8mixed_learned.safetensors",
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646"},
+  loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
+  ENHANCER_DEFAULT_PROMPTS: {
+    text: {
+      A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for LTXV video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
+      B: { name: "Estilo B (narrativo)", prompt: "You are a creative assistant specialized in visual storytelling. Take the user's idea and turn it into an evocative prompt that captures the essence of the scene. Use descriptive, poetic language. Focus on atmosphere, emotions, and the story the image tells. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+    },
+    vision: {
+      A: { name: "Estilo A (descriptivo)", prompt: "You are an expert at describing images for video generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, motion, and atmosphere. The prompt must be suitable for a text-to-video model. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      B: { name: "Estilo B (cinematográfico)", prompt: "You are a digital cinematographer. Look at the image and turn it into a cinematic description. Describe how the camera would move, how lighting would evolve, what action would unfold, and how the scene would change over time. Think in terms of footage, not a still photo. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+    },
+  },
+};
+
+const N = CONFIG.N;
 let uploadedImage=null, localFile=null, seedMode="random";
-let currentAspectRatio = 16/9; // ratio w/h de la imagen cargada (por defecto 16:9)
+let currentAspectRatio = 16/9;
+let currentMedia = {};
+let generationStep = 0;
+let firstPromptId = null;
+let finalVariantIndex = null;
+let promptSteps = {};
+// Exposed for common.js WS error handler.
+window.currentBatchMode = false;
 
+// --- CALLBACKS FOR common.js ---
+CONFIG.findMedia = function(nodeOutput){
+  for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
+  return null;
+};
+CONFIG.showMedia = showVideo;
+CONFIG.addToVariantGallery = addToVariantGallery;
+CONFIG.onSeedUpdate = updateSeedUI;
+CONFIG.onPromptError = function(pid){
+  delete promptSteps[pid];
+  if(generationStep === 1) generationStep = 0;
+};
+CONFIG.startNextVariant = function(index){
+  generationStep = window.currentBatchMode ? 0 : 1;
+  firstPromptId = null;
+  finalVariantIndex = null;
+  runSingleGeneration(index);
+};
+CONFIG.onBatchComplete = function(){
+  $("btnFirstPass").disabled=false;
+  $("btnFull").disabled=false;
+  enableStopButtons(false);
+};
+CONFIG.onStopCurrent = function(pid){
+  delete promptSteps[pid];
+  if(generationStep === 1){
+    generationStep = 0;
+    if(firstPromptId) handledPrompts.add(firstPromptId);
+  }
+};
+CONFIG.onStopAll = function(){
+  for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);
+  if(currentPromptId) handledPrompts.add(currentPromptId);
+  if(firstPromptId) handledPrompts.add(firstPromptId);
+  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
+  pendingSeeds = {};
+  promptSteps = {};
+  processingPrompts.clear();
+  currentPromptId = null;
+  firstPromptId = null;
+  generationStep = 0;
+  currentBatchIndex = totalBatchSize;
+  enableStopButtons(false);
+  $("btnFirstPass").disabled=false;
+  $("btnFull").disabled=false;
+};
+
+// --- LTXV displayResult callback (handles step 1 -> step 2 logic) ---
+CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
+  function paint(slot, label, value){
+    const el = $("time"+slot);
+    if(!el) return;
+    if(value == null){
+      el.textContent = "";
+      el.classList.remove("live");
+    } else {
+      el.textContent = label ? `⏱ ${label} ${value}` : `⏱ ${value}`;
+      el.classList.remove("live");
+    }
+  }
+
+  const step = promptSteps[promptId] || "1";
+  const isFirstOnly = (step === "1");
+  const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
+  const media2 = entry.outputs[N.FINAL_SAVE] ? CONFIG.findMedia(entry.outputs[N.FINAL_SAVE]) : null;
+
+  if(isFirstOnly){
+    if(media1){
+      showVideo(1, media1, { variantIndex: variantCounter + 1 });
+      paint(1, "1er", tTotal || "—");
+      addToVariantGallery(media1, realSeed, tTotal || "", 1, variantCounter + 1);
+    }
+  } else {
+    if(media2){
+      const finalIdx = finalVariantIndex != null ? (finalVariantIndex + 1) : (variantCounter + 1);
+      showVideo(2, media2, { variantIndex: finalIdx });
+      paint(2, "final", tTotal || "—");
+      addToVariantGallery(media2, realSeed, tTotal || "", 2, finalIdx);
+    }
+  }
+
+  delete promptSteps[promptId];
+
+  // --- ¿Continuamos con el paso 2? ---
+  if(generationStep === 1 && step === "1" && window.currentBatchMode === false){
+    log(`➡️ Paso 1 completado, iniciando paso 2 (2º pase)...`, "l-ok");
+    generationStep = 2;
+    const step1Seed = pendingSeeds[promptId];
+    delete pendingSeeds[promptId];
+    pendingSeeds[firstPromptId] = step1Seed;
+    finalVariantIndex = variantCounter;
+    runSingleGeneration(currentBatchIndex);
+    return true;
+  }
+
+  delete pendingSeeds[promptId];
+  generationStep = 0;
+  firstPromptId = null;
+  finalVariantIndex = null;
+  return false;
+};
+
+// --- RESOLUCIÓN ---
 function nearest32(v){ return Math.round(v / 32) * 32; }
 
 function recalcResolution(){
   const mp = parseFloat($("mpSlider").value) || 0.9;
   const totalPx = mp * 1_000_000;
-  // w = sqrt(totalPx * aspect), h = sqrt(totalPx / aspect)
   let w = nearest32(Math.sqrt(totalPx * currentAspectRatio));
   let h = nearest32(Math.sqrt(totalPx / currentAspectRatio));
-  // Ajustar para que w*h se acerque a totalPx (el redondeo a x32 puede desviar)
-  // Recalcular h a partir de w para mantener el aspect ratio exacto
   h = nearest32(w / currentAspectRatio);
-  // Si h es 0, mínimo 256
   if(h < 256) h = 256;
   if(w < 256) w = 256;
   $("width").value = w;
   $("height").value = h;
   $("mpVal").textContent = mp.toFixed(2);
 }
-let loras = [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}];
-let socket = null;
-let currentBatchIndex = 0;
-let totalBatchSize = 0;
-let variantCounter = 0;  // contador global de variantes en la sesión (no se resetea entre batches)
-let pendingSeeds = {};      // prompt_id -> semilla realmente usada en ese envío
-let handledPrompts = new Set(); // prompt_id ya procesados (evita duplicados WS+polling)
-let processingPrompts = new Set(); // prompt_id cuyo history se está consultando ahora
-let batchSeedMode = "random"; // modo capturado al lanzar el batch (independiente del toggle en vivo)
-let currentPromptId = null;   // prompt_id de la variante que se está ejecutando ahora
-let timers = {};               // prompt_id -> { start, iv }
-let promptSteps = {};          // prompt_id -> "1" (first-only / step-1) | "2" (step-2)
-let currentMedia = {};         // slot -> {filename, subfolder, type} del vídeo cargado en ventana principal
-// --- Modo "Generar completo" en 2 pasos ---
-// El backend solo emite execution_success al final de TODO el grafo. Si mandamos
-// el grafo completo de golpe, el 1er pase y el final aparecen a la vez y con el
-// mismo tiempo. Solución: en modo "completo" lanzamos dos prompts secuenciales.
-// Paso 1: grafo sin FINAL_SAVE ni PURGE_VRAM (igual que "Solo 1er pase").
-//   ComfyUI ejecuta el 1er pase y guarda el resultado en caché.
-//   Mostramos vídeo en slot 1 con su tiempo.
-// Paso 2: grafo completo. ComfyUI reutiliza el caché del 1er pase y solo ejecuta
-//   el 2º pase (upscale + final). Mostramos vídeo en slot 2 con su tiempo.
-let generationStep = 0;       // 0 = inactivo; 1 = paso 1; 2 = paso 2
-let firstPromptId = null;     // prompt_id del paso 1 (para mostrar su vídeo al acabar)
-let finalVariantIndex = null; // índice de la variante original cuando se genera el final desde un 1er pase
 
-function fmtMs(ms){
-  const s = Math.floor(ms / 1000);
-  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-}
-
-function startTimer(promptId, slot){
-  if(timers[promptId]) return;
-  const t = { start: Date.now(), iv: null };
-  const el = $("time"+slot);
-  t.iv = setInterval(() => {
-    if(!timers[promptId]) return;
-    const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
-    el.textContent = live;
-    el.classList.add("live");
-  }, 500);
-  timers[promptId] = t;
-}
-
-function stopTimer(promptId){
-  // Cierra el cronómetro y devuelve el tiempo total. NO pinta: lo decide el caller
-  // en función de qué outputs llegaron (FIRST_SAVE / FINAL_SAVE) para no ensuciar
-  // el reproductor final cuando solo se pidió el 1er pase.
-  const t = timers[promptId];
-  if(!t) return null;
-  const total = Date.now() - t.start;
-  if(t.iv){ clearInterval(t.iv); t.iv = null; }
-  delete timers[promptId];
-  return { total, text: `⏱ ${fmtMs(total)}` };
-}
-
-function discardTimer(promptId){
-  // para errores: limpia el interval y olvida el cronómetro sin pintar nada
-  const t = timers[promptId];
-  if(!t) return;
-  if(t.iv) clearInterval(t.iv);
-  delete timers[promptId];
-}
-
-// Saca tiempos del history JSON de ComfyUI. Devuelve {t1, t2, total} en ms o null
-// si no se puede calcular. Prioriza tiempos por nodo si están disponibles; si no,
-// usa execution_start / execution_success para el total.
-//
-// t1 = tiempo del nodo FIRST_SAVE  (solo si hay eventos executing+executed)
-// t2 = tiempo del nodo FINAL_SAVE  (solo si hay eventos executing+executed)
-// total = execution_success.timestamp - execution_start.timestamp (si ambos existen)
-function extractTimings(entry, N){
-  if(!entry || !entry.status) return null;
-  const msgs = entry.status.messages || [];
-  if(!Array.isArray(msgs) || msgs.length === 0) return null;
-
-  // Total oficial del backend
-  let tStart = null, tSuccess = null;
-  // Tiempos por nodo: map nodeId -> {start, end}
-  const nodeTimes = {};
-  for(const m of msgs){
-    if(!Array.isArray(m) || m.length < 2) continue;
-    const type = m[0];
-    const data = m[1] || {};
-    if(type === "execution_start" && data.timestamp != null){
-      tStart = data.timestamp;
-    } else if(type === "execution_success" && data.timestamp != null){
-      tSuccess = data.timestamp;
-    } else if(type === "executing" && data.node != null && data.timestamp != null){
-      // 'executing' marca el inicio de la ejecución del nodo. Algunos nodos vuelven
-      // a entrar aquí varias veces; nos quedamos con la primera.
-      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
-      if(nodeTimes[data.node].start == null) nodeTimes[data.node].start = data.timestamp;
-    } else if(type === "executed" && data.node != null && data.timestamp != null){
-      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
-      nodeTimes[data.node].end = data.timestamp;
-    }
-  }
-
-  const total = (tStart != null && tSuccess != null) ? (tSuccess - tStart) : null;
-  const t1 = nodeTimes[N.FIRST_SAVE] && nodeTimes[N.FIRST_SAVE].start != null && nodeTimes[N.FIRST_SAVE].end != null
-             ? (nodeTimes[N.FIRST_SAVE].end - nodeTimes[N.FIRST_SAVE].start) : null;
-  const t2 = nodeTimes[N.FINAL_SAVE] && nodeTimes[N.FINAL_SAVE].start != null && nodeTimes[N.FINAL_SAVE].end != null
-             ? (nodeTimes[N.FINAL_SAVE].end - nodeTimes[N.FINAL_SAVE].start) : null;
-
-  if(total == null && t1 == null && t2 == null) return null;
-  return { t1, t2, total };
-}
-
-function randomSeed(){
-  // entero positivo de 32 bits, válido para el sampler
-  return Math.floor(Math.random() * 0xFFFFFFFF);
-}
-
-// --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
-// Cuando abres la UI desde otro dispositivo (móvil, otro PC) por la IP de la LAN,
-// el servidor de la UI (serve.py) hace de proxy hacia el backend en :7821, así que
-// el input se deja VACÍO (same-origin) y el fetch va al mismo host:puerto que la
-// página. El placeholder muestra la URL de referencia por si se necesita editar.
-// Si el usuario ya escribió algo a mano, lo respetamos.
-// Migración: si localStorage trae el puerto antiguo (7822), lo descartamos.
-const DEFAULT_BACKEND_PORT = "7821";
-const LEGACY_PORTS = ["7822"];
-const $ = (id) => document.getElementById(id);
-function updateServerHint(){
-  const hint = $("serverHint");
-  if(!hint) return;
-  const v = ($("serverUrl")?.value || "").trim();
-  if(v){
-    hint.textContent = `URL efectiva: ${v}`;
-  } else {
-    const host = (window.location.hostname || "").trim();
-    if(host && !/^(127\.|localhost$|::1$)/i.test(host)){
-      hint.textContent = "proxy activo (same-origin)";
-    } else {
-      hint.textContent = "";
-    }
-  }
-}
-(function autoPickServerUrl(){
-  try {
-    const input = $("serverUrl");
-    if(!input) return;
-    const stored = localStorage.getItem("ltxv_serverUrl");
-    if(stored){
-      const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
-      if(storedPort && LEGACY_PORTS.includes(storedPort)){
-        localStorage.removeItem("ltxv_serverUrl");
-      } else {
-        input.value = stored;
-        updateServerHint();
-        return;
-      }
-    }
-    // Dejar vacío: el proxy de serve.py lo captura
-    updateServerHint();
-  } catch(e) { /* si falla, queda el placeholder */ }
-})();
-// Persiste cambios manuales para que se recuerden entre recargas.
-$("serverUrl").addEventListener("change", (e) => {
-  try { localStorage.setItem("ltxv_serverUrl", e.target.value.trim()); } catch(_){}
-  updateServerHint();
-});
-$("serverUrl").addEventListener("input", updateServerHint);
-
-function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
-function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
-function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
-function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+// --- CHAIN ---
 function setChainActive(keys){document.querySelectorAll(".chain .node").forEach(n=>n.classList.toggle("active",keys.includes(n.dataset.n)));}
 
-// --- WEBSOCKET SETUP ---
-function connectSocket() {
-    // evitar abrir un segundo socket mientras el primero aún está conectando
-    if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
-    const url = server().replace('http', 'ws') + '/ws?clientId=' + CLIENT_ID;
-    socket = new WebSocket(url);
-    socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
-    socket.onmessage = (event) => {
-        let msg;
-        try { msg = JSON.parse(event.data); } catch(e) {
-            // El proxy de serve.py rechaza /ws con 426 y texto plano;
-            // no es JSON, no podemos procesarlo. Cerramos el socket
-            // para que pollFallback tome el relevo.
-            console.warn("WS mensaje no-JSON, cerrando:", event.data.slice(0,80));
-            socket.close();
-            return;
-        }
-        if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
-        if(msg.type === 'execution_error') {
-            const pid = msg.data && msg.data.prompt_id;
-            log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
-            if(pid){ handledPrompts.add(pid); delete pendingSeeds[pid]; delete promptSteps[pid]; discardTimer(pid); }
-            // Si falla el paso 1 del completo, no continuar al paso 2
-            if(generationStep === 1) generationStep = 0;
-            currentBatchIndex++;
-            processNextBatch();
-        }
-    };
-    socket.onerror = (err) => console.error("WS Error", err);
-}
-
-// Procesa un prompt_id terminado, venga del WS o del polling de respaldo.
-// Idempotente: si ya se ha procesado, no hace nada.
-async function handlePromptDone(promptId) {
-    if(handledPrompts.has(promptId)) return;
-    if(processingPrompts.has(promptId)) return; // ya lo está consultando otro
-    processingPrompts.add(promptId);
-    let entry;
-    try {
-        const hr = await fetch(server()+"/history/"+promptId);
-        if(!hr.ok) {
-            log(`⏳ Esperando resultado (HTTP ${hr.status})...`, "l-ok");
-            processingPrompts.delete(promptId);
-            return;
-        }
-        const hist = await hr.json();
-        entry = hist[promptId];
-    } catch(e) {
-        log(`⚠️ Error consultando history: ${e.message}`, "l-err");
-        processingPrompts.delete(promptId);
-        return;
-    }
-    if(!entry || !entry.outputs) {
-        processingPrompts.delete(promptId);
-        return; // aún no ha terminado
-    }
-
-    // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
-    // descartamos silenciosamente cualquier execution_success tardío del backend.
-    // Esto evita que una generación anterior interrumpida dispare el paso 2 de la actual.
-    if(!(promptId in pendingSeeds)){
-        handledPrompts.add(promptId);
-        processingPrompts.delete(promptId);
-        return;
-    }
-
-    handledPrompts.add(promptId);
-    processingPrompts.delete(promptId);
-
-    // La semilla real la conocemos desde que se encoló (la genera el propio navegador),
-    // no hace falta (ni se puede) leerla del historial de ComfyUI.
-    const realSeed = (promptId in pendingSeeds) ? pendingSeeds[promptId] : null;
-    if(realSeed !== null) {
-        updateSeedUI(realSeed);
-        log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
-    }
-
-    // Cronómetro. Fuente principal: timestamps de status.messages del backend
-    // (execution_success.timestamp - execution_start.timestamp). Es la medida
-    // oficial del tiempo que tardó la API y no incluye latencia de red ni parseo.
-    // Fallback: cronómetro del cliente (startTimer) si el backend no trae los
-    // timestamps (versiones muy viejas o builds sin status.messages).
-    const timings = extractTimings(entry, N);
-    let clientResult = stopTimer(promptId); // limpia el interval y devuelve el fallback
-
-    const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
-                    (clientResult ? fmtMs(clientResult.total) : null);
-
-    function paint(slot, label, value){
-        const el = $("time"+slot);
-        if(!el) return;
-        if(value == null){
-            el.textContent = "";
-            el.classList.remove("live");
-        } else {
-            el.textContent = label ? `⏱ ${label} ${value}` : `⏱ ${value}`;
-            el.classList.remove("live");
-        }
-    }
-
-    // --- Mostrar resultados según el paso (1 = 1er pase, 2 = final) ---
-    const step = promptSteps[promptId] || "1";
-    const isFirstOnly = (step === "1");  // paso 1 (o "Solo 1er pase")
-    const media1 = entry.outputs[N.FIRST_SAVE] ? findMedia(entry.outputs[N.FIRST_SAVE]) : null;
-    const media2 = entry.outputs[N.FINAL_SAVE] ? findMedia(entry.outputs[N.FINAL_SAVE]) : null;
-
-    if(isFirstOnly){
-        // Solo 1er pase (botón "Solo 1er pase" o paso 1 del completo)
-        if(media1){
-            showVideo(1, media1, { variantIndex: variantCounter + 1 });
-            paint(1, "1er", tTotal || "—");
-            addToVariantGallery(media1, realSeed, tTotal || "", 1, variantCounter + 1);
-        }
-    } else {
-        // Paso 2 del completo (o grafo completo sin pasos): el final está listo
-        if(media2){
-            const finalIdx = finalVariantIndex != null ? (finalVariantIndex + 1) : (variantCounter + 1);
-            showVideo(2, media2, { variantIndex: finalIdx });
-            paint(2, "final", tTotal || "—");
-            addToVariantGallery(media2, realSeed, tTotal || "", 2, finalIdx);
-        }
-        // Si por casualidad el paso 2 también trae FIRST_SAVE (no debería si lo
-        // cacheó), no lo mostramos de nuevo en slot 1.
-    }
-
-    delete promptSteps[promptId];
-
-    // --- ¿Continuamos con el paso 2? ---
-    if(generationStep === 1 && step === "1" && window.currentBatchMode === false){
-        // Acaba el paso 1 del "Generar completo" -> lanzar paso 2
-        log(`➡️ Paso 1 completado, iniciando paso 2 (2º pase)...`, "l-ok");
-        generationStep = 2;
-        // Guardar la semilla del paso 1 para reutilizarla en el paso 2 ANTES de borrarla
-        const step1Seed = pendingSeeds[promptId];
-        delete pendingSeeds[promptId];
-        // Reinyectar la semilla del paso 1 para que runSingleGeneration la reutilice
-        pendingSeeds[firstPromptId] = step1Seed;
-        // Recordar el índice de la variante original para etiquetar bien el vídeo final
-        finalVariantIndex = variantCounter;
-        runSingleGeneration(currentBatchIndex);  // MISMO índice, paso 2
-        return;  // NO avanzar currentBatchIndex todavía
-    }
-
-    // Si llegamos aquí, el proceso ha terminado completamente (1er pase puro o paso 2 completo)
-    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
-    delete pendingSeeds[promptId];
-    generationStep = 0;
-    firstPromptId = null;
-    finalVariantIndex = null;
-    variantCounter++;
-    currentBatchIndex++;
-    processNextBatch();
-}
-
-// Red de seguridad: si el WS no entrega 'execution_success' (build distinta de ComfyUI,
-// reconexión, mensaje perdido...), esto igualmente recupera el resultado por polling.
-function pollFallback(promptId) {
-    let tries = 0;
-    const iv = setInterval(async () => {
-        tries++;
-        if(handledPrompts.has(promptId) || tries > 180) { clearInterval(iv); return; } // ~12 min máx
-        await handlePromptDone(promptId);
-        if(handledPrompts.has(promptId)) clearInterval(iv);
-    }, 4000);
-}
-
-// FUNCIÓN PARA ACTUALIZAR LA SEMILLA EN EL UI
+// --- UPDATE SEED UI ---
 function updateSeedUI(seedValue) {
     $("seedVal").value = seedValue;
     $("seedVal").classList.remove("seed-updated");
     void $("seedVal").offsetWidth;
     $("seedVal").classList.add("seed-updated");
-    // Solo cambiamos el toggle a "Fija" fuera de un batch (una sola generación):
-    // durante un batch de variantes esto no debe tocar seedMode, o las siguientes
-    // variantes perderían la aleatoriedad (ver batchSeedMode).
     if(totalBatchSize <= 1) {
         seedMode = "fixed";
         $("segFixed").classList.add("on");
@@ -1761,127 +1516,10 @@ function updateSeedUI(seedValue) {
     }
 }
 
-// Galería de variantes. `media` debe venir ya resuelto por findMedia() como
-// {filename, subfolder, type} — antes se reimplementaba el parseo aquí con
-// claves equivocadas (media.images) y casi nunca encontraba el archivo real,
-// cayendo siempre en el fallback "video.mp4" (inexistente -> vídeo roto).
-function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
-    if(!media || !media.filename) {
-        log("⚠️ No se encontró vídeo de salida para añadir a la galería de variantes.", "l-err");
-        return;
-    }
-    const box = $("variantGalleryBox");
-    const grid = $("variantGrid");
-    box.style.display = "block";
-
-    const { filename, subfolder, type } = media;
-    const ts = Date.now();
-    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}`;
-
-    // Determinar qué texto mostrar
-    const hasSeed = seedValue !== null && seedValue !== undefined;
-    const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
-    const slotLabel = slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${idx}`);
-    const displayText = hasSeed ? String(seedValue) : slotLabel;
-    const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
-    const timeStr = timeText || "";
-    const typeShort = slot === 1 ? "1er" : (slot === 2 ? "final" : "var");
-
-    const card = document.createElement("div");
-    card.className = "variant-card";
-    card.dataset.filename = filename;
-    card.dataset.subfolder = subfolder;
-    card.dataset.type = type;
-    card.dataset.slot = String(slot);
-    card.dataset.variantIndex = String(idx);
-
-    // Usamos un span limpio solo con el texto y el icono
-    card.innerHTML = `
-        <span class="variant-badge">Var ${idx} · ${typeShort}</span>
-        <video src="${url}" type="video/mp4" controls muted preload="metadata" playsinline></video>
-        <div class="variant-info">
-            <span class="variant-seed-display" title="${tooltipText}">
-                <span class="seed-text">${displayText}</span>
-                <span class="copy-icon">📋</span>
-            </span>
-            <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
-            <span class="variant-icons">
-                <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
-            </span>
-        </div>
-    `;
-
-    // Añadir evento de copia SOLO si hay semilla
-    if(hasSeed) {
-        const seedSpan = card.querySelector('.variant-seed-display');
-        seedSpan.addEventListener('click', async (e) => {
-            e.stopPropagation(); // Evitar burbujeo
-            try {
-                await navigator.clipboard.writeText(String(seedValue));
-                const originalHTML = seedSpan.innerHTML;
-                seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
-                setTimeout(() => {
-                    seedSpan.innerHTML = originalHTML;
-                }, 1200);
-            } catch(err) {
-                console.error("Error al copiar:", err);
-            }
-        });
-    }
-
-    const delBtn = card.querySelector(".variant-del-btn");
-    delBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if(!confirm("¿Eliminar este vídeo del disco y de la galería?")) return;
-        const fn = card.dataset.filename;
-        const sf = card.dataset.subfolder;
-        const tp = card.dataset.type;
-        delBtn.disabled = true;
-        try {
-            const r = await fetch("/api/file_delete", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({filename: fn, subfolder: sf, type: tp}),
-            });
-            if(!r.ok){
-                const t = await r.text().catch(()=>"");
-                throw new Error("HTTP "+r.status+" "+(t||"").slice(0,200));
-            }
-            const j = await r.json();
-            if(!j.ok && !j.deleted) throw new Error("Respuesta inesperada del backend");
-            card.remove();
-            const remaining = grid.querySelectorAll(".variant-card").length;
-            $("variantCount").textContent = `(${remaining})`;
-            if(remaining === 0) box.style.display = "none";
-            log("🗑️ Vídeo eliminado del disco: "+fn, "l-ok");
-        } catch(err){
-            log("❌ No se pudo borrar del disco: "+err.message, "l-err");
-            delBtn.disabled = false;
-        }
-    });
-
-    // Click en la miniatura de variante -> cargar en su ventana (slot 1 o 2)
-    // Ignorar clicks dentro del propio video para no interferir con controles/play.
-    card.addEventListener("click", (e) => {
-        if(e.target.closest("video")) return;
-        if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn")) return;
-        const varIndex = parseInt(card.dataset.variantIndex, 10) || (currentBatchIndex + 1);
-        showVideo(slot, { filename, subfolder, type }, { variantIndex: varIndex });
-        log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
-    });
-
-    grid.appendChild(card);
-    $("variantCount").textContent = `(${variantCounter + 1})`;
-}
-
 // --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS MP4 ---
-// ComfyUI guarda el workflow en el JSON "extra" del MP4 con clave "prompt".
-// Buscamos la cadena literal "prompt": { y parseamos el JSON con un
-// parser de brackets que respeta strings.
 async function extractWorkflowFromMP4Buffer(arrayBuffer){
   const bytes = new Uint8Array(arrayBuffer);
   const txt = new TextDecoder("latin1").decode(bytes);
-  // Buscar el patrón del workflow: puede ser "prompt": { o directamente {"274": (workflow del MP4)
   let braceIdx = -1;
   const patIdx = txt.indexOf('"prompt": {');
   if(patIdx >= 0){
@@ -1891,7 +1529,6 @@ async function extractWorkflowFromMP4Buffer(arrayBuffer){
     if(m) braceIdx = m.index;
   }
   if(braceIdx < 0) return null;
-  // Parser de brackets que respeta strings y secuencias de escape
   let depth = 0, i = braceIdx, inString = false, escape = false;
   while(i < txt.length){
     const c = txt[i];
@@ -1921,193 +1558,6 @@ async function extractWorkflowFromMP4(url){
   if(!r.ok) throw new Error("HTTP "+r.status);
   return extractWorkflowFromMP4Buffer(await r.arrayBuffer());
 }
-
-function processNextBatch() {
-    if(currentBatchIndex < totalBatchSize) {
-        setTimeout(() => {
-            // Al iniciar una nueva variante del batch, resetear el paso
-            // "Solo 1er pase" => 0; "Generar completo" => 1 (empezar por paso 1)
-            generationStep = window.currentBatchMode ? 0 : 1;
-            firstPromptId = null;
-            finalVariantIndex = null;
-            runSingleGeneration(currentBatchIndex);
-        }, 1000);
-    } else {
-        setRun("ok", "Batch finalizado");
-        log("🏁 Todas las variantes han sido procesadas.", "l-ok");
-        $("btnFirstPass").disabled=false;
-        $("btnFull").disabled=false;
-        enableStopButtons(false);
-    }
-}
-
-// --- GESTIÓN DE PROMPTS (árbol de carpetas jerárquico con /) ---
-const PROMPTS_KEY = 'ltxv_prompts';
-let selectedPromptKey = null;
-
-function loadPrompts(){
-  let saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-  // Limpiar claves con último segmento vacío (trailing slash)
-  let dirty = false;
-  for(const key of Object.keys(saved)){
-    if(key.endsWith('/') || !key.split('/').pop()){
-      delete saved[key]; dirty = true;
-    }
-  }
-  if(dirty) localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-
-  const tree = $("promptTree");
-  tree.innerHTML = '';
-
-  if(Object.keys(saved).length === 0){
-    tree.innerHTML = '<div class="pt-empty">sin prompts guardados</div>';
-    return;
-  }
-
-  // Construir estructura de carpetas
-  // folders[path] = { children: Set<folderNames>, prompts: [{key, name}] }
-  const root = { children: {}, prompts: [] };
-
-  for(const key of Object.keys(saved).sort()){
-    const parts = key.split('/');
-    const promptName = parts.pop(); // último nivel = prompt
-    let node = root;
-    for(const part of parts){
-      if(!node.children[part]) node.children[part] = { children: {}, prompts: [] };
-      node = node.children[part];
-    }
-    node.prompts.push({ key, name: promptName });
-  }
-
-  // Estado de carpetas abiertas (persistente en localStorage)
-  const openState = JSON.parse(localStorage.getItem(PROMPTS_KEY + '_open') || '{}');
-
-  function renderNode(node, container, path){
-    // Subcarpetas
-    for(const folderName of Object.keys(node.children).sort()){
-      const folderPath = path ? `${path}/${folderName}` : folderName;
-      const folderDiv = document.createElement('div');
-      folderDiv.className = 'pt-folder';
-      if(openState[folderPath]) folderDiv.classList.add('open');
-
-      const label = document.createElement('div');
-      label.className = 'pt-folder-label';
-      const arrow = document.createElement('span');
-      arrow.className = 'pt-folder-arrow';
-      arrow.textContent = '▶';
-      label.appendChild(arrow);
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = folderName;
-      label.appendChild(nameSpan);
-      const delFolder = document.createElement('span');
-      delFolder.className = 'pt-folder-del';
-      delFolder.textContent = '×';
-      delFolder.title = 'Eliminar carpeta y todo su contenido';
-      label.appendChild(delFolder);
-
-      delFolder.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
-        const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-        let count = 0;
-        for(const key of Object.keys(saved)){
-          if(key === folderPath || key.startsWith(folderPath + '/')){
-            delete saved[key]; count++;
-          }
-        }
-        localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-        loadPrompts();
-        log(`Carpeta "${folderPath}" eliminada (${count} prompt(s)).`, "l-ok");
-      });
-
-      label.addEventListener("click", (e) => {
-        if(e.target === delFolder) return;
-        folderDiv.classList.toggle("open");
-        openState[folderPath] = folderDiv.classList.contains("open");
-        localStorage.setItem(PROMPTS_KEY + '_open', JSON.stringify(openState));
-      });
-
-      const childrenDiv = document.createElement('div');
-      childrenDiv.className = 'pt-children';
-      renderNode(node.children[folderName], childrenDiv, folderPath);
-
-      folderDiv.appendChild(label);
-      folderDiv.appendChild(childrenDiv);
-      container.appendChild(folderDiv);
-    }
-    // Prompts (hojas)
-    for(const p of node.prompts){
-      const item = document.createElement('div');
-      item.className = 'pt-item';
-      if(p.key === selectedPromptKey) item.classList.add('selected');
-      item.textContent = p.name;
-      item.title = p.key;
-      item.dataset.key = p.key;
-      item.addEventListener("click", () => {
-        const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-        if(saved[p.key]){
-          $("prompt").value = saved[p.key];
-          selectedPromptKey = p.key;
-          document.querySelectorAll(".pt-item").forEach(i => i.classList.remove("selected"));
-          item.classList.add("selected");
-        }
-      });
-      container.appendChild(item);
-    }
-  }
-
-  renderNode(root, tree, '');
-}
-
-function savePrompt(){
-  const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):");
-  if(!name) return;
-  const text = $("prompt").value;
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-  if(saved[name]){
-    const preview = saved[name].slice(0, 80);
-    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
-  }
-  saved[name] = text;
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-  selectedPromptKey = name;
-  loadPrompts();
-  log(`Prompt "${name}" guardado.`, "l-ok");
-}
-
-function movePrompt(){
-  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para mover.", "l-err"); return; }
-  const oldName = selectedPromptKey;
-  const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
-  if(!newName || newName === oldName) return;
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-  if(saved[newName]){
-    if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
-  }
-  saved[newName] = saved[oldName];
-  delete saved[oldName];
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-  selectedPromptKey = newName;
-  loadPrompts();
-  log(`Prompt movido: "${oldName}" → "${newName}"`, "l-ok");
-}
-
-function deletePrompt(){
-  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para eliminar.", "l-err"); return; }
-  if(!confirm(`¿Eliminar "${selectedPromptKey}"?`)) return;
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-  delete saved[selectedPromptKey];
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-  selectedPromptKey = null;
-  loadPrompts();
-  log(`Prompt eliminado.`, "l-ok");
-}
-
-$("btnSavePrompt").addEventListener("click", savePrompt);
-$("btnMovePrompt").addEventListener("click", movePrompt);
-$("btnDeletePrompt").addEventListener("click", deletePrompt);
-loadPrompts();
-
 
 // --- KREA2 RECENT IMAGES PANEL ---
 $("krea2RecentToggle").addEventListener("click", () => {
@@ -2165,13 +1615,11 @@ async function loadKrea2ImageAsInput(url, filename){
   }
 }
 
-// Al cargar la página: si viene ?ref=filename, abrir el panel y cargar esa imagen
 (function maybeLoadFromQuery(){
   const qs = new URLSearchParams(window.location.search);
   const ref = qs.get("ref");
   if(!ref) return;
   const filename = decodeURIComponent(ref);
-  // Asegurar que el panel está abierto
   const h = $("krea2RecentToggle");
   const b = $("krea2RecentBody");
   if(h && b && !h.classList.contains("open")){
@@ -2179,7 +1627,6 @@ async function loadKrea2ImageAsInput(url, filename){
     b.classList.add("open");
     const arr = h.querySelector(".arrow"); if(arr) arr.textContent = "▼";
   }
-  // Esperar a que el grid cargue y luego hacer click en el item
   loadKrea2Recent().then(() => {
     const grid = $("krea2RecentGrid");
     const items = grid.querySelectorAll(".gallery-item");
@@ -2196,57 +1643,6 @@ async function loadKrea2ImageAsInput(url, filename){
     }
   });
 })();
-
-
-// --- GESTIÓN DE LORAS CON MEMORIA ---
-function saveLoraState() { localStorage.setItem('ltxv_loras_state', JSON.stringify(loras)); }
-function loadLoraState() {
-  const saved = localStorage.getItem('ltxv_loras_state');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length === 3) {
-        parsed.forEach((l, i) => {
-          if (AVAILABLE_LORAS.includes(l.lora) || l.lora === "") loras[i] = l;
-        });
-      }
-    } catch (e) { console.error("Error cargando estado LoRA", e); }
-  }
-}
-function loadModels(){
-  const sel = $("modelSelect");
-  if(!sel) return;
-  sel.innerHTML = "";
-  for(const m of AVAILABLE_MODELS){
-    const opt = document.createElement("option");
-    opt.value = m;
-    opt.textContent = m;
-    if(m === "10Eros_v1.3_fp8mixed_learned.safetensors") opt.selected = true;
-    sel.appendChild(opt);
-  }
-}
-loadModels();
-function renderLoras(){
-  const wrap=$("loraList"); wrap.innerHTML="";
-  loras.forEach((l,i)=>{
-    const box=document.createElement("div");
-    box.className="lora"+(l.on?"":" off");
-    let optionsHtml = '<option value="">-- Ninguno --</option>';
-    AVAILABLE_LORAS.forEach(path => {
-      const selected = path === l.lora ? 'selected' : '';
-      const displayName = path.split('/').pop(); 
-      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
-    });
-    box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
-    <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
-    <div class="slider-row"><input type="range" min="0" max="2" step="0.05" value="${l.strength}" data-field="strength" data-i="${i}"><div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div></div>`;
-    wrap.appendChild(box);
-  });
-  wrap.querySelectorAll(".switch").forEach(sw=>sw.addEventListener("click",()=>{loras[+sw.dataset.i].on=!loras[+sw.dataset.i].on;renderLoras();saveLoraState();}));
-  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel=>sel.addEventListener("change",()=>{loras[+sel.dataset.i].lora=sel.value;saveLoraState();}));
-  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
-}
-loadLoraState(); renderLoras();
 
 // --- EXTRACCIÓN Y APLICACIÓN DE WORKFLOW DESDE METADATOS PNG/MP4 ---
 function extractWorkflowFromImage(url){
@@ -2296,7 +1692,6 @@ function applyWorkflow(workflow, opts={}){
   const setApplied = (label) => applied.push(label);
   const setMissing = (label) => missing.push(label);
 
-  // Buscar nodos por class_type (más robusto que por ID, que cambia entre workflows)
   function findByClass(gt){
     for(const k of Object.keys(workflow)){
       if(workflow[k] && workflow[k].class_type === gt) return workflow[k];
@@ -2311,12 +1706,8 @@ function applyWorkflow(workflow, opts={}){
     return out;
   }
 
-  // Prompt: buscar CLIPTextEncode cuyo text no sea un negative prompt.
-  // El negative prompt suele empezar con palabras negativas y ser corto-mediano.
-  // El positivo es narrativo y largo.
   const textEncoders = findAllByClass("CLIPTextEncode");
   function isNegativePrompt(t){
-    // Empieza con palabras negativas típicas O es corto con muchas negativas
     const startsNeg = /^\s*(blurry|low quality|distorted|ugly|watermark|worst|overexposed|underexposed|grainy|noise|out of focus|deformed|jpeg|nsfw|mutation|cropped)/i.test(t);
     const manyNegWords = (t.match(/\b(blurry|low quality|distorted|ugly|watermark|worst|overexposed|underexposed|grainy|deformed|mutation|artifacts)\b/gi) || []).length >= 3;
     return startsNeg || manyNegWords;
@@ -2329,7 +1720,6 @@ function applyWorkflow(workflow, opts={}){
       promptSet = true; break;
     }
   }
-  // Si no encontramos, usar el CLIPTextEncode con texto más largo
   if(!promptSet && textEncoders.length){
     let longest = textEncoders[0].node;
     for(const {node} of textEncoders){
@@ -2340,7 +1730,6 @@ function applyWorkflow(workflow, opts={}){
   }
   if(promptSet) setApplied("prompt"); else setMissing("prompt");
 
-  // Modelo: CheckpointLoaderSimple con ckpt_name
   let modelSet = false;
   const checkpoint = findByClass("CheckpointLoaderSimple");
   if(checkpoint && checkpoint.inputs && checkpoint.inputs.ckpt_name){
@@ -2356,7 +1745,6 @@ function applyWorkflow(workflow, opts={}){
   }
   if(modelSet) setApplied("modelo"); else setMissing("modelo");
 
-  // Resolución, frames, fidelidad y movimiento: leer directamente los mxSlider por título.
   function parseFrameValue(v){
     if(typeof v === "number") return v;
     if(Array.isArray(v)) return null;
@@ -2391,7 +1779,6 @@ function applyWorkflow(workflow, opts={}){
     else if(/fidelity|conditioning/i.test(title)) fid = val;
     else if(/motion|preprocess/i.test(title)) mot = val;
   }
-  // Fallback a EmptyLTXVLatentVideo solo si no encontramos por título
   if(w == null || h == null){
     const emptyLatent = findByClass("EmptyLTXVLatentVideo");
     if(emptyLatent && emptyLatent.inputs){
@@ -2410,7 +1797,6 @@ function applyWorkflow(workflow, opts={}){
   if(w && h) applyAspectRatio(w, h);
   updateDuration();
 
-  // LoRAs: Power Lora Loader (rgthree)
   const powerLora = findByClass("Power Lora Loader (rgthree)");
   if(powerLora && powerLora.inputs){
     for(let i = 0; i < 3; i++){
@@ -2434,7 +1820,6 @@ function applyWorkflow(workflow, opts={}){
     setMissing("LoRAs");
   }
 
-  // Semilla
   let seedVal = null;
   const seedNode = findByClass("Seed (rgthree)");
   if(seedNode){
@@ -2468,7 +1853,15 @@ function applyWorkflow(workflow, opts={}){
   return { applied, missing };
 }
 
-// --- RESTO DEL CÓDIGO ---
+// --- DROPZONE / FILE HANDLING ---
+function updateDzInfo(w, h){
+  const info = $("dzInfo");
+  if(!info) return;
+  function gcd(a,b){ return b ? gcd(b, a % b) : a; }
+  const d = gcd(w, h) || 1;
+  info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
+}
+
 $("segRandom").addEventListener("click",()=>{seedMode="random";$("segRandom").classList.add("on");$("segFixed").classList.remove("on");$("seedVal").disabled=true;});
 $("segFixed").addEventListener("click",()=>{seedMode="fixed";$("segFixed").classList.add("on");$("segRandom").classList.remove("on");$("seedVal").disabled=false;});
 $("fidelitySlider").addEventListener("input",(e)=>{$("fidelityVal").textContent=parseFloat(e.target.value).toFixed(2);});
@@ -2484,7 +1877,6 @@ dz.addEventListener("click",()=>fileInput.click());
 dz.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
 fileInput.addEventListener("change",e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 
-// FUNCIÓN DE CARGA DE IMAGEN / VÍDEO CORREGIDA Y ROBUSTA
 function handleFile(f, shouldSaveToGallery = true){
   uploadedImage = null;
   localFile = null;
@@ -2499,7 +1891,6 @@ function handleFile(f, shouldSaveToGallery = true){
   const uniqueName = `temp_${Date.now()}_${f.name}`;
   localFile = new File([f], uniqueName, {type: f.type});
 
-  // Ocultar selector de frames si se cargó imagen
   const frameSel = $("frameSelector");
   if(frameSel) frameSel.style.display = "none";
 
@@ -2523,7 +1914,6 @@ function handleFile(f, shouldSaveToGallery = true){
 
 let currentVideoFile = null;
 
-// Cargar vídeo: mostrar selector de 1er/último frame y usar el elegido como imagen de entrada
 function handleVideoFile(file, shouldSaveToGallery = true){
   currentVideoFile = file;
   const videoUrl = URL.createObjectURL(file);
@@ -2533,7 +1923,6 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   vid.crossOrigin = "anonymous";
   vid.preload = "auto";
 
-  // Leer metadatos del vídeo directamente desde el File
   const metaPromise = file.arrayBuffer().then(buf => extractWorkflowFromMP4Buffer(buf)).catch(err => {
     console.warn("Error leyendo metadatos del vídeo:", err);
     return null;
@@ -2606,7 +1995,7 @@ function handleVideoFile(file, shouldSaveToGallery = true){
 
     sel.querySelector('[data-frame="first"]').onclick = useFirst;
     sel.querySelector('[data-frame="last"]').onclick = useLast;
-    useFirst(); // por defecto 1er frame
+    useFirst();
   }
 
   vid.addEventListener("loadedmetadata", () => {
@@ -2622,24 +2011,11 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   vid.src = videoUrl;
 }
 
-$("btnTest").addEventListener("click", async ()=>{
-    setConn("busy","comprobando...");
-    try{
-        const r=await fetch(server()+"/system_stats");
-        if(!r.ok) throw new Error("HTTP "+r.status);
-        await r.json(); 
-        setConn("ok","conectado"); 
-        connectSocket();
-        log("Conexión OK","l-ok");
-    }catch(err){setConn("bad","sin conexión");log("Error: "+err.message,"l-err");}
-});
-
 async function ensureImageUploaded(){
   if(!localFile) throw new Error("selecciona imagen");
   setRun("busy","subiendo...");
   const fd=new FormData();
-  // Usar el nombre original sin el prefijo temporal para que ComfyUI lo guarde limpio
-  fd.append("image", localFile, localFile.name.replace(/^temp_\d+_/, '')); 
+  fd.append("image", localFile, localFile.name.replace(/^temp_\d+_/, ''));
   fd.append("overwrite","true");
   const r=await fetch(server()+"/upload/image",{method:"POST",body:fd});
   if(!r.ok) throw new Error("fallo subida");
@@ -2666,11 +2042,6 @@ function buildGraph(firstPassOnly){
   return g;
 }
 
-function findMedia(nodeOutput){
-  for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
-  return null;
-}
-
 function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
@@ -2680,20 +2051,20 @@ function showVideo(slot, media, options={}){
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
-  // Etiqueta de variante + tipo encima del vídeo
   if(badge){
     const varIndex = options.variantIndex != null ? options.variantIndex : (currentBatchIndex + 1);
     const typeLabel = slot === 1 ? "1er" : "final";
     badge.textContent = `Var ${varIndex} · ${typeLabel}`;
   }
-  // Mostrar resolución real del vídeo cuando cargue los metadatos
   const resEl=$("res"+slot);
   if(resEl){
     resEl.textContent="";
     const onMeta=()=>{
       const vw=v.videoWidth||0, vh=v.videoHeight||0;
       if(vw && vh){
-        resEl.textContent=`${vw}×${vh} · ${aspectRatioStr(vw,vh)}`;
+        function gcd(a,b){ return b ? gcd(b, a % b) : a; }
+        const d = gcd(vw, vh) || 1;
+        resEl.textContent=`${vw}×${vh} · ${vw/d}:${vh/d}`;
       }
       v.removeEventListener("loadedmetadata", onMeta);
     };
@@ -2770,7 +2141,7 @@ setupDownloadButton(1);
 setupDownloadButton(2);
 
 // --- Controles de frame en el reproductor final ---
-const FRAME_STEP = 1 / 25; // salto de ~1 frame a 25 fps
+const FRAME_STEP = 1 / 25;
 
 function nudgeFrame(delta){
   const v = $("video2");
@@ -2790,7 +2161,6 @@ function captureFrameFromPlayer(){
   btnSaveFrame2.textContent = "⏳";
   (async () => {
     try {
-      // Esperar metadatos del vídeo
       await new Promise((resolve, reject) => {
         if(v.readyState >= 2) resolve();
         else {
@@ -2803,17 +2173,14 @@ function captureFrameFromPlayer(){
       const dur = v.duration || 0;
       if(!dur || !isFinite(dur)){ throw new Error("duración del vídeo no disponible"); }
       const targetTime = v.currentTime || 0;
-      // Asegurar que el frame actual está listo para dibujar
       await new Promise((resolve, reject) => {
         let resolved = false;
         const onSeeked = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; resolve(); } };
         const onError = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; reject(new Error("error durante seek")); } };
         v.addEventListener("seeked", onSeeked, { once: true });
         v.addEventListener("error", onError, { once: true });
-        // Forzar un pequeño seek para asegurar que tenemos el frame pintado
         v.currentTime = targetTime;
       });
-      // Capturar el frame en un canvas con la resolución real del vídeo
       const canvas = document.createElement("canvas");
       canvas.width = v.videoWidth || 640;
       canvas.height = v.videoHeight || 360;
@@ -2861,157 +2228,112 @@ if(vidbox2){
   vidbox2.setAttribute("tabindex", "0");
 }
 
-// FUNCIÓN PANTALLA COMPLETA ROBUSTA
-async function runSingleGeneration(index) {
-    try {
-        // --- Determinar qué grafo enviar según el paso ---
-        // generationStep:
-        //   0 = modo "Solo 1er pase" (firstPassOnly=true) — solo paso 1, no continúa
-        //   1 = paso 1 del "Generar completo" — continúa a paso 2 al acabar
-        //   2 = paso 2 del "Generar completo" — grafo completo (2º pase)
-        const isStep2 = (generationStep === 2);
-        // firstPassOnly=true => grafo sin FINAL_SAVE (paso 1)
-        // firstPassOnly=false => grafo completo (paso 2 del completo, o modo "completo" directo)
-        const firstPassOnly = isStep2 ? false : true;
-        const graph = buildGraph(firstPassOnly);
-        // Seed(rgthree) con -1 solo se randomiza en el editor de ComfyUI (JS del nodo);
-        // por la API llega tal cual. Generamos aquí la semilla real para cada variante.
-        // En el paso 2 del completo, hay que reusar la misma semilla del paso 1.
-        let seedUsed;
-        if(isStep2 && firstPromptId && pendingSeeds[firstPromptId] != null){
-            seedUsed = pendingSeeds[firstPromptId];
-        } else {
-            seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("seedVal").value, 10);
-        }
-        graph[N.SEED].inputs.seed = seedUsed;
-
-        const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize})`);
-        log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
-        const r = await fetch(server()+"/prompt",{
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
-        });
-        if(!r.ok){
-            const t = await r.text().catch(()=> "");
-            throw new Error("HTTP "+r.status+" "+t.slice(0,300));
-        }
-        const data = await r.json();
-        if(data.error) throw new Error(JSON.stringify(data.error));
-
-        pendingSeeds[data.prompt_id] = seedUsed;
-        currentPromptId = data.prompt_id;
-        // Registrar el paso de este prompt
-        promptSteps[data.prompt_id] = isStep2 ? "2" : "1";
-        if(!isStep2 && generationStep === 1){
-            // Paso 1 del "completo": guardar el prompt_id para el paso 2
-            firstPromptId = data.prompt_id;
-        }
-        // Cronómetro en el slot correspondiente: paso 1 -> slot 1, paso 2 -> slot 2
-        startTimer(data.prompt_id, isStep2 ? 2 : 1);
-        pollFallback(data.prompt_id); // respaldo por si el WS no avisa
-    } catch(err) {
-        // Si el envío falla (p.ej. validación del grafo), no se queda colgado:
-        // se registra el fallo y se pasa a la siguiente variante del batch.
-        log(`❌ No se pudo encolar: ${err.message}`, "l-err");
-        if(generationStep === 1){
-            // Fallo en paso 1 del completo: no continuamos al paso 2
-            generationStep = 0;
-        }
-        currentBatchIndex++;
-        processNextBatch();
+// --- VARIANT GALLERY (LTXV video version) ---
+function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
+    if(!media || !media.filename) {
+        log("⚠️ No se encontró vídeo de salida para añadir a la galería de variantes.", "l-err");
+        return;
     }
+    const box = $("variantGalleryBox");
+    const grid = $("variantGrid");
+    box.style.display = "block";
+
+    const { filename, subfolder, type } = media;
+    const ts = Date.now();
+    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}`;
+
+    const hasSeed = seedValue !== null && seedValue !== undefined;
+    const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
+    const slotLabel = slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${idx}`);
+    const displayText = hasSeed ? String(seedValue) : slotLabel;
+    const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
+    const timeStr = timeText || "";
+    const typeShort = slot === 1 ? "1er" : (slot === 2 ? "final" : "var");
+
+    const card = document.createElement("div");
+    card.className = "variant-card";
+    card.dataset.filename = filename;
+    card.dataset.subfolder = subfolder;
+    card.dataset.type = type;
+    card.dataset.slot = String(slot);
+    card.dataset.variantIndex = String(idx);
+
+    card.innerHTML = `
+        <span class="variant-badge">Var ${idx} · ${typeShort}</span>
+        <video src="${url}" type="video/mp4" controls muted preload="metadata" playsinline></video>
+        <div class="variant-info">
+            <span class="variant-seed-display" title="${tooltipText}">
+                <span class="seed-text">${displayText}</span>
+                <span class="copy-icon">📋</span>
+            </span>
+            <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
+            <span class="variant-icons">
+                <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
+            </span>
+        </div>
+    `;
+
+    if(hasSeed) {
+        const seedSpan = card.querySelector('.variant-seed-display');
+        seedSpan.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await navigator.clipboard.writeText(String(seedValue));
+                const originalHTML = seedSpan.innerHTML;
+                seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
+                setTimeout(() => {
+                    seedSpan.innerHTML = originalHTML;
+                }, 1200);
+            } catch(err) {
+                console.error("Error al copiar:", err);
+            }
+        });
+    }
+
+    const delBtn = card.querySelector(".variant-del-btn");
+    delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        if(!confirm("¿Eliminar este vídeo del disco y de la galería?")) return;
+        const fn = card.dataset.filename;
+        const sf = card.dataset.subfolder;
+        const tp = card.dataset.type;
+        delBtn.disabled = true;
+        try {
+            const r = await fetch("/api/file_delete", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({filename: fn, subfolder: sf, type: tp}),
+            });
+            if(!r.ok){
+                const t = await r.text().catch(()=>"");
+                throw new Error("HTTP "+r.status+" "+(t||"").slice(0,200));
+            }
+            const j = await r.json();
+            if(!j.ok && !j.deleted) throw new Error("Respuesta inesperada del backend");
+            card.remove();
+            const remaining = grid.querySelectorAll(".variant-card").length;
+            $("variantCount").textContent = `(${remaining})`;
+            if(remaining === 0) box.style.display = "none";
+            log("🗑️ Vídeo eliminado del disco: "+fn, "l-ok");
+        } catch(err){
+            log("❌ No se pudo borrar del disco: "+err.message, "l-err");
+            delBtn.disabled = false;
+        }
+    });
+
+    card.addEventListener("click", (e) => {
+        if(e.target.closest("video")) return;
+        if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn")) return;
+        const varIndex = parseInt(card.dataset.variantIndex, 10) || (currentBatchIndex + 1);
+        showVideo(slot, { filename, subfolder, type }, { variantIndex: varIndex });
+        log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
+    });
+
+    grid.appendChild(card);
+    $("variantCount").textContent = `(${variantCounter + 1})`;
 }
 
-async function queueAndWait(firstPassOnly){
-  connectSocket();
-  await ensureImageUploaded();
-  totalBatchSize = parseInt($("batchSize").value || "1", 10);
-  currentBatchIndex = 0;
-  batchSeedMode = seedMode; // capturado aquí: el toggle en vivo puede cambiar tras cada variante
-  window.currentBatchMode = firstPassOnly;
-  // Inicializar el estado de pasos del modo "Generar completo"
-  // generationStep: 1 = paso 1 en curso (continuará a paso 2); 0 = "Solo 1er pase" (no hay paso 2)
-  generationStep = firstPassOnly ? 0 : 1;
-  firstPromptId = null;
-  setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
-  $("btnFirstPass").disabled=true;
-  $("btnFull").disabled=true;
-  enableStopButtons(true);
-  runSingleGeneration(0);
-}
-
-async function runGeneration(fp){
-  try{ await queueAndWait(fp); }
-  catch(err){ setRun("bad","error");log("Error: "+err.message,"l-err"); $("btnFirstPass").disabled=false;$("btnFull").disabled=false; }
-}
-
-// --- PROMPT ENHANCER (Ollama) ---
-const ENHANCER_DEFAULT_PROMPTS = {
-  text: {
-    A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for LTXV video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
-    B: { name: "Estilo B (narrativo)", prompt: "You are a creative assistant specialized in visual storytelling. Take the user's idea and turn it into an evocative prompt that captures the essence of the scene. Use descriptive, poetic language. Focus on atmosphere, emotions, and the story the image tells. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
-  },
-  vision: {
-    A: { name: "Estilo A (descriptivo)", prompt: "You are an expert at describing images for video generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, motion, and atmosphere. The prompt must be suitable for a text-to-video model. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
-    B: { name: "Estilo B (cinematográfico)", prompt: "You are a digital cinematographer. Look at the image and turn it into a cinematic description. Describe how the camera would move, how lighting would evolve, what action would unfold, and how the scene would change over time. Think in terms of footage, not a still photo. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
-  },
-};
-
-function loadSysPrompts(){
-  const saved = localStorage.getItem("ltxv_enhancer_sysprompts");
-  if(saved){
-    try { return JSON.parse(saved); } catch(e) {}
-  }
-  return JSON.parse(JSON.stringify(ENHANCER_DEFAULT_PROMPTS));
-}
-
-function saveSysPrompts(data){
-  localStorage.setItem("ltxv_enhancer_sysprompts", JSON.stringify(data));
-}
-
-function populateStyleSelect(data, mode){
-  const sel = $("enhancerStyle");
-  sel.innerHTML = "";
-  const styles = data[mode] || {};
-  for(const key of Object.keys(styles).sort()){
-    const opt = document.createElement("option");
-    opt.value = key;
-    opt.textContent = styles[key].name || key;
-    sel.appendChild(opt);
-  }
-}
-
-function getCurrentSysPrompt(data, mode, styleKey){
-  const styles = data[mode] || {};
-  const entry = styles[styleKey];
-  return entry ? entry.prompt : "";
-}
-
-// Collapsible toggle
-function makeCollapsible(toggleId, bodyId, onOpen){
-  const h = $(toggleId), b = $(bodyId);
-  if(!h || !b) return;
-  h.addEventListener("click", () => {
-    h.classList.toggle("open");
-    b.classList.toggle("open");
-    const arrow = h.querySelector(".arrow");
-    if(arrow) arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
-    if(h.classList.contains("open") && onOpen) onOpen();
-  });
-}
-
-$("enhancerToggle").addEventListener("click", () => {
-  const h = $("enhancerToggle");
-  const b = $("enhancerBody");
-  h.classList.toggle("open");
-  b.classList.toggle("open");
-  const arrow = h.querySelector(".arrow");
-  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
-});
-
-makeCollapsible("promptLibToggle", "promptLibBody");
-makeCollapsible("loraToggle", "loraBody");
-
+// --- VIDEO HISTORY ---
 $("videoHistoryToggle").addEventListener("click", () => {
   const h = $("videoHistoryToggle");
   const b = $("videoHistoryBody");
@@ -3124,37 +2446,76 @@ async function loadVideoHistory(){
   }
 }
 
-// Poblar modelos desde Ollama
-async function loadEnhancerModels(){
-  const sel = $("enhancerModel");
-  try {
-    const r = await fetch("/api/tags");
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const data = await r.json();
-    const models = data.models || [];
-    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
-    for(const m of models){
-      const opt = document.createElement("option");
-      opt.value = m.name;
-      opt.textContent = m.name;
-      sel.appendChild(opt);
+// --- GENERACIÓN ---
+async function runSingleGeneration(index) {
+    try {
+        const isStep2 = (generationStep === 2);
+        const firstPassOnly = isStep2 ? false : true;
+        const graph = buildGraph(firstPassOnly);
+        let seedUsed;
+        if(isStep2 && firstPromptId && pendingSeeds[firstPromptId] != null){
+            seedUsed = pendingSeeds[firstPromptId];
+        } else {
+            seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("seedVal").value, 10);
+        }
+        graph[N.SEED].inputs.seed = seedUsed;
+
+        const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize})`);
+        log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
+        const r = await fetch(server()+"/prompt",{
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
+        });
+        if(!r.ok){
+            const t = await r.text().catch(()=> "");
+            throw new Error("HTTP "+r.status+" "+t.slice(0,300));
+        }
+        const data = await r.json();
+        if(data.error) throw new Error(JSON.stringify(data.error));
+
+        pendingSeeds[data.prompt_id] = seedUsed;
+        currentPromptId = data.prompt_id;
+        promptSteps[data.prompt_id] = isStep2 ? "2" : "1";
+        if(!isStep2 && generationStep === 1){
+            firstPromptId = data.prompt_id;
+        }
+        startTimer(data.prompt_id, isStep2 ? 2 : 1);
+        pollFallback(data.prompt_id);
+    } catch(err) {
+        log(`❌ No se pudo encolar: ${err.message}`, "l-err");
+        if(generationStep === 1){
+            generationStep = 0;
+        }
+        currentBatchIndex++;
+        processNextBatch();
     }
-    // Seleccionar por defecto Qwythos-9B si está disponible
-    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
-    if(defaultModel) sel.value = defaultModel.name;
-  } catch(e) {
-    sel.innerHTML = '<option value="">Ollama no disponible</option>';
-    console.warn("No se pudieron cargar modelos:", e.message);
-  }
 }
 
-// Recargar estilos al cambiar modo
-$("enhancerMode").addEventListener("change", () => {
-  const data = loadSysPrompts();
-  populateStyleSelect(data, $("enhancerMode").value);
-});
+async function queueAndWait(firstPassOnly){
+  connectSocket();
+  await ensureImageUploaded();
+  totalBatchSize = parseInt($("batchSize").value || "1", 10);
+  currentBatchIndex = 0;
+  batchSeedMode = seedMode;
+  window.currentBatchMode = firstPassOnly;
+  generationStep = firstPassOnly ? 0 : 1;
+  firstPromptId = null;
+  setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
+  $("btnFirstPass").disabled=true;
+  $("btnFull").disabled=true;
+  enableStopButtons(true);
+  runSingleGeneration(0);
+}
 
-// Mejorar prompt
+async function runGeneration(fp){
+  try{ await queueAndWait(fp); }
+  catch(err){ setRun("bad","error");log("Error: "+err.message,"l-err"); $("btnFirstPass").disabled=false;$("btnFull").disabled=false; }
+}
+
+$("btnFirstPass").addEventListener("click",()=>runGeneration(true));
+$("btnFull").addEventListener("click",()=>runGeneration(false));
+
+// --- ENHANCER (LTXV vision-mode uses localFile) ---
 $("btnEnhance").addEventListener("click", async () => {
   const model = $("enhancerModel").value;
   if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
@@ -3167,7 +2528,6 @@ $("btnEnhance").addEventListener("click", async () => {
 
   const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
   if(mode === "vision" && localFile){
-    // Leer la imagen cargada como base64
     try {
       const b64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -3212,21 +2572,560 @@ $("btnEnhance").addEventListener("click", async () => {
   }
 });
 
-// Guardar en biblioteca
-$("btnSaveEnhanced").addEventListener("click", () => {
-  const text = $("enhancerOutput").value.trim();
-  if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
-  const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):");
+// --- INIT ---
+updateDuration();
+// common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
+//
+// This file is injected AFTER the UI-specific CONFIG and N definitions.
+// CONFIG must be set by the UI (ltxv.js / krea2.js) BEFORE this script runs.
+//
+// Required CONFIG fields:
+//   PROMPTS_KEY, LORA_STATE_KEY, ENHANCER_SYSKEY, SERVERURL_KEY,
+//   N, DEFAULT_BACKEND_PORT, UI_TYPE, DEFAULT_MODEL,
+//   ENHANCER_DEFAULT_PROMPTS, loras,
+//   findMedia(nodeOutput), showMedia(slot, media, options),
+//   addToVariantGallery(media, seedValue, timeText, slot, variantIndex),
+//   onSeedUpdate(realSeed),
+//   displayResult(entry, realSeed, tTotal, promptId) -> true to skip finalize,
+//   onPromptError(pid), startNextVariant(index), onBatchComplete(),
+//   onStopCurrent(pid), onStopAll()
+
+const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
+let socket = null;
+let currentBatchIndex = 0;
+let totalBatchSize = 0;
+let variantCounter = 0;
+let pendingSeeds = {};
+let handledPrompts = new Set();
+let processingPrompts = new Set();
+let batchSeedMode = "random";
+let currentPromptId = null;
+let timers = {};
+let loras = CONFIG.loras;
+
+const LEGACY_PORTS = ["7822"];
+const DEFAULT_BACKEND_PORT = CONFIG.DEFAULT_BACKEND_PORT;
+const $ = (id) => document.getElementById(id);
+
+// --- TIMERS ---
+function fmtMs(ms){
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function startTimer(promptId, slot){
+  if(timers[promptId]) return;
+  const t = { start: Date.now(), iv: null };
+  const el = $("time"+slot);
+  t.iv = setInterval(() => {
+    if(!timers[promptId]) return;
+    const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
+    el.textContent = live;
+    el.classList.add("live");
+  }, 500);
+  timers[promptId] = t;
+}
+
+function stopTimer(promptId){
+  const t = timers[promptId];
+  if(!t) return null;
+  const total = Date.now() - t.start;
+  if(t.iv){ clearInterval(t.iv); t.iv = null; }
+  delete timers[promptId];
+  return { total, text: `⏱ ${fmtMs(total)}` };
+}
+
+function discardTimer(promptId){
+  const t = timers[promptId];
+  if(!t) return;
+  if(t.iv) clearInterval(t.iv);
+  delete timers[promptId];
+}
+
+// Saca tiempos del history JSON de ComfyUI. Devuelve {t1, t2, total} en ms o null.
+function extractTimings(entry, N){
+  if(!entry || !entry.status) return null;
+  const msgs = entry.status.messages || [];
+  if(!Array.isArray(msgs) || msgs.length === 0) return null;
+
+  let tStart = null, tSuccess = null;
+  const nodeTimes = {};
+  for(const m of msgs){
+    if(!Array.isArray(m) || m.length < 2) continue;
+    const type = m[0];
+    const data = m[1] || {};
+    if(type === "execution_start" && data.timestamp != null){
+      tStart = data.timestamp;
+    } else if(type === "execution_success" && data.timestamp != null){
+      tSuccess = data.timestamp;
+    } else if(type === "executing" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      if(nodeTimes[data.node].start == null) nodeTimes[data.node].start = data.timestamp;
+    } else if(type === "executed" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      nodeTimes[data.node].end = data.timestamp;
+    }
+  }
+
+  const total = (tStart != null && tSuccess != null) ? (tSuccess - tStart) : null;
+  const t1 = nodeTimes[N.FIRST_SAVE] && nodeTimes[N.FIRST_SAVE].start != null && nodeTimes[N.FIRST_SAVE].end != null
+             ? (nodeTimes[N.FIRST_SAVE].end - nodeTimes[N.FIRST_SAVE].start) : null;
+  const t2 = nodeTimes[N.FINAL_SAVE] && nodeTimes[N.FINAL_SAVE].start != null && nodeTimes[N.FINAL_SAVE].end != null
+             ? (nodeTimes[N.FINAL_SAVE].end - nodeTimes[N.FINAL_SAVE].start) : null;
+
+  if(total == null && t1 == null && t2 == null) return null;
+  return { t1, t2, total };
+}
+
+// --- SEED ---
+function randomSeed(){
+  return Math.floor(Math.random() * 0xFFFFFFFF);
+}
+
+// --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
+function updateServerHint(){
+  const hint = $("serverHint");
+  if(!hint) return;
+  const v = ($("serverUrl")?.value || "").trim();
+  if(v){
+    hint.textContent = `URL efectiva: ${v}`;
+  } else {
+    const host = (window.location.hostname || "").trim();
+    if(host && !/^(127\.|localhost$|::1$)/i.test(host)){
+      hint.textContent = "proxy activo (same-origin)";
+    } else {
+      hint.textContent = "";
+    }
+  }
+}
+(function autoPickServerUrl(){
+  try {
+    const input = $("serverUrl");
+    if(!input) return;
+    const stored = localStorage.getItem(CONFIG.SERVERURL_KEY);
+    if(stored){
+      const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
+      if(storedPort && LEGACY_PORTS.includes(storedPort)){
+        localStorage.removeItem(CONFIG.SERVERURL_KEY);
+      } else {
+        input.value = stored;
+        updateServerHint();
+        return;
+      }
+    }
+    updateServerHint();
+  } catch(e) { /* si falla, queda el placeholder */ }
+})();
+$("serverUrl").addEventListener("change", (e) => {
+  try { localStorage.setItem(CONFIG.SERVERURL_KEY, e.target.value.trim()); } catch(_){}
+  updateServerHint();
+});
+$("serverUrl").addEventListener("input", updateServerHint);
+
+function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
+function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
+function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+
+// --- WEBSOCKET SETUP ---
+function connectSocket() {
+    if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+    const url = server().replace('http', 'ws') + '/ws?clientId=' + CLIENT_ID;
+    socket = new WebSocket(url);
+    socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
+    socket.onmessage = (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); } catch(e) {
+            console.warn("WS mensaje no-JSON, cerrando:", event.data.slice(0,80));
+            socket.close();
+            return;
+        }
+        if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
+        if(msg.type === 'execution_error') {
+            const pid = msg.data && msg.data.prompt_id;
+            log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
+            if(pid){
+              handledPrompts.add(pid);
+              delete pendingSeeds[pid];
+              discardTimer(pid);
+              if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
+            }
+            currentBatchIndex++;
+            processNextBatch();
+        }
+    };
+    socket.onerror = (err) => console.error("WS Error", err);
+}
+
+// --- HANDLE PROMPT DONE ---
+// Procesa un prompt_id terminado, venga del WS o del polling de respaldo.
+// Idempotente: si ya se ha procesado, no hace nada.
+async function handlePromptDone(promptId) {
+    if(handledPrompts.has(promptId)) return;
+    if(processingPrompts.has(promptId)) return;
+    processingPrompts.add(promptId);
+    let entry;
+    try {
+        const hr = await fetch(server()+"/history/"+promptId);
+        if(!hr.ok) {
+            log(`⏳ Esperando resultado (HTTP ${hr.status})...`, "l-ok");
+            processingPrompts.delete(promptId);
+            return;
+        }
+        const hist = await hr.json();
+        entry = hist[promptId];
+    } catch(e) {
+        log(`⚠️ Error consultando history: ${e.message}`, "l-err");
+        processingPrompts.delete(promptId);
+        return;
+    }
+    if(!entry || !entry.outputs) {
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
+    // descartamos silenciosamente cualquier execution_success tardío del backend.
+    if(!(promptId in pendingSeeds)){
+        handledPrompts.add(promptId);
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    handledPrompts.add(promptId);
+    processingPrompts.delete(promptId);
+
+    const realSeed = (promptId in pendingSeeds) ? pendingSeeds[promptId] : null;
+    if(realSeed !== null) {
+        if(CONFIG.onSeedUpdate) CONFIG.onSeedUpdate(realSeed);
+        log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
+    }
+
+    const timings = extractTimings(entry, CONFIG.N);
+    const clientResult = stopTimer(promptId);
+    const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
+                   (clientResult ? fmtMs(clientResult.total) : null);
+
+    // UI-specific media display + continuation logic.
+    // Returns true to skip finalize (e.g. LTXV step 1 → step 2).
+    const cont = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
+    if(cont) return;
+
+    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
+    delete pendingSeeds[promptId];
+    variantCounter++;
+    currentBatchIndex++;
+    processNextBatch();
+}
+
+// Red de seguridad: si el WS no entrega 'execution_success', recupera el resultado por polling.
+function pollFallback(promptId) {
+    let tries = 0;
+    const iv = setInterval(async () => {
+        tries++;
+        if(handledPrompts.has(promptId) || tries > 180) { clearInterval(iv); return; }
+        await handlePromptDone(promptId);
+        if(handledPrompts.has(promptId)) clearInterval(iv);
+    }, 4000);
+}
+
+function processNextBatch() {
+    if(currentBatchIndex < totalBatchSize) {
+        setTimeout(() => CONFIG.startNextVariant(currentBatchIndex), 1000);
+    } else {
+        setRun("ok", "Batch finalizado");
+        log("🏁 Todas las variantes han sido procesadas.", "l-ok");
+        CONFIG.onBatchComplete();
+    }
+}
+
+// --- GESTIÓN DE PROMPTS (árbol de carpetas jerárquico con /) ---
+let selectedPromptKey = null;
+
+function loadPrompts(){
+  let saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  let dirty = false;
+  for(const key of Object.keys(saved)){
+    if(key.endsWith('/') || !key.split('/').pop()){
+      delete saved[key]; dirty = true;
+    }
+  }
+  if(dirty) localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+
+  const tree = $("promptTree");
+  tree.innerHTML = '';
+
+  if(Object.keys(saved).length === 0){
+    tree.innerHTML = '<div class="pt-empty">sin prompts guardados</div>';
+    return;
+  }
+
+  const root = { children: {}, prompts: [] };
+
+  for(const key of Object.keys(saved).sort()){
+    const parts = key.split('/');
+    const promptName = parts.pop();
+    let node = root;
+    for(const part of parts){
+      if(!node.children[part]) node.children[part] = { children: {}, prompts: [] };
+      node = node.children[part];
+    }
+    node.prompts.push({ key, name: promptName });
+  }
+
+  const openState = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY + '_open') || '{}');
+
+  function renderNode(node, container, path){
+    for(const folderName of Object.keys(node.children).sort()){
+      const folderPath = path ? `${path}/${folderName}` : folderName;
+      const folderDiv = document.createElement('div');
+      folderDiv.className = 'pt-folder';
+      if(openState[folderPath]) folderDiv.classList.add('open');
+
+      const label = document.createElement('div');
+      label.className = 'pt-folder-label';
+      const arrow = document.createElement('span');
+      arrow.className = 'pt-folder-arrow';
+      arrow.textContent = '▶';
+      label.appendChild(arrow);
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = folderName;
+      label.appendChild(nameSpan);
+      const delFolder = document.createElement('span');
+      delFolder.className = 'pt-folder-del';
+      delFolder.textContent = '×';
+      delFolder.title = 'Eliminar carpeta y todo su contenido';
+      label.appendChild(delFolder);
+
+      delFolder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
+        const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+        let count = 0;
+        for(const key of Object.keys(saved)){
+          if(key === folderPath || key.startsWith(folderPath + '/')){
+            delete saved[key]; count++;
+          }
+        }
+        localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+        loadPrompts();
+        log(`Carpeta "${folderPath}" eliminada (${count} prompt(s)).`, "l-ok");
+      });
+
+      label.addEventListener("click", (e) => {
+        if(e.target === delFolder) return;
+        folderDiv.classList.toggle("open");
+        openState[folderPath] = folderDiv.classList.contains("open");
+        localStorage.setItem(CONFIG.PROMPTS_KEY + '_open', JSON.stringify(openState));
+      });
+
+      const childrenDiv = document.createElement('div');
+      childrenDiv.className = 'pt-children';
+      renderNode(node.children[folderName], childrenDiv, folderPath);
+
+      folderDiv.appendChild(label);
+      folderDiv.appendChild(childrenDiv);
+      container.appendChild(folderDiv);
+    }
+    for(const p of node.prompts){
+      const item = document.createElement('div');
+      item.className = 'pt-item';
+      if(p.key === selectedPromptKey) item.classList.add('selected');
+      item.textContent = p.name;
+      item.title = p.key;
+      item.dataset.key = p.key;
+      item.addEventListener("click", () => {
+        const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+        if(saved[p.key]){
+          $("prompt").value = saved[p.key];
+          selectedPromptKey = p.key;
+          document.querySelectorAll(".pt-item").forEach(i => i.classList.remove("selected"));
+          item.classList.add("selected");
+        }
+      });
+      container.appendChild(item);
+    }
+  }
+
+  renderNode(root, tree, '');
+}
+
+function savePrompt(){
+  const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):");
   if(!name) return;
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
+  const text = $("prompt").value;
+  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
   if(saved[name]){
-    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
+    const preview = saved[name].slice(0, 80);
+    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
   }
   saved[name] = text;
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
   selectedPromptKey = name;
   loadPrompts();
-  log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+  log(`Prompt "${name}" guardado.`, "l-ok");
+}
+
+function movePrompt(){
+  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para mover.", "l-err"); return; }
+  const oldName = selectedPromptKey;
+  const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
+  if(!newName || newName === oldName) return;
+  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  if(saved[newName]){
+    if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
+  }
+  saved[newName] = saved[oldName];
+  delete saved[oldName];
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  selectedPromptKey = newName;
+  loadPrompts();
+  log(`Prompt movido: "${oldName}" → "${newName}"`, "l-ok");
+}
+
+function deletePrompt(){
+  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para eliminar.", "l-err"); return; }
+  if(!confirm(`¿Eliminar "${selectedPromptKey}"?`)) return;
+  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  delete saved[selectedPromptKey];
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  selectedPromptKey = null;
+  loadPrompts();
+  log(`Prompt eliminado.`, "l-ok");
+}
+
+$("btnSavePrompt").addEventListener("click", savePrompt);
+$("btnMovePrompt").addEventListener("click", movePrompt);
+$("btnDeletePrompt").addEventListener("click", deletePrompt);
+loadPrompts();
+
+// --- GESTIÓN DE LORAS CON MEMORIA ---
+function saveLoraState() { localStorage.setItem(CONFIG.LORA_STATE_KEY, JSON.stringify(loras)); }
+function loadLoraState() {
+  const saved = localStorage.getItem(CONFIG.LORA_STATE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 3) {
+        parsed.forEach((l, i) => {
+          if (AVAILABLE_LORAS.includes(l.lora) || l.lora === "") loras[i] = l;
+        });
+      }
+    } catch (e) { console.error("Error cargando estado LoRA", e); }
+  }
+}
+function loadModels(){
+  const sel = $("modelSelect");
+  if(!sel) return;
+  sel.innerHTML = "";
+  for(const m of AVAILABLE_MODELS){
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    if(m === CONFIG.DEFAULT_MODEL) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+function renderLoras(){
+  const wrap=$("loraList"); wrap.innerHTML="";
+  loras.forEach((l,i)=>{
+    const box=document.createElement("div");
+    box.className="lora"+(l.on?"":" off");
+    let optionsHtml = '<option value="">-- Ninguno --</option>';
+    AVAILABLE_LORAS.forEach(path => {
+      const selected = path === l.lora ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+    });
+    box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
+    <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
+    <div class="slider-row"><input type="range" min="0" max="2" step="0.05" value="${l.strength}" data-field="strength" data-i="${i}"><div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div></div>`;
+    wrap.appendChild(box);
+  });
+  wrap.querySelectorAll(".switch").forEach(sw=>sw.addEventListener("click",()=>{loras[+sw.dataset.i].on=!loras[+sw.dataset.i].on;renderLoras();saveLoraState();}));
+  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel=>sel.addEventListener("change",()=>{loras[+sel.dataset.i].lora=sel.value;saveLoraState();}));
+  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
+}
+loadLoraState(); renderLoras(); loadModels();
+
+// --- PROMPT ENHANCER (Ollama) — shared skeleton ---
+function loadSysPrompts(){
+  const saved = localStorage.getItem(CONFIG.ENHANCER_SYSKEY);
+  if(saved){
+    try { return JSON.parse(saved); } catch(e) {}
+  }
+  return JSON.parse(JSON.stringify(CONFIG.ENHANCER_DEFAULT_PROMPTS));
+}
+
+function saveSysPrompts(data){
+  localStorage.setItem(CONFIG.ENHANCER_SYSKEY, JSON.stringify(data));
+}
+
+function populateStyleSelect(data, mode){
+  const sel = $("enhancerStyle");
+  sel.innerHTML = "";
+  const styles = data[mode] || {};
+  for(const key of Object.keys(styles).sort()){
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = styles[key].name || key;
+    sel.appendChild(opt);
+  }
+}
+
+function getCurrentSysPrompt(data, mode, styleKey){
+  const styles = data[mode] || {};
+  const entry = styles[styleKey];
+  return entry ? entry.prompt : "";
+}
+
+function makeCollapsible(toggleId, bodyId, onOpen){
+  const h = $(toggleId), b = $(bodyId);
+  if(!h || !b) return;
+  h.addEventListener("click", () => {
+    h.classList.toggle("open");
+    b.classList.toggle("open");
+    const arrow = h.querySelector(".arrow");
+    if(arrow) arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+    if(h.classList.contains("open") && onOpen) onOpen();
+  });
+}
+
+async function loadEnhancerModels(){
+  const sel = $("enhancerModel");
+  try {
+    const r = await fetch("/api/tags");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    const models = data.models || [];
+    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
+    for(const m of models){
+      const opt = document.createElement("option");
+      opt.value = m.name;
+      opt.textContent = m.name;
+      sel.appendChild(opt);
+    }
+    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
+    if(defaultModel) sel.value = defaultModel.name;
+  } catch(e) {
+    sel.innerHTML = '<option value="">Ollama no disponible</option>';
+    console.warn("No se pudieron cargar modelos:", e.message);
+  }
+}
+
+// --- Enhancer shared listeners ---
+$("enhancerToggle").addEventListener("click", () => {
+  const h = $("enhancerToggle");
+  const b = $("enhancerBody");
+  h.classList.toggle("open");
+  b.classList.toggle("open");
+  const arrow = h.querySelector(".arrow");
+  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+});
+
+$("enhancerMode").addEventListener("change", () => {
+  const data = loadSysPrompts();
+  populateStyleSelect(data, $("enhancerMode").value);
 });
 
 $("btnUseAsPrompt").addEventListener("click", () => {
@@ -3236,7 +3135,23 @@ $("btnUseAsPrompt").addEventListener("click", () => {
   log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
 });
 
-// --- Editor de system prompts ---
+$("btnSaveEnhanced").addEventListener("click", () => {
+  const text = $("enhancerOutput").value.trim();
+  if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
+  const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):");
+  if(!name) return;
+  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  if(saved[name]){
+    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
+  }
+  saved[name] = text;
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  selectedPromptKey = name;
+  loadPrompts();
+  log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+});
+
+// --- Editor de system prompts (modal) ---
 let sysPromptEditData = null;
 let sysPromptEditMode = "text";
 
@@ -3250,7 +3165,7 @@ function renderSysPromptEditor(){
   container.innerHTML = "";
   for(const key of keys){
     const entry = styles[key];
-    const isDefault = (key === "A" || key === "B") && ENHANCER_DEFAULT_PROMPTS[mode] && ENHANCER_DEFAULT_PROMPTS[mode][key];
+    const isDefault = (key === "A" || key === "B") && CONFIG.ENHANCER_DEFAULT_PROMPTS[mode] && CONFIG.ENHANCER_DEFAULT_PROMPTS[mode][key];
     const row = document.createElement("div");
     row.className = "sysprompt-row";
     row.innerHTML = `
@@ -3263,7 +3178,6 @@ function renderSysPromptEditor(){
     `;
     container.appendChild(row);
   }
-  // Conectar botones de eliminar
   container.querySelectorAll(".spr-del").forEach(btn => {
     btn.addEventListener("click", () => {
       const key = btn.dataset.key;
@@ -3273,7 +3187,6 @@ function renderSysPromptEditor(){
   });
 }
 
-// --- MODAL: Editor de system prompts (crear ANTES de los listeners que lo usan) ---
 const sysPromptModal = document.createElement("div");
 sysPromptModal.className = "modal-overlay";
 sysPromptModal.id = "sysPromptModal";
@@ -3292,7 +3205,6 @@ sysPromptModal.innerHTML = '<div class="modal-content">' +
 '</div>';
 document.body.appendChild(sysPromptModal);
 
-// Listeners del modal
 $("btnAddSysPrompt").addEventListener("click", () => {
   const mode = sysPromptEditMode;
   if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
@@ -3324,7 +3236,6 @@ $("btnSaveSysPrompts").addEventListener("click", () => {
 $("btnCancelSysPrompts").addEventListener("click", () => {
   $("sysPromptModal").classList.remove("open");
 });
-// Tabs del modal
 document.querySelectorAll(".modal-tab").forEach(tab => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
@@ -3338,7 +3249,6 @@ $("btnEditSysPrompts").addEventListener("click", () => {
   sysPromptEditData = loadSysPrompts();
   sysPromptEditMode = "text";
   renderSysPromptEditor();
-  // Activar pestaña texto (el modal ya existe en el DOM)
   const tabs = document.querySelectorAll(".modal-tab");
   tabs.forEach(t => t.classList.remove("active"));
   const textTab = document.querySelector('.modal-tab[data-tab="text"]');
@@ -3346,7 +3256,9 @@ $("btnEditSysPrompts").addEventListener("click", () => {
   $("sysPromptModal").classList.add("open");
 });
 
-// Tabs del modal (se adjuntan después de crear el modal abajo)
+// Collapsibles shared
+makeCollapsible("promptLibToggle", "promptLibBody");
+makeCollapsible("loraToggle", "loraBody");
 
 // Inicializar enhancer
 (async () => {
@@ -3370,13 +3282,8 @@ async function stopCurrentVideo(){
   } catch(e) { /* si falla, igual limpiamos local */ }
   discardTimer(pid);
   delete pendingSeeds[pid];
-  delete promptSteps[pid];
   handledPrompts.add(pid);
-  // Si se cancela el paso 1 del completo, no continuar al paso 2
-  if(generationStep === 1){
-    generationStep = 0;
-    if(firstPromptId) handledPrompts.add(firstPromptId);
-  }
+  if(CONFIG.onStopCurrent) CONFIG.onStopCurrent(pid);
   log("⏹ Video actual detenido.", "l-err");
   currentBatchIndex++;
   processNextBatch();
@@ -3389,24 +3296,7 @@ async function stopAll(){
       body:JSON.stringify({action:"cancel_all"})
     });
   } catch(e) { /* si falla, igual limpiamos local */ }
-  // Marcar como "handled" todos los prompts pendientes antes de limpiarlos, así
-  // si el backend sigue ejecutando una generación cancelada y luego emite
-  // execution_success, handlePromptDone la descarta en lugar de mezclarla
-  // con la siguiente generación.
-  for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);
-  if(currentPromptId) handledPrompts.add(currentPromptId);
-  if(firstPromptId) handledPrompts.add(firstPromptId);
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
-  pendingSeeds = {};
-  promptSteps = {};
-  processingPrompts.clear();
-  currentPromptId = null;
-  firstPromptId = null;
-  generationStep = 0;
-  currentBatchIndex = totalBatchSize;
-  enableStopButtons(false);
-  $("btnFirstPass").disabled=false;
-  $("btnFull").disabled=false;
+  if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");
 }
@@ -3414,8 +3304,18 @@ async function stopAll(){
 $("btnStopVideo").addEventListener("click", stopCurrentVideo);
 $("btnStopAll").addEventListener("click", stopAll);
 
-$("btnFirstPass").addEventListener("click",()=>runGeneration(true));
-$("btnFull").addEventListener("click",()=>runGeneration(false));
-updateDuration();
+// --- TEST CONEXIÓN ---
+$("btnTest").addEventListener("click", async ()=>{
+    setConn("busy","comprobando...");
+    try{
+        const r=await fetch(server()+"/system_stats");
+        if(!r.ok) throw new Error("HTTP "+r.status);
+        await r.json();
+        setConn("ok","conectado");
+        connectSocket();
+        log("Conexión OK","l-ok");
+    }catch(err){setConn("bad","sin conexión");log("Error: "+err.message,"l-err");}
+});
 </script>
+</body>
 </html>

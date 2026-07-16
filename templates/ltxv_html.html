@@ -1,0 +1,91 @@
+  <div class="chain" id="chain">
+    <div class="node" data-n="img">imagen</div><div class="arrow">→</div><div class="node" data-n="cond">cond</div><div class="arrow">→</div>
+    <div class="node" data-n="p1">1er pase</div><div class="arrow">→</div><div class="node" data-n="up">upscale</div><div class="arrow">→</div>
+    <div class="node" data-n="p2">2º pase</div><div class="arrow">→</div><div class="node" data-n="out">final</div>
+  </div>
+  <div class="grid">
+    <div class="controls-col">
+      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="krea2RecentToggle">
+          <span class="arrow">▶</span> Imágenes Krea2 recientes
+        </div>
+        <div class="collapsible-body" id="krea2RecentBody">
+          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="gallery-grid" id="krea2RecentGrid"></div>
+        </div>
+      </div>
+
+      <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
+      <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
+      <div class="panel">
+        <div class="collapsible-header" id="loraToggle">
+          <span class="arrow">▶</span> LoRAs
+        </div>
+        <div class="collapsible-body" id="loraBody">
+          <div id="loraList"></div>
+        </div>
+      </div>
+      <div class="panel"><h2>Resolución & duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
+      <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
+      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
+      <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
+      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnFirstPass">Solo 1er pase</button><button id="btnFull" class="primary">Generar completo</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar video</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
+    </div>
+    <div class="results-col">
+      <!-- REPRODUCTOR 1ER PASE -->
+      <div class="vidbox">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <span class="video-badge" id="badge1"></span>
+        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="time1"></span>
+          <span class="res-tag" id="res1"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR FINAL -->
+      <div class="vidbox">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnSaveFrame2" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="empty2">sin generar</div>
+        <span class="video-badge" id="badge2"></span>
+        <video id="video2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="time2"></span>
+          <span class="res-tag" id="res2"></span>
+        </div>
+      </div>
+      
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+
+      <!-- HISTORIAL DE VÍDEOS -->
+      <div class="vidbox">
+        <div class="collapsible-header" id="videoHistoryToggle">
+          <span class="arrow">▶</span> Historial de Vídeos <button id="btnRefreshVideoHistory" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();">↻</button>
+        </div>
+        <div class="collapsible-body" id="videoHistoryBody">
+          <div class="hint" id="videoHistoryStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="variant-grid" id="videoHistoryGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>

@@ -5,148 +5,175 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Krea2 · Panel Pro</title>
 <style>
-  :root{--bg:#0a0c0e;--panel:#12161a;--panel-2:#171c21;--border:#242b31;--text:#e7ecef;--muted:#8b96a0;--muted-2:#5b6670;--accent:#57e8c9;--accent-dim:#2a4d47;--warn:#ffb454;--danger:#ff6a6a;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Roboto,sans-serif;}
-  *{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;}
-  .wrap{max-width:1400px;margin:0 auto;padding:22px 18px 60px;}
-  .head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
-  .head h1{font-family:var(--mono);font-size:15px;letter-spacing:.12em;text-transform:uppercase;margin:0;color:var(--text);font-weight:600;}
-  .head h1 span{color:var(--accent);}.head .sub{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.04em;}
-  .grid{display:grid;grid-template-columns:1fr 1.2fr;gap:20px;}@media(max-width:1000px){.grid{grid-template-columns:1fr;}}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 16px 18px;margin-bottom:16px;}
-  .panel h2{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:8px;}
-  .panel h2::before{content:"";width:5px;height:5px;background:var(--accent);border-radius:1px;display:inline-block;}
-  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
-  .row{margin-bottom:14px;}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  input[type=text],input[type=number],textarea,select{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;}
-  select{cursor:pointer; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b96a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat:no-repeat; background-position:right 8px center; background-size:14px;}
-  input[type=number]{font-family:var(--mono);}input:focus,textarea:focus,select:focus{border-color:var(--accent);}
-  textarea{resize:vertical;min-height:92px;line-height:1.5;}
-  .seed-toggle{display:flex;gap:8px;margin-bottom:8px;}
-  .seg{flex:1;text-align:center;padding:7px 0;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:var(--muted);background:var(--panel-2);user-select:none;}
-  .seg.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
-  .slider-row{display:flex;align-items:center;gap:10px;}
-  input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;}
-  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--accent);}
-  .slider-val{font-family:var(--mono);font-size:12px;color:var(--accent);width:52px;text-align:right;flex-shrink:0;}
-  .lora{border:1px solid var(--border);border-radius:6px;padding:10px 11px;margin-bottom:8px;background:var(--panel-2);}
-  .lora.off{opacity:.5;}
-  .lora-top{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
-  .switch{width:30px;height:17px;background:var(--border);border-radius:20px;position:relative;cursor:pointer;flex-shrink:0;transition:background .15s;}
-  .switch.on{background:var(--accent-dim);border:1px solid var(--accent);}
-  .switch i{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted-2);transition:left .15s,background .15s;}
-  .switch.on i{left:15px;background:var(--accent);}
-  .btn-row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
-  button{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);padding:11px 16px;cursor:pointer;transition:all .15s;flex:1;min-width:150px;}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#08110f;font-weight:700;}
-  button.danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700;}
-  button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allowed;}
-  .statusbar{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:10px 2px 0;min-height:16px;}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);flex-shrink:0;}
-  .dot.ok{background:var(--accent);box-shadow:0 0 6px var(--accent);}.dot.bad{background:var(--danger);}.dot.busy{background:var(--warn);animation:pulse 1s infinite;}
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
-  .server-row{display:flex;gap:8px;}.server-row input{flex:1;}
-  .results-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;}
-  .imgbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;}
-  .img-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-  .img-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
-  .img-header-actions{display:flex;gap:4px;}
-  .img-header-actions button{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);padding:4px 8px;cursor:pointer;min-width:auto;flex:none;transition:all .15s;}
-  .img-header-actions button:hover{color:var(--text);border-color:var(--accent);}
-  .img-wrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:#000;min-height:120px;max-height:45vh;display:flex;align-items:center;justify-content:center;}
-  .img-wrap:active{cursor:grabbing;}
-  .img-wrap img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;}
-  .img-wrap:fullscreen, .img-wrap:-webkit-full-screen{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;background:#000;border-radius:0;display:flex;align-items:center;justify-content:center;padding:0;margin:0;z-index:99999;}
-  .img-wrap:fullscreen img, .img-wrap:-webkit-full-screen img{max-width:100vw!important;max-height:100vh!important;width:auto!important;height:auto!important;object-fit:contain!important;display:block;}
-  #refDropzone{min-height:80px;}
-  #refWrap{background:var(--panel-2);border:1px solid var(--border);border-radius:5px;min-height:120px;max-height:45vh;display:flex;align-items:center;justify-content:center;}
-  .img-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;min-height:24px;}
-  .time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
-  .time-tag.live{color:var(--warn);}
-  .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:1;max-height:45vh;object-fit:contain;}
-  .empty{height:120px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
-  .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
-  .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
-  .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
-  .gallery-item{border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:pointer;position:relative;background:var(--panel-2);}
-  .gallery-item img{width:100%;height:auto;display:block;transition:transform .2s;}
-  .gallery-item:hover img{transform:scale(1.04);}
-  .gallery-item.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim);}
-  .gallery-item .info-tag{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;background:linear-gradient(transparent, rgba(0,0,0,.88));font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:.02em;pointer-events:none;}
-  .gallery-item .del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s, background .15s;z-index:2;}
-  .gallery-item:hover .del-btn{opacity:1;}
-  .gallery-item .del-btn:hover{background:var(--danger);border-color:var(--danger);}
-  .gallery-item .lq-badge{position:absolute;top:4px;left:4px;background:rgba(255,180,84,.9);color:#1a1200;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;z-index:2;letter-spacing:.03em;}
-  .panel-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
-  .panel-head-row h2{margin:0;}
-  .btn-mini{padding:5px 9px;font-size:10px;min-width:auto;flex:none;}
-  .prompt-actions{display:flex;gap:8px;margin-top:8px;}
-  .prompt-actions button{padding:6px 10px;font-size:10px;min-width:auto;}
-  .prompt-tree{max-height:260px;overflow-y:auto;font-size:12px;user-select:none;}
-  .pt-folder{margin-left:14px;}
-  .pt-folder-label{cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:10.5px;padding:2px 0;display:flex;align-items:center;gap:4px;}
-  .pt-folder-label:hover{color:var(--text);}
-  .pt-folder-del{margin-left:auto;opacity:0;cursor:pointer;color:var(--danger);font-size:14px;line-height:1;padding:0 2px;border-radius:3px;}
-  .pt-folder-label:hover .pt-folder-del{opacity:1;}
-  .pt-folder-del:hover{background:rgba(255,106,106,.15);}
-  .pt-folder-arrow{font-size:9px;width:10px;display:inline-block;transition:transform .15s;}
-  .pt-folder.open > .pt-folder-arrow{transform:rotate(90deg);}
-  .pt-children{display:none;margin-left:12px;border-left:1px solid var(--border);padding-left:4px;}
-  .pt-folder.open > .pt-children{display:block;}
-  .pt-item{cursor:pointer;padding:3px 6px;border-radius:4px;color:var(--text);font-size:12px;}
-  .pt-item:hover{background:var(--panel-2);}
-  .pt-item.selected{background:var(--accent-dim);color:var(--accent);}
-  .pt-empty{color:var(--muted-2);font-size:10px;padding:6px 0;}
-  .variant-gallery{margin-top:20px;}
-  .variant-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(200px,1fr));gap:12px;}
-  .variant-card{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
-  .variant-card img{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;display:block;}
-  .variant-info{padding:8px;font-size:11px;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between;align-items:center;gap:6px;}
-  .variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
-  .variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
-  .variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
-  .variant-seed-display{color:var(--accent);cursor:pointer;user-select:text;display:flex;align-items:center;gap:6px;}
-  .variant-seed-display:hover{color:#fff;}
-  .copy-icon{font-size:12px;opacity:.7;transition:opacity .2s;}
-  .variant-seed-display:hover .copy-icon{opacity:1;}
-  .collapsible-header{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:4px 0;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
-  .collapsible-header:hover{color:var(--text);}
-  .collapsible-header .arrow{font-size:9px;transition:transform .2s;}
-  .collapsible-header.open .arrow{transform:rotate(90deg);}
-  .collapsible-body{overflow:hidden;max-height:0;transition:max-height .3s ease;}
-  .collapsible-body.open{max-height:800px;}
-  .enhancer-row{margin-bottom:10px;}
-  .enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
-  .enhancer-row select{width:100%;}
-  .enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
-  .enhancer-output:focus{border-color:var(--accent);}
-  .enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
-  .enhancer-actions button{flex:1;min-width:120px;}
-  .modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;}
-  .modal-overlay.open{display:flex;}
-  .modal-content{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;}
-  .modal-content h2{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;}
-  .modal-tabs{display:flex;gap:4px;margin-bottom:14px;}
-  .modal-tab{padding:6px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--panel-2);}
-  .modal-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
-  .sysprompt-row{border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:8px;background:var(--panel-2);}
-  .sysprompt-row .spr-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
-  .sysprompt-row .spr-name{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);}
-  .sysprompt-row .spr-del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;min-width:auto;flex:0;}
-  .sysprompt-row .spr-del:hover{background:var(--danger);color:#fff;}
-  .sysprompt-row textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-family:var(--sans);font-size:12px;outline:none;resize:vertical;min-height:50px;line-height:1.4;}
-  .sysprompt-row textarea:focus{border-color:var(--accent);}
-  .modal-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;}
-  .modal-actions button{min-width:100px;flex:0;}
-  @keyframes seedFlash{0%{background-color:var(--panel-2);border-color:var(--border);}50%{background-color:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 10px var(--accent);}100%{background-color:var(--panel-2);border-color:var(--border);}}
-  .seed-updated{animation:seedFlash 1.5s ease-out;}
-  .dropzone{border:1.5px dashed var(--border);border-radius:7px;padding:10px;background:var(--panel-2);transition:border-color .15s,background .15s;}
-  .dropzone.drag{border-color:var(--accent);background:var(--accent-dim);}
-  .dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
-  .dropzone input{display:none;}
-  .ref-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .enhancer-caption-row{margin-top:8px;}
-  .enhancer-caption-row button{flex:1;min-width:120px;}
+/* ============================================================
+   base.css — CSS compartido entre LTXV y Krea2
+   Extraído de generar_ltxv.py y generar_krea2.py
+   ============================================================ */
+
+:root{--bg:#0a0c0e;--panel:#12161a;--panel-2:#171c21;--border:#242b31;--text:#e7ecef;--muted:#8b96a0;--muted-2:#5b6670;--accent:#57e8c9;--accent-dim:#2a4d47;--warn:#ffb454;--danger:#ff6a6a;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Roboto,sans-serif;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;}
+.wrap{max-width:1400px;margin:0 auto;padding:22px 18px 60px;}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+.head h1{font-family:var(--mono);font-size:15px;letter-spacing:.12em;text-transform:uppercase;margin:0;color:var(--text);font-weight:600;}
+.head h1 span{color:var(--accent);}.head .sub{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.04em;}
+.grid{display:grid;grid-template-columns:1fr 1.2fr;gap:20px;}@media(max-width:1000px){.grid{grid-template-columns:1fr;}}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 16px 18px;margin-bottom:16px;}
+.panel h2{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+.panel h2::before{content:"";width:5px;height:5px;background:var(--accent);border-radius:1px;display:inline-block;}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.row{margin-bottom:14px;}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+input[type=text],input[type=number],textarea,select{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;}
+select{cursor:pointer; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b96a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat:no-repeat; background-position:right 8px center; background-size:14px;}
+input[type=number]{font-family:var(--mono);}input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+textarea{resize:vertical;min-height:92px;line-height:1.5;}
+.seed-toggle{display:flex;gap:8px;margin-bottom:8px;}
+.seg{flex:1;text-align:center;padding:7px 0;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:var(--muted);background:var(--panel-2);user-select:none;}
+.seg.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.slider-row{display:flex;align-items:center;gap:10px;}
+input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--accent);}
+.slider-val{font-family:var(--mono);font-size:12px;color:var(--accent);width:52px;text-align:right;flex-shrink:0;}
+.lora{border:1px solid var(--border);border-radius:6px;padding:10px 11px;margin-bottom:8px;background:var(--panel-2);}
+.lora.off{opacity:.5;}
+.lora-top{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
+.switch{width:30px;height:17px;background:var(--border);border-radius:20px;position:relative;cursor:pointer;flex-shrink:0;transition:background .15s;}
+.switch.on{background:var(--accent-dim);border:1px solid var(--accent);}
+.switch i{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted-2);transition:left .15s,background .15s;}
+.switch.on i{left:15px;background:var(--accent);}
+.btn-row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
+button{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);padding:11px 16px;cursor:pointer;transition:all .15s;flex:1;min-width:150px;}
+button.primary{background:var(--accent);border-color:var(--accent);color:#08110f;font-weight:700;}
+button.danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700;}
+button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allowed;}
+.statusbar{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:10px 2px 0;min-height:16px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);flex-shrink:0;}
+.dot.ok{background:var(--accent);box-shadow:0 0 6px var(--accent);}.dot.bad{background:var(--danger);}.dot.busy{background:var(--warn);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.server-row{display:flex;gap:8px;}.server-row input{flex:1;}
+.results-col{display:flex;flex-direction:column;gap:16px;position:sticky;top:20px;}
+.time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
+.time-tag.live{color:var(--warn);}
+.variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);margin-right:6px;letter-spacing:.04em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.empty{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+.log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
+.hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
+.gallery-item{border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:pointer;position:relative;background:var(--panel-2);}
+.gallery-item img{width:100%;height:auto;display:block;transition:transform .2s;}
+.gallery-item:hover img{transform:scale(1.04);}
+.gallery-item.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim);}
+.gallery-item .info-tag{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;background:linear-gradient(transparent, rgba(0,0,0,.88));font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:.02em;pointer-events:none;}
+.gallery-item .del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s, background .15s;z-index:2;}
+.gallery-item:hover .del-btn{opacity:1;}
+.gallery-item .del-btn:hover{background:var(--danger);border-color:var(--danger);}
+.gallery-item .lq-badge{position:absolute;top:4px;left:4px;background:rgba(255,180,84,.9);color:#1a1200;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;z-index:2;letter-spacing:.03em;}
+.panel-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.panel-head-row h2{margin:0;}
+.btn-mini{padding:5px 9px;font-size:10px;min-width:auto;flex:none;}
+.prompt-actions{display:flex;gap:8px;margin-top:8px;}
+.prompt-actions button{padding:6px 10px;font-size:10px;min-width:auto;}
+.prompt-tree{max-height:260px;overflow-y:auto;font-size:12px;user-select:none;}
+.pt-folder{margin-left:14px;}
+.pt-folder-label{cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:10.5px;padding:2px 0;display:flex;align-items:center;gap:4px;}
+.pt-folder-label:hover{color:var(--text);}
+.pt-folder-del{margin-left:auto;opacity:0;cursor:pointer;color:var(--danger);font-size:14px;line-height:1;padding:0 2px;border-radius:3px;}
+.pt-folder-label:hover .pt-folder-del{opacity:1;}
+.pt-folder-del:hover{background:rgba(255,106,106,.15);}
+.pt-folder-arrow{font-size:9px;width:10px;display:inline-block;transition:transform .15s;}
+.pt-folder.open > .pt-folder-arrow{transform:rotate(90deg);}
+.pt-children{display:none;margin-left:12px;border-left:1px solid var(--border);padding-left:4px;}
+.pt-folder.open > .pt-children{display:block;}
+.pt-item{cursor:pointer;padding:3px 6px;border-radius:4px;color:var(--text);font-size:12px;}
+.pt-item:hover{background:var(--panel-2);}
+.pt-item.selected{background:var(--accent-dim);color:var(--accent);}
+.pt-empty{color:var(--muted-2);font-size:10px;padding:6px 0;}
+.variant-gallery{margin-top:20px;}
+.variant-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(200px,1fr));gap:12px;}
+.variant-card{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.variant-info{padding:8px;font-size:11px;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between;align-items:center;gap:6px;}
+.variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
+.variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
+.variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
+.variant-seed-display{color:var(--accent);cursor:pointer;user-select:text;display:flex;align-items:center;gap:6px;}
+.variant-seed-display:hover{color:#fff;}
+.copy-icon{font-size:12px;opacity:.7;transition:opacity .2s;}
+.variant-seed-display:hover .copy-icon{opacity:1;}
+.collapsible-header{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:4px 0;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.collapsible-header:hover{color:var(--text);}
+.collapsible-header .arrow{font-size:9px;transition:transform .2s;}
+.collapsible-header.open .arrow{transform:rotate(90deg);}
+.collapsible-body{overflow:hidden;max-height:0;transition:max-height .3s ease;}
+.collapsible-body.open{max-height:800px;}
+.enhancer-row{margin-bottom:10px;}
+.enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
+.enhancer-row select{width:100%;}
+.enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
+.enhancer-output:focus{border-color:var(--accent);}
+.enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+.enhancer-actions button{flex:1;min-width:120px;}
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-content{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;}
+.modal-content h2{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;}
+.modal-tabs{display:flex;gap:4px;margin-bottom:14px;}
+.modal-tab{padding:6px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--panel-2);}
+.modal-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.sysprompt-row{border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:8px;background:var(--panel-2);}
+.sysprompt-row .spr-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.sysprompt-row .spr-name{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);}
+.sysprompt-row .spr-del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;min-width:auto;flex:0;}
+.sysprompt-row .spr-del:hover{background:var(--danger);color:#fff;}
+.sysprompt-row textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-family:var(--sans);font-size:12px;outline:none;resize:vertical;min-height:50px;line-height:1.4;}
+.sysprompt-row textarea:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;}
+.modal-actions button{min-width:100px;flex:0;}
+@keyframes seedFlash{0%{background-color:var(--panel-2);border-color:var(--border);}50%{background-color:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 10px var(--accent);}100%{background-color:var(--panel-2);border-color:var(--border);}}
+.seed-updated{animation:seedFlash 1.5s ease-out;}
+/* ============================================================
+   krea2.css — CSS específico de Krea2 (generar_krea2.py)
+   ============================================================ */
+
+/* Estructura imgbox (contenedor de imagen, en vez de vidbox) */
+.imgbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;}
+.img-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.img-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
+.img-header-actions{display:flex;gap:4px;}
+.img-header-actions button{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);padding:4px 8px;cursor:pointer;min-width:auto;flex:none;transition:all .15s;}
+.img-header-actions button:hover{color:var(--text);border-color:var(--accent);}
+
+/* img-wrap (visor de imagen con zoom/pan) */
+.img-wrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:#000;min-height:120px;max-height:45vh;display:flex;align-items:center;justify-content:center;}
+.img-wrap:active{cursor:grabbing;}
+.img-wrap img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;}
+.img-wrap:fullscreen, .img-wrap:-webkit-full-screen{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;background:#000;border-radius:0;display:flex;align-items:center;justify-content:center;padding:0;margin:0;z-index:99999;}
+.img-wrap:fullscreen img, .img-wrap:-webkit-full-screen img{max-width:100vw!important;max-height:100vh!important;width:auto!important;height:auto!important;object-fit:contain!important;display:block;}
+
+/* Dropzone de referencia (#refDropzone) y wrap de referencia */
+#refDropzone{min-height:80px;}
+#refWrap{background:var(--panel-2);border:1px solid var(--border);border-radius:5px;min-height:120px;max-height:45vh;display:flex;align-items:center;justify-content:center;}
+
+/* Empty Krea2 (altura 120) */
+.empty{height:120px;}
+
+/* Footer de imagen (tiempo, info, descarga) */
+.img-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;min-height:24px;}
+
+/* Imagen de salida principal */
+img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:1;max-height:45vh;object-fit:contain;}
+
+/* Variantes Krea2 (imagen, en vez de vídeo) */
+.variant-card img{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;display:block;}
+
+/* Dropzone Krea2 (redefinida sin cursor/text-align/position:relative) */
+.dropzone{border:1.5px dashed var(--border);border-radius:7px;padding:10px;background:var(--panel-2);transition:border-color .15s,background .15s;}
+.dropzone.drag{border-color:var(--accent);background:var(--accent-dim);}
+.dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
+.dropzone input{display:none;}
+
+/* Acciones de la imagen de referencia */
+.ref-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.enhancer-caption-row{margin-top:8px;}
+.enhancer-caption-row button{flex:1;min-width:120px;}
 </style>
 </head>
 <body>
@@ -154,53 +181,6 @@
   <div class="head"><h1>Krea2 <span>//</span> panel pro</h1><div class="sub">grafo: Krea2_OK</div></div>
   <div class="grid">
     <div class="controls-col">
-      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
-
-      <div class="panel">
-        <div class="collapsible-header" id="promptLibToggle">
-          <span class="arrow">▶</span> Biblioteca de Prompts
-        </div>
-        <div class="collapsible-body" id="promptLibBody">
-          <div id="promptTree" class="prompt-tree"></div>
-          <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnMovePrompt" class="ghost">Mover</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
-          <div class="hint" style="font-size:10px;margin-top:4px;">Usa <code style="color:var(--accent)">/</code> para clasificar: <code>casa/pasillo/noche</code> (los dos primeros son carpetas)</div>
-        </div>
-      </div>
-
-      <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
-
-      <!-- ENHANCER PANEL -->
-      <div class="panel">
-        <div class="collapsible-header" id="enhancerToggle">
-          <span class="arrow">▶</span> MEJORAR PROMPT CON IA / CAPTION
-        </div>
-        <div class="collapsible-body" id="enhancerBody">
-          <div class="enhancer-row">
-            <label>Modelo</label>
-            <select id="enhancerModel"><option value="">Cargando modelos...</option></select>
-          </div>
-          <div class="enhancer-row">
-            <label>Modo</label>
-            <select id="enhancerMode"><option value="text">Texto</option><option value="vision">Visión</option></select>
-          </div>
-          <div class="enhancer-row">
-            <label>Estilo</label>
-            <select id="enhancerStyle"></select>
-          </div>
-          <div class="enhancer-row">
-            <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
-          </div>
-          <div class="enhancer-row">
-            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado aparecerá aquí..."></textarea>
-          </div>
-          <div class="enhancer-actions">
-            <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
-            <button id="btnSaveEnhanced">Guardar en biblioteca</button>
-            <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
-          </div>
-        </div>
-      </div>
-
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
 
       <div class="panel"><h2>Resolución</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.1" max="4.0" step="0.1" value="1.0"><div class="slider-val" id="mpVal">1.00</div></div><div class="row"><label>Aspect Ratio</label><select id="aspectRatio"><option value="1:1 (Square)">1:1 (Square)</option><option value="2:3 (Portrait Photo)">2:3 (Portrait Photo)</option><option value="3:2 (Photo)">3:2 (Photo)</option><option value="3:4 (Portrait Standard)">3:4 (Portrait Standard)</option><option value="4:3 (Standard)">4:3 (Standard)</option><option value="9:16 (Portrait Widescreen)">9:16 (Portrait Widescreen)</option><option value="16:9 (Widescreen)" selected>16:9 (Widescreen)</option><option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option></select></div></div>
@@ -302,7 +282,6 @@
     </div>
   </div>
 </div>
-
 <script>
 const BASE_GRAPH = {
   "1": {
@@ -601,224 +580,78 @@ const BASE_GRAPH = {
 };
 const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-int4_convrot.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b-nvfp4.safetensors", "flux-2-klein-9b.safetensors", "krea2_raw_int8_convrot.safetensors", "krea2_turbo_convrot_int4_fast.safetensors", "krea2_turbo_fp8_scaled.safetensors", "krea2_turbo_int4_tensorwise_mixed.safetensors"];
 const AVAILABLE_LORAS = ["KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "anal_helper_krea2_loraholic.safetensors", "fedor_bypass.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "z0jglf.safetensors"];
+// krea2.js — Krea2-specific JavaScript.
+// Injected AFTER common.js. Sets CONFIG BEFORE common.js runs.
 
-const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"39",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"};
-const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
-let socket = null;
-let currentBatchIndex = 0;
-let totalBatchSize = 0;
-let variantCounter = 0;  // contador global de variantes en la sesión (no se resetea entre batches)
-let pendingSeeds = {};
-let handledPrompts = new Set();
-let processingPrompts = new Set();
-let batchSeedMode = "random";
-let currentPromptId = null;
-let timers = {};
-let loras = [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}];
+const CONFIG = {
+  PROMPTS_KEY: 'krea2_prompts',
+  LORA_STATE_KEY: 'krea2_loras_state',
+  ENHANCER_SYSKEY: 'krea2_enhancer_sysprompts',
+  SERVERURL_KEY: 'krea2_serverUrl',
+  DEFAULT_BACKEND_PORT: "7821",
+  UI_TYPE: "krea2",
+  DEFAULT_MODEL: "krea2_turbo_convrot_int4_fast.safetensors",
+  N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"39",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
+  loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
+  ENHANCER_DEFAULT_PROMPTS: {
+    text: {
+      A: { name: "Estilo A (photorealistic)", prompt: "You are an expert in prompts for Krea2/Flux2 image generation. Transform the user's idea into a detailed photorealistic prompt. Include: subject, lighting, colors, texture, composition, and atmosphere. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
+      B: { name: "Estilo B (artistic)", prompt: "You are a creative assistant specialized in artistic image prompts. Take the user's idea and turn it into an evocative, artistic prompt. Use descriptive, poetic language. Focus on style, mood, and visual impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+    },
+    vision: {
+      A: { name: "Estilo A (descriptive)", prompt: "You are an expert at describing images for image generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, and style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      B: { name: "Estilo B (stylized)", prompt: "You are a digital artist. Look at the image and turn it into a stylized artistic description. Focus on the artistic style, color palette, and emotional impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      C: { name: "Estilo C (literal caption)", prompt: "You are an image captioning specialist. Describe the provided image factually and concisely in 1-3 sentences. No artistic interpretation, no camera instructions, no stylistic flourishes. Just what is visible: main subjects, setting, lighting, and notable details. The user may write in any language; you must ALWAYS respond in English with ONLY the caption, no explanations or preambles." },
+    },
+  },
+};
 
-function fmtMs(ms){
-  const s = Math.floor(ms / 1000);
-  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
-}
+const N = CONFIG.N;
+let currentOutputMedia = null;
+let currentRefVariantIndex = -1;
 
-function startTimer(promptId, slot){
-  if(timers[promptId]) return;
-  const t = { start: Date.now(), iv: null };
-  const el = $("time"+slot);
-  t.iv = setInterval(() => {
-    if(!timers[promptId]) return;
-    const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
-    el.textContent = live;
-    el.classList.add("live");
-  }, 500);
-  timers[promptId] = t;
-}
-
-function stopTimer(promptId){
-  const t = timers[promptId];
-  if(!t) return null;
-  const total = Date.now() - t.start;
-  if(t.iv){ clearInterval(t.iv); t.iv = null; }
-  delete timers[promptId];
-  return { total, text: `⏱ ${fmtMs(total)}` };
-}
-
-function discardTimer(promptId){
-  const t = timers[promptId];
-  if(!t) return;
-  if(t.iv) clearInterval(t.iv);
-  delete timers[promptId];
-}
-
-function extractTimings(entry, N){
-  if(!entry || !entry.status) return null;
-  const msgs = entry.status.messages || [];
-  if(!Array.isArray(msgs) || msgs.length === 0) return null;
-  let tStart = null, tSuccess = null;
-  const nodeTimes = {};
-  for(const m of msgs){
-    if(!Array.isArray(m) || m.length < 2) continue;
-    const type = m[0];
-    const data = m[1] || {};
-    if(type === "execution_start" && data.timestamp != null) tStart = data.timestamp;
-    else if(type === "execution_success" && data.timestamp != null) tSuccess = data.timestamp;
-    else if(type === "executing" && data.node != null && data.timestamp != null){
-      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
-      if(nodeTimes[data.node].start == null) nodeTimes[data.node].start = data.timestamp;
-    } else if(type === "executed" && data.node != null && data.timestamp != null){
-      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
-      nodeTimes[data.node].end = data.timestamp;
-    }
-  }
-  const total = (tStart != null && tSuccess != null) ? (tSuccess - tStart) : null;
-  const t1 = nodeTimes[N.PREVIEW] && nodeTimes[N.PREVIEW].start != null && nodeTimes[N.PREVIEW].end != null
-             ? (nodeTimes[N.PREVIEW].end - nodeTimes[N.PREVIEW].start) : null;
-  const t2 = nodeTimes[N.VAE_DECODE] && nodeTimes[N.VAE_DECODE].start != null && nodeTimes[N.VAE_DECODE].end != null
-             ? (nodeTimes[N.VAE_DECODE].end - nodeTimes[N.VAE_DECODE].start) : null;
-  if(total == null && t1 == null && t2 == null) return null;
-  return { t1, t2, total };
-}
-
-function randomSeed(){
-  return Math.floor(Math.random() * 0xFFFFFFFF);
-}
-
-// --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
-const DEFAULT_BACKEND_PORT = "7821";
-const LEGACY_PORTS = ["7822"];
-const $ = (id) => document.getElementById(id);
-function updateServerHint(){
-  const hint = $("serverHint");
-  if(!hint) return;
-  const v = ($("serverUrl")?.value || "").trim();
-  if(v){
-    hint.textContent = `URL efectiva: ${v}`;
-  } else {
-    const host = (window.location.hostname || "").trim();
-    if(host && !/^(127\.|localhost$|::1$)/i.test(host)){
-      hint.textContent = "proxy activo (same-origin)";
-    } else {
-      hint.textContent = "";
-    }
-  }
-}
-(function autoPickServerUrl(){
-  try {
-    const input = $("serverUrl");
-    if(!input) return;
-    const stored = localStorage.getItem("krea2_serverUrl");
-    if(stored){
-      const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
-      if(storedPort && LEGACY_PORTS.includes(storedPort)){
-        localStorage.removeItem("krea2_serverUrl");
-      } else {
-        input.value = stored;
-        updateServerHint();
-        return;
-      }
-    }
-    updateServerHint();
-  } catch(e) {}
-})();
-$("serverUrl").addEventListener("change", (e) => {
-  try { localStorage.setItem("krea2_serverUrl", e.target.value.trim()); } catch(_){}
-  updateServerHint();
-});
-$("serverUrl").addEventListener("input", updateServerHint);
-
-function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
-function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
-function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
-function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
-
-// --- WEBSOCKET SETUP ---
-function connectSocket() {
-    if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
-    const url = server().replace('http', 'ws') + '/ws?clientId=' + CLIENT_ID;
-    socket = new WebSocket(url);
-    socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
-    socket.onmessage = (event) => {
-        let msg;
-        try { msg = JSON.parse(event.data); } catch(e) {
-            console.warn("WS mensaje no-JSON, cerrando:", event.data.slice(0,80));
-            socket.close();
-            return;
-        }
-        if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
-        if(msg.type === 'execution_error') {
-            const pid = msg.data && msg.data.prompt_id;
-            log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
-            if(pid){ handledPrompts.add(pid); delete pendingSeeds[pid]; discardTimer(pid); }
-            currentBatchIndex++;
-            processNextBatch();
-        }
-    };
-    socket.onerror = (err) => console.error("WS Error", err);
-}
-
-// --- HANDLE PROMPT DONE ---
-async function handlePromptDone(promptId) {
-    if(handledPrompts.has(promptId)) return;
-    if(processingPrompts.has(promptId)) return;
-    processingPrompts.add(promptId);
-    let entry;
-    try {
-        const hr = await fetch(server()+"/history/"+promptId);
-        if(!hr.ok) { processingPrompts.delete(promptId); return; }
-        const hist = await hr.json();
-        entry = hist[promptId];
-    } catch(e) { processingPrompts.delete(promptId); return; }
-    if(!entry || !entry.outputs) { processingPrompts.delete(promptId); return; }
-
-    handledPrompts.add(promptId);
-    processingPrompts.delete(promptId);
-
-    const realSeed = (promptId in pendingSeeds) ? pendingSeeds[promptId] : null;
-    if(realSeed !== null) {
-        log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
-    }
-
-    const timings = extractTimings(entry, N);
-    let clientResult = stopTimer(promptId);
-    const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
-                   (clientResult ? fmtMs(clientResult.total) : null);
-    const timeText = tTotal || "";
-
-    // Mostrar imagen final (prioridad: SaveImage para persistencia > PreviewImage > VAE_DECODE)
-    const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
-    if(outNode) {
-        const media = findMedia(outNode);
-        showImage(media);
-    }
-
-    // Añadir a galería de variantes
-    const media = outNode ? findMedia(outNode) : null;
-    addToVariantGallery(media, realSeed, timeText);
-
-    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
-    delete pendingSeeds[promptId];
-    variantCounter++;
-    currentBatchIndex++;
-    processNextBatch();
-}
-
-function pollFallback(promptId) {
-    let tries = 0;
-    const iv = setInterval(async () => {
-        tries++;
-        if(handledPrompts.has(promptId) || tries > 180) { clearInterval(iv); return; }
-        await handlePromptDone(promptId);
-        if(handledPrompts.has(promptId)) clearInterval(iv);
-    }, 4000);
-}
-
-function findMedia(nodeOutput){
+// --- CALLBACKS FOR common.js ---
+CONFIG.findMedia = function(nodeOutput){
   for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
   return null;
-}
+};
+CONFIG.showMedia = function(slot, media, options){ showImage(media); };
+CONFIG.addToVariantGallery = addToVariantGallery;
+CONFIG.onSeedUpdate = function(realSeed){ /* Krea2 logs only; no seed UI toggle */ };
+CONFIG.onPromptError = function(pid){};
+CONFIG.startNextVariant = function(index){ runSingleGeneration(index); };
+CONFIG.onBatchComplete = function(){
+  $("btnGenerate").disabled=false;
+  enableStopButtons(false);
+};
+CONFIG.onStopCurrent = function(pid){};
+CONFIG.onStopAll = function(){
+  pendingSeeds = {};
+  handledPrompts.clear();
+  processingPrompts.clear();
+  currentPromptId = null;
+  currentBatchIndex = totalBatchSize;
+  enableStopButtons(false);
+  $("btnGenerate").disabled=false;
+};
 
-let currentOutputMedia = null;
+// --- Krea2 displayResult callback ---
+CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
+  const timeText = tTotal || "";
+  const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
+  if(outNode) {
+    const media = CONFIG.findMedia(outNode);
+    showImage(media);
+    addToVariantGallery(media, realSeed, timeText);
+  }
+  delete pendingSeeds[promptId];
+  variantCounter++;
+  currentBatchIndex++;
+  // Common finalize skipped here because we already advanced; return true.
+  return true;
+};
 
+// --- SHOW IMAGE ---
 function showImage(media){
   if(!media) return;
   currentOutputMedia = media;
@@ -838,7 +671,6 @@ function showImage(media){
 }
 
 // --- ZOOM / PAN / FULLSCREEN ---
-// Calcula el rectángulo visible de la imagen dentro de su elemento (object-fit:contain / flex center)
 function getImageVisibleRect(img){
   const rect = img.getBoundingClientRect();
   const natW = img.naturalWidth || rect.width;
@@ -884,7 +716,6 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
     if(!img || img.style.display === "none") return;
     e.preventDefault();
     const visRect = getImageVisibleRect(img);
-    // Solo hacer zoom si el cursor está sobre la imagen visible
     if(e.clientX < visRect.left || e.clientX > visRect.right || e.clientY < visRect.top || e.clientY > visRect.bottom) return;
     const mx = e.clientX - visRect.left;
     const my = e.clientY - visRect.top;
@@ -894,8 +725,6 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
     zoomLevel *= (e.deltaY < 0) ? 1.12 : 0.88;
     zoomLevel = Math.max(1, Math.min(20, zoomLevel));
     const ratio = zoomLevel / old;
-    // Con transform-origin:center, el punto bajo el cursor se mantiene fijo:
-    // pan += (cursorLocal - center) * (1 - ratio)
     zoomPanX += (mx - cx) * (1 - ratio);
     zoomPanY += (my - cy) * (1 - ratio);
     applyZoom();
@@ -1022,19 +851,23 @@ $("btnSendLtxv").addEventListener("click", () => {
   if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
   else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
 });
+
 let _fsResetTimer = null;
 function scheduleResetAfterFullscreen(){
   if(_fsResetTimer) clearTimeout(_fsResetTimer);
   _fsResetTimer = setTimeout(() => {
     _fsResetTimer = null;
-    exitFullscreenStyles();
-    zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
     const wrap = $("imgWrap");
-    if(wrap) wrap.style.cursor = "grab";
+    if(wrap){
+      wrap.style.cssText = "";
+      const img = $("outputImg");
+      if(img) img.style.transform = "none";
+      wrap.style.cursor = "grab";
+    }
   }, 80);
 }
 function onFsEnter(){
-  requestAnimationFrame(() => { void $("outputImg").offsetWidth; enterFullscreenStyles(); });
+  requestAnimationFrame(() => { void $("outputImg").offsetWidth; const wrap = $("imgWrap"); if(wrap){ wrap.style.cssText = "position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;margin:0!important;padding:0!important;background:#000;border-radius:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;"; const img=$("outputImg"); if(img){ img.style.cssText="display:block!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;transform:none!important;transform-origin:center center!important;"; } } });
 }
 document.addEventListener("fullscreenchange", () => {
   if(document.fullscreenElement) onFsEnter();
@@ -1045,6 +878,7 @@ document.addEventListener("webkitfullscreenchange", () => {
   else scheduleResetAfterFullscreen();
 });
 
+// --- VARIANT GALLERY (Krea2 image version with IndexedDB) ---
 function addToVariantGallery(media, seedValue, timeText) {
     if(!media || !media.filename) {
         log("⚠️ No se encontró imagen de salida para añadir a la galería de variantes.", "l-err");
@@ -1127,10 +961,6 @@ function addToVariantGallery(media, seedValue, timeText) {
         }
     });
 
-    grid.appendChild(card);
-    $("variantCount").textContent = `(${variantCounter + 1})`;
-
-    // Click en la miniatura de variante -> cargar como referencia y como output actual
     card.addEventListener("click", (e) => {
       if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
       loadRefImage(url);
@@ -1142,13 +972,14 @@ function addToVariantGallery(media, seedValue, timeText) {
       currentOutputMedia = { filename, subfolder, type };
       currentRefVariantIndex = Array.from(grid.children).indexOf(card);
     });
+
+    grid.appendChild(card);
+    $("variantCount").textContent = `(${variantCounter + 1})`;
 }
 
-let currentRefVariantIndex = -1;
-
+// --- REFERENCE IMAGE ---
 function loadRefImage(url){
   const img = $("refImg"), wrap = $("refWrap"), ph = $("refPlaceholder"), dz = $("refDropzone"), info = $("refInfo");
-  // Crear un nuevo elemento img para evitar que el navegador cachee la imagen anterior
   const newImg = document.createElement("img");
   newImg.id = "refImg";
   newImg.style.cssText = "display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;";
@@ -1158,7 +989,6 @@ function loadRefImage(url){
   newImg.style.display = "block";
   wrap.style.display = "block";
   ph.style.display = "none";
-  // Mantener dropzone como barra compacta para poder reemplazar la imagen
   dz.style.display = "flex";
   dz.style.padding = "4px 8px";
   dz.style.minHeight = "auto";
@@ -1188,13 +1018,10 @@ function loadRefImage(url){
       $("mpVal").textContent = parseFloat(mpSlider.value).toFixed(2);
     }
   };
-  // Intentar extraer workflow de los metadatos de la imagen
   extractWorkflowFromImage(url);
 }
 
 // --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS PNG / SWARMUI ---
-// ComfyUI guarda el workflow completo en el chunk tEXt "prompt" del PNG.
-// SwarmUI guarda params en chunks "sui_image_params" y "sui_extra_data".
 function extractWorkflowFromImage(url){
   fetch(url).then(r => r.arrayBuffer()).then(buf => {
     const bytes = new Uint8Array(buf);
@@ -1253,13 +1080,11 @@ function applySwarmParams(swarm){
   const applied = [];
   const missing = [];
 
-  // Prompt
   if(p.prompt){
     $("prompt").value = p.prompt;
     applied.push("prompt");
   } else { missing.push("prompt"); }
 
-  // Seed
   if(p.seed != null && p.seed >= 0){
     $("samplerSeed").value = p.seed;
     $("segSamplerFixed").classList.add("on");
@@ -1268,7 +1093,6 @@ function applySwarmParams(swarm){
     applied.push("semilla");
   } else { missing.push("semilla"); }
 
-  // Resolución
   if(p.width != null && p.height != null){
     const w = +p.width, h = +p.height;
     const mpSlider = $("mpSlider");
@@ -1290,7 +1114,6 @@ function applySwarmParams(swarm){
     applied.push("resolución");
   } else { missing.push("resolución"); }
 
-  // Modelo
   if(p.model){
     const sel = $("modelSelect");
     let found = false;
@@ -1302,7 +1125,6 @@ function applySwarmParams(swarm){
     if(found) applied.push("modelo"); else missing.push("modelo");
   } else { missing.push("modelo"); }
 
-  // LoRAs
   if(Array.isArray(p.loras) && p.loras.length){
     const weights = Array.isArray(p.loraweights) ? p.loraweights : [];
     for(let i = 0; i < 3; i++){
@@ -1330,14 +1152,11 @@ function applySwarmParams(swarm){
 }
 
 function applyWorkflow(workflow){
-  // Mapear nodos del workflow a los controles de la UI
-const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"39",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"};
+  const N = CONFIG.N;
   const g = workflow;
 
-  // Prompt
   if(g[N.PROMPT]) $("prompt").value = g[N.PROMPT].inputs.string || "";
 
-  // Modelo
   if(g[N.UNET]){
     const name = g[N.UNET].inputs.unet_name || "";
     const sel = $("modelSelect");
@@ -1348,7 +1167,6 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
     }
   }
 
-  // Resolution
   if(g[N.RES_SELECTOR]){
     const ar = g[N.RES_SELECTOR].inputs.aspect_ratio;
     if(ar) $("aspectRatio").value = ar;
@@ -1359,7 +1177,6 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
     }
   }
 
-  // Projector Delta
   if(g[N.PROJECTOR]){
     if(g[N.PROJECTOR].inputs.preset) $("projectorPreset").value = g[N.PROJECTOR].inputs.preset;
     if(g[N.PROJECTOR].inputs.strength != null){
@@ -1368,7 +1185,6 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
     }
   }
 
-  // T-Enhancer
   if(g[N.ENHANCER]){
     const enabled = g[N.ENHANCER].inputs.enabled;
     const sw = $("enhancerEnabled");
@@ -1390,7 +1206,6 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
     }
   }
 
-  // RBG Smart Seed Variance
   if(g[N.SEED_VARIANCE]){
     if(g[N.SEED_VARIANCE].inputs.variance_preset) $("variancePreset").value = g[N.SEED_VARIANCE].inputs.variance_preset;
     if(g[N.SEED_VARIANCE].inputs.protect_mode) $("protectMode").value = g[N.SEED_VARIANCE].inputs.protect_mode;
@@ -1403,7 +1218,6 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
     }
   }
 
-  // LoRAs
   for(let i = 0; i < 3; i++){
     const nodeId = [N.LORA1, N.LORA2, N.LORA3][i];
     const node = g[nodeId];
@@ -1419,7 +1233,6 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
   renderLoras();
   saveLoraState();
 
-  // Sampler
   if(g[N.SAMPLER]){
     if(g[N.SAMPLER].inputs.eta != null){
       $("etaSlider").value = g[N.SAMPLER].inputs.eta;
@@ -1438,7 +1251,7 @@ const N = {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"
   log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
 }
 
-// --- GESTIÓN DE GALERÍA DE IMÁGENES (IndexedDB: miniatura + original a resolución completa) ---
+// --- INDEXEDDB GALLERY ---
 const GALLERY_DB_NAME = 'krea2_gallery_db';
 const GALLERY_STORE = 'images';
 
@@ -1617,10 +1430,8 @@ $("galleryToggle").addEventListener("click", () => {
   const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef"), wrap = $("refWrap");
   if(!dz) return;
   btn.addEventListener("click", (e) => { e.stopPropagation(); input.click(); });
-  // Prevenir que el navegador abra el archivo al soltarlo fuera
   document.addEventListener("dragover", e => e.preventDefault());
   document.addEventListener("drop", e => e.preventDefault());
-  // Eventos en el dropzone y en el wrap (por si la imagen tapa el dropzone)
   function onDragEnter(e){ e.preventDefault(); dz.classList.add("drag"); }
   function onDragOver(e){ e.preventDefault(); dz.classList.add("drag"); }
   function onDragLeave(){ dz.classList.remove("drag"); }
@@ -1652,230 +1463,6 @@ function handleRefFile(f){
   };
   reader.readAsDataURL(f);
 }
-
-function processNextBatch() {
-    if(currentBatchIndex < totalBatchSize) {
-        setTimeout(() => runSingleGeneration(currentBatchIndex), 1000);
-    } else {
-        setRun("ok", "Batch finalizado");
-        log("🏁 Todas las variantes han sido procesadas.", "l-ok");
-        $("btnGenerate").disabled=false;
-        enableStopButtons(false);
-    }
-}
-
-// --- GESTIÓN DE PROMPTS (árbol de carpetas jerárquico con /) ---
-const PROMPTS_KEY = 'krea2_prompts';
-let selectedPromptKey = null;
-
-function loadPrompts(){
-  let saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-  // Limpiar claves con último segmento vacío (trailing slash)
-  let dirty = false;
-  for(const key of Object.keys(saved)){
-    if(key.endsWith('/') || !key.split('/').pop()){
-      delete saved[key]; dirty = true;
-    }
-  }
-  if(dirty) localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-
-  const tree = $("promptTree");
-  tree.innerHTML = '';
-
-  if(Object.keys(saved).length === 0){
-    tree.innerHTML = '<div class="pt-empty">sin prompts guardados</div>';
-    return;
-  }
-
-  const root = { children: {}, prompts: [] };
-
-  for(const key of Object.keys(saved).sort()){
-    const parts = key.split('/');
-    const promptName = parts.pop();
-    let node = root;
-    for(const part of parts){
-      if(!node.children[part]) node.children[part] = { children: {}, prompts: [] };
-      node = node.children[part];
-    }
-    node.prompts.push({ key, name: promptName });
-  }
-
-  const openState = JSON.parse(localStorage.getItem(PROMPTS_KEY + '_open') || '{}');
-
-  function renderNode(node, container, path){
-    for(const folderName of Object.keys(node.children).sort()){
-      const folderPath = path ? `${path}/${folderName}` : folderName;
-      const folderDiv = document.createElement('div');
-      folderDiv.className = 'pt-folder';
-      if(openState[folderPath]) folderDiv.classList.add('open');
-
-      const label = document.createElement('div');
-      label.className = 'pt-folder-label';
-      const arrow = document.createElement('span');
-      arrow.className = 'pt-folder-arrow';
-      arrow.textContent = '▶';
-      label.appendChild(arrow);
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = folderName;
-      label.appendChild(nameSpan);
-      const delFolder = document.createElement('span');
-      delFolder.className = 'pt-folder-del';
-      delFolder.textContent = '×';
-      delFolder.title = 'Eliminar carpeta y todo su contenido';
-      label.appendChild(delFolder);
-
-      delFolder.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
-        const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-        let count = 0;
-        for(const key of Object.keys(saved)){
-          if(key === folderPath || key.startsWith(folderPath + '/')){
-            delete saved[key]; count++;
-          }
-        }
-        localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-        loadPrompts();
-        log(`Carpeta "${folderPath}" eliminada (${count} prompt(s)).`, "l-ok");
-      });
-
-      label.addEventListener("click", (e) => {
-        if(e.target === delFolder) return;
-        folderDiv.classList.toggle("open");
-        openState[folderPath] = folderDiv.classList.contains("open");
-        localStorage.setItem(PROMPTS_KEY + '_open', JSON.stringify(openState));
-      });
-
-      const childrenDiv = document.createElement('div');
-      childrenDiv.className = 'pt-children';
-      renderNode(node.children[folderName], childrenDiv, folderPath);
-
-      folderDiv.appendChild(label);
-      folderDiv.appendChild(childrenDiv);
-      container.appendChild(folderDiv);
-    }
-    for(const p of node.prompts){
-      const item = document.createElement('div');
-      item.className = 'pt-item';
-      if(p.key === selectedPromptKey) item.classList.add('selected');
-      item.textContent = p.name;
-      item.title = p.key;
-      item.dataset.key = p.key;
-      item.addEventListener("click", () => {
-        const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-        if(saved[p.key]){
-          $("prompt").value = saved[p.key];
-          selectedPromptKey = p.key;
-          document.querySelectorAll(".pt-item").forEach(i => i.classList.remove("selected"));
-          item.classList.add("selected");
-        }
-      });
-      container.appendChild(item);
-    }
-  }
-
-  renderNode(root, tree, '');
-}
-
-function savePrompt(){
-  const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):");
-  if(!name) return;
-  const text = $("prompt").value;
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-  if(saved[name]){
-    const preview = saved[name].slice(0, 80);
-    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
-  }
-  saved[name] = text;
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-  selectedPromptKey = name;
-  loadPrompts();
-  log(`Prompt "${name}" guardado.`, "l-ok");
-}
-
-function movePrompt(){
-  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para mover.", "l-err"); return; }
-  const oldName = selectedPromptKey;
-  const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
-  if(!newName || newName === oldName) return;
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-  if(saved[newName]){
-    if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
-  }
-  saved[newName] = saved[oldName];
-  delete saved[oldName];
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-  selectedPromptKey = newName;
-  loadPrompts();
-  log(`Prompt movido: "${oldName}" → "${newName}"`, "l-ok");
-}
-
-function deletePrompt(){
-  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para eliminar.", "l-err"); return; }
-  if(!confirm(`¿Eliminar "${selectedPromptKey}"?`)) return;
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
-  delete saved[selectedPromptKey];
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
-  selectedPromptKey = null;
-  loadPrompts();
-  log(`Prompt eliminado.`, "l-ok");
-}
-
-$("btnSavePrompt").addEventListener("click", savePrompt);
-$("btnMovePrompt").addEventListener("click", movePrompt);
-$("btnDeletePrompt").addEventListener("click", deletePrompt);
-loadPrompts();
-
-// --- MODELOS ---
-function loadModels(){
-  const sel = $("modelSelect");
-  sel.innerHTML = "";
-  for(const m of AVAILABLE_MODELS){
-    const opt = document.createElement("option");
-    opt.value = m;
-    opt.textContent = m;
-    if(m === "krea2_turbo_convrot_int4_fast.safetensors") opt.selected = true;
-    sel.appendChild(opt);
-  }
-}
-loadModels();
-
-// --- LORAS ---
-function saveLoraState() { localStorage.setItem('krea2_loras_state', JSON.stringify(loras)); }
-function loadLoraState() {
-  const saved = localStorage.getItem('krea2_loras_state');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length === 3) {
-        parsed.forEach((l, i) => {
-          if (AVAILABLE_LORAS.includes(l.lora) || l.lora === "") loras[i] = l;
-        });
-      }
-    } catch (e) { console.error("Error cargando estado LoRA", e); }
-  }
-}
-function renderLoras(){
-  const wrap=$("loraList"); wrap.innerHTML="";
-  loras.forEach((l,i)=>{
-    const box=document.createElement("div");
-    box.className="lora"+(l.on?"":" off");
-    let optionsHtml = '<option value="">-- Ninguno --</option>';
-    AVAILABLE_LORAS.forEach(path => {
-      const selected = path === l.lora ? 'selected' : '';
-      const displayName = path.split('/').pop();
-      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
-    });
-    box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
-    <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
-    <div class="slider-row"><input type="range" min="0" max="2" step="0.05" value="${l.strength}" data-field="strength" data-i="${i}"><div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div></div>`;
-    wrap.appendChild(box);
-  });
-  wrap.querySelectorAll(".switch").forEach(sw=>sw.addEventListener("click",()=>{loras[+sw.dataset.i].on=!loras[+sw.dataset.i].on;renderLoras();saveLoraState();}));
-  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel=>sel.addEventListener("change",()=>{loras[+sel.dataset.i].lora=sel.value;saveLoraState();}));
-  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
-}
-loadLoraState(); renderLoras();
 
 // --- RESOLUCIÓN ---
 $("mpSlider").addEventListener("input",()=>{$("mpVal").textContent=parseFloat($("mpSlider").value).toFixed(2);});
@@ -1911,7 +1498,6 @@ $("enhancerLinkTextScale").addEventListener("change",()=>{
   }
   try { localStorage.setItem("krea2_enhancer_link_text_scale", linked ? "1" : "0"); } catch(_){}
 });
-// Restaurar estado del link
 try {
   const saved = localStorage.getItem("krea2_enhancer_link_text_scale");
   if(saved === "0"){
@@ -2007,168 +1593,9 @@ async function runGeneration(){
   catch(err){ setRun("bad","error");log("Error: "+err.message,"l-err"); $("btnGenerate").disabled=false; }
 }
 
-// --- BOTONES DE PARAR ---
-function enableStopButtons(v){ $("btnStopVideo").disabled = !v; $("btnStopAll").disabled = !v; }
-
-async function stopCurrentVideo(){
-  if(!currentPromptId) return;
-  const pid = currentPromptId;
-  currentPromptId = null;
-  try {
-    await fetch(server()+"/queue", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({action:"cancel", prompt_id:pid})
-    });
-  } catch(e) {}
-  discardTimer(pid);
-  delete pendingSeeds[pid];
-  handledPrompts.add(pid);
-  log("⏹ Video actual detenido.", "l-err");
-  currentBatchIndex++;
-  processNextBatch();
-}
-
-async function stopAll(){
-  try {
-    await fetch(server()+"/queue", {
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({action:"cancel_all"})
-    });
-  } catch(e) {}
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
-  pendingSeeds = {};
-  handledPrompts.clear();
-  processingPrompts.clear();
-  currentPromptId = null;
-  currentBatchIndex = totalBatchSize;
-  enableStopButtons(false);
-  $("btnGenerate").disabled=false;
-  setRun("bad", "Detenido por usuario");
-  log("🛑 Generación detenida.", "l-err");
-}
-
 $("btnGenerate").addEventListener("click", runGeneration);
-$("btnStopVideo").addEventListener("click", stopCurrentVideo);
-$("btnStopAll").addEventListener("click", stopAll);
 
-// --- ENHANCER OLLAMA ---
-const ENHANCER_DEFAULT_PROMPTS = {
-  text: {
-    A: { name: "Estilo A (photorealistic)", prompt: "You are an expert in prompts for Krea2/Flux2 image generation. Transform the user's idea into a detailed photorealistic prompt. Include: subject, lighting, colors, texture, composition, and atmosphere. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
-    B: { name: "Estilo B (artistic)", prompt: "You are a creative assistant specialized in artistic image prompts. Take the user's idea and turn it into an evocative, artistic prompt. Use descriptive, poetic language. Focus on style, mood, and visual impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
-  },
-  vision: {
-    A: { name: "Estilo A (descriptive)", prompt: "You are an expert at describing images for image generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, and style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
-    B: { name: "Estilo B (stylized)", prompt: "You are a digital artist. Look at the image and turn it into a stylized artistic description. Focus on the artistic style, color palette, and emotional impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
-    C: { name: "Estilo C (literal caption)", prompt: "You are an image captioning specialist. Describe the provided image factually and concisely in 1-3 sentences. No artistic interpretation, no camera instructions, no stylistic flourishes. Just what is visible: main subjects, setting, lighting, and notable details. The user may write in any language; you must ALWAYS respond in English with ONLY the caption, no explanations or preambles." },
-  },
-};
-
-function loadSysPrompts(){
-  const saved = localStorage.getItem("krea2_enhancer_sysprompts");
-  if(saved){ try { return JSON.parse(saved); } catch(e) {} }
-  return JSON.parse(JSON.stringify(ENHANCER_DEFAULT_PROMPTS));
-}
-function saveSysPrompts(data){ localStorage.setItem("krea2_enhancer_sysprompts", JSON.stringify(data)); }
-function populateStyleSelect(data, mode){
-  const sel = $("enhancerStyle");
-  sel.innerHTML = "";
-  const styles = data[mode] || {};
-  for(const key of Object.keys(styles).sort()){
-    const opt = document.createElement("option");
-    opt.value = key; opt.textContent = styles[key].name || key;
-    sel.appendChild(opt);
-  }
-}
-function getCurrentSysPrompt(data, mode, styleKey){
-  const styles = data[mode] || {};
-  const entry = styles[styleKey];
-  return entry ? entry.prompt : "";
-}
-
-$("enhancerToggle").addEventListener("click", () => {
-  const h = $("enhancerToggle");
-  const b = $("enhancerBody");
-  h.classList.toggle("open");
-  b.classList.toggle("open");
-  const arrow = h.querySelector(".arrow");
-  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
-});
-
-function makeCollapsible(toggleId, bodyId, onOpen){
-  const h = $(toggleId), b = $(bodyId);
-  if(!h || !b) return;
-  h.addEventListener("click", () => {
-    h.classList.toggle("open");
-    b.classList.toggle("open");
-    const arrow = h.querySelector(".arrow");
-    if(arrow) arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
-    if(h.classList.contains("open") && onOpen) onOpen();
-  });
-}
-
-makeCollapsible("promptLibToggle", "promptLibBody");
-makeCollapsible("loraToggle", "loraBody");
-
-async function loadEnhancerModels(){
-  const sel = $("enhancerModel");
-  try {
-    const r = await fetch("/api/tags");
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const data = await r.json();
-    const models = data.models || [];
-    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
-    for(const m of models){
-      const opt = document.createElement("option");
-      opt.value = m.name; opt.textContent = m.name;
-      sel.appendChild(opt);
-    }
-    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
-    if(defaultModel) sel.value = defaultModel.name;
-  } catch(e) {
-    sel.innerHTML = '<option value="">Ollama no disponible</option>';
-    console.warn("No se pudieron cargar modelos:", e.message);
-  }
-}
-
-$("enhancerMode").addEventListener("change", () => {
-  const data = loadSysPrompts();
-  populateStyleSelect(data, $("enhancerMode").value);
-});
-
-$("btnEnhance").addEventListener("click", async () => {
-  const model = $("enhancerModel").value;
-  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
-  const mode = $("enhancerMode").value;
-  const styleKey = $("enhancerStyle").value;
-  const data = loadSysPrompts();
-  const system = getCurrentSysPrompt(data, mode, styleKey);
-  const userPrompt = $("prompt").value.trim();
-  if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
-
-  const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
-
-  $("btnEnhance").disabled = true;
-  $("btnEnhance").textContent = "Mejorando...";
-  $("enhancerOutput").value = "";
-  try {
-    const r = await fetchWithRetry("/api/generate", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload),
-    });
-    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,200)); }
-    const result = await r.json();
-    $("enhancerOutput").value = (result.response || "").trim();
-    log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
-  } catch(e) {
-    log("❌ Error al mejorar: "+e.message, "l-err");
-    $("enhancerOutput").value = "Error: "+e.message;
-  } finally {
-    $("btnEnhance").disabled = false;
-    $("btnEnhance").textContent = "Mejorar prompt";
-  }
-});
-
+// --- ENHANCER HELPERS (Krea2-specific) ---
 async function fetchWithRetry(url, options, attempts=3){
   let lastErr = null;
   for(let i=0; i<attempts; i++){
@@ -2248,6 +1675,41 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
   return c.toDataURL("image/jpeg", 0.85).split(",")[1];
 }
 
+// --- ENHANCER (Krea2 btnEnhance uses fetchWithRetry) ---
+$("btnEnhance").addEventListener("click", async () => {
+  const model = $("enhancerModel").value;
+  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+  const mode = $("enhancerMode").value;
+  const styleKey = $("enhancerStyle").value;
+  const data = loadSysPrompts();
+  const system = getCurrentSysPrompt(data, mode, styleKey);
+  const userPrompt = $("prompt").value.trim();
+  if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+
+  const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
+
+  $("btnEnhance").disabled = true;
+  $("btnEnhance").textContent = "Mejorando...";
+  $("enhancerOutput").value = "";
+  try {
+    const r = await fetchWithRetry("/api/generate", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload),
+    });
+    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,200)); }
+    const result = await r.json();
+    $("enhancerOutput").value = (result.response || "").trim();
+    log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
+  } catch(e) {
+    log("❌ Error al mejorar: "+e.message, "l-err");
+    $("enhancerOutput").value = "Error: "+e.message;
+  } finally {
+    $("btnEnhance").disabled = false;
+    $("btnEnhance").textContent = "Mejorar prompt";
+  }
+});
+
+// --- CAPTION (Krea2-specific) ---
 $("btnCaption").addEventListener("click", async () => {
   const model = $("enhancerModel").value;
   if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
@@ -2301,7 +1763,6 @@ $("btnSendRefLtxv").addEventListener("click", () => {
     return;
   }
   const src = refImgEl.src;
-  // Si es una URL de /view?filename=..., extraer el filename
   const m = src.match(/[?&]filename=([^&]+)/);
   if(m){
     const filename = decodeURIComponent(m[1]);
@@ -2381,21 +1842,558 @@ $("btnLoadMeta").addEventListener("click", async () => {
     $("btnLoadMeta").textContent = "Cargar metadatos";
   }
 });
+// common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
+//
+// This file is injected AFTER the UI-specific CONFIG and N definitions.
+// CONFIG must be set by the UI (ltxv.js / krea2.js) BEFORE this script runs.
+//
+// Required CONFIG fields:
+//   PROMPTS_KEY, LORA_STATE_KEY, ENHANCER_SYSKEY, SERVERURL_KEY,
+//   N, DEFAULT_BACKEND_PORT, UI_TYPE, DEFAULT_MODEL,
+//   ENHANCER_DEFAULT_PROMPTS, loras,
+//   findMedia(nodeOutput), showMedia(slot, media, options),
+//   addToVariantGallery(media, seedValue, timeText, slot, variantIndex),
+//   onSeedUpdate(realSeed),
+//   displayResult(entry, realSeed, tTotal, promptId) -> true to skip finalize,
+//   onPromptError(pid), startNextVariant(index), onBatchComplete(),
+//   onStopCurrent(pid), onStopAll()
 
-$("btnSaveEnhanced").addEventListener("click", () => {
-  const text = $("enhancerOutput").value.trim();
-  if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
-  const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):");
+const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
+let socket = null;
+let currentBatchIndex = 0;
+let totalBatchSize = 0;
+let variantCounter = 0;
+let pendingSeeds = {};
+let handledPrompts = new Set();
+let processingPrompts = new Set();
+let batchSeedMode = "random";
+let currentPromptId = null;
+let timers = {};
+let loras = CONFIG.loras;
+
+const LEGACY_PORTS = ["7822"];
+const DEFAULT_BACKEND_PORT = CONFIG.DEFAULT_BACKEND_PORT;
+const $ = (id) => document.getElementById(id);
+
+// --- TIMERS ---
+function fmtMs(ms){
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function startTimer(promptId, slot){
+  if(timers[promptId]) return;
+  const t = { start: Date.now(), iv: null };
+  const el = $("time"+slot);
+  t.iv = setInterval(() => {
+    if(!timers[promptId]) return;
+    const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
+    el.textContent = live;
+    el.classList.add("live");
+  }, 500);
+  timers[promptId] = t;
+}
+
+function stopTimer(promptId){
+  const t = timers[promptId];
+  if(!t) return null;
+  const total = Date.now() - t.start;
+  if(t.iv){ clearInterval(t.iv); t.iv = null; }
+  delete timers[promptId];
+  return { total, text: `⏱ ${fmtMs(total)}` };
+}
+
+function discardTimer(promptId){
+  const t = timers[promptId];
+  if(!t) return;
+  if(t.iv) clearInterval(t.iv);
+  delete timers[promptId];
+}
+
+// Saca tiempos del history JSON de ComfyUI. Devuelve {t1, t2, total} en ms o null.
+function extractTimings(entry, N){
+  if(!entry || !entry.status) return null;
+  const msgs = entry.status.messages || [];
+  if(!Array.isArray(msgs) || msgs.length === 0) return null;
+
+  let tStart = null, tSuccess = null;
+  const nodeTimes = {};
+  for(const m of msgs){
+    if(!Array.isArray(m) || m.length < 2) continue;
+    const type = m[0];
+    const data = m[1] || {};
+    if(type === "execution_start" && data.timestamp != null){
+      tStart = data.timestamp;
+    } else if(type === "execution_success" && data.timestamp != null){
+      tSuccess = data.timestamp;
+    } else if(type === "executing" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      if(nodeTimes[data.node].start == null) nodeTimes[data.node].start = data.timestamp;
+    } else if(type === "executed" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      nodeTimes[data.node].end = data.timestamp;
+    }
+  }
+
+  const total = (tStart != null && tSuccess != null) ? (tSuccess - tStart) : null;
+  const t1 = nodeTimes[N.FIRST_SAVE] && nodeTimes[N.FIRST_SAVE].start != null && nodeTimes[N.FIRST_SAVE].end != null
+             ? (nodeTimes[N.FIRST_SAVE].end - nodeTimes[N.FIRST_SAVE].start) : null;
+  const t2 = nodeTimes[N.FINAL_SAVE] && nodeTimes[N.FINAL_SAVE].start != null && nodeTimes[N.FINAL_SAVE].end != null
+             ? (nodeTimes[N.FINAL_SAVE].end - nodeTimes[N.FINAL_SAVE].start) : null;
+
+  if(total == null && t1 == null && t2 == null) return null;
+  return { t1, t2, total };
+}
+
+// --- SEED ---
+function randomSeed(){
+  return Math.floor(Math.random() * 0xFFFFFFFF);
+}
+
+// --- AUTO-DETECCIÓN DEL BACKEND EN LAN ---
+function updateServerHint(){
+  const hint = $("serverHint");
+  if(!hint) return;
+  const v = ($("serverUrl")?.value || "").trim();
+  if(v){
+    hint.textContent = `URL efectiva: ${v}`;
+  } else {
+    const host = (window.location.hostname || "").trim();
+    if(host && !/^(127\.|localhost$|::1$)/i.test(host)){
+      hint.textContent = "proxy activo (same-origin)";
+    } else {
+      hint.textContent = "";
+    }
+  }
+}
+(function autoPickServerUrl(){
+  try {
+    const input = $("serverUrl");
+    if(!input) return;
+    const stored = localStorage.getItem(CONFIG.SERVERURL_KEY);
+    if(stored){
+      const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
+      if(storedPort && LEGACY_PORTS.includes(storedPort)){
+        localStorage.removeItem(CONFIG.SERVERURL_KEY);
+      } else {
+        input.value = stored;
+        updateServerHint();
+        return;
+      }
+    }
+    updateServerHint();
+  } catch(e) { /* si falla, queda el placeholder */ }
+})();
+$("serverUrl").addEventListener("change", (e) => {
+  try { localStorage.setItem(CONFIG.SERVERURL_KEY, e.target.value.trim()); } catch(_){}
+  updateServerHint();
+});
+$("serverUrl").addEventListener("input", updateServerHint);
+
+function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
+function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
+function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+
+// --- WEBSOCKET SETUP ---
+function connectSocket() {
+    if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+    const url = server().replace('http', 'ws') + '/ws?clientId=' + CLIENT_ID;
+    socket = new WebSocket(url);
+    socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
+    socket.onmessage = (event) => {
+        let msg;
+        try { msg = JSON.parse(event.data); } catch(e) {
+            console.warn("WS mensaje no-JSON, cerrando:", event.data.slice(0,80));
+            socket.close();
+            return;
+        }
+        if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
+        if(msg.type === 'execution_error') {
+            const pid = msg.data && msg.data.prompt_id;
+            log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
+            if(pid){
+              handledPrompts.add(pid);
+              delete pendingSeeds[pid];
+              discardTimer(pid);
+              if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
+            }
+            currentBatchIndex++;
+            processNextBatch();
+        }
+    };
+    socket.onerror = (err) => console.error("WS Error", err);
+}
+
+// --- HANDLE PROMPT DONE ---
+// Procesa un prompt_id terminado, venga del WS o del polling de respaldo.
+// Idempotente: si ya se ha procesado, no hace nada.
+async function handlePromptDone(promptId) {
+    if(handledPrompts.has(promptId)) return;
+    if(processingPrompts.has(promptId)) return;
+    processingPrompts.add(promptId);
+    let entry;
+    try {
+        const hr = await fetch(server()+"/history/"+promptId);
+        if(!hr.ok) {
+            log(`⏳ Esperando resultado (HTTP ${hr.status})...`, "l-ok");
+            processingPrompts.delete(promptId);
+            return;
+        }
+        const hist = await hr.json();
+        entry = hist[promptId];
+    } catch(e) {
+        log(`⚠️ Error consultando history: ${e.message}`, "l-err");
+        processingPrompts.delete(promptId);
+        return;
+    }
+    if(!entry || !entry.outputs) {
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
+    // descartamos silenciosamente cualquier execution_success tardío del backend.
+    if(!(promptId in pendingSeeds)){
+        handledPrompts.add(promptId);
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    handledPrompts.add(promptId);
+    processingPrompts.delete(promptId);
+
+    const realSeed = (promptId in pendingSeeds) ? pendingSeeds[promptId] : null;
+    if(realSeed !== null) {
+        if(CONFIG.onSeedUpdate) CONFIG.onSeedUpdate(realSeed);
+        log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
+    }
+
+    const timings = extractTimings(entry, CONFIG.N);
+    const clientResult = stopTimer(promptId);
+    const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
+                   (clientResult ? fmtMs(clientResult.total) : null);
+
+    // UI-specific media display + continuation logic.
+    // Returns true to skip finalize (e.g. LTXV step 1 → step 2).
+    const cont = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
+    if(cont) return;
+
+    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
+    delete pendingSeeds[promptId];
+    variantCounter++;
+    currentBatchIndex++;
+    processNextBatch();
+}
+
+// Red de seguridad: si el WS no entrega 'execution_success', recupera el resultado por polling.
+function pollFallback(promptId) {
+    let tries = 0;
+    const iv = setInterval(async () => {
+        tries++;
+        if(handledPrompts.has(promptId) || tries > 180) { clearInterval(iv); return; }
+        await handlePromptDone(promptId);
+        if(handledPrompts.has(promptId)) clearInterval(iv);
+    }, 4000);
+}
+
+function processNextBatch() {
+    if(currentBatchIndex < totalBatchSize) {
+        setTimeout(() => CONFIG.startNextVariant(currentBatchIndex), 1000);
+    } else {
+        setRun("ok", "Batch finalizado");
+        log("🏁 Todas las variantes han sido procesadas.", "l-ok");
+        CONFIG.onBatchComplete();
+    }
+}
+
+// --- GESTIÓN DE PROMPTS (árbol de carpetas jerárquico con /) ---
+let selectedPromptKey = null;
+
+function loadPrompts(){
+  let saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  let dirty = false;
+  for(const key of Object.keys(saved)){
+    if(key.endsWith('/') || !key.split('/').pop()){
+      delete saved[key]; dirty = true;
+    }
+  }
+  if(dirty) localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+
+  const tree = $("promptTree");
+  tree.innerHTML = '';
+
+  if(Object.keys(saved).length === 0){
+    tree.innerHTML = '<div class="pt-empty">sin prompts guardados</div>';
+    return;
+  }
+
+  const root = { children: {}, prompts: [] };
+
+  for(const key of Object.keys(saved).sort()){
+    const parts = key.split('/');
+    const promptName = parts.pop();
+    let node = root;
+    for(const part of parts){
+      if(!node.children[part]) node.children[part] = { children: {}, prompts: [] };
+      node = node.children[part];
+    }
+    node.prompts.push({ key, name: promptName });
+  }
+
+  const openState = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY + '_open') || '{}');
+
+  function renderNode(node, container, path){
+    for(const folderName of Object.keys(node.children).sort()){
+      const folderPath = path ? `${path}/${folderName}` : folderName;
+      const folderDiv = document.createElement('div');
+      folderDiv.className = 'pt-folder';
+      if(openState[folderPath]) folderDiv.classList.add('open');
+
+      const label = document.createElement('div');
+      label.className = 'pt-folder-label';
+      const arrow = document.createElement('span');
+      arrow.className = 'pt-folder-arrow';
+      arrow.textContent = '▶';
+      label.appendChild(arrow);
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = folderName;
+      label.appendChild(nameSpan);
+      const delFolder = document.createElement('span');
+      delFolder.className = 'pt-folder-del';
+      delFolder.textContent = '×';
+      delFolder.title = 'Eliminar carpeta y todo su contenido';
+      label.appendChild(delFolder);
+
+      delFolder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
+        const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+        let count = 0;
+        for(const key of Object.keys(saved)){
+          if(key === folderPath || key.startsWith(folderPath + '/')){
+            delete saved[key]; count++;
+          }
+        }
+        localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+        loadPrompts();
+        log(`Carpeta "${folderPath}" eliminada (${count} prompt(s)).`, "l-ok");
+      });
+
+      label.addEventListener("click", (e) => {
+        if(e.target === delFolder) return;
+        folderDiv.classList.toggle("open");
+        openState[folderPath] = folderDiv.classList.contains("open");
+        localStorage.setItem(CONFIG.PROMPTS_KEY + '_open', JSON.stringify(openState));
+      });
+
+      const childrenDiv = document.createElement('div');
+      childrenDiv.className = 'pt-children';
+      renderNode(node.children[folderName], childrenDiv, folderPath);
+
+      folderDiv.appendChild(label);
+      folderDiv.appendChild(childrenDiv);
+      container.appendChild(folderDiv);
+    }
+    for(const p of node.prompts){
+      const item = document.createElement('div');
+      item.className = 'pt-item';
+      if(p.key === selectedPromptKey) item.classList.add('selected');
+      item.textContent = p.name;
+      item.title = p.key;
+      item.dataset.key = p.key;
+      item.addEventListener("click", () => {
+        const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+        if(saved[p.key]){
+          $("prompt").value = saved[p.key];
+          selectedPromptKey = p.key;
+          document.querySelectorAll(".pt-item").forEach(i => i.classList.remove("selected"));
+          item.classList.add("selected");
+        }
+      });
+      container.appendChild(item);
+    }
+  }
+
+  renderNode(root, tree, '');
+}
+
+function savePrompt(){
+  const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):");
   if(!name) return;
-  const saved = JSON.parse(localStorage.getItem(PROMPTS_KEY) || '{}');
+  const text = $("prompt").value;
+  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
   if(saved[name]){
-    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
+    const preview = saved[name].slice(0, 80);
+    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
   }
   saved[name] = text;
-  localStorage.setItem(PROMPTS_KEY, JSON.stringify(saved));
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
   selectedPromptKey = name;
   loadPrompts();
-  log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+  log(`Prompt "${name}" guardado.`, "l-ok");
+}
+
+function movePrompt(){
+  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para mover.", "l-err"); return; }
+  const oldName = selectedPromptKey;
+  const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
+  if(!newName || newName === oldName) return;
+  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  if(saved[newName]){
+    if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
+  }
+  saved[newName] = saved[oldName];
+  delete saved[oldName];
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  selectedPromptKey = newName;
+  loadPrompts();
+  log(`Prompt movido: "${oldName}" → "${newName}"`, "l-ok");
+}
+
+function deletePrompt(){
+  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para eliminar.", "l-err"); return; }
+  if(!confirm(`¿Eliminar "${selectedPromptKey}"?`)) return;
+  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  delete saved[selectedPromptKey];
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  selectedPromptKey = null;
+  loadPrompts();
+  log(`Prompt eliminado.`, "l-ok");
+}
+
+$("btnSavePrompt").addEventListener("click", savePrompt);
+$("btnMovePrompt").addEventListener("click", movePrompt);
+$("btnDeletePrompt").addEventListener("click", deletePrompt);
+loadPrompts();
+
+// --- GESTIÓN DE LORAS CON MEMORIA ---
+function saveLoraState() { localStorage.setItem(CONFIG.LORA_STATE_KEY, JSON.stringify(loras)); }
+function loadLoraState() {
+  const saved = localStorage.getItem(CONFIG.LORA_STATE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 3) {
+        parsed.forEach((l, i) => {
+          if (AVAILABLE_LORAS.includes(l.lora) || l.lora === "") loras[i] = l;
+        });
+      }
+    } catch (e) { console.error("Error cargando estado LoRA", e); }
+  }
+}
+function loadModels(){
+  const sel = $("modelSelect");
+  if(!sel) return;
+  sel.innerHTML = "";
+  for(const m of AVAILABLE_MODELS){
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    if(m === CONFIG.DEFAULT_MODEL) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+function renderLoras(){
+  const wrap=$("loraList"); wrap.innerHTML="";
+  loras.forEach((l,i)=>{
+    const box=document.createElement("div");
+    box.className="lora"+(l.on?"":" off");
+    let optionsHtml = '<option value="">-- Ninguno --</option>';
+    AVAILABLE_LORAS.forEach(path => {
+      const selected = path === l.lora ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+    });
+    box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
+    <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
+    <div class="slider-row"><input type="range" min="0" max="2" step="0.05" value="${l.strength}" data-field="strength" data-i="${i}"><div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div></div>`;
+    wrap.appendChild(box);
+  });
+  wrap.querySelectorAll(".switch").forEach(sw=>sw.addEventListener("click",()=>{loras[+sw.dataset.i].on=!loras[+sw.dataset.i].on;renderLoras();saveLoraState();}));
+  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel=>sel.addEventListener("change",()=>{loras[+sel.dataset.i].lora=sel.value;saveLoraState();}));
+  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
+}
+loadLoraState(); renderLoras(); loadModels();
+
+// --- PROMPT ENHANCER (Ollama) — shared skeleton ---
+function loadSysPrompts(){
+  const saved = localStorage.getItem(CONFIG.ENHANCER_SYSKEY);
+  if(saved){
+    try { return JSON.parse(saved); } catch(e) {}
+  }
+  return JSON.parse(JSON.stringify(CONFIG.ENHANCER_DEFAULT_PROMPTS));
+}
+
+function saveSysPrompts(data){
+  localStorage.setItem(CONFIG.ENHANCER_SYSKEY, JSON.stringify(data));
+}
+
+function populateStyleSelect(data, mode){
+  const sel = $("enhancerStyle");
+  sel.innerHTML = "";
+  const styles = data[mode] || {};
+  for(const key of Object.keys(styles).sort()){
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = styles[key].name || key;
+    sel.appendChild(opt);
+  }
+}
+
+function getCurrentSysPrompt(data, mode, styleKey){
+  const styles = data[mode] || {};
+  const entry = styles[styleKey];
+  return entry ? entry.prompt : "";
+}
+
+function makeCollapsible(toggleId, bodyId, onOpen){
+  const h = $(toggleId), b = $(bodyId);
+  if(!h || !b) return;
+  h.addEventListener("click", () => {
+    h.classList.toggle("open");
+    b.classList.toggle("open");
+    const arrow = h.querySelector(".arrow");
+    if(arrow) arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+    if(h.classList.contains("open") && onOpen) onOpen();
+  });
+}
+
+async function loadEnhancerModels(){
+  const sel = $("enhancerModel");
+  try {
+    const r = await fetch("/api/tags");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    const models = data.models || [];
+    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
+    for(const m of models){
+      const opt = document.createElement("option");
+      opt.value = m.name;
+      opt.textContent = m.name;
+      sel.appendChild(opt);
+    }
+    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
+    if(defaultModel) sel.value = defaultModel.name;
+  } catch(e) {
+    sel.innerHTML = '<option value="">Ollama no disponible</option>';
+    console.warn("No se pudieron cargar modelos:", e.message);
+  }
+}
+
+// --- Enhancer shared listeners ---
+$("enhancerToggle").addEventListener("click", () => {
+  const h = $("enhancerToggle");
+  const b = $("enhancerBody");
+  h.classList.toggle("open");
+  b.classList.toggle("open");
+  const arrow = h.querySelector(".arrow");
+  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+});
+
+$("enhancerMode").addEventListener("change", () => {
+  const data = loadSysPrompts();
+  populateStyleSelect(data, $("enhancerMode").value);
 });
 
 $("btnUseAsPrompt").addEventListener("click", () => {
@@ -2405,7 +2403,23 @@ $("btnUseAsPrompt").addEventListener("click", () => {
   log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
 });
 
-// --- MODAL SYSTEM PROMPTS ---
+$("btnSaveEnhanced").addEventListener("click", () => {
+  const text = $("enhancerOutput").value.trim();
+  if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
+  const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):");
+  if(!name) return;
+  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  if(saved[name]){
+    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
+  }
+  saved[name] = text;
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  selectedPromptKey = name;
+  loadPrompts();
+  log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+});
+
+// --- Editor de system prompts (modal) ---
 let sysPromptEditData = null;
 let sysPromptEditMode = "text";
 
@@ -2419,7 +2433,7 @@ function renderSysPromptEditor(){
   container.innerHTML = "";
   for(const key of keys){
     const entry = styles[key];
-    const isDefault = (key === "A" || key === "B") && ENHANCER_DEFAULT_PROMPTS[mode] && ENHANCER_DEFAULT_PROMPTS[mode][key];
+    const isDefault = (key === "A" || key === "B") && CONFIG.ENHANCER_DEFAULT_PROMPTS[mode] && CONFIG.ENHANCER_DEFAULT_PROMPTS[mode][key];
     const row = document.createElement("div");
     row.className = "sysprompt-row";
     row.innerHTML = `
@@ -2510,13 +2524,55 @@ $("btnEditSysPrompts").addEventListener("click", () => {
   $("sysPromptModal").classList.add("open");
 });
 
-// --- INICIALIZAR ---
+// Collapsibles shared
+makeCollapsible("promptLibToggle", "promptLibBody");
+makeCollapsible("loraToggle", "loraBody");
+
+// Inicializar enhancer
 (async () => {
   await loadEnhancerModels();
   const data = loadSysPrompts();
   populateStyleSelect(data, $("enhancerMode").value);
 })();
 
+// --- BOTONES DE PARAR ---
+function enableStopButtons(v){ $("btnStopVideo").disabled = !v; $("btnStopAll").disabled = !v; }
+
+async function stopCurrentVideo(){
+  if(!currentPromptId) return;
+  const pid = currentPromptId;
+  currentPromptId = null;
+  try {
+    await fetch(server()+"/queue", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"cancel", prompt_id:pid})
+    });
+  } catch(e) { /* si falla, igual limpiamos local */ }
+  discardTimer(pid);
+  delete pendingSeeds[pid];
+  handledPrompts.add(pid);
+  if(CONFIG.onStopCurrent) CONFIG.onStopCurrent(pid);
+  log("⏹ Video actual detenido.", "l-err");
+  currentBatchIndex++;
+  processNextBatch();
+}
+
+async function stopAll(){
+  try {
+    await fetch(server()+"/queue", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"cancel_all"})
+    });
+  } catch(e) { /* si falla, igual limpiamos local */ }
+  if(CONFIG.onStopAll) CONFIG.onStopAll();
+  setRun("bad", "Detenido por usuario");
+  log("🛑 Generación detenida.", "l-err");
+}
+
+$("btnStopVideo").addEventListener("click", stopCurrentVideo);
+$("btnStopAll").addEventListener("click", stopAll);
+
+// --- TEST CONEXIÓN ---
 $("btnTest").addEventListener("click", async ()=>{
     setConn("busy","comprobando...");
     try{
