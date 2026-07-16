@@ -272,7 +272,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           <div id="loraList"></div>
           <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
             <div class="switch on" id="dmdBypassSwitch"><i></i></div>
-            <label for="dmdBypassSwitch" style="margin:0;font-size:11px;color:var(--muted-2);flex:1;">Bypass DMD LoRA (LTX2.3_DMD_reshaped_r256)</label>
+            <label for="dmdBypassSwitch" style="margin:0;font-size:11px;color:var(--muted-2);flex:1;">DMD LoRA (LTX2.3_DMD_reshaped_r256)</label>
           </div>
         </div>
       </div>
@@ -2680,7 +2680,7 @@ function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint
 $("dmdBypassSwitch").addEventListener("click",()=>{
   dmdBypass = !dmdBypass;
   $("dmdBypassSwitch").classList.toggle("on", !dmdBypass);
-  log(dmdBypass ? "DMD LoRA bypassed (using model without DMD distillation)" : "DMD LoRA restored", "l-ok");
+  log(dmdBypass ? "DMD LoRA desactivada" : "DMD LoRA activada", "l-ok");
 });
 
 const dz=$("dropzone"),fileInput=$("fileInput");

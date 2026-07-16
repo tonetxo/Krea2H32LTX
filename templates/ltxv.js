@@ -536,7 +536,7 @@ function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint
 $("dmdBypassSwitch").addEventListener("click",()=>{
   dmdBypass = !dmdBypass;
   $("dmdBypassSwitch").classList.toggle("on", !dmdBypass);
-  log(dmdBypass ? "DMD LoRA bypassed (using model without DMD distillation)" : "DMD LoRA restored", "l-ok");
+  log(dmdBypass ? "DMD LoRA desactivada" : "DMD LoRA activada", "l-ok");
 });
 
 const dz=$("dropzone"),fileInput=$("fileInput");
