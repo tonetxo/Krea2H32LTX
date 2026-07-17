@@ -430,9 +430,9 @@ function loadRefImage(url){
 
 // --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS PNG / SWARMUI ---
 function extractWorkflowFromImage(url){
-  fetch(url).then(r => r.arrayBuffer()).then(buf => {
+  return fetch(url).then(r => r.arrayBuffer()).then(buf => {
     const bytes = new Uint8Array(buf);
-    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return;
+    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return null;
     let pos = 8;
     let workflowRaw = null;
     let swarmRaw = null;
@@ -460,10 +460,10 @@ function extractWorkflowFromImage(url){
       try { swarm = JSON.parse(swarmRaw); } catch(e){ console.warn("No se pudo parsear metadatos SwarmUI:", e.message); }
       if(swarm){
         applySwarmParams(swarm);
-        return;
+        return true;
       }
     }
-    if(workflowRaw == null) return;
+    if(workflowRaw == null) return null;
     let workflow;
     try {
       workflow = JSON.parse(workflowRaw);
@@ -472,14 +472,15 @@ function extractWorkflowFromImage(url){
       const last = workflowRaw.lastIndexOf("}");
       if(first !== -1 && last > first){
         try { workflow = JSON.parse(workflowRaw.slice(first, last + 1)); }
-        catch(e2){ console.warn("No se pudo parsear workflow de metadatos:", e2.message); return; }
+        catch(e2){ console.warn("No se pudo parsear workflow de metadatos:", e2.message); return null; }
       } else {
         console.warn("No se pudo parsear workflow de metadatos:", e1.message);
-        return;
+        return null;
       }
     }
     applyWorkflow(workflow);
-  }).catch(e => console.warn("No se pudo leer metadatos:", e.message));
+    return true;
+  }).catch(e => { console.warn("No se pudo leer metadatos:", e.message); return null; });
 }
 
 function applySwarmParams(swarm){
@@ -1194,54 +1195,8 @@ $("btnLoadMeta").addEventListener("click", async () => {
   $("btnLoadMeta").disabled = true;
   $("btnLoadMeta").textContent = "Leyendo metadatos...";
   try {
-    const r = await fetch(refImgEl.src);
-    const buf = await r.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50){
-      log("ℹ️ No es un PNG válido, no puede contener metadatos Krea2.", "l-info");
-      return;
-    }
-    let pos = 8;
-    let workflowRaw = null;
-    while(pos < bytes.length - 8){
-      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
-      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
-      if(type === "tEXt"){
-        const dataStart = pos + 8;
-        let nullPos = dataStart;
-        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
-        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
-        if(keyword === "prompt"){
-          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
-          break;
-        }
-      }
-      if(type === "IEND") break;
-      pos = pos + 12 + len;
-    }
-    if(workflowRaw == null){
-      log("ℹ️ Esta imagen no contiene metadatos de workflow Krea2.", "l-info");
-      return;
-    }
-    let workflow;
-    try {
-      workflow = JSON.parse(workflowRaw);
-    } catch(e1){
-      const first = workflowRaw.indexOf("{");
-      const last = workflowRaw.lastIndexOf("}");
-      if(first !== -1 && last > first){
-        try {
-          workflow = JSON.parse(workflowRaw.slice(first, last + 1));
-          log("⚠️ Metadatos tenían basura tras el JSON; se recortó.", "l-warn");
-        } catch(e2){
-          throw new Error("JSON inválido tras recortar: "+e2.message);
-        }
-      } else {
-        throw e1;
-      }
-    }
-    applyWorkflow(workflow);
-    log("📋 Metadatos cargados: prompt, semilla, modelo, LoRAs y demás parámetros actualizados.", "l-ok");
+    const found = await extractWorkflowFromImage(refImgEl.src);
+    if(found === null) log("ℹ️ Esta imagen no contiene metadatos de workflow.", "l-info");
   } catch(e) {
     log("❌ Error leyendo metadatos: "+e.message, "l-err");
   } finally {
