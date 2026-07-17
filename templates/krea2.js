@@ -355,8 +355,16 @@ function addToVariantGallery(media, seedValue, timeText) {
             if(remaining === 0) box.style.display = "none";
             log("🗑️ Variante eliminada del disco: "+fn, "l-ok");
         } catch(err){
-            log("❌ No se pudo borrar del disco: "+err.message, "l-err");
-            delBtn.disabled = false;
+            if(err.message.includes("404")){
+                card.remove();
+                const remaining = grid.querySelectorAll(".variant-card").length;
+                $("variantCount").textContent = `(${remaining})`;
+                if(remaining === 0) box.style.display = "none";
+                log("🗑️ Variante ya no estaba en disco, eliminada de la galería: "+fn, "l-ok");
+            } else {
+                log("❌ No se pudo borrar del disco: "+err.message, "l-err");
+                delBtn.disabled = false;
+            }
         }
     });
 
