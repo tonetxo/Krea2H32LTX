@@ -540,6 +540,20 @@ $("dmdBypassSwitch").addEventListener("click",()=>{
   log(dmdBypass ? "DMD LoRA desactivada" : "DMD LoRA activada", "l-ok");
 });
 
+// Zoom/pan/fullscreen para imagen de entrada
+const inputZoom = setupZoomPan("inputWrap", "inputImg", "btnResetZoomInput", "btnFullscreenInput");
+
+// Click en el wrap de la imagen de entrada -> abrir file dialog para reemplazar
+$("inputWrap").addEventListener("click", (e) => {
+  if(inputZoom.isFullscreen()) return;
+  if(e.target.closest("#btnResetZoomInput") || e.target.closest("#btnFullscreenInput")) return;
+  $("fileInput").click();
+});
+// Drag/drop sobre el wrap también
+["dragenter","dragover"].forEach(ev=>$("inputWrap").addEventListener(ev,e=>{e.preventDefault();$("dropzone").classList.add("drag");}));
+["dragleave","drop"].forEach(ev=>$("inputWrap").addEventListener(ev,e=>{e.preventDefault();$("dropzone").classList.remove("drag");}));
+$("inputWrap").addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+
 const dz=$("dropzone"),fileInput=$("fileInput");
 dz.addEventListener("click",()=>fileInput.click());
 ["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("drag");}));
@@ -554,6 +568,10 @@ function handleFile(f, shouldSaveToGallery = true){
   const isVideo = f.type.startsWith("video/") || /\.(mp4|webm|mov|mkv|avi)$/i.test(f.name);
 
   if(isVideo){
+    // Mostrar dropzone, ocultar wrap de imagen
+    $("dropzone").style.display = "";
+    $("inputWrap").style.display = "none";
+    $("imgInputActions").style.display = "none";
     handleVideoFile(f, shouldSaveToGallery);
     return;
   }
@@ -566,20 +584,26 @@ function handleFile(f, shouldSaveToGallery = true){
 
   const reader = new FileReader();
   reader.onload = (e) => {
-    const ph = dz.querySelector(".ph");
-    if(ph) ph.remove();
-
-    let img = dz.querySelector("img");
-    if(!img){
-      img = document.createElement("img");
-      dz.appendChild(img);
-    }
-    img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
-    img.src = e.target.result;
-
+    showInputImage(e.target.result);
     log(`🖼️ Imagen cargada: ${f.name}`, "l-ok");
   };
   reader.readAsDataURL(f);
+}
+
+function showInputImage(src){
+  const wrap = $("inputWrap"), img = $("inputImg"), actions = $("imgInputActions");
+  if(!wrap || !img) return;
+  img.onload = () => {
+    updateDzInfo(img.naturalWidth, img.naturalHeight);
+    inputZoom.resetZoom();
+  };
+  img.src = src;
+  img.style.display = "block";
+  wrap.style.display = "flex";
+  actions.style.display = "flex";
+  // Ocultar el dropzone y el placeholder
+  const dz = $("dropzone");
+  if(dz) dz.style.display = "none";
 }
 
 let currentVideoFile = null;
@@ -619,13 +643,7 @@ function handleVideoFile(file, shouldSaveToGallery = true){
       const frameName = `temp_${Date.now()}_${file.name.replace(/\.[^.]+$/, '')}_${frameLabel}.jpg`;
       localFile = new File([blob], frameName, {type: "image/jpeg"});
 
-      const ph = dz.querySelector(".ph");
-      if(ph) ph.remove();
-      let img = dz.querySelector("img");
-      if(!img){ img = document.createElement("img"); dz.appendChild(img); }
-      img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
-      img.src = dataUrl;
-
+      showInputImage(dataUrl);
       log(`🎬 Vídeo cargado: ${file.name} (${frameLabel} frame como imagen de entrada)`, "l-ok");
 
       metaPromise.then(workflow => {
@@ -864,12 +882,7 @@ function captureFrameFromPlayer(){
       try { dataUrl = canvas.toDataURL("image/jpeg", 0.92); }
       catch(secErr){ log("❌ Canvas tainted (CORS). No se puede capturar el frame del vídeo.", "l-err"); return; }
       const baseName = (currentMedia[2]?.filename || "video").replace(/\.[^.]+$/, "");
-      const ph = dz.querySelector(".ph");
-      if(ph) ph.remove();
-      let img = dz.querySelector("img");
-      if(!img){ img = document.createElement("img"); dz.appendChild(img); }
-      img.onload = () => updateDzInfo(img.naturalWidth, img.naturalHeight);
-      img.src = dataUrl;
+      showInputImage(dataUrl);
       const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.92));
       const frameFile = new File([blob], `${baseName}_frame_${targetTime.toFixed(2)}s.jpg`, { type: "image/jpeg" });
       localFile = frameFile;

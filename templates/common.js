@@ -569,6 +569,147 @@ async function stopAll(){
   log("🛑 Generación detenida.", "l-err");
 }
 
+// --- ZOOM / PAN / FULLSCREEN (shared) ---
+function getImageVisibleRect(img){
+  const rect = img.getBoundingClientRect();
+  const natW = img.naturalWidth || rect.width;
+  const natH = img.naturalHeight || rect.height;
+  if(!natW || !natH) return rect;
+  const scale = Math.min(rect.width / natW, rect.height / natH);
+  const visW = natW * scale;
+  const visH = natH * scale;
+  return {
+    left: rect.left + (rect.width - visW) / 2,
+    top: rect.top + (rect.height - visH) / 2,
+    width: visW,
+    height: visH,
+    right: rect.left + (rect.width + visW) / 2,
+    bottom: rect.top + (rect.height + visH) / 2
+  };
+}
+
+function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
+  let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY;
+  const wrap = $(wrapId);
+  if(!wrap) return { resetZoom: ()=>{}, isFullscreen: ()=>false };
+
+  function getImg(){ return $(imgId); }
+
+  function resetZoom(){
+    zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
+    const img = getImg();
+    if(img){
+      img.style.transform = "none";
+      void img.offsetWidth;
+    }
+    wrap.style.cursor = "grab";
+  }
+
+  function applyZoom(){
+    const img = getImg();
+    if(img) img.style.transform = `translate(${zoomPanX}px,${zoomPanY}px) scale(${zoomLevel})`;
+  }
+
+  wrap.addEventListener("wheel", (e) => {
+    const img = getImg();
+    if(!img || img.style.display === "none") return;
+    e.preventDefault();
+    const visRect = getImageVisibleRect(img);
+    if(e.clientX < visRect.left || e.clientX > visRect.right || e.clientY < visRect.top || e.clientY > visRect.bottom) return;
+    const mx = e.clientX - visRect.left;
+    const my = e.clientY - visRect.top;
+    const cx = visRect.width / 2;
+    const cy = visRect.height / 2;
+    const old = zoomLevel;
+    zoomLevel *= (e.deltaY < 0) ? 1.12 : 0.88;
+    zoomLevel = Math.max(1, Math.min(20, zoomLevel));
+    const ratio = zoomLevel / old;
+    zoomPanX += (mx - cx) * (1 - ratio);
+    zoomPanY += (my - cy) * (1 - ratio);
+    applyZoom();
+  });
+
+  wrap.addEventListener("mousedown", (e) => {
+    const img = getImg();
+    if(!img || img.style.display === "none" || zoomLevel <= 1) return;
+    e.preventDefault();
+    zoomDragging = true;
+    zoomStartX = e.clientX; zoomStartY = e.clientY;
+    zoomStartPanX = zoomPanX; zoomStartPanY = zoomPanY;
+    wrap.style.cursor = "grabbing";
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if(!zoomDragging) return;
+    e.preventDefault();
+    zoomPanX = zoomStartPanX + (e.clientX - zoomStartX);
+    zoomPanY = zoomStartPanY + (e.clientY - zoomStartY);
+    applyZoom();
+  });
+
+  window.addEventListener("mouseup", () => {
+    if(!zoomDragging) return;
+    zoomDragging = false;
+    wrap.style.cursor = "grab";
+  });
+
+  if(resetBtnId){
+    const btn = $(resetBtnId);
+    if(btn) btn.addEventListener("click", resetZoom);
+  }
+
+  function enterFs(){
+    const img = getImg();
+    wrap.dataset.fsPrev = wrap.style.cssText || "";
+    wrap.style.cssText = "position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;margin:0!important;padding:0!important;background:#000;border-radius:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;";
+    if(img){
+      img.dataset.fsPrev = img.style.cssText || "";
+      img.style.cssText = "display:block!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;transform:none!important;transform-origin:center center!important;";
+    }
+  }
+  function exitFs(){
+    const img = getImg();
+    if(wrap.dataset.fsPrev !== undefined){ wrap.style.cssText = wrap.dataset.fsPrev; delete wrap.dataset.fsPrev; }
+    else { wrap.style.cssText = ""; }
+    if(img){
+      if(img.dataset.fsPrev !== undefined){ img.style.cssText = img.dataset.fsPrev; delete img.dataset.fsPrev; }
+      else { img.style.cssText = ""; }
+      applyZoom();
+    }
+    if(wrap.style.display === "") wrap.style.display = "block";
+  }
+
+  function isFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+
+  if(fullscreenBtnId){
+    const btn = $(fullscreenBtnId);
+    if(btn){
+      btn.addEventListener("click", () => {
+        if(!document.fullscreenElement && !document.webkitFullscreenElement){
+          if(wrap.requestFullscreen) wrap.requestFullscreen();
+          else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
+        } else {
+          if(document.exitFullscreen) document.exitFullscreen();
+          else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+      });
+    }
+  }
+
+  wrap.addEventListener("fullscreenchange", () => {
+    if(document.fullscreenElement || document.webkitFullscreenElement) enterFs();
+    else exitFs();
+  });
+  wrap.addEventListener("webkitfullscreenchange", () => {
+    if(document.fullscreenElement || document.webkitFullscreenElement) enterFs();
+    else exitFs();
+  });
+
+  function getState(){ return { zoomLevel, zoomPanX, zoomPanY }; }
+
+  return { resetZoom, getState, isFullscreen };
+}
+
 // --- INIT: all top-level code that uses $ or CONFIG ---
 // Called by the UI-specific JS after CONFIG is defined.
 function initCommon(){
