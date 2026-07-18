@@ -28,6 +28,7 @@ let currentPromptId = null;
 let timers = {};
 let loras = [];
 let selectedPromptKey = null;
+let lastPromptDir = "";
 let sysPromptEditData = null;
 let sysPromptEditMode = "text";
 
@@ -346,7 +347,8 @@ function loadPrompts(){
 }
 
 function savePrompt(){
-  const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):");
+  const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
+  const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):", defaultName);
   if(!name) return;
   const text = $("prompt").value;
   const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
@@ -357,6 +359,8 @@ function savePrompt(){
   saved[name] = text;
   localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
   selectedPromptKey = name;
+  const parts = name.split('/');
+  if(parts.length > 1) lastPromptDir = parts.slice(0, -1).join('/');
   loadPrompts();
   log(`Prompt "${name}" guardado.`, "l-ok");
 }
@@ -776,7 +780,8 @@ function initCommon(){
   $("btnSaveEnhanced").addEventListener("click", () => {
     const text = $("enhancerOutput").value.trim();
     if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
-    const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):");
+    const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
+    const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);
     if(!name) return;
     const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
     if(saved[name]){
@@ -785,6 +790,8 @@ function initCommon(){
     saved[name] = text;
     localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
     selectedPromptKey = name;
+    const parts = name.split('/');
+    if(parts.length > 1) lastPromptDir = parts.slice(0, -1).join('/');
     loadPrompts();
     log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
   });
