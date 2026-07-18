@@ -3477,7 +3477,7 @@ async function runSingleGeneration(index) {
         startTimer(data.prompt_id, isStep2 ? 2 : 1);
         pollFallback(data.prompt_id);
     } catch(err) {
-        log(`❌ No se pudo encolar: ${err.message}`, "l-err");
+        log(`❌ No se pudo encolar: ${err.message || err}`, "l-err");
         if(generationStep === 1){
             generationStep = 0;
         }
@@ -3522,7 +3522,8 @@ $("btnEnhance").addEventListener("click", async () => {
   if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
   const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
-  if(mode === "vision" && localFile){
+  if(mode === "vision"){
+    if(!localFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
     try {
       const b64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -3531,12 +3532,12 @@ $("btnEnhance").addEventListener("click", async () => {
           const base64 = dataUrl.split(",")[1];
           resolve(base64);
         };
-        reader.onerror = reject;
+        reader.onerror = () => reject(new Error("FileReader error: " + (reader.error?.message || reader.error?.code || "unknown")));
         reader.readAsDataURL(localFile);
       });
       payload.images = [b64];
     } catch(e) {
-      log("⚠️ No se pudo leer la imagen: "+e.message, "l-err");
+      log("⚠️ No se pudo leer la imagen: "+(e.message || e), "l-err");
       return;
     }
   }
