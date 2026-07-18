@@ -594,6 +594,9 @@ function getImageVisibleRect(img){
 
 function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
   let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY;
+  let panMoved = false;
+  // Guardar estado de zoom/pan al entrar/salir de fullscreen
+  let fsSavedZoom = null;
   const wrap = $(wrapId);
   if(!wrap) return { resetZoom: ()=>{}, isFullscreen: ()=>false };
 
@@ -638,6 +641,7 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
     if(!img || img.style.display === "none" || zoomLevel <= 1) return;
     e.preventDefault();
     zoomDragging = true;
+    panMoved = false;
     zoomStartX = e.clientX; zoomStartY = e.clientY;
     zoomStartPanX = zoomPanX; zoomStartPanY = zoomPanY;
     wrap.style.cursor = "grabbing";
@@ -646,8 +650,11 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
   window.addEventListener("mousemove", (e) => {
     if(!zoomDragging) return;
     e.preventDefault();
-    zoomPanX = zoomStartPanX + (e.clientX - zoomStartX);
-    zoomPanY = zoomStartPanY + (e.clientY - zoomStartY);
+    const dx = e.clientX - zoomStartX;
+    const dy = e.clientY - zoomStartY;
+    if(Math.abs(dx) > 3 || Math.abs(dy) > 3) panMoved = true;
+    zoomPanX = zoomStartPanX + dx;
+    zoomPanY = zoomStartPanY + dy;
     applyZoom();
   });
 
@@ -659,17 +666,21 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
 
   if(resetBtnId){
     const btn = $(resetBtnId);
-    if(btn) btn.addEventListener("click", resetZoom);
+    if(btn) btn.addEventListener("click", (e) => { e.stopPropagation(); resetZoom(); });
   }
 
   function enterFs(){
     const img = getImg();
+    // Guardar estado de zoom/pan actual antes de resetear para fullscreen
+    fsSavedZoom = { level: zoomLevel, panX: zoomPanX, panY: zoomPanY, wrapCss: wrap.style.cssText || "", imgCss: img ? (img.style.cssText || "") : "" };
     wrap.dataset.fsPrev = wrap.style.cssText || "";
     wrap.style.cssText = "position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;margin:0!important;padding:0!important;background:#000;border-radius:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;";
     if(img){
       img.dataset.fsPrev = img.style.cssText || "";
       img.style.cssText = "display:block!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;transform:none!important;transform-origin:center center!important;";
     }
+    // Resetear zoom/pan para fullscreen (empezar fresco)
+    zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
   }
   function exitFs(){
     const img = getImg();
@@ -678,9 +689,17 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
     if(img){
       if(img.dataset.fsPrev !== undefined){ img.style.cssText = img.dataset.fsPrev; delete img.dataset.fsPrev; }
       else { img.style.cssText = ""; }
-      applyZoom();
     }
-    if(wrap.style.display === "") wrap.style.display = "block";
+    // Restaurar estado de zoom/pan anterior al fullscreen
+    if(fsSavedZoom){
+      zoomLevel = fsSavedZoom.level;
+      zoomPanX = fsSavedZoom.panX;
+      zoomPanY = fsSavedZoom.panY;
+      fsSavedZoom = null;
+    }
+    applyZoom();
+    // Asegurar que el wrap sigue visible (display flex o block según el caso)
+    if(wrap.style.display === "" || wrap.style.display === "none") wrap.style.display = "flex";
   }
 
   function isFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
@@ -688,7 +707,8 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
   if(fullscreenBtnId){
     const btn = $(fullscreenBtnId);
     if(btn){
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
         if(!document.fullscreenElement && !document.webkitFullscreenElement){
           if(wrap.requestFullscreen) wrap.requestFullscreen();
           else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
@@ -711,7 +731,10 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
 
   function getState(){ return { zoomLevel, zoomPanX, zoomPanY }; }
 
-  return { resetZoom, getState, isFullscreen };
+  // Retornar también si el último mousedown+mouseup fue un pan (para que el caller pueda ignorar el click)
+  function wasPan(){ return panMoved; }
+
+  return { resetZoom, getState, isFullscreen, wasPan };
 }
 
 // --- INIT: all top-level code that uses $ or CONFIG ---

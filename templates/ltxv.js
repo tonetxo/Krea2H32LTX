@@ -547,6 +547,7 @@ const inputZoom = setupZoomPan("inputWrap", "inputImg", "btnResetZoomInput", "bt
 $("inputWrap").addEventListener("click", (e) => {
   if(inputZoom.isFullscreen()) return;
   if(e.target.closest("#btnResetZoomInput") || e.target.closest("#btnFullscreenInput")) return;
+  if(inputZoom.wasPan && inputZoom.wasPan()) return;
   $("fileInput").click();
 });
 // Drag/drop sobre el wrap también
