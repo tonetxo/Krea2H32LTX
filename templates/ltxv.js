@@ -957,7 +957,7 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
 
     card.innerHTML = `
         <span class="variant-badge">Var ${idx} · ${typeShort}</span>
-        <video src="${url}" crossorigin="anonymous" controls muted preload="none" playsinline></video>
+        <video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
         <div class="variant-info">
             <span class="variant-seed-display" title="${tooltipText}">
                 <span class="seed-text">${displayText}</span>
