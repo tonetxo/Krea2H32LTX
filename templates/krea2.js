@@ -37,6 +37,9 @@ CONFIG.findMedia = function(nodeOutput){
 };
 CONFIG.showMedia = function(slot, media, options){ showImage(media); };
 CONFIG.addToVariantGallery = addToVariantGallery;
+CONFIG.renderVariantMedia = function(card, url, media){
+  return `<img src="${url}">`;
+};
 CONFIG.onSeedUpdate = function(realSeed){ /* Krea2 logs only; no seed UI toggle */ };
 CONFIG.onPromptError = function(pid){};
 CONFIG.startNextVariant = function(index){ runSingleGeneration(index); };
@@ -61,16 +64,13 @@ CONFIG.onStopAll = function(){
 // --- Krea2 displayResult callback ---
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   const timeText = tTotal || "";
-  const outputKeys = Object.keys(entry.outputs || {});
   const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
-  log(`[DEBUG displayResult pid=${promptId}] outputKeys=[${outputKeys.join(", ")}] save=${!!entry.outputs[N.SAVE]} preview=${!!entry.outputs[N.PREVIEW]} decoded=${!!entry.outputs[N.VAE_DECODE]}`);
+  if(window.DEBUG) console.debug("[displayResult]", promptId, "keys=", Object.keys(entry.outputs||{}), "out=", !!outNode);
   if(!outNode) {
-    log(`[DEBUG displayResult] no outNode (S=${N.SAVE}, P=${N.PREVIEW}, V=${N.VAE_DECODE}); foundOutput=false`, "l-warn");
     return { foundOutput: false };
   }
-  log(`[DEBUG displayResult] outNode keys: ${Object.keys(outNode).join(", ")}`);
   const media = CONFIG.findMedia(outNode);
-  log(`[DEBUG displayResult] media=${JSON.stringify(media)}`);
+  if(window.DEBUG) console.debug("[displayResult] media=", media);
   if(!media) {
     return { foundOutput: false };
   }
@@ -136,7 +136,7 @@ $("btnSendLtxv").addEventListener("click", () => {
   const ref = encodeURIComponent(filename);
   const here = window.location;
   const targetHost = here.hostname;
-  const targetPort = "8000";
+  const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
   const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
   const win = window.open(url, "_blank");
   if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
@@ -156,85 +156,43 @@ function addToVariantGallery(media, seedValue, timeText) {
     const grid = $("variantGrid");
     box.style.display = "block";
 
-    const { filename, subfolder, type } = media;
-    const ts = Date.now();
-    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}`;
+    const card = buildVariantCard(grid, box, media, seedValue, timeText, null, null, "var");
+    const url = mediaViewUrl(media, { anchor: "" });
+
+    // Añadir enlace de descarga extra (específico de la galería Krea2).
+    const icons = card.querySelector(".variant-icons");
+    if(icons){
+      const dl = document.createElement("a");
+      dl.href = url;
+      dl.download = "";
+      dl.style.cssText = "color:var(--accent);text-decoration:none";
+      dl.textContent = "⬇";
+      dl.addEventListener("click", (e) => e.stopPropagation());
+      icons.insertBefore(dl, icons.firstChild);
+    }
 
     const hasSeed = seedValue !== null && seedValue !== undefined;
-    const displayText = hasSeed ? String(seedValue) : `Var. #${variantCounter + 1}`;
-    const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
-    const timeStr = timeText || "";
-
-    const card = document.createElement("div");
-    card.className = "variant-card";
-    card.dataset.filename = filename;
-    card.dataset.subfolder = subfolder;
-    card.dataset.type = type;
-    card.innerHTML = `
-        <img src="${url}">
-        <div class="variant-info">
-            <span class="variant-seed-display" title="${tooltipText}">
-                <span class="seed-text">${displayText}</span>
-                <span class="copy-icon">📋</span>
-            </span>
-            <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
-            <span class="variant-icons">
-                <a href="${url}" download style="color:var(--accent);text-decoration:none" onclick="event.stopPropagation();">⬇</a>
-                <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
-            </span>
-        </div>
-    `;
-
     if(hasSeed) {
         const seedSpan = card.querySelector('.variant-seed-display');
-        seedSpan.addEventListener('click', async (e) => {
+        seedSpan.addEventListener('click', (e) => {
             e.stopPropagation();
-            try {
-                await navigator.clipboard.writeText(String(seedValue));
-                const originalHTML = seedSpan.innerHTML;
-                seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
-                setTimeout(() => { seedSpan.innerHTML = originalHTML; }, 1200);
-            } catch(err) { console.error("Error al copiar:", err); }
+            copySeedToClipboard(seedSpan, seedValue);
         });
     }
 
     const delBtn = card.querySelector(".variant-del-btn");
-    delBtn.addEventListener("click", async (e) => {
+    delBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if(!confirm("¿Eliminar esta variante del disco y de la galería?")) return;
-        const fn = card.dataset.filename;
-        const sf = card.dataset.subfolder;
-        const tp = card.dataset.type;
-        delBtn.disabled = true;
-        try {
-            const r = await fetch("/api/file_delete", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({filename: fn, subfolder: sf, type: tp}),
-            });
-            if(!r.ok){
-                const t = await r.text().catch(()=>"");
-                throw new Error("HTTP "+r.status+" "+(t||"").slice(0,200));
-            }
-            const j = await r.json();
-            if(!j.ok && !j.deleted) throw new Error("Respuesta inesperada del backend");
-            card.remove();
+        const updateCount = (grid, box) => {
             const remaining = grid.querySelectorAll(".variant-card").length;
             $("variantCount").textContent = `(${remaining})`;
             if(remaining === 0) box.style.display = "none";
-            log("🗑️ Variante eliminada del disco: "+fn, "l-ok");
-        } catch(err){
-            if(err.message.includes("404")){
-                card.remove();
-                const remaining = grid.querySelectorAll(".variant-card").length;
-                $("variantCount").textContent = `(${remaining})`;
-                if(remaining === 0) box.style.display = "none";
-                log("🗑️ Variante ya no estaba en disco, eliminada de la galería: "+fn, "l-ok");
-            } else {
-                log("❌ No se pudo borrar del disco: "+err.message, "l-err");
-                delBtn.disabled = false;
-            }
-        }
+        };
+        deleteMediaFile(card, delBtn, {
+            filename: card.dataset.filename,
+            subfolder: card.dataset.subfolder,
+            type: card.dataset.type,
+        }, grid, box, "Variante", updateCount, updateCount);
     });
 
     card.addEventListener("click", (e) => {
@@ -245,11 +203,10 @@ function addToVariantGallery(media, seedValue, timeText) {
         reader.onload = (ev) => addToGallery(ev.target.result);
         reader.readAsDataURL(blob);
       });
-      currentOutputMedia = { filename, subfolder, type };
+      currentOutputMedia = { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type };
       currentRefVariantIndex = Array.from(grid.children).indexOf(card);
     });
 
-    grid.appendChild(card);
     $("variantCount").textContent = `(${variantCounter + 1})`;
 }
 
@@ -429,7 +386,6 @@ function applySwarmParams(swarm){
 }
 
 function applyWorkflow(workflow){
-  const N = CONFIG.N;
   const g = workflow;
 
   if(g[N.PROMPT]) $("prompt").value = g[N.PROMPT].inputs.string || "";
@@ -562,6 +518,7 @@ async function dbGetAllImages(){
     const req = tx.objectStore(GALLERY_STORE).getAll();
     req.onsuccess = () => resolve(req.result || []);
     req.onerror = () => reject(req.error);
+    tx.onerror = () => reject(tx.error);
   });
 }
 async function dbDeleteImage(hash){
@@ -592,7 +549,10 @@ function aspectRatioStr(w, h){
 async function getImageHash(base64Str) {
     try {
         if(!crypto?.subtle?.digest) throw new Error("crypto.subtle no disponible (HTTP)");
-        const msgBuffer = new TextEncoder().encode(base64Str.substring(0, 500) + base64Str.length);
+        // Hasheamos el thumb completo (es pequeño: ~260px JPEG) + la longitud del full.
+        // Antes solo se hasheaban los primeros 500 bytes, lo que provocaba colisiones
+        // entre imágenes distintas con mismo prefijo y misma longitud.
+        const msgBuffer = new TextEncoder().encode(base64Str + "|" + base64Str.length);
         const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
@@ -621,11 +581,29 @@ function resizeImageForStorage(base64Str, maxWidth = 260) {
     });
 }
 
+// Tope del historial de imágenes en IndexedDB. Cuando se supera, se borran
+// los registros más antiguos (por ts). Evita que la base crezca indefinidamente
+// con uso prolongado.
+const GALLERY_MAX_RECORDS = 500;
+
+async function _evictOldGalleryEntries(){
+  try {
+    const all = await dbGetAllImages();
+    if(all.length <= GALLERY_MAX_RECORDS) return;
+    all.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    const toRemove = all.slice(0, all.length - GALLERY_MAX_RECORDS);
+    for(const item of toRemove){
+      if(item.hash) await dbDeleteImage(item.hash);
+    }
+  } catch(e){ console.warn("Eviction de galería falló:", e); }
+}
+
 async function addToGallery(base64Data) {
     try {
         const { dataUrl: thumb, width, height } = await resizeImageForStorage(base64Data, 260);
         const hash = await getImageHash(thumb);
         await dbPutImage({ hash, thumb, full: base64Data, width, height, ts: Date.now() });
+        await _evictOldGalleryEntries();
         await renderGallery();
     } catch (err) {
         console.warn("No se pudo guardar en galería:", err);
@@ -1091,7 +1069,7 @@ $("btnSendRefLtxv").addEventListener("click", () => {
     const ref = encodeURIComponent(filename);
     const here = window.location;
     const targetHost = here.hostname;
-    const targetPort = "8000";
+    const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
     const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
     const win = window.open(url, "_blank");
     if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");

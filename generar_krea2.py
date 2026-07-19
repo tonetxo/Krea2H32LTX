@@ -1,10 +1,15 @@
+import os
 from generar_common import generate_html
 
 # --- CONFIGURACIÓN ---
-JSON_FILE = 'Krea2_OK.json'
-OUTPUT_HTML = 'Krea2_WebUI.html'
-MODELS_DIR = '/home/tonetxo/SwarmUI/Models/diffusion_models/flux2'
-LORAS_DIR = '/home/tonetxo/SwarmUI/Models/Lora/K2'
+# Rutas configurables vía env vars; defaults = entorno original del autor.
+#   KREA2_JSON, KREA2_OUTPUT_HTML, KREA2_MODELS_DIR, KREA2_LORAS_DIR.
+JSON_FILE = os.environ.get("KREA2_JSON", "Krea2_OK.json")
+OUTPUT_HTML = os.environ.get("KREA2_OUTPUT_HTML", "Krea2_WebUI.html")
+MODELS_DIR = os.environ.get("KREA2_MODELS_DIR", "/home/tonetxo/SwarmUI/Models/diffusion_models/flux2")
+LORAS_DIR = os.environ.get("KREA2_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/K2")
+# Puerto donde se sirve la UI LTXV (para el botón "enviar a LTXV").
+LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
 # ---------------------
 
 def main():
@@ -24,6 +29,7 @@ def main():
         'header_title': 'Krea2',
         'header_sub': 'grafo: Krea2_OK',
         'model_count_label': 'modelos',
+        'ltxv_ui_port': LTXV_UI_PORT,
     })
 
 if __name__ == '__main__':

@@ -1403,6 +1403,7 @@ const BASE_GRAPH = {
 };
 const AVAILABLE_MODELS = ["10Eros_v1.3_fp8mixed_learned.safetensors", "10Eros_v1.4_DMD_int8_convrot.safetensors", "ltx-2.3-22b-distilled-1.1.safetensors", "ltxv/10Eros_v1.3_fp8mixed_learned.safetensors", "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors", "ltxv/sulphur_distil_bf16.safetensors"];
 const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "anal-insertion-i2v.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-distilled-lora-1.1_rank96_energy.safetensors", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors", "ltx-2.3-22b-distilled-lora-fro90_ceil72.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi2ltxv.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001250.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_000001750.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
+const LTXV_UI_PORT = "8000";
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
 //
 // This file is injected BEFORE the UI-specific JS (ltxv.js / krea2.js).
@@ -1517,7 +1518,7 @@ function extractTimings(entry, N){
 
 // --- SEED ---
 function randomSeed(){
-  return Math.floor(Math.random() * 0xFFFFFFFF);
+  return Math.floor(Math.random() * 0x100000000);
 }
 
 // --- SERVER / LOG ---
@@ -1545,7 +1546,7 @@ function updateServerHint(){
 // --- WEBSOCKET ---
 function connectSocket() {
     if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
-    const url = server().replace('http', 'ws') + '/ws?clientId=' + CLIENT_ID;
+    const url = server().replace(/^http/, 'ws') + '/ws?clientId=' + CLIENT_ID;
     socket = new WebSocket(url);
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
@@ -1600,7 +1601,7 @@ async function handlePromptDone(promptId) {
     }
 
     const statusInfo = entry.status ? { completed: entry.status.completed, status_str: entry.status.status_str } : null;
-    log(`[DEBUG handlePromptDone pid=${promptId}] status=${JSON.stringify(statusInfo)} outputKeys=[${Object.keys(entry.outputs).join(", ")}]`);
+    if(window.DEBUG) console.debug("[handlePromptDone]", promptId, statusInfo, Object.keys(entry.outputs));
 
     if(entry.status && entry.status.status_str === "error") {
         const errMsg = entry.status.exception_message || (entry.status.messages || []).filter(m => m[0] === "execution_error").map(m => m[1] && m[1].exception_message).filter(Boolean)[0] || "error desconocido del backend";
@@ -1681,8 +1682,28 @@ function processNextBatch() {
 }
 
 // --- PROMPT LIBRARY ---
+// Helper: lee el store de prompts como objeto; si está corrupto o no es un
+// objeto plano, lo resetea a {} para no romper la UI entera.
+function _readPromptStore(){
+  const raw = localStorage.getItem(CONFIG.PROMPTS_KEY);
+  if(!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if(parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+  } catch(e){ /* JSON corrupto: ignoramos y reseteamos */ }
+  try { localStorage.removeItem(CONFIG.PROMPTS_KEY); } catch(_){}
+  log("⚠️ Prompts guardados corruptos, reseteados.", "l-warn");
+  return {};
+}
+function _readOpenState(){
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY + '_open') || '{}');
+    return (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : {};
+  } catch(e){ return {}; }
+}
+
 function loadPrompts(){
-  let saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  let saved = _readPromptStore();
   let dirty = false;
   for(const key of Object.keys(saved)){
     if(key.endsWith('/') || !key.split('/').pop()){
@@ -1712,7 +1733,7 @@ function loadPrompts(){
     node.prompts.push({ key, name: promptName });
   }
 
-  const openState = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY + '_open') || '{}');
+  const openState = _readOpenState();
 
   function renderNode(node, container, path){
     for(const folderName of Object.keys(node.children).sort()){
@@ -1739,7 +1760,7 @@ function loadPrompts(){
       delFolder.addEventListener("click", (e) => {
         e.stopPropagation();
         if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
-        const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+        const saved = _readPromptStore();
         let count = 0;
         for(const key of Object.keys(saved)){
           if(key === folderPath || key.startsWith(folderPath + '/')){
@@ -1774,7 +1795,7 @@ function loadPrompts(){
       item.title = p.key;
       item.dataset.key = p.key;
       item.addEventListener("click", () => {
-        const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+        const saved = _readPromptStore();
         if(saved[p.key]){
           $("prompt").value = saved[p.key];
           selectedPromptKey = p.key;
@@ -1794,7 +1815,7 @@ function savePrompt(){
   const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):", defaultName);
   if(!name) return;
   const text = $("prompt").value;
-  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  const saved = _readPromptStore();
   if(saved[name]){
     const preview = saved[name].slice(0, 80);
     if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
@@ -1813,7 +1834,7 @@ function movePrompt(){
   const oldName = selectedPromptKey;
   const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
   if(!newName || newName === oldName) return;
-  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  const saved = _readPromptStore();
   if(saved[newName]){
     if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
   }
@@ -1828,7 +1849,7 @@ function movePrompt(){
 function deletePrompt(){
   if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para eliminar.", "l-err"); return; }
   if(!confirm(`¿Eliminar "${selectedPromptKey}"?`)) return;
-  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  const saved = _readPromptStore();
   delete saved[selectedPromptKey];
   localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
   selectedPromptKey = null;
@@ -2190,6 +2211,111 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
   return { resetZoom, getState, isFullscreen, wasPan };
 }
 
+// --- SHARED GALLERY HELPERS ---
+// Usados por addToVariantGallery() en ltxv.js y krea2.js.
+
+function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+
+function mediaViewUrl(media, extra){
+  const ts = extra && extra.ts != null ? extra.ts : Date.now();
+  const anchor = extra && extra.anchor ? extra.anchor : "";
+  const f = encodeURIComponent(media.filename || "");
+  const s = encodeURIComponent(media.subfolder || "");
+  const t = encodeURIComponent(media.type || "output");
+  return `${server()}/view?filename=${f}&subfolder=${s}&type=${t}&t=${ts}${anchor}`;
+}
+
+async function copySeedToClipboard(seedSpan, seedValue){
+  try {
+    await navigator.clipboard.writeText(String(seedValue));
+    const originalHTML = seedSpan.innerHTML;
+    seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
+    setTimeout(() => { seedSpan.innerHTML = originalHTML; }, 1200);
+  } catch(err){
+    console.error("Error al copiar:", err);
+  }
+}
+
+// Borrado de un fichero de output/temp via /api/file_delete.
+// Trata 404 como éxito (ya no estaba en disco) y elimina la tarjeta del DOM.
+// Callbacks opcionales: onOk(grid, box), onMissing(grid, box).
+async function deleteMediaFile(card, delBtn, media, grid, box, logPrefix, onOk, onMissing){
+  if(!confirm(`¿Eliminar este fichero del disco y de la galería?`)) return;
+  delBtn.disabled = true;
+  try {
+    const r = await fetch("/api/file_delete", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        filename: media.filename,
+        subfolder: media.subfolder || "",
+        type: media.type || "output",
+      }),
+    });
+    if(!r.ok){
+      const t = await r.text().catch(()=>"");
+      throw new Error("HTTP "+r.status+" "+(t||"").slice(0,200));
+    }
+    const j = await r.json();
+    if(!j.ok && !j.deleted) throw new Error("Respuesta inesperada del backend");
+    card.remove();
+    log("🗑️ "+logPrefix+" eliminado del disco: "+media.filename, "l-ok");
+    if(onOk) onOk(grid, box);
+  } catch(err){
+    if(err.message.includes("404")){
+      card.remove();
+      log("🗑️ "+logPrefix+" ya no estaba en disco, eliminado de la galería: "+media.filename, "l-ok");
+      if(onMissing) onMissing(grid, box);
+    } else {
+      log("❌ No se pudo borrar del disco: "+err.message, "l-err");
+      delBtn.disabled = false;
+    }
+  }
+}
+
+// Construye una tarjeta de variante común y la inserta en el grid.
+// CONFIG.renderVariantMedia(card, url, media) debe devolver el HTML del
+// elemento media (\u003cvideo\u003e o \u003cimg\u003e) y opcionalmente configurar
+// atributos (crossorigin, controls, preload, etc.).
+// Devuelve la tarjeta creada (ya insertada en el grid).
+function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort){
+  const hasSeed = seedValue !== null && seedValue !== undefined;
+  const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
+  const displayText = hasSeed ? String(seedValue) : (slot ? (slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${idx}`)) : `Var. #${idx}`);
+  const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
+  const timeStr = timeText || "";
+
+  const card = document.createElement("div");
+  card.className = "variant-card";
+  card.dataset.filename = media.filename || "";
+  card.dataset.subfolder = media.subfolder || "";
+  card.dataset.type = media.type || "output";
+  if(slot != null) card.dataset.slot = String(slot);
+  card.dataset.variantIndex = String(idx);
+
+  const url = mediaViewUrl(media, { anchor: "#t=0.1" });
+  const mediaHtml = CONFIG.renderVariantMedia
+    ? CONFIG.renderVariantMedia(card, url, media)
+    : `<img src="${url}">`;
+
+  card.innerHTML = `
+    <span class="variant-badge">Var ${idx} · ${typeShort}</span>
+    ${mediaHtml}
+    <div class="variant-info">
+      <span class="variant-seed-display" title="${tooltipText}">
+        <span class="seed-text">${displayText}</span>
+        <span class="copy-icon">📋</span>
+      </span>
+      <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
+      <span class="variant-icons">
+        <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
+      </span>
+    </div>
+  `;
+  grid.appendChild(card);
+  return card;
+}
+
 // --- INIT: all top-level code that uses $ or CONFIG ---
 // Called by the UI-specific JS after CONFIG is defined.
 function initCommon(){
@@ -2259,7 +2385,7 @@ function initCommon(){
     const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
     const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);
     if(!name) return;
-    const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+    const saved = _readPromptStore();
     if(saved[name]){
       if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
     }
@@ -2348,7 +2474,7 @@ function initCommon(){
 
   // Export prompts
   $("btnExportPrompts").addEventListener("click", () => {
-    const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+    const saved = _readPromptStore();
     const json = JSON.stringify(saved, null, 2);
     const blob = new Blob([json], {type: "application/json"});
     const a = document.createElement("a");
@@ -2376,7 +2502,7 @@ function initCommon(){
           if(typeof imported !== 'object' || Array.isArray(imported)){
             throw new Error("formato inválido (se esperaba un objeto)");
           }
-          const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+          const saved = _readPromptStore();
           let added = 0, overwritten = 0;
           for(const [key, val] of Object.entries(imported)){
             if(typeof val !== 'string') continue;
@@ -2467,6 +2593,9 @@ CONFIG.findMedia = function(nodeOutput){
 };
 CONFIG.showMedia = showVideo;
 CONFIG.addToVariantGallery = addToVariantGallery;
+CONFIG.renderVariantMedia = function(card, url, media){
+  return `<video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
+};
 CONFIG.onSeedUpdate = updateSeedUI;
 CONFIG.onPromptError = function(pid){
   delete promptSteps[pid];
@@ -2549,7 +2678,14 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
     generationStep = 2;
     const step1Seed = pendingSeeds[promptId];
     delete pendingSeeds[promptId];
-    pendingSeeds[firstPromptId] = step1Seed;
+    // Solo transferimos la seed al prompt del paso 2 si firstPromptId es válido;
+    // si por algún borde raro firstPromptId es null (p.ej. /prompt falló y luego
+    // llegó un execution_success tardío), no contaminamos pendingSeeds con clave "null".
+    if(firstPromptId && step1Seed != null){
+      pendingSeeds[firstPromptId] = step1Seed;
+    } else {
+      log("⚠️ No se pudo encadenar el paso 2: firstPromptId no asignado.", "l-warn");
+    }
     finalVariantIndex = variantCounter;
     runSingleGeneration(currentBatchIndex);
     // Marcamos el prompt del paso 1 como handled para que pollFallback no lo reprocese
@@ -2599,40 +2735,78 @@ function updateSeedUI(seedValue) {
 }
 
 // --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS MP4 ---
+// Busca el workflow embebido en el MP4 sin decodificar el archivo entero a string
+// (que para vídeos de cientos de MB dispararía la memoria). Escanea el Uint8Array
+// buscando el marcador ASCII '"prompt": {' o '{"<digitos>":\s*{', y a partir de ahí
+// decodifica en streaming con TextDecoder y brace-matching incremental.
 async function extractWorkflowFromMP4Buffer(arrayBuffer){
   const bytes = new Uint8Array(arrayBuffer);
-  const txt = new TextDecoder("latin1").decode(bytes);
-  let braceIdx = -1;
-  const patIdx = txt.indexOf('"prompt": {');
-  if(patIdx >= 0){
-    braceIdx = txt.indexOf('{', patIdx);
-  } else {
-    const m = txt.match(/\{"\d+":\s*\{/);
-    if(m) braceIdx = m.index;
-  }
-  if(braceIdx < 0) return null;
-  let depth = 0, i = braceIdx, inString = false, escape = false;
-  while(i < txt.length){
-    const c = txt[i];
-    if(inString){
-      if(escape){ escape = false; }
-      else if(c === '\\'){ escape = true; }
-      else if(c === '"'){ inString = false; }
-    } else {
-      if(c === '"'){ inString = true; }
-      else if(c === '{'){ depth++; }
-      else if(c === '}'){ depth--; if(depth === 0){ i++; break; } }
+  const marker = new TextEncoder().encode('"prompt": {');
+  let startIdx = -1;
+
+  // 1) Buscar el marcador '"prompt": {' (12 bytes ASCII) en el buffer.
+  outer: for(let i = 0; i <= bytes.length - marker.length; i++){
+    for(let j = 0; j < marker.length; j++){
+      if(bytes[i + j] !== marker[j]) continue outer;
     }
-    i++;
+    // Encontrado. Saltamos a la primera '{' después del marcador.
+    for(let k = i + marker.length; k < bytes.length; k++){
+      if(bytes[k] === 0x7B){ startIdx = k; break; }
+    }
+    break;
   }
-  if(depth !== 0) return null;
-  const jsonStr = txt.substring(braceIdx, i);
-  try {
-    return JSON.parse(jsonStr);
-  } catch(e){
-    console.warn("No se pudo parsear workflow del MP4:", e.message);
-    return null;
+
+  // 2) Si no aparece, buscamos el patrón '{"<digitos>":\s*{' (comienzo típico del
+  //    objeto "prompt" de ComfyUI cuando el primer nodo es numérico).
+  if(startIdx < 0){
+    for(let i = 0; i < bytes.length - 4; i++){
+      if(bytes[i] !== 0x7B || bytes[i+1] !== 0x22) continue; // '{"'
+      let j = i + 2;
+      while(j < bytes.length && bytes[j] >= 0x30 && bytes[j] <= 0x39) j++; // dígitos
+      if(j === i + 2) continue; // no había dígitos
+      if(bytes[j] !== 0x22) continue; // cierre de comillas '"'
+      let k = j + 1;
+      while(k < bytes.length && (bytes[k] === 0x20 || bytes[k] === 0x09 || bytes[k] === 0x0A || bytes[k] === 0x0D)) k++; // ws
+      if(bytes[k] === 0x3A){ // ':'
+        let m = k + 1;
+        while(m < bytes.length && (bytes[m] === 0x20 || bytes[m] === 0x09 || bytes[m] === 0x0A || bytes[m] === 0x0D)) m++;
+        if(bytes[m] === 0x7B){ startIdx = m; break; }
+      }
+    }
   }
+
+  if(startIdx < 0) return null;
+
+  // 3) Brace-matching incremental decodificando en streaming. Sólo conservamos
+  //    en memoria el fragmento desde startIdx hasta el cierre del objeto (típicamente
+  //    unas pocas decenas de KB en lugar de todo el MP4).
+  const decoder = new TextDecoder("latin1");
+  let depth = 0, inString = false, escape = false;
+  let collected = "";
+  const CHUNK = 65536;
+  for(let pos = startIdx; pos < bytes.length; pos += CHUNK){
+    const slice = bytes.subarray(pos, Math.min(pos + CHUNK, bytes.length));
+    const piece = decoder.decode(slice, { stream: true });
+    for(let i = 0; i < piece.length; i++){
+      const c = piece[i];
+      collected += c;
+      if(inString){
+        if(escape){ escape = false; }
+        else if(c === '\\'){ escape = true; }
+        else if(c === '"'){ inString = false; }
+      } else {
+        if(c === '"'){ inString = true; }
+        else if(c === '{'){ depth++; }
+        else if(c === '}'){ depth--; if(depth === 0){
+          try { return JSON.parse(collected); }
+          catch(e){ console.warn("No se pudo parsear workflow del MP4:", e.message); return null; }
+        } }
+      }
+    }
+  }
+  // Si llegamos al final sin cerrar el objeto, no hay workflow válido.
+  decoder.decode();
+  return null;
 }
 
 async function extractWorkflowFromMP4(url){
@@ -3356,108 +3530,41 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     const grid = $("variantGrid");
     box.style.display = "block";
 
-    const { filename, subfolder, type } = media;
-    const ts = Date.now();
-    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}#t=0.1`;
+    const typeShort = slot === 1 ? "1er" : (slot === 2 ? "final" : "var");
+    const card = buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort);
 
     const hasSeed = seedValue !== null && seedValue !== undefined;
-    const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
-    const slotLabel = slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${idx}`);
-    const displayText = hasSeed ? String(seedValue) : slotLabel;
-    const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
-    const timeStr = timeText || "";
-    const typeShort = slot === 1 ? "1er" : (slot === 2 ? "final" : "var");
-
-    const card = document.createElement("div");
-    card.className = "variant-card";
-    card.dataset.filename = filename;
-    card.dataset.subfolder = subfolder;
-    card.dataset.type = type;
-    card.dataset.slot = String(slot);
-    card.dataset.variantIndex = String(idx);
-
-    card.innerHTML = `
-        <span class="variant-badge">Var ${idx} · ${typeShort}</span>
-        <video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
-        <div class="variant-info">
-            <span class="variant-seed-display" title="${tooltipText}">
-                <span class="seed-text">${displayText}</span>
-                <span class="copy-icon">📋</span>
-            </span>
-            <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
-            <span class="variant-icons">
-                <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
-            </span>
-        </div>
-    `;
-
-
-
     if(hasSeed) {
         const seedSpan = card.querySelector('.variant-seed-display');
-        seedSpan.addEventListener('click', async (e) => {
+        seedSpan.addEventListener('click', (e) => {
             e.stopPropagation();
-            try {
-                await navigator.clipboard.writeText(String(seedValue));
-                const originalHTML = seedSpan.innerHTML;
-                seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
-                setTimeout(() => {
-                    seedSpan.innerHTML = originalHTML;
-                }, 1200);
-            } catch(err) {
-                console.error("Error al copiar:", err);
-            }
+            copySeedToClipboard(seedSpan, seedValue);
         });
     }
 
     const delBtn = card.querySelector(".variant-del-btn");
-    delBtn.addEventListener("click", async (e) => {
+    delBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        if(!confirm("¿Eliminar este vídeo del disco y de la galería?")) return;
-        const fn = card.dataset.filename;
-        const sf = card.dataset.subfolder;
-        const tp = card.dataset.type;
-        delBtn.disabled = true;
-        try {
-            const r = await fetch("/api/file_delete", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({filename: fn, subfolder: sf, type: tp}),
-            });
-            if(!r.ok){
-                const t = await r.text().catch(()=>"");
-                throw new Error("HTTP "+r.status+" "+(t||"").slice(0,200));
-            }
-            const j = await r.json();
-            if(!j.ok && !j.deleted) throw new Error("Respuesta inesperada del backend");
-            card.remove();
+        const updateCount = (grid, box) => {
             const remaining = grid.querySelectorAll(".variant-card").length;
             $("variantCount").textContent = `(${remaining})`;
             if(remaining === 0) box.style.display = "none";
-            log("🗑️ Vídeo eliminado del disco: "+fn, "l-ok");
-        } catch(err){
-            if(err.message.includes("404")){
-                card.remove();
-                const remaining = grid.querySelectorAll(".variant-card").length;
-                $("variantCount").textContent = `(${remaining})`;
-                if(remaining === 0) box.style.display = "none";
-                log("🗑️ Vídeo ya no estaba en disco, eliminado de la galería: "+fn, "l-ok");
-            } else {
-                log("❌ No se pudo borrar del disco: "+err.message, "l-err");
-                delBtn.disabled = false;
-            }
-        }
+        };
+        deleteMediaFile(card, delBtn, {
+            filename: card.dataset.filename,
+            subfolder: card.dataset.subfolder,
+            type: card.dataset.type,
+        }, grid, box, "Vídeo", updateCount, updateCount);
     });
 
     card.addEventListener("click", (e) => {
         if(e.target.closest("video")) return;
         if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn")) return;
         const varIndex = parseInt(card.dataset.variantIndex, 10) || (currentBatchIndex + 1);
-        showVideo(slot, { filename, subfolder, type }, { variantIndex: varIndex });
-        log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+filename, "l-ok");
+        showVideo(slot, { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type }, { variantIndex: varIndex });
+        log("▶ Vídeo cargado en ventana "+(slot===1?"1er pase":"final")+": "+card.dataset.filename, "l-ok");
     });
 
-    grid.appendChild(card);
     $("variantCount").textContent = `(${variantCounter + 1})`;
 }
 
@@ -3555,35 +3662,20 @@ async function loadVideoHistory(){
         }
       });
 
-      card.querySelector('[data-action="delete"]').addEventListener("click", async (e) => {
+      card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {
         e.stopPropagation();
-        if(!confirm("¿Eliminar este vídeo del disco?")) return;
         const btn = e.target;
-        btn.disabled = true;
-        try {
-          const r = await fetch("/api/file_delete", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({filename: item.filename, subfolder: item.subfolder, type: item.type}),
-          });
-          if(!r.ok) throw new Error("HTTP "+r.status);
-          const j = await r.json();
-          if(!j.ok && !j.deleted) throw new Error("Error del backend");
-          card.remove();
-          log("🗑️ Vídeo eliminado: "+item.filename, "l-ok");
+        const updateStatus = (grid) => {
           const remaining = grid.querySelectorAll(".variant-card").length;
           status.textContent = remaining ? `${remaining} vídeos.` : "No hay vídeos en el historial.";
-        } catch(err){
-          if(err.message.includes("404")){
-            card.remove();
-            log("🗑️ Vídeo ya no estaba en disco, eliminado: "+item.filename, "l-ok");
-            const remaining = grid.querySelectorAll(".variant-card").length;
-            status.textContent = remaining ? `${remaining} vídeos.` : "No hay vídeos en el historial.";
-          } else {
-            log("❌ No se pudo borrar: "+err.message, "l-err");
-            btn.disabled = false;
-          }
-        }
+        };
+        deleteMediaFile(card, btn, {
+          filename: item.filename,
+          subfolder: item.subfolder,
+          type: item.type,
+        }, grid, null, "Vídeo",
+          (grid) => updateStatus(grid),
+          (grid) => updateStatus(grid));
       });
 
       grid.appendChild(card);

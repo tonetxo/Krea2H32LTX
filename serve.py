@@ -23,6 +23,7 @@ import json
 import os
 import socketserver
 import sys
+import time
 import urllib.request
 import urllib.error
 
@@ -54,6 +55,12 @@ def _resolve_krea2_dir():
     return candidates[0]  # fall back; will report empty list
 
 KREA2_OUTPUT_DIR = _resolve_krea2_dir()
+
+# Caché simple por endpoint para /api/krea2_list y /api/ltxv_list.
+# Evita hacer glob+stat en cada refresh. TTL bajo (5s) para que el usuario vea
+# borrados/adiciones recientes sin esperar a que expire. Invalidado en file_delete.
+_LIST_CACHE = {}  # key -> (expires_at, payload_dict)
+LIST_CACHE_TTL = 5.0  # segundos
 
 # ComfyUI's install root (parent of /output and /temp). Used to validate
 # that file_delete targets are inside the backend's writable areas.
@@ -137,8 +144,32 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_error(405, "Method Not Allowed")
 
+    def _allowed_origin(self):
+        """Devuelve el Origin del cliente si coincide con el host de esta petición
+        (same-origin estricto). Bloquea que webs externas llamadas desde el mismo
+        navegador puedan reachar el proxy o los endpoints locales con credenciales.
+        Devuelve None si el origen no está permitido."""
+        origin = self.headers.get("Origin")
+        if not origin:
+            return None
+        host = self.headers.get("Host")
+        if not host:
+            return None
+        # Orígenes válidos: mismo esquema (http/https) + mismo Host (host:port).
+        # El Host header ya contiene el puerto que el navegador usó para llegar.
+        for scheme in ("http", "https"):
+            expected = f"{scheme}://{host}"
+            if origin == expected:
+                return origin
+        return None
+
     def _cors_preflight(self):
-        origin = self.headers.get("Origin", "*")
+        origin = self._allowed_origin()
+        if not origin:
+            # Origen no permitido: respondemos sin cabeceras CORS, el navegador bloqueará.
+            self.send_response(204)
+            self.end_headers()
+            return
         req_method = self.headers.get("Access-Control-Request-Method", "POST")
         req_headers = self.headers.get("Access-Control-Request-Headers", "Content-Type")
         self.send_response(204)
@@ -192,6 +223,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def _do_krea2_list(self):
         """List PNGs in KREA2_OUTPUT_DIR, newest first, max 50."""
+        cached = _LIST_CACHE.get("krea2")
+        if cached and cached[0] > time.time():
+            self._send_json(200, cached[1])
+            return
+        result = self._build_krea2_list()
+        _LIST_CACHE["krea2"] = (time.time() + LIST_CACHE_TTL, result)
+        self._send_json(200, result)
+
+    def _build_krea2_list(self):
         items = []
         try:
             paths = glob.glob(os.path.join(KREA2_OUTPUT_DIR, "*.png"))
@@ -203,7 +243,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     continue
             paths_with_time.sort(key=lambda x: x[0], reverse=True)
             paths = [p for _, p in paths_with_time][:50]
-            
+
             for p in paths:
                 try:
                     st = os.stat(p)
@@ -218,14 +258,23 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     continue
         except OSError as e:
             sys.stderr.write(f"[serve] krea2_list error: {e}\n")
-        self._send_json(200, {
+        return {
             "dir": KREA2_OUTPUT_DIR,
             "count": len(items),
             "items": items,
-        })
+        }
 
     def _do_ltxv_list(self):
         """List MP4s in ComfyUI output dir (recursive), newest first, max 100."""
+        cached = _LIST_CACHE.get("ltxv")
+        if cached and cached[0] > time.time():
+            self._send_json(200, cached[1])
+            return
+        result = self._build_ltxv_list()
+        _LIST_CACHE["ltxv"] = (time.time() + LIST_CACHE_TTL, result)
+        self._send_json(200, result)
+
+    def _build_ltxv_list(self):
         items = []
         output_dir = os.path.join(COMFYUI_ROOT, "output")
         try:
@@ -257,14 +306,19 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     continue
         except OSError as e:
             sys.stderr.write(f"[serve] ltxv_list error: {e}\n")
-        self._send_json(200, {
+        return {
             "dir": output_dir,
             "count": len(items),
             "items": items,
-        })
+        }
 
     def _do_file_delete(self):
-        """Delete a file inside ComfyUI's output/ or temp/. Validates path."""
+        """Delete a file inside ComfyUI's output/ or temp/. Validates path and origin."""
+        # Same-origin estricto: bloquea que una web externa abierta en el navegador
+        # pueda borrar archivos del disco del usuario vía CSRF.
+        if not self._allowed_origin():
+            self._send_json(403, {"error": "forbidden: solo same-origin puede llamar a file_delete"})
+            return
         length = int(self.headers.get("Content-Length", 0))
         if length > 1024 * 1024:  # Limit payload to 1MB
             self._send_json(400, {"error": "Content-Length demasiado grande"})
@@ -301,6 +355,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         try:
             os.remove(target)
             sys.stderr.write(f"[serve] file_delete: {target}\n")
+            # Invalidar cachés de listado para que el siguiente /api/*_list refleje el borrado.
+            _LIST_CACHE.pop("krea2", None)
+            _LIST_CACHE.pop("ltxv", None)
             self._send_json(200, {"ok": True, "deleted": target})
         except OSError as e:
             self._send_json(500, {"error": str(e)})
@@ -320,11 +377,21 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         body = None
         if method in ("POST", "PUT", "PATCH"):
             length = int(self.headers.get("Content-Length", 0))
+            # Tope para evitar que un cliente (o un atacante desde una web maliciosa)
+            # OOMee el proceso enviando cuerpos enormes al proxy. 100 MB es amplio
+            # para los payloads de /prompt (workflow JSON) y de /upload/image (imágenes
+            # y vídeos cortos). Subidas de vídeo muy grandes deberían trocearse por
+            # el cliente o subirse directamente a ComfyUI.
+            if length > 100 * 1024 * 1024:
+                self.send_error(413, "Payload Too Large (máx 100 MB en el proxy)")
+                return
             body = self.rfile.read(length) if length > 0 else b""
 
         # Exclude accept-encoding to prevent backend from returning compressed data,
         # which would require complex decompression logic and cause client issues
         # since we strip the Content-Encoding headers from the response.
+        # Exclude cookie/authorization too: el proxy no debe reenviar credenciales
+        # de sesión que pertenezcan a otros servicios de 127.0.0.1.
         req = urllib.request.Request(
             target,
             data=body,
@@ -332,7 +399,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 k: v
                 for k, v in self.headers.items()
                 if k.lower()
-                not in ("host", "connection", "transfer-encoding", "content-length", "origin", "accept-encoding")
+                not in ("host", "connection", "transfer-encoding", "content-length",
+                        "origin", "accept-encoding", "cookie", "authorization")
             },
             method=method,
         )
@@ -345,8 +413,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         if base == OLLAMA:
             req.add_header("Origin", "http://127.0.0.1:11434")
 
-        # Siempre añadimos los headers CORS correctos para el cliente en la respuesta.
-        client_origin = self.headers.get("Origin", "*")
+        # Siempre añadimos los headers CORS correctos para el cliente en la respuesta,
+        # pero solo si el origen del cliente es same-origin (mismo host:port).
+        client_origin = self._allowed_origin()
 
         try:
             with urllib.request.urlopen(req, timeout=600) as resp:

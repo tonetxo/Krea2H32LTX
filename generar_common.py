@@ -85,6 +85,8 @@ def generate_html(config):
         header_title:    e.g. "LTXV" or "Krea2"
         header_sub:      e.g. "grafo: LTXV_DMD_OK"
         model_count_label: "modelos" or "" (for the success message)
+        ltxv_ui_port:    port where the LTXV UI is served (for the "send to LTXV"
+                        button in both UIs). Default "8000".
     """
     # --- Read workflow JSON ---
     if not os.path.exists(config['json_file']):
@@ -102,6 +104,8 @@ def generate_html(config):
     lora_files = get_lora_list(config['lora_dir'], fallback=config.get('lora_fallback'))
     lora_js_array = json.dumps(lora_files)
 
+    ltxv_ui_port = config.get('ltxv_ui_port', '8000')
+
     # --- Assemble CSS ---
     css = _read_template('base.css') + '\n' + _read_template(config['ui_css'])
 
@@ -110,7 +114,7 @@ def generate_html(config):
     ui_html = _read_template(config['ui_html'])
 
     # --- Assemble JS ---
-    # Order: BASE_GRAPH + AVAILABLE_MODELS + AVAILABLE_LORAS (placeholders),
+    # Order: BASE_GRAPH + AVAILABLE_MODELS + AVAILABLE_LORAS + LTXV_UI_PORT (placeholders),
     #         then common.js (defines $, log, server, initCommon, etc. — no CONFIG access at top level),
     #         then UI-specific JS (defines CONFIG, N, calls initCommon(), UI functions).
     ui_js = _read_template(config['ui_js'])
@@ -120,6 +124,7 @@ def generate_html(config):
         "const BASE_GRAPH = __GRAPH_JSON__;\n"
         "const AVAILABLE_MODELS = __MODEL_LIST__;\n"
         "const AVAILABLE_LORAS = __LORA_LIST__;\n"
+        "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
         + common_js + "\n"
         + ui_js
     )
@@ -154,6 +159,7 @@ def generate_html(config):
     html = html.replace('__GRAPH_JSON__', graph_json)
     html = html.replace('__MODEL_LIST__', model_js_array)
     html = html.replace('__LORA_LIST__', lora_js_array)
+    html = html.replace('__LTXV_UI_PORT__', json.dumps(ltxv_ui_port))
 
     # --- Write output ---
     with open(config['output_html'], 'w', encoding='utf-8') as f:

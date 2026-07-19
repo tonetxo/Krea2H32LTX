@@ -112,7 +112,7 @@ function extractTimings(entry, N){
 
 // --- SEED ---
 function randomSeed(){
-  return Math.floor(Math.random() * 0xFFFFFFFF);
+  return Math.floor(Math.random() * 0x100000000);
 }
 
 // --- SERVER / LOG ---
@@ -140,7 +140,7 @@ function updateServerHint(){
 // --- WEBSOCKET ---
 function connectSocket() {
     if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
-    const url = server().replace('http', 'ws') + '/ws?clientId=' + CLIENT_ID;
+    const url = server().replace(/^http/, 'ws') + '/ws?clientId=' + CLIENT_ID;
     socket = new WebSocket(url);
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
@@ -195,7 +195,7 @@ async function handlePromptDone(promptId) {
     }
 
     const statusInfo = entry.status ? { completed: entry.status.completed, status_str: entry.status.status_str } : null;
-    log(`[DEBUG handlePromptDone pid=${promptId}] status=${JSON.stringify(statusInfo)} outputKeys=[${Object.keys(entry.outputs).join(", ")}]`);
+    if(window.DEBUG) console.debug("[handlePromptDone]", promptId, statusInfo, Object.keys(entry.outputs));
 
     if(entry.status && entry.status.status_str === "error") {
         const errMsg = entry.status.exception_message || (entry.status.messages || []).filter(m => m[0] === "execution_error").map(m => m[1] && m[1].exception_message).filter(Boolean)[0] || "error desconocido del backend";
@@ -276,8 +276,28 @@ function processNextBatch() {
 }
 
 // --- PROMPT LIBRARY ---
+// Helper: lee el store de prompts como objeto; si está corrupto o no es un
+// objeto plano, lo resetea a {} para no romper la UI entera.
+function _readPromptStore(){
+  const raw = localStorage.getItem(CONFIG.PROMPTS_KEY);
+  if(!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if(parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+  } catch(e){ /* JSON corrupto: ignoramos y reseteamos */ }
+  try { localStorage.removeItem(CONFIG.PROMPTS_KEY); } catch(_){}
+  log("⚠️ Prompts guardados corruptos, reseteados.", "l-warn");
+  return {};
+}
+function _readOpenState(){
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY + '_open') || '{}');
+    return (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : {};
+  } catch(e){ return {}; }
+}
+
 function loadPrompts(){
-  let saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  let saved = _readPromptStore();
   let dirty = false;
   for(const key of Object.keys(saved)){
     if(key.endsWith('/') || !key.split('/').pop()){
@@ -307,7 +327,7 @@ function loadPrompts(){
     node.prompts.push({ key, name: promptName });
   }
 
-  const openState = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY + '_open') || '{}');
+  const openState = _readOpenState();
 
   function renderNode(node, container, path){
     for(const folderName of Object.keys(node.children).sort()){
@@ -334,7 +354,7 @@ function loadPrompts(){
       delFolder.addEventListener("click", (e) => {
         e.stopPropagation();
         if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
-        const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+        const saved = _readPromptStore();
         let count = 0;
         for(const key of Object.keys(saved)){
           if(key === folderPath || key.startsWith(folderPath + '/')){
@@ -369,7 +389,7 @@ function loadPrompts(){
       item.title = p.key;
       item.dataset.key = p.key;
       item.addEventListener("click", () => {
-        const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+        const saved = _readPromptStore();
         if(saved[p.key]){
           $("prompt").value = saved[p.key];
           selectedPromptKey = p.key;
@@ -389,7 +409,7 @@ function savePrompt(){
   const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):", defaultName);
   if(!name) return;
   const text = $("prompt").value;
-  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  const saved = _readPromptStore();
   if(saved[name]){
     const preview = saved[name].slice(0, 80);
     if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
@@ -408,7 +428,7 @@ function movePrompt(){
   const oldName = selectedPromptKey;
   const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
   if(!newName || newName === oldName) return;
-  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  const saved = _readPromptStore();
   if(saved[newName]){
     if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
   }
@@ -423,7 +443,7 @@ function movePrompt(){
 function deletePrompt(){
   if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para eliminar.", "l-err"); return; }
   if(!confirm(`¿Eliminar "${selectedPromptKey}"?`)) return;
-  const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+  const saved = _readPromptStore();
   delete saved[selectedPromptKey];
   localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
   selectedPromptKey = null;
@@ -785,6 +805,111 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
   return { resetZoom, getState, isFullscreen, wasPan };
 }
 
+// --- SHARED GALLERY HELPERS ---
+// Usados por addToVariantGallery() en ltxv.js y krea2.js.
+
+function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+
+function mediaViewUrl(media, extra){
+  const ts = extra && extra.ts != null ? extra.ts : Date.now();
+  const anchor = extra && extra.anchor ? extra.anchor : "";
+  const f = encodeURIComponent(media.filename || "");
+  const s = encodeURIComponent(media.subfolder || "");
+  const t = encodeURIComponent(media.type || "output");
+  return `${server()}/view?filename=${f}&subfolder=${s}&type=${t}&t=${ts}${anchor}`;
+}
+
+async function copySeedToClipboard(seedSpan, seedValue){
+  try {
+    await navigator.clipboard.writeText(String(seedValue));
+    const originalHTML = seedSpan.innerHTML;
+    seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
+    setTimeout(() => { seedSpan.innerHTML = originalHTML; }, 1200);
+  } catch(err){
+    console.error("Error al copiar:", err);
+  }
+}
+
+// Borrado de un fichero de output/temp via /api/file_delete.
+// Trata 404 como éxito (ya no estaba en disco) y elimina la tarjeta del DOM.
+// Callbacks opcionales: onOk(grid, box), onMissing(grid, box).
+async function deleteMediaFile(card, delBtn, media, grid, box, logPrefix, onOk, onMissing){
+  if(!confirm(`¿Eliminar este fichero del disco y de la galería?`)) return;
+  delBtn.disabled = true;
+  try {
+    const r = await fetch("/api/file_delete", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        filename: media.filename,
+        subfolder: media.subfolder || "",
+        type: media.type || "output",
+      }),
+    });
+    if(!r.ok){
+      const t = await r.text().catch(()=>"");
+      throw new Error("HTTP "+r.status+" "+(t||"").slice(0,200));
+    }
+    const j = await r.json();
+    if(!j.ok && !j.deleted) throw new Error("Respuesta inesperada del backend");
+    card.remove();
+    log("🗑️ "+logPrefix+" eliminado del disco: "+media.filename, "l-ok");
+    if(onOk) onOk(grid, box);
+  } catch(err){
+    if(err.message.includes("404")){
+      card.remove();
+      log("🗑️ "+logPrefix+" ya no estaba en disco, eliminado de la galería: "+media.filename, "l-ok");
+      if(onMissing) onMissing(grid, box);
+    } else {
+      log("❌ No se pudo borrar del disco: "+err.message, "l-err");
+      delBtn.disabled = false;
+    }
+  }
+}
+
+// Construye una tarjeta de variante común y la inserta en el grid.
+// CONFIG.renderVariantMedia(card, url, media) debe devolver el HTML del
+// elemento media (\u003cvideo\u003e o \u003cimg\u003e) y opcionalmente configurar
+// atributos (crossorigin, controls, preload, etc.).
+// Devuelve la tarjeta creada (ya insertada en el grid).
+function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort){
+  const hasSeed = seedValue !== null && seedValue !== undefined;
+  const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
+  const displayText = hasSeed ? String(seedValue) : (slot ? (slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${idx}`)) : `Var. #${idx}`);
+  const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
+  const timeStr = timeText || "";
+
+  const card = document.createElement("div");
+  card.className = "variant-card";
+  card.dataset.filename = media.filename || "";
+  card.dataset.subfolder = media.subfolder || "";
+  card.dataset.type = media.type || "output";
+  if(slot != null) card.dataset.slot = String(slot);
+  card.dataset.variantIndex = String(idx);
+
+  const url = mediaViewUrl(media, { anchor: "#t=0.1" });
+  const mediaHtml = CONFIG.renderVariantMedia
+    ? CONFIG.renderVariantMedia(card, url, media)
+    : `<img src="${url}">`;
+
+  card.innerHTML = `
+    <span class="variant-badge">Var ${idx} · ${typeShort}</span>
+    ${mediaHtml}
+    <div class="variant-info">
+      <span class="variant-seed-display" title="${tooltipText}">
+        <span class="seed-text">${displayText}</span>
+        <span class="copy-icon">📋</span>
+      </span>
+      <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
+      <span class="variant-icons">
+        <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
+      </span>
+    </div>
+  `;
+  grid.appendChild(card);
+  return card;
+}
+
 // --- INIT: all top-level code that uses $ or CONFIG ---
 // Called by the UI-specific JS after CONFIG is defined.
 function initCommon(){
@@ -854,7 +979,7 @@ function initCommon(){
     const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
     const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);
     if(!name) return;
-    const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+    const saved = _readPromptStore();
     if(saved[name]){
       if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
     }
@@ -943,7 +1068,7 @@ function initCommon(){
 
   // Export prompts
   $("btnExportPrompts").addEventListener("click", () => {
-    const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+    const saved = _readPromptStore();
     const json = JSON.stringify(saved, null, 2);
     const blob = new Blob([json], {type: "application/json"});
     const a = document.createElement("a");
@@ -971,7 +1096,7 @@ function initCommon(){
           if(typeof imported !== 'object' || Array.isArray(imported)){
             throw new Error("formato inválido (se esperaba un objeto)");
           }
-          const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+          const saved = _readPromptStore();
           let added = 0, overwritten = 0;
           for(const [key, val] of Object.entries(imported)){
             if(typeof val !== 'string') continue;
