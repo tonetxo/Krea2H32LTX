@@ -584,9 +584,12 @@ async function stopCurrentVideo(){
   const pid = currentPromptId;
   currentPromptId = null;
   try {
+    // Interrumpir la ejecución activa en el backend ComfyUI
+    await fetch(server()+"/interrupt", { method:"POST" });
+    // Opcional: borrar el prompt de la cola si estuviese pendiente
     await fetch(server()+"/queue", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({action:"cancel", prompt_id:pid})
+      body:JSON.stringify({delete:[pid]})
     });
   } catch(e) { /* si falla, igual limpiamos local */ }
   discardTimer(pid);
@@ -600,9 +603,12 @@ async function stopCurrentVideo(){
 
 async function stopAll(){
   try {
+    // Interrumpir la ejecución activa en el backend ComfyUI
+    await fetch(server()+"/interrupt", { method:"POST" });
+    // Limpiar toda la cola pendiente en el backend ComfyUI
     await fetch(server()+"/queue", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({action:"cancel_all"})
+      body:JSON.stringify({clear:true})
     });
   } catch(e) { /* si falla, igual limpiamos local */ }
   for(const pid of Object.keys(pendingSeeds)) {

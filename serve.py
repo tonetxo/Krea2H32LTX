@@ -76,7 +76,7 @@ ALLOWED_DELETE_DIRS = (
 )
 
 # Routes that should be proxied to the backend instead of served as files.
-PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/view", "/upload/image")
+PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/view", "/upload/image", "/queue", "/interrupt")
 OLLAMA_PREFIXES = ("/api",)
 WS_PREFIX = "/ws"
 
