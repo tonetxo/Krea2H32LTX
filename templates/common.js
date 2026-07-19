@@ -891,10 +891,14 @@ async function deleteMediaFile(card, delBtn, media, grid, box, logPrefix, onOk, 
 
 // Construye una tarjeta de variante común y la inserta en el grid.
 // CONFIG.renderVariantMedia(card, url, media) debe devolver el HTML del
-// elemento media (\u003cvideo\u003e o \u003cimg\u003e) y opcionalmente configurar
+// elemento media (<video> o <img>) y opcionalmente configurar
 // atributos (crossorigin, controls, preload, etc.).
+// `meta` (opcional): objeto con metadata de la generación (loas, sliders, etc.)
+//   o string preformateado. Se muestra en el tooltip al hacer hover. Si es
+//   objeto, se formatea como filas clave/valor. Se guarda en card.dataset.meta
+//   como JSON para sobrevivir a re-renders.
 // Devuelve la tarjeta creada (ya insertada en el grid).
-function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort){
+function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort, meta){
   const hasSeed = seedValue !== null && seedValue !== undefined;
   const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
   const displayText = hasSeed ? String(seedValue) : (slot ? (slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${idx}`)) : `Var. #${idx}`);
@@ -908,6 +912,9 @@ function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, s
   card.dataset.type = media.type || "output";
   if(slot != null) card.dataset.slot = String(slot);
   card.dataset.variantIndex = String(idx);
+  if(meta != null){
+    card.dataset.meta = (typeof meta === "string") ? meta : JSON.stringify(meta);
+  }
 
   const url = mediaViewUrl(media, { anchor: "#t=0.1" });
   const mediaHtml = CONFIG.renderVariantMedia
@@ -928,8 +935,95 @@ function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, s
       </span>
     </div>
   `;
+
+  // Tooltip de metadata al hacer hover.
+  if(meta != null){
+    card.addEventListener("mouseenter", () => showVariantTooltip(card));
+    card.addEventListener("mouseleave", () => hideVariantTooltip());
+    card.addEventListener("mousemove", (e) => positionVariantTooltip(e));
+  }
+
   grid.appendChild(card);
   return card;
+}
+
+// --- TOOLTIP DE METADATA ---
+// Un único tooltip global reutilizado para todas las variant-cards.
+let _variantTooltipEl = null;
+
+function _ensureVariantTooltip(){
+  if(_variantTooltipEl) return _variantTooltipEl;
+  _variantTooltipEl = document.createElement("div");
+  _variantTooltipEl.className = "variant-tooltip";
+  _variantTooltipEl.id = "variantTooltip";
+  document.body.appendChild(_variantTooltipEl);
+  return _variantTooltipEl;
+}
+
+function positionVariantTooltip(e){
+  if(!_variantTooltipEl || !_variantTooltipEl.classList.contains("show")) return;
+  const pad = 14;
+  const tw = _variantTooltipEl.offsetWidth || 280;
+  const th = _variantTooltipEl.offsetHeight || 80;
+  let x = e.clientX + 16;
+  let y = e.clientY + 16;
+  if(x + tw + pad > window.innerWidth) x = e.clientX - tw - 16;
+  if(y + th + pad > window.innerHeight) y = e.clientY - th - 16;
+  _variantTooltipEl.style.left = Math.max(pad, x) + "px";
+  _variantTooltipEl.style.top = Math.max(pad, y) + "px";
+}
+
+function showVariantTooltip(card){
+  const el = _ensureVariantTooltip();
+  const raw = card.dataset.meta;
+  if(!raw) return;
+  let html;
+  try {
+    const obj = JSON.parse(raw);
+    html = formatVariantMeta(obj);
+  } catch(_){
+    html = raw; // string preformateado
+  }
+  el.innerHTML = html;
+  el.classList.add("show");
+  // Posición inicial cerca de la tarjeta.
+  const r = card.getBoundingClientRect();
+  el.style.left = Math.max(14, r.left) + "px";
+  el.style.top = Math.max(14, r.bottom + 8) + "px";
+}
+
+function hideVariantTooltip(){
+  if(_variantTooltipEl) _variantTooltipEl.classList.remove("show");
+}
+
+// Formatea un objeto meta {title?, rows:[[k,v]...], loras:[{name,strength,on}...]}
+// como HTML para el tooltip.
+function formatVariantMeta(obj){
+  if(!obj || typeof obj !== "object") return String(obj || "");
+  const parts = [];
+  if(obj.title) parts.push(`<div class="vt-title">${escapeHtml(obj.title)}</div>`);
+  if(Array.isArray(obj.rows)){
+    for(const [k, v] of obj.rows){
+      parts.push(`<div class="vt-row"><span class="vt-key">${escapeHtml(String(k))}</span><span class="vt-val">${escapeHtml(String(v))}</span></div>`);
+    }
+  }
+  if(Array.isArray(obj.loras) && obj.loras.length){
+    parts.push(`<div class="vt-row" style="margin-top:6px;"><span class="vt-key">LoRAs</span><span class="vt-val">`);
+    for(const l of obj.loras){
+      const cls = l.on ? "vt-lora" : "vt-lora off";
+      const name = escapeHtml(l.name || "—");
+      const strength = l.strength != null ? ` · ${l.strength}` : "";
+      const status = l.on ? "" : " (off)";
+      parts.push(`<div class="${cls}"><span class="vt-lora-name" title="${name}">${name}</span>${escapeHtml(strength)}${escapeHtml(status)}</div>`);
+    }
+    parts.push(`</span></div>`);
+  }
+  if(parts.length === 0) return `<div class="vt-empty">sin metadata</div>`;
+  return parts.join("");
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 }
 
 // --- INIT: all top-level code that uses $ or CONFIG ---

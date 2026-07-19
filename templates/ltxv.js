@@ -49,6 +49,24 @@ CONFIG.addToVariantGallery = addToVariantGallery;
 CONFIG.renderVariantMedia = function(card, url, media){
   return `<video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
 };
+// Metadata para el tooltip de la variant-card: captura los sliders/LoRAs en el
+// momento de crear la tarjeta (no al hacer hover, que podría haber cambiado).
+CONFIG.variantMeta = function(){
+  const rows = [
+    ["Modelo", $("modelSelect")?.value || ""],
+    ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
+    ["Frames", $("frames")?.value || ""],
+    ["Fidelidad", parseFloat($("fidelitySlider")?.value || 0).toFixed(2)],
+    ["Movimiento", parseFloat($("motionSlider")?.value || 0).toFixed(1)],
+  ];
+  const loraList = (typeof loras !== "undefined" && Array.isArray(loras)) ? loras : [];
+  const lorasMeta = loraList.map(l => ({
+    name: l.lora ? l.lora.replace(/^.*\//, "") : "",
+    strength: l.strength != null ? Number(l.strength).toFixed(2) : null,
+    on: !!l.on,
+  }));
+  return { title: "Parámetros LTXV", rows, loras: lorasMeta };
+};
 CONFIG.onSeedUpdate = updateSeedUI;
 CONFIG.onPromptError = function(pid){
   delete promptSteps[pid];
@@ -984,7 +1002,8 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     box.style.display = "block";
 
     const typeShort = slot === 1 ? "1er" : (slot === 2 ? "final" : "var");
-    const card = buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort);
+    const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
+    const card = buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort, meta);
 
     const hasSeed = seedValue !== null && seedValue !== undefined;
     if(hasSeed) {

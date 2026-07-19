@@ -40,6 +40,30 @@ CONFIG.addToVariantGallery = addToVariantGallery;
 CONFIG.renderVariantMedia = function(card, url, media){
   return `<img src="${url}">`;
 };
+// Metadata para el tooltip de la variant-card: captura sliders/LoRAs en el
+// momento de crear la tarjeta.
+CONFIG.variantMeta = function(){
+  const rows = [
+    ["Modelo", $("modelSelect")?.value || ""],
+    ["MP", parseFloat($("mpSlider")?.value || 0).toFixed(2)],
+    ["Aspecto", $("aspectRatio")?.value || ""],
+    ["Steps", $("steps")?.value || ""],
+    ["Eta", parseFloat($("etaSlider")?.value || 0).toFixed(2)],
+    ["Projector", `${$("projectorPreset")?.value || ""} @ ${parseFloat($("projectorStrength")?.value || 0).toFixed(2)}`],
+  ];
+  const enhOn = $("enhancerEnabled")?.classList.contains("on");
+  if(enhOn){
+    rows.push(["Enhancer", `${parseFloat($("enhancerStrength")?.value || 0).toFixed(2)} (ts ${parseFloat($("enhancerTextScale")?.value || 0).toFixed(2)})`]);
+  }
+  rows.push(["Variance", `${$("variancePreset")?.value || ""} / ${$("protectMode")?.value || ""}`]);
+  const loraList = (typeof loras !== "undefined" && Array.isArray(loras)) ? loras : [];
+  const lorasMeta = loraList.map(l => ({
+    name: l.lora ? l.lora.replace(/^.*\//, "") : "",
+    strength: l.strength != null ? Number(l.strength).toFixed(2) : null,
+    on: !!l.on,
+  }));
+  return { title: "Parámetros Krea2", rows, loras: lorasMeta };
+};
 CONFIG.onSeedUpdate = function(realSeed){ /* Krea2 logs only; no seed UI toggle */ };
 CONFIG.onPromptError = function(pid){};
 CONFIG.startNextVariant = function(index){ runSingleGeneration(index); };
@@ -156,7 +180,8 @@ function addToVariantGallery(media, seedValue, timeText) {
     const grid = $("variantGrid");
     box.style.display = "block";
 
-    const card = buildVariantCard(grid, box, media, seedValue, timeText, null, null, "var");
+    const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
+    const card = buildVariantCard(grid, box, media, seedValue, timeText, null, null, "var", meta);
     const url = mediaViewUrl(media, { anchor: "" });
 
     // Añadir enlace de descarga extra (específico de la galería Krea2).
