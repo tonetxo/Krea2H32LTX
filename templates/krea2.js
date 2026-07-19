@@ -61,17 +61,30 @@ CONFIG.onStopAll = function(){
 // --- Krea2 displayResult callback ---
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   const timeText = tTotal || "";
-  const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
+  let outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
+  // Si no hay outputs, reintentar el fetch del history (ComfyUI puede tardar en escribirlos)
+  if(!outNode){
+    for(let i = 0; i < 5; i++){
+      await new Promise(r => setTimeout(r, 1000));
+      try {
+        const hr = await fetch(server()+"/history/"+promptId);
+        if(hr.ok){
+          const hist = await hr.json();
+          const retryEntry = hist[promptId];
+          if(retryEntry && retryEntry.outputs){
+            outNode = retryEntry.outputs[N.SAVE] || retryEntry.outputs[N.PREVIEW] || retryEntry.outputs[N.VAE_DECODE];
+            if(outNode){ entry = retryEntry; break; }
+          }
+        }
+      } catch(e) {}
+    }
+  }
   if(outNode) {
     const media = CONFIG.findMedia(outNode);
     if(media){
       showImage(media);
       addToVariantGallery(media, realSeed, timeText);
-    } else {
-      log("⚠️ No se encontró media en el nodo de salida", "l-err");
     }
-  } else {
-    log("⚠️ No hay nodo de salida en outputs. Keys: " + Object.keys(entry.outputs || {}).join(", "), "l-err");
   }
   return false;
 };

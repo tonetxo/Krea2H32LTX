@@ -173,19 +173,20 @@ async function handlePromptDone(promptId) {
     try {
         const hr = await fetch(server()+"/history/"+promptId);
         if(!hr.ok) {
+            log(`⏳ Esperando resultado (HTTP ${hr.status})...`, "l-ok");
             processingPrompts.delete(promptId);
             return;
         }
         const hist = await hr.json();
         entry = hist[promptId];
     } catch(e) {
+        log(`⚠️ Error consultando history: ${e.message}`, "l-err");
         processingPrompts.delete(promptId);
         return;
     }
-    // Si no hay outputs todavía, no marcar como handled: pollFallback reintentará
-    if(!entry || !entry.outputs || Object.keys(entry.outputs).length === 0) {
+    if(!entry || !entry.outputs) {
         processingPrompts.delete(promptId);
-        return; // aún no ha terminado de escribir outputs
+        return; // aún no ha terminado
     }
 
     // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
