@@ -212,23 +212,24 @@ function updateSeedUI(seedValue) {
 // decodifica en streaming con TextDecoder y brace-matching incremental.
 async function extractWorkflowFromMP4Buffer(arrayBuffer){
   const bytes = new Uint8Array(arrayBuffer);
-  const marker = new TextEncoder().encode('"prompt": {');
   let startIdx = -1;
 
-  // 1) Buscar el marcador '"prompt": {' (12 bytes ASCII) en el buffer.
+  // 1) Buscar el marcador '"prompt": {' (12 bytes ASCII). La última '{' del
+  //    marcador ES la llave de apertura del objeto prompt; empezamos ahí.
+  //    (Antes buscábamos la SIGUIENTE '{', que es la del primer nodo interno,
+  //    y parseábamos solo ese nodo en lugar del grafo completo.)
+  const marker = new TextEncoder().encode('"prompt": {');
   outer: for(let i = 0; i <= bytes.length - marker.length; i++){
     for(let j = 0; j < marker.length; j++){
       if(bytes[i + j] !== marker[j]) continue outer;
     }
-    // Encontrado. Saltamos a la primera '{' después del marcador.
-    for(let k = i + marker.length; k < bytes.length; k++){
-      if(bytes[k] === 0x7B){ startIdx = k; break; }
-    }
+    startIdx = i + marker.length - 1; // última '{' del marcador
     break;
   }
 
   // 2) Si no aparece, buscamos el patrón '{"<digitos>":\s*{' (comienzo típico del
-  //    objeto "prompt" de ComfyUI cuando el primer nodo es numérico).
+  //    objeto "prompt" de ComfyUI cuando el primer nodo es numérico). La '{'
+  //    inicial (antes de '"') es la apertura del objeto prompt.
   if(startIdx < 0){
     for(let i = 0; i < bytes.length - 4; i++){
       if(bytes[i] !== 0x7B || bytes[i+1] !== 0x22) continue; // '{"'
@@ -241,7 +242,7 @@ async function extractWorkflowFromMP4Buffer(arrayBuffer){
       if(bytes[k] === 0x3A){ // ':'
         let m = k + 1;
         while(m < bytes.length && (bytes[m] === 0x20 || bytes[m] === 0x09 || bytes[m] === 0x0A || bytes[m] === 0x0D)) m++;
-        if(bytes[m] === 0x7B){ startIdx = m; break; }
+        if(bytes[m] === 0x7B){ startIdx = i; break; } // la '{' exterior abre el prompt
       }
     }
   }
