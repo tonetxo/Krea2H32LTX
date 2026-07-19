@@ -341,19 +341,6 @@ const BASE_GRAPH = {
       "title": "Load Diffusion Model"
     }
   },
-  "100": {
-    "inputs": {
-      "filename_prefix": "krea2/imagen",
-      "images": [
-        "43",
-        0
-      ]
-    },
-    "class_type": "SaveImage",
-    "_meta": {
-      "title": "Save Image"
-    }
-  },
   "5": {
     "inputs": {
       "images": [
@@ -426,7 +413,7 @@ const BASE_GRAPH = {
     "inputs": {
       "preset": "SKC3VO",
       "use_custom": false,
-      "custom_values": "-0.05444335938,-0.1611328125,0.37109375,0.50390625,0.70703125,0.39453125,0.3984375,-1.4375,-0.51171875,-0.890625,-0.609375,0.1127929688",
+      "custom_values": "-0.054443359375,-0.1611328125,0.37109375,0.50390625,0.70703125,0.39453125,0.3984375,-1.4375,-0.51171875,-0.890625,-0.609375,0.11279296875",
       "strength": 1,
       "model": [
         "1",
@@ -438,28 +425,12 @@ const BASE_GRAPH = {
       "title": "Krea2 Projector Delta"
     }
   },
-  "39": {
-    "inputs": {
-      "enabled": true,
-      "strength": 0.5,
-      "text_scale": 0.5,
-      "debug": false,
-      "model": [
-        "35",
-        0
-      ]
-    },
-    "class_type": "Krea2T-Enhancer-Advanced",
-    "_meta": {
-      "title": "Krea2T Enhancer Advanced"
-    }
-  },
   "40": {
     "inputs": {
       "lora_name": "K2/realism_engine_krea2_v2.safetensors",
       "strength_model": 0.4,
       "model": [
-        "39",
+        "101",
         0
       ]
     },
@@ -623,6 +594,35 @@ const BASE_GRAPH = {
     "_meta": {
       "title": "RBG Smart Seed Variance 🌱"
     }
+  },
+  "100": {
+    "inputs": {
+      "filename_prefix": "krea2/imagen",
+      "images": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "101": {
+    "inputs": {
+      "model": [
+        "35",
+        0
+      ],
+      "enabled": true,
+      "strength": 1,
+      "text_scale": 1,
+      "debug": false
+    },
+    "class_type": "Krea2T-Enhancer-Advanced",
+    "_meta": {
+      "title": "Krea2T Enhancer Advanced"
+    }
   }
 };
 const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-int4_convrot.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b-nvfp4.safetensors", "flux-2-klein-9b.safetensors", "krea2_raw_int8_convrot.safetensors", "krea2_turbo_convrot_int4_fast.safetensors", "krea2_turbo_fp8_scaled.safetensors", "krea2_turbo_int4_tensorwise_mixed.safetensors"];
@@ -640,7 +640,12 @@ const AVAILABLE_LORAS = ["KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scal
 //   findMedia(nodeOutput), showMedia(slot, media, options),
 //   addToVariantGallery(media, seedValue, timeText, slot, variantIndex),
 //   onSeedUpdate(realSeed),
-//   displayResult(entry, realSeed, tTotal, promptId) -> true to skip finalize,
+//   displayResult(entry, realSeed, tTotal, promptId) -> return value controls post-processing:
+//     - boolean true: skip common finalize (used by LTXV step 1 -> step 2).
+//     - object { skipFinalize: true }: same as boolean true.
+//     - object { foundOutput: false }: no usable media found; do not mark handled,
+//       so pollFallback keeps retrying.
+//     - otherwise (false/undefined): standard finalize.
 //   onPromptError(pid), startNextVariant(index), onBatchComplete(),
 //   onStopCurrent(pid), onStopAll()
 
@@ -661,7 +666,7 @@ let lastPromptDir = "";
 let sysPromptEditData = null;
 let sysPromptEditMode = "text";
 
-const LEGACY_PORTS = ["7822"];
+const LEGACY_PORTS = ["7822", "7821"];
 let DEFAULT_BACKEND_PORT = "7821";
 const $ = (id) => document.getElementById(id);
 
@@ -818,6 +823,23 @@ async function handlePromptDone(promptId) {
         return; // aún no ha terminado
     }
 
+    const statusInfo = entry.status ? { completed: entry.status.completed, status_str: entry.status.status_str } : null;
+    log(`[DEBUG handlePromptDone pid=${promptId}] status=${JSON.stringify(statusInfo)} outputKeys=[${Object.keys(entry.outputs).join(", ")}]`);
+
+    if(entry.status && entry.status.status_str === "error") {
+        const errMsg = entry.status.exception_message || (entry.status.messages || []).filter(m => m[0] === "execution_error").map(m => m[1] && m[1].exception_message).filter(Boolean)[0] || "error desconocido del backend";
+        log(`❌ Error en backend: ${errMsg}`, "l-err");
+        if(entry.status.exception_type) log(`   Tipo: ${entry.status.exception_type}`, "l-err");
+        handledPrompts.add(promptId);
+        processingPrompts.delete(promptId);
+        delete pendingSeeds[promptId];
+        discardTimer(promptId);
+        if(CONFIG.onPromptError) CONFIG.onPromptError(promptId);
+        currentBatchIndex++;
+        processNextBatch();
+        return;
+    }
+
     // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
     // descartamos silenciosamente cualquier execution_success tardío del backend.
     if(!(promptId in pendingSeeds)){
@@ -825,9 +847,6 @@ async function handlePromptDone(promptId) {
         processingPrompts.delete(promptId);
         return;
     }
-
-    handledPrompts.add(promptId);
-    processingPrompts.delete(promptId);
 
     const realSeed = (promptId in pendingSeeds) ? pendingSeeds[promptId] : null;
     if(realSeed !== null) {
@@ -840,10 +859,25 @@ async function handlePromptDone(promptId) {
     const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
                    (clientResult ? fmtMs(clientResult.total) : null);
 
-    const cont = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
-    if(cont) return;
+    const displayResult = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
+    const skipFinalize = displayResult === true || (displayResult && displayResult.skipFinalize === true);
+    const foundOutput = !(displayResult && displayResult.foundOutput === false);
+
+    if(!foundOutput) {
+        // displayResult vio outputs pero aún no hay media usable; pollFallback reintentará.
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    if(skipFinalize) {
+        // LTXV paso 1->2 ya gestionó sus estados; liberamos el lock para ese prompt_id.
+        processingPrompts.delete(promptId);
+        return;
+    }
 
     log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
+    handledPrompts.add(promptId);
+    processingPrompts.delete(promptId);
     delete pendingSeeds[promptId];
     variantCounter++;
     currentBatchIndex++;
@@ -1200,7 +1234,11 @@ async function stopAll(){
       body:JSON.stringify({action:"cancel_all"})
     });
   } catch(e) { /* si falla, igual limpiamos local */ }
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
+  for(const pid of Object.keys(pendingSeeds)) {
+    discardTimer(pid);
+    handledPrompts.add(pid);
+    delete pendingSeeds[pid];
+  }
   if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");
@@ -1610,7 +1648,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "krea2",
   DEFAULT_MODEL: "krea2_turbo_convrot_int4_fast.safetensors",
-  N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"39",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
+  N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
   loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -1662,32 +1700,22 @@ CONFIG.onStopAll = function(){
 // --- Krea2 displayResult callback ---
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   const timeText = tTotal || "";
-  let outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
-  // Si no hay outputs, reintentar el fetch del history (ComfyUI puede tardar en escribirlos)
-  if(!outNode){
-    for(let i = 0; i < 5; i++){
-      await new Promise(r => setTimeout(r, 1000));
-      try {
-        const hr = await fetch(server()+"/history/"+promptId);
-        if(hr.ok){
-          const hist = await hr.json();
-          const retryEntry = hist[promptId];
-          if(retryEntry && retryEntry.outputs){
-            outNode = retryEntry.outputs[N.SAVE] || retryEntry.outputs[N.PREVIEW] || retryEntry.outputs[N.VAE_DECODE];
-            if(outNode){ entry = retryEntry; break; }
-          }
-        }
-      } catch(e) {}
-    }
+  const outputKeys = Object.keys(entry.outputs || {});
+  const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
+  log(`[DEBUG displayResult pid=${promptId}] outputKeys=[${outputKeys.join(", ")}] save=${!!entry.outputs[N.SAVE]} preview=${!!entry.outputs[N.PREVIEW]} decoded=${!!entry.outputs[N.VAE_DECODE]}`);
+  if(!outNode) {
+    log(`[DEBUG displayResult] no outNode (S=${N.SAVE}, P=${N.PREVIEW}, V=${N.VAE_DECODE}); foundOutput=false`, "l-warn");
+    return { foundOutput: false };
   }
-  if(outNode) {
-    const media = CONFIG.findMedia(outNode);
-    if(media){
-      showImage(media);
-      addToVariantGallery(media, realSeed, timeText);
-    }
+  log(`[DEBUG displayResult] outNode keys: ${Object.keys(outNode).join(", ")}`);
+  const media = CONFIG.findMedia(outNode);
+  log(`[DEBUG displayResult] media=${JSON.stringify(media)}`);
+  if(!media) {
+    return { foundOutput: false };
   }
-  return false;
+  showImage(media);
+  addToVariantGallery(media, realSeed, timeText);
+  return { foundOutput: true };
 };
 
 // --- SHOW IMAGE ---
@@ -2420,9 +2448,19 @@ function buildGraph(){
   g[N.RES_SELECTOR].inputs.aspect_ratio = $("aspectRatio").value;
   g[N.PROJECTOR].inputs.preset = $("projectorPreset").value;
   g[N.PROJECTOR].inputs.strength = parseFloat($("projectorStrength").value);
-  g[N.ENHANCER].inputs.enabled = $("enhancerEnabled").classList.contains("on");
-  g[N.ENHANCER].inputs.strength = parseFloat($("enhancerStrength").value);
-  g[N.ENHANCER].inputs.text_scale = parseFloat($("enhancerTextScale").value);
+  const enhancerEnabled = $("enhancerEnabled").classList.contains("on");
+  if(enhancerEnabled){
+    g[N.ENHANCER].inputs.enabled = true;
+    g[N.ENHANCER].inputs.strength = parseFloat($("enhancerStrength").value);
+    g[N.ENHANCER].inputs.text_scale = parseFloat($("enhancerTextScale").value);
+  } else {
+    // Si el enhancer está desactivado, lo eliminamos del grafo y conectamos
+    // el projector directamente al primer LoRA, evitando errores del backend.
+    delete g[N.ENHANCER];
+    if(g[N.LORA1] && g[N.LORA1].inputs.model && g[N.LORA1].inputs.model[0] === N.ENHANCER){
+      g[N.LORA1].inputs.model = [N.PROJECTOR, 0];
+    }
+  }
   g[N.SEED_VARIANCE].inputs.variance_preset = $("variancePreset").value;
   g[N.SEED_VARIANCE].inputs.protect_mode = $("protectMode").value;
   g[N.SEED_VARIANCE].inputs.seed = $("segVarianceRandom").classList.contains("on") ? -1 : parseInt($("varianceSeed").value, 10);

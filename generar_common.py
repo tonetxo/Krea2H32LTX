@@ -15,10 +15,15 @@ def get_file_list(directory, ext='.safetensors', fallback=None):
     El prefijo_relativo se antepone a los nombres de archivo para que ComfyUI
     pueda encontrarlos en su carpeta de checkpoints.
     """
+    if directory is None:
+        return [fallback] if fallback else []
     if isinstance(directory, str):
         entries = [(directory, '')]
     else:
-        entries = list(directory)
+        try:
+            entries = list(directory)
+        except TypeError:
+            return [fallback] if fallback else []
     files = []
     for d, prefix in entries:
         if not os.path.exists(d):

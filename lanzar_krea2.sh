@@ -21,10 +21,22 @@ if command -v ss >/dev/null 2>&1; then
   fi
 fi
 
+# Si ya hay algo escuchando en el puerto de la UI, no se puede bindear.
+# Avisamos con el PID para que el usuario pueda matarlo (kill <PID> o
+# 'pkill -f serve.py' si lo lanzó este script).
+if command -v ss >/dev/null 2>&1; then
+  UI_BIND=$(ss -tlnp 2>/dev/null | awk -v p=":$PORT " '$4 ~ p {print $0; exit}')
+  if [ -n "$UI_BIND" ]; then
+    echo "⚠️  Ya hay algo escuchando en :$PORT:"
+    echo "    $UI_BIND"
+    echo "    Ciérralo (Ctrl+C en la terminal que lo lanzó, o kill <PID>) y vuelve a ejecutar este script."
+  fi
+fi
+
 echo "🌐 Abriendo navegador en http://localhost:$PORT/$HTML_FILE ..."
-$BROWSER "http://localhost:$PORT/$HTML_FILE" &
+"$BROWSER" "http://localhost:$PORT/$HTML_FILE" &
 
 echo "🟢 Sirviendo (Ctrl+C para detener)..."
-python3 serve.py "$PORT"
+python3 serve.py "$PORT" "$@"
 
 echo "🛑 Servidor detenido."

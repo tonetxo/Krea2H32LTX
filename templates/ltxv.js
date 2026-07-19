@@ -131,6 +131,9 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
     pendingSeeds[firstPromptId] = step1Seed;
     finalVariantIndex = variantCounter;
     runSingleGeneration(currentBatchIndex);
+    // Marcamos el prompt del paso 1 como handled para que pollFallback no lo reprocese
+    // como paso 2 si llega otro execution_success/poll tardío.
+    handledPrompts.add(promptId);
     return true;
   }
 
@@ -737,9 +740,14 @@ function buildGraph(firstPassOnly){
 
 function showVideo(slot, media, options={}){
   if(!media) return;
-  const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
+  const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
-  v.crossOrigin = "anonymous"; v.src=url; v.style.display="block"; empty.style.display="none";
+  v.crossOrigin = "anonymous";
+  v.src = url;
+  v.load();
+  v.style.display = "block";
+  empty.style.display = "none";
+  v.play().catch(err => console.log("Autoplay blocked:", err));
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
@@ -790,6 +798,7 @@ function setupMetaButton(slot){
       }
     } catch(err){
       log("❌ Error leyendo metadatos del vídeo: "+err.message, "l-err");
+      console.error("Error al recuperar workflow:", err);
     } finally {
       btn.disabled = false;
       btn.innerHTML = originalHTML;
@@ -928,7 +937,7 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
 
     const { filename, subfolder, type } = media;
     const ts = Date.now();
-    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}`;
+    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent(type)}&t=${ts}#t=0.1`;
 
     const hasSeed = seedValue !== null && seedValue !== undefined;
     const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
@@ -948,7 +957,7 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
 
     card.innerHTML = `
         <span class="variant-badge">Var ${idx} · ${typeShort}</span>
-        <video src="${url}" type="video/mp4" controls muted preload="metadata" playsinline></video>
+        <video src="${url}" crossorigin="anonymous" controls muted preload="none" playsinline></video>
         <div class="variant-info">
             <span class="variant-seed-display" title="${tooltipText}">
                 <span class="seed-text">${displayText}</span>
@@ -960,6 +969,8 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
             </span>
         </div>
     `;
+
+
 
     if(hasSeed) {
         const seedSpan = card.querySelector('.variant-seed-display');
@@ -1062,10 +1073,10 @@ async function loadVideoHistory(){
     for(const item of data.items){
       const card = document.createElement("div");
       card.className = "variant-card";
-      const url = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}&t=${item.mtime}`;
+      const url = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}&t=${item.mtime}#t=0.1`;
       const dateStr = new Date(item.mtime * 1000).toLocaleString("es-ES", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
       card.innerHTML = `
-        <video src="${url}" type="video/mp4" muted preload="metadata" playsinline></video>
+        <video src="${url}" crossorigin="anonymous" muted preload="none" playsinline></video>
         <div class="variant-info">
           <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
           <span class="variant-icons">
@@ -1080,8 +1091,19 @@ async function loadVideoHistory(){
       card.dataset.subfolder = item.subfolder;
       card.dataset.type = item.type;
 
-      card.querySelector('[data-action="play"]').addEventListener("click", (e) => {
-        e.stopPropagation();
+      const videoEl = card.querySelector("video");
+
+      // Reproducir al pasar el cursor (hover-play) para evitar que salgan en negro
+      card.addEventListener("mouseenter", () => {
+        videoEl.play().catch(err => console.log("Hover play failed:", err));
+      });
+      card.addEventListener("mouseleave", () => {
+        videoEl.pause();
+        videoEl.currentTime = 0.1; // reset frame
+      });
+
+      // Toda la tarjeta carga y reproduce el vídeo en el reproductor principal al hacer clic
+      card.addEventListener("click", () => {
         const slot = item.filename.includes("_prev") ? 1 : 2;
         const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
         showVideo(slot, media, { variantIndex: 0 });
@@ -1103,8 +1125,9 @@ async function loadVideoHistory(){
           } else {
             log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
           }
-        } catch(err){
+        } catch(err) {
           log("❌ Error leyendo workflow: "+err.message, "l-err");
+          console.error("Error al recuperar workflow de la tarjeta:", err);
         } finally {
           btn.disabled = false;
           btn.textContent = orig;

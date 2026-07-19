@@ -11,7 +11,12 @@
 //   findMedia(nodeOutput), showMedia(slot, media, options),
 //   addToVariantGallery(media, seedValue, timeText, slot, variantIndex),
 //   onSeedUpdate(realSeed),
-//   displayResult(entry, realSeed, tTotal, promptId) -> true to skip finalize,
+//   displayResult(entry, realSeed, tTotal, promptId) -> return value controls post-processing:
+//     - boolean true: skip common finalize (used by LTXV step 1 -> step 2).
+//     - object { skipFinalize: true }: same as boolean true.
+//     - object { foundOutput: false }: no usable media found; do not mark handled,
+//       so pollFallback keeps retrying.
+//     - otherwise (false/undefined): standard finalize.
 //   onPromptError(pid), startNextVariant(index), onBatchComplete(),
 //   onStopCurrent(pid), onStopAll()
 
@@ -32,7 +37,7 @@ let lastPromptDir = "";
 let sysPromptEditData = null;
 let sysPromptEditMode = "text";
 
-const LEGACY_PORTS = ["7822"];
+const LEGACY_PORTS = ["7822", "7821"];
 let DEFAULT_BACKEND_PORT = "7821";
 const $ = (id) => document.getElementById(id);
 
@@ -189,6 +194,23 @@ async function handlePromptDone(promptId) {
         return; // aún no ha terminado
     }
 
+    const statusInfo = entry.status ? { completed: entry.status.completed, status_str: entry.status.status_str } : null;
+    log(`[DEBUG handlePromptDone pid=${promptId}] status=${JSON.stringify(statusInfo)} outputKeys=[${Object.keys(entry.outputs).join(", ")}]`);
+
+    if(entry.status && entry.status.status_str === "error") {
+        const errMsg = entry.status.exception_message || (entry.status.messages || []).filter(m => m[0] === "execution_error").map(m => m[1] && m[1].exception_message).filter(Boolean)[0] || "error desconocido del backend";
+        log(`❌ Error en backend: ${errMsg}`, "l-err");
+        if(entry.status.exception_type) log(`   Tipo: ${entry.status.exception_type}`, "l-err");
+        handledPrompts.add(promptId);
+        processingPrompts.delete(promptId);
+        delete pendingSeeds[promptId];
+        discardTimer(promptId);
+        if(CONFIG.onPromptError) CONFIG.onPromptError(promptId);
+        currentBatchIndex++;
+        processNextBatch();
+        return;
+    }
+
     // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
     // descartamos silenciosamente cualquier execution_success tardío del backend.
     if(!(promptId in pendingSeeds)){
@@ -196,9 +218,6 @@ async function handlePromptDone(promptId) {
         processingPrompts.delete(promptId);
         return;
     }
-
-    handledPrompts.add(promptId);
-    processingPrompts.delete(promptId);
 
     const realSeed = (promptId in pendingSeeds) ? pendingSeeds[promptId] : null;
     if(realSeed !== null) {
@@ -211,10 +230,25 @@ async function handlePromptDone(promptId) {
     const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
                    (clientResult ? fmtMs(clientResult.total) : null);
 
-    const cont = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
-    if(cont) return;
+    const displayResult = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
+    const skipFinalize = displayResult === true || (displayResult && displayResult.skipFinalize === true);
+    const foundOutput = !(displayResult && displayResult.foundOutput === false);
+
+    if(!foundOutput) {
+        // displayResult vio outputs pero aún no hay media usable; pollFallback reintentará.
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    if(skipFinalize) {
+        // LTXV paso 1->2 ya gestionó sus estados; liberamos el lock para ese prompt_id.
+        processingPrompts.delete(promptId);
+        return;
+    }
 
     log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
+    handledPrompts.add(promptId);
+    processingPrompts.delete(promptId);
     delete pendingSeeds[promptId];
     variantCounter++;
     currentBatchIndex++;
@@ -571,7 +605,11 @@ async function stopAll(){
       body:JSON.stringify({action:"cancel_all"})
     });
   } catch(e) { /* si falla, igual limpiamos local */ }
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
+  for(const pid of Object.keys(pendingSeeds)) {
+    discardTimer(pid);
+    handledPrompts.add(pid);
+    delete pendingSeeds[pid];
+  }
   if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");

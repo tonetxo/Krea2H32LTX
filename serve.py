@@ -19,7 +19,6 @@ Usage: python3 serve.py [PORT] [BACKEND_URL] [KREA2_OUTPUT_DIR]
 """
 import glob
 import http.server
-import io
 import json
 import os
 import socketserver
@@ -83,6 +82,8 @@ WS_PREFIX = "/ws"
 
 
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
         self.send_header("Pragma", "no-cache")
@@ -193,20 +194,28 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         """List PNGs in KREA2_OUTPUT_DIR, newest first, max 50."""
         items = []
         try:
-            paths = sorted(
-                glob.glob(os.path.join(KREA2_OUTPUT_DIR, "*.png")),
-                key=lambda p: os.path.getmtime(p),
-                reverse=True,
-            )[:50]
+            paths = glob.glob(os.path.join(KREA2_OUTPUT_DIR, "*.png"))
+            paths_with_time = []
             for p in paths:
-                st = os.stat(p)
-                items.append({
-                    "filename": os.path.basename(p),
-                    "subfolder": "krea2",
-                    "type": "output",
-                    "mtime": int(st.st_mtime),
-                    "size": st.st_size,
-                })
+                try:
+                    paths_with_time.append((os.path.getmtime(p), p))
+                except OSError:
+                    continue
+            paths_with_time.sort(key=lambda x: x[0], reverse=True)
+            paths = [p for _, p in paths_with_time][:50]
+            
+            for p in paths:
+                try:
+                    st = os.stat(p)
+                    items.append({
+                        "filename": os.path.basename(p),
+                        "subfolder": "krea2",
+                        "type": "output",
+                        "mtime": int(st.st_mtime),
+                        "size": st.st_size,
+                    })
+                except OSError:
+                    continue
         except OSError as e:
             sys.stderr.write(f"[serve] krea2_list error: {e}\n")
         self._send_json(200, {
@@ -220,24 +229,32 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         items = []
         output_dir = os.path.join(COMFYUI_ROOT, "output")
         try:
-            paths = sorted(
-                glob.glob(os.path.join(output_dir, "**", "*.mp4"), recursive=True),
-                key=lambda p: os.path.getmtime(p),
-                reverse=True,
-            )[:100]
+            paths = glob.glob(os.path.join(output_dir, "**", "*.mp4"), recursive=True)
+            paths_with_time = []
             for p in paths:
-                st = os.stat(p)
-                rel = os.path.relpath(p, output_dir)
-                parts = rel.split(os.sep)
-                filename = parts[-1]
-                subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
-                items.append({
-                    "filename": filename,
-                    "subfolder": subfolder,
-                    "type": "output",
-                    "mtime": int(st.st_mtime),
-                    "size": st.st_size,
-                })
+                try:
+                    paths_with_time.append((os.path.getmtime(p), p))
+                except OSError:
+                    continue
+            paths_with_time.sort(key=lambda x: x[0], reverse=True)
+            paths = [p for _, p in paths_with_time][:100]
+
+            for p in paths:
+                try:
+                    st = os.stat(p)
+                    rel = os.path.relpath(p, output_dir)
+                    parts = rel.split(os.sep)
+                    filename = parts[-1]
+                    subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
+                    items.append({
+                        "filename": filename,
+                        "subfolder": subfolder,
+                        "type": "output",
+                        "mtime": int(st.st_mtime),
+                        "size": st.st_size,
+                    })
+                except OSError:
+                    continue
         except OSError as e:
             sys.stderr.write(f"[serve] ltxv_list error: {e}\n")
         self._send_json(200, {
@@ -249,6 +266,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def _do_file_delete(self):
         """Delete a file inside ComfyUI's output/ or temp/. Validates path."""
         length = int(self.headers.get("Content-Length", 0))
+        if length > 1024 * 1024:  # Limit payload to 1MB
+            self._send_json(400, {"error": "Content-Length demasiado grande"})
+            return
         raw = self.rfile.read(length) if length > 0 else b""
         try:
             payload = json.loads(raw) if raw else {}
@@ -302,6 +322,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length > 0 else b""
 
+        # Exclude accept-encoding to prevent backend from returning compressed data,
+        # which would require complex decompression logic and cause client issues
+        # since we strip the Content-Encoding headers from the response.
         req = urllib.request.Request(
             target,
             data=body,
@@ -309,7 +332,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 k: v
                 for k, v in self.headers.items()
                 if k.lower()
-                not in ("host", "connection", "transfer-encoding", "content-length", "origin")
+                not in ("host", "connection", "transfer-encoding", "content-length", "origin", "accept-encoding")
             },
             method=method,
         )
@@ -319,42 +342,57 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
         # Si reenviamos a Ollama, le mentimos sobre el Origin: Ollama solo
         # permite CORS desde localhost/127.0.0.1. Ponemos uno que sí acepte.
-        # Los headers CORS correctos para el cliente se añaden en la respuesta.
         if base == OLLAMA:
             req.add_header("Origin", "http://127.0.0.1:11434")
-            client_origin = self.headers.get("Origin", "*")
-        else:
-            client_origin = None
+
+        # Siempre añadimos los headers CORS correctos para el cliente en la respuesta.
+        client_origin = self.headers.get("Origin", "*")
 
         try:
-            resp = urllib.request.urlopen(req, timeout=600)
-            self.send_response(resp.status)
-            # Copy response headers (except transfer-encoding / connection)
-            for k, v in resp.headers.items():
-                if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
-                    self.send_header(k, v)
-            if client_origin:
-                self.send_header("Access-Control-Allow-Origin", client_origin)
-                self.send_header("Vary", "Origin")
-            self.end_headers()
-            # Stream the body
-            chunk = resp.read(65536)
-            while chunk:
-                self.wfile.write(chunk)
+            with urllib.request.urlopen(req, timeout=600) as resp:
+                self.send_response(resp.status)
+                # Copy response headers (except transfer-encoding / connection)
+                for k, v in resp.headers.items():
+                    if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
+                        self.send_header(k, v)
+                # Force closing connection on proxy responses under HTTP/1.1 to prevent browser hangs,
+                # but preserve keep-alive for /view requests to allow smooth video streaming.
+                if not self.path.split("?")[0].startswith("/view"):
+                    self.send_header("Connection", "close")
+                    self.close_connection = True
+                if client_origin:
+                    self.send_header("Access-Control-Allow-Origin", client_origin)
+                    self.send_header("Vary", "Origin")
+                self.end_headers()
+                # Stream the body
                 chunk = resp.read(65536)
+                while chunk:
+                    self.wfile.write(chunk)
+                    chunk = resp.read(65536)
+        except (ConnectionError, BrokenPipeError) as e:
+            # Client disconnected early (e.g. browser cancelled request, closed tab, or seeked)
+            # We log a simple line and return cleanly.
+            sys.stderr.write(f"[serve] Client disconnected: {e}\n")
+            return
         except urllib.error.HTTPError as e:
-            self.send_response(e.code)
-            for k, v in e.headers.items():
-                if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
-                    self.send_header(k, v)
-            if client_origin:
-                self.send_header("Access-Control-Allow-Origin", client_origin)
-                self.send_header("Vary", "Origin")
-            self.end_headers()
-            chunk = e.read(65536)
-            while chunk:
-                self.wfile.write(chunk)
+            try:
+                self.send_response(e.code)
+                for k, v in e.headers.items():
+                    if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
+                        self.send_header(k, v)
+                if not self.path.split("?")[0].startswith("/view"):
+                    self.send_header("Connection", "close")
+                    self.close_connection = True
+                if client_origin:
+                    self.send_header("Access-Control-Allow-Origin", client_origin)
+                    self.send_header("Vary", "Origin")
+                self.end_headers()
                 chunk = e.read(65536)
+                while chunk:
+                    self.wfile.write(chunk)
+                    chunk = e.read(65536)
+            finally:
+                e.close()
         except urllib.error.URLError as e:
             reason = str(e.reason)
             if "reset" in reason.lower() or "broken pipe" in reason.lower():
@@ -363,23 +401,35 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_error(502, f"Backend unreachable: {reason}")
         except OSError as e:
+            # If the socket is already closed, write fails can raise BrokenPipe/ConnectionReset here too.
+            # We check and return cleanly.
+            if e.errno in (32, 104):  # EPIPE, ECONNRESET
+                sys.stderr.write(f"[serve] Client disconnected during error handler: {e}\n")
+                return
             self.send_error(502, f"Backend error: {e}")
 
 
-class ReusableServer(socketserver.TCPServer):
+class ReusableServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
+    daemon_threads = True
 
 
 def main():
-    with ReusableServer(("0.0.0.0", PORT), ProxyHandler) as httpd:
-        sys.stderr.write(
-            f"[serve] Sirviendo en 0.0.0.0:{PORT} (proxy -> {BACKEND}, krea2 -> {KREA2_OUTPUT_DIR}, delete-allowed -> {ALLOWED_DELETE_DIRS}, no-cache)\n"
-        )
-        sys.stderr.flush()
-        try:
+    try:
+        with ReusableServer(("0.0.0.0", PORT), ProxyHandler) as httpd:
+            sys.stderr.write(
+                f"[serve] Sirviendo en 0.0.0.0:{PORT} (proxy -> {BACKEND}, krea2 -> {KREA2_OUTPUT_DIR}, delete-allowed -> {ALLOWED_DELETE_DIRS}, no-cache)\n"
+            )
+            sys.stderr.flush()
             httpd.serve_forever()
-        except KeyboardInterrupt:
-            sys.stderr.write("[serve] Ctrl+C, saliendo.\n")
+    except OSError as e:
+        if e.errno == 98:  # Address already in use
+            sys.stderr.write(f"❌ Error: El puerto {PORT} ya está en uso. Cierra el proceso que lo está usando o elige otro puerto.\n")
+        else:
+            sys.stderr.write(f"❌ Error al iniciar el servidor: {e}\n")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.stderr.write("[serve] Ctrl+C, saliendo.\n")
 
 
 if __name__ == "__main__":

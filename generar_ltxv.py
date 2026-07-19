@@ -1,4 +1,3 @@
-import os
 from generar_common import generate_html
 
 # --- CONFIGURACIÓN ---

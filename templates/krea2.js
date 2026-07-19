@@ -9,7 +9,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "krea2",
   DEFAULT_MODEL: "krea2_turbo_convrot_int4_fast.safetensors",
-  N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"39",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
+  N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
   loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -61,32 +61,22 @@ CONFIG.onStopAll = function(){
 // --- Krea2 displayResult callback ---
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   const timeText = tTotal || "";
-  let outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
-  // Si no hay outputs, reintentar el fetch del history (ComfyUI puede tardar en escribirlos)
-  if(!outNode){
-    for(let i = 0; i < 5; i++){
-      await new Promise(r => setTimeout(r, 1000));
-      try {
-        const hr = await fetch(server()+"/history/"+promptId);
-        if(hr.ok){
-          const hist = await hr.json();
-          const retryEntry = hist[promptId];
-          if(retryEntry && retryEntry.outputs){
-            outNode = retryEntry.outputs[N.SAVE] || retryEntry.outputs[N.PREVIEW] || retryEntry.outputs[N.VAE_DECODE];
-            if(outNode){ entry = retryEntry; break; }
-          }
-        }
-      } catch(e) {}
-    }
+  const outputKeys = Object.keys(entry.outputs || {});
+  const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
+  log(`[DEBUG displayResult pid=${promptId}] outputKeys=[${outputKeys.join(", ")}] save=${!!entry.outputs[N.SAVE]} preview=${!!entry.outputs[N.PREVIEW]} decoded=${!!entry.outputs[N.VAE_DECODE]}`);
+  if(!outNode) {
+    log(`[DEBUG displayResult] no outNode (S=${N.SAVE}, P=${N.PREVIEW}, V=${N.VAE_DECODE}); foundOutput=false`, "l-warn");
+    return { foundOutput: false };
   }
-  if(outNode) {
-    const media = CONFIG.findMedia(outNode);
-    if(media){
-      showImage(media);
-      addToVariantGallery(media, realSeed, timeText);
-    }
+  log(`[DEBUG displayResult] outNode keys: ${Object.keys(outNode).join(", ")}`);
+  const media = CONFIG.findMedia(outNode);
+  log(`[DEBUG displayResult] media=${JSON.stringify(media)}`);
+  if(!media) {
+    return { foundOutput: false };
   }
-  return false;
+  showImage(media);
+  addToVariantGallery(media, realSeed, timeText);
+  return { foundOutput: true };
 };
 
 // --- SHOW IMAGE ---
@@ -819,9 +809,19 @@ function buildGraph(){
   g[N.RES_SELECTOR].inputs.aspect_ratio = $("aspectRatio").value;
   g[N.PROJECTOR].inputs.preset = $("projectorPreset").value;
   g[N.PROJECTOR].inputs.strength = parseFloat($("projectorStrength").value);
-  g[N.ENHANCER].inputs.enabled = $("enhancerEnabled").classList.contains("on");
-  g[N.ENHANCER].inputs.strength = parseFloat($("enhancerStrength").value);
-  g[N.ENHANCER].inputs.text_scale = parseFloat($("enhancerTextScale").value);
+  const enhancerEnabled = $("enhancerEnabled").classList.contains("on");
+  if(enhancerEnabled){
+    g[N.ENHANCER].inputs.enabled = true;
+    g[N.ENHANCER].inputs.strength = parseFloat($("enhancerStrength").value);
+    g[N.ENHANCER].inputs.text_scale = parseFloat($("enhancerTextScale").value);
+  } else {
+    // Si el enhancer está desactivado, lo eliminamos del grafo y conectamos
+    // el projector directamente al primer LoRA, evitando errores del backend.
+    delete g[N.ENHANCER];
+    if(g[N.LORA1] && g[N.LORA1].inputs.model && g[N.LORA1].inputs.model[0] === N.ENHANCER){
+      g[N.LORA1].inputs.model = [N.PROJECTOR, 0];
+    }
+  }
   g[N.SEED_VARIANCE].inputs.variance_preset = $("variancePreset").value;
   g[N.SEED_VARIANCE].inputs.protect_mode = $("protectMode").value;
   g[N.SEED_VARIANCE].inputs.seed = $("segVarianceRandom").classList.contains("on") ? -1 : parseInt($("varianceSeed").value, 10);

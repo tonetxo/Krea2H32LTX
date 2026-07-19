@@ -40,11 +40,11 @@ fi
 
 # Abrir el navegador en segundo plano
 echo "🌐 Abriendo navegador en http://localhost:$PORT/$HTML_FILE ..."
-$BROWSER "http://localhost:$PORT/$HTML_FILE" &
+"$BROWSER" "http://localhost:$PORT/$HTML_FILE" &
 
 # Servidor: serve.py añade Cache-Control: no-store a todas las respuestas
 # para que el móvil siempre recargue la UI al cambiar de versión.
 echo "🟢 Sirviendo (Ctrl+C para detener)..."
-python3 serve.py "$PORT"
+python3 serve.py "$PORT" "$@"
 
 echo "🛑 Servidor detenido."
