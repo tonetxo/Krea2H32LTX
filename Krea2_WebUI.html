@@ -792,32 +792,33 @@ function connectSocket() {
 }
 
 // --- HANDLE PROMPT DONE ---
+// Procesa un prompt_id terminado, venga del WS o del polling de respaldo.
+// Idempotente: si ya se ha procesado, no hace nada.
 async function handlePromptDone(promptId) {
     if(handledPrompts.has(promptId)) return;
-    if(processingPrompts.has(promptId)) return;
+    if(processingPrompts.has(promptId)) return; // ya lo está consultando otro
     processingPrompts.add(promptId);
-
-    let entry = null;
-    let retries = 0;
-    while(retries < 10){
-        try {
-            const hr = await fetch(server()+"/history/"+promptId);
-            if(!hr.ok) { break; }
-            const hist = await hr.json();
-            entry = hist[promptId];
-        } catch(e) { /* reintentar */ }
-        if(entry && entry.outputs && Object.keys(entry.outputs).length > 0) break;
-        entry = null;
-        retries++;
-        if(retries < 10) await new Promise(r => setTimeout(r, 500));
-    }
-
-    if(!entry || !entry.outputs || Object.keys(entry.outputs).length === 0) {
-        log(`⚠️ No se obtuvo output tras ${retries} intentos`, "l-err");
+    let entry;
+    try {
+        const hr = await fetch(server()+"/history/"+promptId);
+        if(!hr.ok) {
+            processingPrompts.delete(promptId);
+            return;
+        }
+        const hist = await hr.json();
+        entry = hist[promptId];
+    } catch(e) {
         processingPrompts.delete(promptId);
         return;
     }
+    // Si no hay outputs todavía, no marcar como handled: pollFallback reintentará
+    if(!entry || !entry.outputs || Object.keys(entry.outputs).length === 0) {
+        processingPrompts.delete(promptId);
+        return; // aún no ha terminado de escribir outputs
+    }
 
+    // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
+    // descartamos silenciosamente cualquier execution_success tardío del backend.
     if(!(promptId in pendingSeeds)){
         handledPrompts.add(promptId);
         processingPrompts.delete(promptId);
@@ -1186,7 +1187,7 @@ async function stopCurrentVideo(){
   delete pendingSeeds[pid];
   handledPrompts.add(pid);
   if(CONFIG.onStopCurrent) CONFIG.onStopCurrent(pid);
-  log("⏹ Video actual detenido.", "l-err");
+  log("⏹ Generación actual detenida.", "l-err");
   currentBatchIndex++;
   processNextBatch();
 }
