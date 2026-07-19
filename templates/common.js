@@ -893,6 +893,55 @@ function initCommon(){
   makeCollapsible("promptLibToggle", "promptLibBody");
   makeCollapsible("loraToggle", "loraBody");
 
+  // Export prompts
+  $("btnExportPrompts").addEventListener("click", () => {
+    const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+    const json = JSON.stringify(saved, null, 2);
+    const blob = new Blob([json], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = CONFIG.UI_TYPE + "_prompts.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    log(`📥 ${Object.keys(saved).length} prompts exportados.`, "l-ok");
+  });
+
+  // Import prompts
+  $("btnImportPrompts").addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const imported = JSON.parse(ev.target.result);
+          if(typeof imported !== 'object' || Array.isArray(imported)){
+            throw new Error("formato inválido (se esperaba un objeto)");
+          }
+          const saved = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY) || '{}');
+          let added = 0, overwritten = 0;
+          for(const [key, val] of Object.entries(imported)){
+            if(typeof val !== 'string') continue;
+            if(saved[key]) overwritten++; else added++;
+            saved[key] = val;
+          }
+          localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+          loadPrompts();
+          log(`📤 ${added} prompts importados (${overwritten} sobrescritos).`, "l-ok");
+        } catch(err){
+          log("❌ Error importando: " + err.message, "l-err");
+        }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  });
+
   // Init enhancer
   (async () => {
     await loadEnhancerModels();
