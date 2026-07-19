@@ -810,6 +810,28 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
 
 function gcd(a, b){ return b ? gcd(b, a % b) : a; }
 
+// Redimensiona un File/Blob a un lado máximo (manteniendo proporción) y devuelve
+// base64 JPEG (sin el prefijo data:). Útil para enviar imágenes a Ollama sin
+// superar el tope de body del servidor (~4 MB por defecto).
+async function resizeFileToBase64(file, maxSide){
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  c.getContext("2d").drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+
+// Variante que acepta una URL (usada por Krea2 desde refImg.src).
+async function imageToResizedBase64(srcUrl, maxSide){
+  const resp = await fetch(srcUrl);
+  const blob = await resp.blob();
+  return resizeFileToBase64(blob, maxSide);
+}
+
 function mediaViewUrl(media, extra){
   const ts = extra && extra.ts != null ? extra.ts : Date.now();
   const anchor = extra && extra.anchor ? extra.anchor : "";

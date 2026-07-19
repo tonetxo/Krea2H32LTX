@@ -914,20 +914,6 @@ async function fetchWithRetry(url, options, attempts=3){
   throw lastErr || new Error("fetch failed");
 }
 
-async function imageToResizedBase64(srcUrl, maxSide){
-  const resp = await fetch(srcUrl);
-  const blob = await resp.blob();
-  const bitmap = await createImageBitmap(blob);
-  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
-  const w = Math.max(1, Math.round(bitmap.width * scale));
-  const h = Math.max(1, Math.round(bitmap.height * scale));
-  const c = document.createElement("canvas");
-  c.width = w; c.height = h;
-  c.getContext("2d").drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
-  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
-}
-
 async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
   const wrap = $(wrapId);
   const img = wrap ? wrap.querySelector("img") : null;

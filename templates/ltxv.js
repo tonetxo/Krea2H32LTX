@@ -1222,16 +1222,10 @@ $("btnEnhance").addEventListener("click", async () => {
   if(mode === "vision"){
     if(!localFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
     try {
-      const b64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = reader.result;
-          const base64 = dataUrl.split(",")[1];
-          resolve(base64);
-        };
-        reader.onerror = () => reject(new Error("FileReader error: " + (reader.error?.message || reader.error?.code || "unknown")));
-        reader.readAsDataURL(localFile);
-      });
+      // Redimensionamos antes de enviar: Ollama rechaza bodies > ~4 MB
+      // ("http: request body too large"). 1280 px de lado máximo es ample para
+      // visión y mantiene el JPEG por debajo del tope.
+      const b64 = await resizeFileToBase64(localFile, 1280);
       payload.images = [b64];
     } catch(e) {
       log("⚠️ No se pudo leer la imagen: "+(e.message || e), "l-err");
