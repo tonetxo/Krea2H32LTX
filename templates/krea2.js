@@ -64,10 +64,15 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
   if(outNode) {
     const media = CONFIG.findMedia(outNode);
-    showImage(media);
-    addToVariantGallery(media, realSeed, timeText);
+    if(media){
+      showImage(media);
+      addToVariantGallery(media, realSeed, timeText);
+    } else {
+      log("⚠️ No se encontró media en el nodo de salida", "l-err");
+    }
+  } else {
+    log("⚠️ No hay nodo de salida en outputs. Keys: " + Object.keys(entry.outputs || {}).join(", "), "l-err");
   }
-  // Let common.js handle: delete pendingSeeds, variantCounter++, currentBatchIndex++, processNextBatch()
   return false;
 };
 
