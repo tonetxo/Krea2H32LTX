@@ -1572,22 +1572,24 @@ async function handlePromptDone(promptId) {
     if(handledPrompts.has(promptId)) return;
     if(processingPrompts.has(promptId)) return;
     processingPrompts.add(promptId);
-    let entry;
-    try {
-        const hr = await fetch(server()+"/history/"+promptId);
-        if(!hr.ok) {
-            log(`⏳ Esperando resultado (HTTP ${hr.status})...`, "l-ok");
-            processingPrompts.delete(promptId);
-            return;
-        }
-        const hist = await hr.json();
-        entry = hist[promptId];
-    } catch(e) {
-        log(`⚠️ Error consultando history: ${e.message}`, "l-err");
-        processingPrompts.delete(promptId);
-        return;
+
+    let entry = null;
+    let retries = 0;
+    while(retries < 10){
+        try {
+            const hr = await fetch(server()+"/history/"+promptId);
+            if(!hr.ok) { break; }
+            const hist = await hr.json();
+            entry = hist[promptId];
+        } catch(e) { /* reintentar */ }
+        if(entry && entry.outputs && Object.keys(entry.outputs).length > 0) break;
+        entry = null;
+        retries++;
+        if(retries < 10) await new Promise(r => setTimeout(r, 500));
     }
-    if(!entry || !entry.outputs) {
+
+    if(!entry || !entry.outputs || Object.keys(entry.outputs).length === 0) {
+        log(`⚠️ No se obtuvo output tras ${retries} intentos`, "l-err");
         processingPrompts.delete(promptId);
         return;
     }
