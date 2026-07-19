@@ -2464,9 +2464,44 @@ function buildGraph(){
   g[N.SEED_VARIANCE].inputs.variance_preset = $("variancePreset").value;
   g[N.SEED_VARIANCE].inputs.protect_mode = $("protectMode").value;
   g[N.SEED_VARIANCE].inputs.seed = $("segVarianceRandom").classList.contains("on") ? -1 : parseInt($("varianceSeed").value, 10);
-  g[N.LORA1].inputs.lora_name = (loras[0].on && loras[0].lora) ? "K2/"+loras[0].lora : g[N.LORA1].inputs.lora_name; g[N.LORA1].inputs.strength_model = loras[0].on ? loras[0].strength : 0;
-  g[N.LORA2].inputs.lora_name = (loras[1].on && loras[1].lora) ? "K2/"+loras[1].lora : g[N.LORA2].inputs.lora_name; g[N.LORA2].inputs.strength_model = loras[1].on ? loras[1].strength : 0;
-  g[N.LORA3].inputs.lora_name = (loras[2].on && loras[2].lora) ? "K2/"+loras[2].lora : g[N.LORA3].inputs.lora_name; g[N.LORA3].inputs.strength_model = loras[2].on ? loras[2].strength : 0;
+  // Proceso de LoRAs con bypass dinámico y resolución de rutas si están desactivados, vacíos o no existen en disco
+  const loraNodes = [N.LORA1, N.LORA2, N.LORA3];
+  for(let i = 0; i < 3; i++){
+    const nodeKey = loraNodes[i];
+    if(!g[nodeKey]) continue;
+    const loraObj = loras[i];
+    const name = loraObj ? loraObj.lora : "";
+    
+    let resolvedName = name;
+    let exists = false;
+    if(name && typeof AVAILABLE_LORAS !== "undefined"){
+      const targetBase = name.replace(/^.*\//, "").toLowerCase();
+      const matched = AVAILABLE_LORAS.find(al => al.replace(/^.*\//, "").toLowerCase() === targetBase);
+      if(matched){
+        resolvedName = matched;
+        exists = true;
+      }
+    }
+
+    const shouldBypass = !loraObj || !loraObj.on || !exists;
+    if(shouldBypass){
+      const parentModel = g[nodeKey].inputs.model;
+      if(i === 0){
+        if(g[N.LORA2]) g[N.LORA2].inputs.model = parentModel;
+        else if(g[N.LORA3]) g[N.LORA3].inputs.model = parentModel;
+        else g[N.SAMPLER].inputs.model = parentModel;
+      } else if(i === 1){
+        if(g[N.LORA3]) g[N.LORA3].inputs.model = parentModel;
+        else g[N.SAMPLER].inputs.model = parentModel;
+      } else if(i === 2){
+        g[N.SAMPLER].inputs.model = parentModel;
+      }
+      delete g[nodeKey];
+    } else {
+      g[nodeKey].inputs.lora_name = "K2/" + resolvedName;
+      g[nodeKey].inputs.strength_model = loraObj.strength;
+    }
+  }
   g[N.SAMPLER].inputs.eta = parseFloat($("etaSlider").value);
   g[N.SAMPLER].inputs.steps = parseInt($("steps").value, 10);
   g[N.SAMPLER].inputs.seed = $("segSamplerRandom").classList.contains("on") ? -1 : parseInt($("samplerSeed").value, 10);
