@@ -355,19 +355,36 @@ async function loadKrea2ImageAsInput(url, filename){
     b.classList.add("open");
     const arr = h.querySelector(".arrow"); if(arr) arr.textContent = "▼";
   }
-  // Cargamos la lista para que la tarjeta aparezca en el panel (UX), y luego
-  // cargamos la imagen directamente como entrada via loadKrea2ImageAsInput,
-  // que descarga el fichero y lo pasa por handleFile. Antes hacíamos click
-  // en la tarjeta encontrada por substring de img.src, pero era frágil
-  // (codificación, nombre devuelto por ComfyUI vs. el de /api/krea2_list).
-  loadKrea2Recent().then(async () => {
-    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent("krea2")}&type=${encodeURIComponent("output")}`;
+  // Cargar la imagen directamente como entrada, sin depender de la lista
+  // del panel (que puede estar cacheada o tener el nombre desfasado).
+  // Usamos URL relativa (same-origin) para garantizar que pasa por el proxy
+  // de serve.py en lugar de ir directo al backend (server() podría no estar
+  // inicializado en una pestaña recién abierta).
+  (async () => {
+    // Refrescar el panel para que la tarjeta aparezca visible (UX).
+    loadKrea2Recent().catch(()=>{});
+    const tryLoad = async (subfolder) => {
+      const url = `/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent("output")}`;
+      log("⏳ Cargando imagen Krea2 como entrada: "+filename+" (subfolder="+subfolder+")", "l-info");
+      const r = await fetch(url);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const blob = await r.blob();
+      if(blob.size === 0) throw new Error("respuesta vacía");
+      const file = new File([blob], filename, { type: blob.type || "image/png" });
+      handleFile(file, true);
+      log("✅ Imagen Krea2 cargada como entrada: "+filename, "l-ok");
+    };
     try {
-      await loadKrea2ImageAsInput(url, filename);
-    } catch(e){
-      log("⚠️ La imagen '"+filename+"' no se pudo cargar desde Krea2: "+e.message, "l-err");
+      await tryLoad("krea2");
+    } catch(e1){
+      // Reintentar sin subfolder por si el backend lo guardó en output/ raíz.
+      try {
+        await tryLoad("");
+      } catch(e2){
+        log("⚠️ La imagen '"+filename+"' no se pudo cargar desde Krea2: "+e2.message, "l-err");
+      }
     }
-  });
+  })();
 })();
 
 // --- EXTRACCIÓN Y APLICACIÓN DE WORKFLOW DESDE METADATOS PNG/MP4 ---
