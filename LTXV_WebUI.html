@@ -3030,19 +3030,17 @@ async function loadKrea2ImageAsInput(url, filename){
     b.classList.add("open");
     const arr = h.querySelector(".arrow"); if(arr) arr.textContent = "▼";
   }
-  loadKrea2Recent().then(() => {
-    const grid = $("krea2RecentGrid");
-    const items = grid.querySelectorAll(".gallery-item");
-    let found = null;
-    for(const it of items){
-      if(it.querySelector("img")?.src.includes(encodeURIComponent(filename))){
-        found = it; break;
-      }
-    }
-    if(found){
-      found.click();
-    } else {
-      log("⚠️ La imagen '"+filename+"' no está en la lista de Krea2 recientes.", "l-err");
+  // Cargamos la lista para que la tarjeta aparezca en el panel (UX), y luego
+  // cargamos la imagen directamente como entrada via loadKrea2ImageAsInput,
+  // que descarga el fichero y lo pasa por handleFile. Antes hacíamos click
+  // en la tarjeta encontrada por substring de img.src, pero era frágil
+  // (codificación, nombre devuelto por ComfyUI vs. el de /api/krea2_list).
+  loadKrea2Recent().then(async () => {
+    const url = `${server()}/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent("krea2")}&type=${encodeURIComponent("output")}`;
+    try {
+      await loadKrea2ImageAsInput(url, filename);
+    } catch(e){
+      log("⚠️ La imagen '"+filename+"' no se pudo cargar desde Krea2: "+e.message, "l-err");
     }
   });
 })();
