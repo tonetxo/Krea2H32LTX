@@ -348,7 +348,6 @@ async function loadKrea2ImageAsInput(url, filename){
   const ref = qs.get("ref");
   if(!ref) return;
   const rawName = decodeURIComponent(ref);
-  // Normalizar: si ?ref incluye subfolder (p.ej. "krea2/ref_123.png"), tomar solo basename.
   const filename = rawName.replace(/^.*\//, "");
   const subfolder = (rawName.includes("/") && rawName.split("/").slice(0,-1).join("/")) || "krea2";
   const h = $("krea2RecentToggle");
@@ -644,6 +643,7 @@ dz.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleFile(e.dataTrans
 fileInput.addEventListener("change",e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 
 function handleFile(f, shouldSaveToGallery = true){
+  console.log("[LTXV] handleFile", f.name, f.type, f.size);
   uploadedImage = null;
   localFile = null;
 
@@ -673,17 +673,19 @@ function handleFile(f, shouldSaveToGallery = true){
 }
 
 function showInputImage(src){
+  console.log("[LTXV] showInputImage src length:", src ? src.length : 0);
   const wrap = $("inputWrap"), img = $("inputImg"), actions = $("imgInputActions");
-  if(!wrap || !img) return;
+  if(!wrap || !img) { console.warn("[LTXV] showInputImage: wrap/img no disponible"); return; }
   img.onload = () => {
+    console.log("[LTXV] inputImg loaded", img.naturalWidth, "x", img.naturalHeight);
     updateDzInfo(img.naturalWidth, img.naturalHeight);
     inputZoom.resetZoom();
   };
+  img.onerror = (e) => console.error("[LTXV] inputImg error", e);
   img.src = src;
   img.style.display = "block";
   wrap.style.display = "flex";
   actions.style.display = "flex";
-  // Ocultar el dropzone y el placeholder
   const dz = $("dropzone");
   if(dz) dz.style.display = "none";
 }

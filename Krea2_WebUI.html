@@ -2990,28 +2990,25 @@ $("btnSendRefLtxv").addEventListener("click", async () => {
     return;
   }
 
-  // data:URL: la imagen es local del navegador. La subimos a ComfyUI en
-  // output/krea2/ con un nombre temporal y le pasamos ese filename a LTXV,
-  // que la encontrará en el panel "Imágenes Krea2 recientes".
+  // data:URL: la imagen es local del navegador. La subimos a nuestro endpoint
+  // /api/krea2_upload, que la guarda en output/krea2/, y le pasamos ese
+  // filename a LTXV, que la encontrará en el panel "Imágenes Krea2 recientes".
   if(!src.startsWith("data:")){
     log("⚠️ Origen de imagen no soportado: "+src.slice(0,40), "l-err");
     return;
   }
-  log("⏳ Subiendo imagen de referencia a ComfyUI para enviarla a LTXV...", "l-info");
+  log("⏳ Subiendo imagen de referencia para enviarla a LTXV...", "l-info");
   try {
     const blob = await (await fetch(src)).blob();
     const ts = Date.now();
     const ext = (blob.type && blob.type.split("/")[1]) || "png";
     const filename = `ref_${ts}.${ext.replace(/[^a-z0-9]/i,"")}`;
     const fd = new FormData();
-    fd.append("image", new File([blob], filename, { type: blob.type }));
-    fd.append("overwrite", "true");
-    fd.append("subfolder", "krea2");
-    const r = await fetch(server()+"/upload/image", { method: "POST", body: fd });
+    fd.append("image", new File([blob], filename, { type: blob.type || "image/png" }));
+    const r = await fetch("/api/krea2_upload", { method: "POST", body: fd });
     if(!r.ok) throw new Error("HTTP "+r.status);
     const data = await r.json();
-    // ComfyUI puede devolver data.name con la subfolder incluida ("krea2/ref_123.png").
-    // Para el parámetro ?ref= queremos solo el basename; LTXV añade subfolder=krea2.
+    if(data.error) throw new Error(data.error);
     const finalName = (data.name || filename).replace(/^.*\//, "");
     log("✅ Imagen subida a output/krea2/"+finalName, "l-ok");
     openLtxv(finalName);

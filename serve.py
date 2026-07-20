@@ -32,7 +32,7 @@ BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/file_delete")
+CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/file_delete", "/api/krea2_upload")
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
@@ -124,6 +124,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_file_delete():
             self._do_file_delete()
+        elif self._is_krea2_upload():
+            self._do_krea2_upload()
         elif self._is_ollama_route():
             self._proxy("POST", OLLAMA)
         elif self._is_proxy_route():
@@ -141,6 +143,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._cors_preflight()
         elif self._is_proxy_route():
             self._proxy("OPTIONS", BACKEND)
+        elif self._is_krea2_upload() or self._is_file_delete() or self._is_krea2_list() or self._is_ltxv_list():
+            # Endpoints custom también necesitan preflight same-origin.
+            self._cors_preflight()
         else:
             self.send_error(405, "Method Not Allowed")
 
@@ -208,9 +213,112 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         return path == "/api/ltxv_list"
 
+    def _is_krea2_upload(self):
+        path = self.path.split("?")[0]
+        return path == "/api/krea2_upload"
+
     def _is_file_delete(self):
         path = self.path.split("?")[0]
         return path == "/api/file_delete"
+
+    def _parse_multipart_parts(self):
+        """Parsea un POST multipart/form-data y devuelve un dict {field_name: {...}}."""
+        import re
+        ctype = self.headers.get("Content-Type", "")
+        if not ctype.startswith("multipart/form-data"):
+            return None
+        m = re.search(r'boundary=([^;]+)', ctype)
+        if not m:
+            return None
+        boundary = m.group(1).strip().strip('"')
+        length = int(self.headers.get("Content-Length", 0))
+        if length <= 0:
+            return None
+        body = self.rfile.read(length)
+        delim = b"--" + boundary.encode()
+        parts = body.split(delim)
+        out = {}
+        for part in parts:
+            part = part.strip(b"\r\n")
+            if not part or part == b"--":
+                continue
+            header_end = part.find(b"\r\n\r\n")
+            offset = 4
+            if header_end == -1:
+                header_end = part.find(b"\n\n")
+                offset = 2
+            if header_end == -1:
+                continue
+            headers_raw = part[:header_end].decode("latin-1")
+            content = part[header_end + offset:]
+            # Tras el split por boundary, el contenido de cada parte termina con
+            # el CRLF (o LF) que precede al siguiente boundary. Lo quitamos.
+            if content.endswith(b"\r\n"):
+                content = content[:-2]
+            elif content.endswith(b"\n"):
+                content = content[:-1]
+            fn_match = re.search(r'filename="([^"]+)"', headers_raw)
+            name_match = re.search(r'name="([^"]+)"', headers_raw)
+            if name_match:
+                out[name_match.group(1)] = {
+                    "filename": fn_match.group(1) if fn_match else "",
+                    "data": content,
+                    "headers": headers_raw,
+                }
+        return out
+
+    def _do_krea2_upload(self):
+        """Guarda un blob de imagen en KREA2_OUTPUT_DIR para compartir con LTXV."""
+        # Same-origin estricto: no permitir que sitios externos suban archivos.
+        if not self._allowed_origin():
+            self._send_json(403, {"error": "forbidden: solo same-origin puede subir archivos"})
+            return
+        parts = self._parse_multipart_parts()
+        if not parts or "image" not in parts:
+            self._send_json(400, {"error": "falta campo image"})
+            return
+        img = parts["image"]
+        data = img["data"]
+        if len(data) == 0:
+            self._send_json(400, {"error": "imagen vacía"})
+            return
+        # Determinar extensión por Content-Type o filename original.
+        ct = ""
+        for h in img["headers"].splitlines():
+            if h.lower().startswith("content-type:"):
+                ct = h.split(":", 1)[1].strip()
+                break
+        ext_map = {
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/webp": ".webp",
+        }
+        ext = ".png"
+        if ct in ext_map:
+            ext = ext_map[ct]
+        orig = img["filename"]
+        if orig:
+            _, e = os.path.splitext(orig)
+            e = e.lower()
+            if e in (".png", ".jpg", ".jpeg", ".webp"):
+                ext = ".jpg" if e == ".jpeg" else e
+        filename = f"ref_{int(time.time() * 1000)}{ext}"
+        os.makedirs(KREA2_OUTPUT_DIR, exist_ok=True)
+        path = os.path.join(KREA2_OUTPUT_DIR, filename)
+        try:
+            with open(path, "wb") as f:
+                f.write(data)
+            _LIST_CACHE.pop("krea2", None)
+            sys.stderr.write(f"[serve] krea2_upload: {path}\n")
+            self._send_json(200, {
+                "name": filename,
+                "subfolder": "krea2",
+                "type": "output",
+                "size": len(data),
+            })
+        except OSError as e:
+            self._send_json(500, {"error": str(e)})
 
     def _is_ws(self):
         return self.path.split("?")[0].startswith(WS_PREFIX)
@@ -234,9 +342,19 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def _build_krea2_list(self):
         items = []
         try:
-            paths = glob.glob(os.path.join(KREA2_OUTPUT_DIR, "*.png"))
-            paths_with_time = []
+            paths = []
+            for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+                paths.extend(glob.glob(os.path.join(KREA2_OUTPUT_DIR, pattern)))
+            # eliminar duplicados si hay alias .jpg/.jpeg
+            seen = set()
+            unique_paths = []
             for p in paths:
+                rp = os.path.realpath(p)
+                if rp not in seen:
+                    seen.add(rp)
+                    unique_paths.append(p)
+            paths_with_time = []
+            for p in unique_paths:
                 try:
                     paths_with_time.append((os.path.getmtime(p), p))
                 except OSError:
