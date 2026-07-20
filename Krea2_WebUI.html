@@ -2966,26 +2966,55 @@ $("btnCaption").addEventListener("click", async () => {
   }
 });
 
-$("btnSendRefLtxv").addEventListener("click", () => {
+$("btnSendRefLtxv").addEventListener("click", async () => {
   const refImgEl = $("refImg");
   if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
     log("⚠️ Primero carga una imagen de referencia.", "l-err");
     return;
   }
   const src = refImgEl.src;
-  const m = src.match(/[?&]filename=([^&]+)/);
-  if(m){
-    const filename = decodeURIComponent(m[1]);
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
+  const openLtxv = (filename) => {
     const ref = encodeURIComponent(filename);
-    const here = window.location;
-    const targetHost = here.hostname;
-    const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
     const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
     const win = window.open(url, "_blank");
     if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
     else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
-  } else {
-    log("⚠️ La imagen de referencia no está en disco (es data:URL). Guárdala primero o usa la galería de variantes.", "l-err");
+  };
+
+  const m = src.match(/[?&]filename=([^&]+)/);
+  if(m){
+    openLtxv(decodeURIComponent(m[1]));
+    return;
+  }
+
+  // data:URL: la imagen es local del navegador. La subimos a ComfyUI en
+  // output/krea2/ con un nombre temporal y le pasamos ese filename a LTXV,
+  // que la encontrará en el panel "Imágenes Krea2 recientes".
+  if(!src.startsWith("data:")){
+    log("⚠️ Origen de imagen no soportado: "+src.slice(0,40), "l-err");
+    return;
+  }
+  log("⏳ Subiendo imagen de referencia a ComfyUI para enviarla a LTXV...", "l-info");
+  try {
+    const blob = await (await fetch(src)).blob();
+    const ts = Date.now();
+    const ext = (blob.type && blob.type.split("/")[1]) || "png";
+    const filename = `ref_${ts}.${ext.replace(/[^a-z0-9]/i,"")}`;
+    const fd = new FormData();
+    fd.append("image", new File([blob], filename, { type: blob.type }));
+    fd.append("overwrite", "true");
+    fd.append("subfolder", "krea2");
+    const r = await fetch(server()+"/upload/image", { method: "POST", body: fd });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    const finalName = data.name || filename;
+    log("✅ Imagen subida a output/krea2/"+finalName, "l-ok");
+    openLtxv(finalName);
+  } catch(e){
+    log("❌ No se pudo enviar la imagen a LTXV: "+e.message, "l-err");
   }
 });
 
