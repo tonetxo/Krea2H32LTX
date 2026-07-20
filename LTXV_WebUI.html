@@ -3022,7 +3022,10 @@ async function loadKrea2ImageAsInput(url, filename){
   const qs = new URLSearchParams(window.location.search);
   const ref = qs.get("ref");
   if(!ref) return;
-  const filename = decodeURIComponent(ref);
+  const rawName = decodeURIComponent(ref);
+  // Normalizar: si ?ref incluye subfolder (p.ej. "krea2/ref_123.png"), tomar solo basename.
+  const filename = rawName.replace(/^.*\//, "");
+  const subfolder = (rawName.includes("/") && rawName.split("/").slice(0,-1).join("/")) || "krea2";
   const h = $("krea2RecentToggle");
   const b = $("krea2RecentBody");
   if(h && b && !h.classList.contains("open")){
@@ -3030,17 +3033,11 @@ async function loadKrea2ImageAsInput(url, filename){
     b.classList.add("open");
     const arr = h.querySelector(".arrow"); if(arr) arr.textContent = "▼";
   }
-  // Cargar la imagen directamente como entrada, sin depender de la lista
-  // del panel (que puede estar cacheada o tener el nombre desfasado).
-  // Usamos URL relativa (same-origin) para garantizar que pasa por el proxy
-  // de serve.py en lugar de ir directo al backend (server() podría no estar
-  // inicializado en una pestaña recién abierta).
   (async () => {
-    // Refrescar el panel para que la tarjeta aparezca visible (UX).
     loadKrea2Recent().catch(()=>{});
-    const tryLoad = async (subfolder) => {
-      const url = `/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(subfolder)}&type=${encodeURIComponent("output")}`;
-      log("⏳ Cargando imagen Krea2 como entrada: "+filename+" (subfolder="+subfolder+")", "l-info");
+    const tryLoad = async (sf) => {
+      const url = `/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(sf)}&type=${encodeURIComponent("output")}`;
+      log("⏳ Cargando imagen Krea2 como entrada: "+filename+" (subfolder="+sf+")", "l-info");
       const r = await fetch(url);
       if(!r.ok) throw new Error("HTTP "+r.status);
       const blob = await r.blob();
@@ -3050,9 +3047,8 @@ async function loadKrea2ImageAsInput(url, filename){
       log("✅ Imagen Krea2 cargada como entrada: "+filename, "l-ok");
     };
     try {
-      await tryLoad("krea2");
+      await tryLoad(subfolder);
     } catch(e1){
-      // Reintentar sin subfolder por si el backend lo guardó en output/ raíz.
       try {
         await tryLoad("");
       } catch(e2){

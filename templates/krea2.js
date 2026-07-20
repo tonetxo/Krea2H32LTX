@@ -1111,7 +1111,9 @@ $("btnSendRefLtxv").addEventListener("click", async () => {
     const r = await fetch(server()+"/upload/image", { method: "POST", body: fd });
     if(!r.ok) throw new Error("HTTP "+r.status);
     const data = await r.json();
-    const finalName = data.name || filename;
+    // ComfyUI puede devolver data.name con la subfolder incluida ("krea2/ref_123.png").
+    // Para el parámetro ?ref= queremos solo el basename; LTXV añade subfolder=krea2.
+    const finalName = (data.name || filename).replace(/^.*\//, "");
     log("✅ Imagen subida a output/krea2/"+finalName, "l-ok");
     openLtxv(finalName);
   } catch(e){
