@@ -9,7 +9,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -36,8 +36,29 @@ const DMD_MODEL_SOURCE = "868";
 let firstPromptId = null;
 let finalVariantIndex = null;
 let promptSteps = {};
+const BITDEPTH_KEY = "ltxv_bit_depth";
 // Exposed for common.js WS error handler.
 window.currentBatchMode = false;
+
+function getBitDepth(){
+  return ($("segBitDepth10")?.classList.contains("on") ? 10 : 8);
+}
+function setBitDepthUI(value){
+  const eight = $("segBitDepth8");
+  const ten = $("segBitDepth10");
+  if(!eight || !ten) return;
+  if(value === 10){ ten.classList.add("on"); eight.classList.remove("on"); }
+  else { eight.classList.add("on"); ten.classList.remove("on"); }
+}
+function saveBitDepth(value){
+  try { localStorage.setItem(BITDEPTH_KEY, String(value)); } catch(_){}
+}
+function loadBitDepth(){
+  try { return parseInt(localStorage.getItem(BITDEPTH_KEY) || "8", 10); } catch(_){ return 8; }
+}
+setBitDepthUI(loadBitDepth());
+$("segBitDepth8")?.addEventListener("click", () => { setBitDepthUI(8); saveBitDepth(8); });
+$("segBitDepth10")?.addEventListener("click", () => { setBitDepthUI(10); saveBitDepth(10); });
 
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
@@ -583,6 +604,22 @@ function applyWorkflow(workflow, opts={}){
 
   const appliedMsg = applied.length ? "✅ Usados: " + applied.join(", ") : "";
   const missingMsg = missing.length ? "⚠️ Sin coincidencia: " + missing.join(", ") : "";
+
+  // Profundidad de color
+  let bitDepthSet = false;
+  const createVideos = findAllByClass("CreateVideo");
+  if(createVideos.length){
+    const bdNode = createVideos.find(n => n.node.inputs && (n.node.inputs.bit_depth === 8 || n.node.inputs.bit_depth === 10));
+    if(bdNode){
+      const bd = bdNode.node.inputs.bit_depth;
+      setBitDepthUI(bd);
+      saveBitDepth(bd);
+      bitDepthSet = true;
+      setApplied("profundidad de color");
+    }
+  }
+  if(!bitDepthSet) setMissing("profundidad de color");
+
   if(opts.silent) return { applied, missing };
   if(appliedMsg) log(appliedMsg, "l-ok");
   if(missingMsg) log(missingMsg, "l-warn");
@@ -810,6 +847,9 @@ function buildGraph(firstPassOnly){
   g[N.LORA].inputs.lora_2={on:loras[1].on,lora:loras[1].lora,strength:loras[1].strength};
   g[N.LORA].inputs.lora_3={on:loras[2].on,lora:loras[2].lora,strength:loras[2].strength};
   if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs) g[N.CHECKPOINT].inputs.ckpt_name = $("modelSelect").value;
+  const bitDepth = getBitDepth();
+  if(g[N.CREATE_VIDEO_1] && g[N.CREATE_VIDEO_1].inputs) g[N.CREATE_VIDEO_1].inputs.bit_depth = bitDepth;
+  if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;
   // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
   if(dmdBypass && g[N.LORA] && g[N.LORA].inputs.model){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
