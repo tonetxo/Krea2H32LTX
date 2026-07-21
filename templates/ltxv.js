@@ -1070,6 +1070,99 @@ $("btnRefreshVideoHistory").addEventListener("click", (e) => {
   loadVideoHistory();
 });
 
+// --- VIDEO HISTORY THUMBNAILS ---
+const THUMB_CACHE_PREFIX = "ltxv_thumb_";
+const THUMB_WIDTH = 320;
+const THUMB_QUALITY = 0.72;
+
+function _thumbCacheKey(item){
+  return item.filename + "|" + (item.mtime || 0) + "|" + item.subfolder + "|" + item.type;
+}
+
+function _safeCacheGet(key){
+  try { return localStorage.getItem(THUMB_CACHE_PREFIX + key); } catch(e){ return null; }
+}
+
+function _safeCacheSet(key, value){
+  try { localStorage.setItem(THUMB_CACHE_PREFIX + key, value); } catch(e){ /* quota/full: ignore */ }
+}
+
+function extractVideoFrame(videoUrl){
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    v.crossOrigin = "anonymous";
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+    let resolved = false;
+    function done(result){
+      if(resolved) return;
+      resolved = true;
+      try { v.pause(); v.src = ""; v.load(); } catch(_){}
+      resolve(result);
+    }
+    v.addEventListener("loadedmetadata", () => {
+      const t = v.duration ? Math.min(0.5, v.duration / 2) : 0.1;
+      v.currentTime = t;
+    }, {once:true});
+    v.addEventListener("seeked", () => {
+      try {
+        const canvas = document.createElement("canvas");
+        const ratio = v.videoHeight / (v.videoWidth || 1);
+        canvas.width = THUMB_WIDTH;
+        canvas.height = Math.max(1, Math.round(THUMB_WIDTH * ratio));
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+        done(canvas.toDataURL("image/jpeg", THUMB_QUALITY));
+      } catch(err){ done(null); }
+    }, {once:true});
+    v.addEventListener("error", () => done(null), {once:true});
+    v.src = videoUrl;
+  });
+}
+
+async function getCachedThumb(item){
+  const key = _thumbCacheKey(item);
+  const cached = _safeCacheGet(key);
+  if(cached) return cached;
+  const url = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}&t=${item.mtime}`;
+  const dataUrl = await extractVideoFrame(url + "#t=0.1");
+  if(dataUrl) _safeCacheSet(key, dataUrl);
+  return dataUrl;
+}
+
+let _thumbObserver = null;
+function observeThumbs(){
+  if(_thumbObserver) _thumbObserver.disconnect();
+  if(!("IntersectionObserver" in window)){
+    document.querySelectorAll(".thumb-img").forEach(async (img) => {
+      if(img.dataset.loaded) return;
+      const item = JSON.parse(img.dataset.item || "{}");
+      if(!item.filename) return;
+      const dataUrl = await getCachedThumb(item);
+      if(dataUrl){ img.src = dataUrl; img.style.opacity = 1; }
+      img.dataset.loaded = "1";
+    });
+    return;
+  }
+  _thumbObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if(!entry.isIntersecting) return;
+      const img = entry.target;
+      if(img.dataset.loaded) return;
+      img.dataset.loaded = "1";
+      const item = JSON.parse(img.dataset.item || "{}");
+      if(!item.filename) return;
+      getCachedThumb(item).then(dataUrl => {
+        if(dataUrl){ img.src = dataUrl; img.style.opacity = 1; }
+      }).catch(() => {});
+    });
+  }, { rootMargin: "50px" });
+  document.querySelectorAll(".thumb-img").forEach(img => _thumbObserver.observe(img));
+}
+
 async function loadVideoHistory(){
   const status = $("videoHistoryStatus");
   const grid = $("videoHistoryGrid");
@@ -1083,89 +1176,103 @@ async function loadVideoHistory(){
       status.textContent = "No hay vídeos en el historial.";
       return;
     }
-    status.textContent = `${data.count} vídeos encontrados.`;
-    for(const item of data.items){
-      const card = document.createElement("div");
-      card.className = "variant-card";
-      const url = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}&t=${item.mtime}#t=0.1`;
-      const dateStr = new Date(item.mtime * 1000).toLocaleString("es-ES", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
-      card.innerHTML = `
-        <video src="${url}" crossorigin="anonymous" muted preload="none" playsinline></video>
-        <div class="variant-info">
-          <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
-          <span class="variant-icons">
-            <button class="variant-meta-btn" title="Reproducir" data-action="play">▶</button>
-            <button class="variant-meta-btn" title="Copiar workflow" data-action="workflow">📋</button>
-            <button class="variant-del-btn" title="Eliminar" data-action="delete">×</button>
-          </span>
-        </div>
-        <div style="padding:2px 8px 6px;font-size:9px;color:var(--muted-2);font-family:var(--mono);">${dateStr}</div>
-      `;
-      card.dataset.filename = item.filename;
-      card.dataset.subfolder = item.subfolder;
-      card.dataset.type = item.type;
+    const allItems = data.items;
+    let visibleCount = Math.min(30, allItems.length);
 
-      const videoEl = card.querySelector("video");
+    function renderBatch(){
+      grid.innerHTML = "";
+      const items = allItems.slice(0, visibleCount);
+      for(const item of items){
+        const card = document.createElement("div");
+        card.className = "variant-card";
+        const dateStr = new Date(item.mtime * 1000).toLocaleString("es-ES", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+        const itemJson = JSON.stringify(item).replace(/"/g, "&quot;");
+        card.innerHTML = `
+          <div class="thumb-wrap" style="position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;">
+            <img class="thumb-img" data-item="${itemJson}" loading="lazy" alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:.6;transition:opacity .2s;">
+          </div>
+          <div class="variant-info">
+            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
+            <span class="variant-icons">
+              <button class="variant-meta-btn" title="Copiar workflow" data-action="workflow">📋</button>
+              <button class="variant-del-btn" title="Eliminar" data-action="delete">×</button>
+            </span>
+          </div>
+          <div style="padding:2px 8px 6px;font-size:9px;color:var(--muted-2);font-family:var(--mono);">${dateStr}</div>
+        `;
+        card.dataset.filename = item.filename;
+        card.dataset.subfolder = item.subfolder;
+        card.dataset.type = item.type;
 
-      // Reproducir al pasar el cursor (hover-play) para evitar que salgan en negro
-      card.addEventListener("mouseenter", () => {
-        videoEl.play().catch(err => console.log("Hover play failed:", err));
-      });
-      card.addEventListener("mouseleave", () => {
-        videoEl.pause();
-        videoEl.currentTime = 0.1; // reset frame
-      });
+        card.addEventListener("click", () => {
+          const slot = item.filename.includes("_prev") ? 1 : 2;
+          const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
+          showVideo(slot, media, { variantIndex: 0 });
+          log("▶ Reproduciendo: "+item.filename, "l-ok");
+        });
 
-      // Toda la tarjeta carga y reproduce el vídeo en el reproductor principal al hacer clic
-      card.addEventListener("click", () => {
-        const slot = item.filename.includes("_prev") ? 1 : 2;
-        const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
-        showVideo(slot, media, { variantIndex: 0 });
-        log("▶ Reproduciendo: "+item.filename, "l-ok");
-      });
-
-      card.querySelector('[data-action="workflow"]').addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const btn = e.target;
-        btn.disabled = true;
-        const orig = btn.textContent;
-        btn.textContent = "⏳";
-        try {
-          const wfUrl = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
-          const workflow = await extractWorkflowFromMP4(wfUrl);
-          if(workflow){
-            applyWorkflow(workflow);
-            log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
-          } else {
-            log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
+        card.querySelector('[data-action="workflow"]').addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const btn = e.target;
+          btn.disabled = true;
+          const orig = btn.textContent;
+          btn.textContent = "⏳";
+          try {
+            const wfUrl = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
+            const workflow = await extractWorkflowFromMP4(wfUrl);
+            if(workflow){
+              applyWorkflow(workflow);
+              log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
+            } else {
+              log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
+            }
+          } catch(err) {
+            log("❌ Error leyendo workflow: "+err.message, "l-err");
+            console.error("Error al recuperar workflow de la tarjeta:", err);
+          } finally {
+            btn.disabled = false;
+            btn.textContent = orig;
           }
-        } catch(err) {
-          log("❌ Error leyendo workflow: "+err.message, "l-err");
-          console.error("Error al recuperar workflow de la tarjeta:", err);
-        } finally {
-          btn.disabled = false;
-          btn.textContent = orig;
-        }
-      });
+        });
 
-      card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {
-        e.stopPropagation();
-        const btn = e.target;
-        const updateStatus = (grid) => {
-          const remaining = grid.querySelectorAll(".variant-card").length;
-          status.textContent = remaining ? `${remaining} vídeos.` : "No hay vídeos en el historial.";
-        };
-        deleteMediaFile(card, btn, {
-          filename: item.filename,
-          subfolder: item.subfolder,
-          type: item.type,
-        }, grid, null, "Vídeo",
-          (grid) => updateStatus(grid),
-          (grid) => updateStatus(grid));
-      });
+        card.querySelector('[data-action="delete"]').addEventListener("click", (e) => {
+          e.stopPropagation();
+          const btn = e.target;
+          const updateStatus = (g) => {
+            const remaining = g.querySelectorAll(".variant-card").length;
+            status.textContent = remaining ? `${remaining} vídeos.` : "No hay vídeos en el historial.";
+          };
+          deleteMediaFile(card, btn, {
+            filename: item.filename,
+            subfolder: item.subfolder,
+            type: item.type,
+          }, grid, null, "Vídeo",
+            (g) => updateStatus(g),
+            (g) => updateStatus(g));
+        });
 
-      grid.appendChild(card);
+        grid.appendChild(card);
+      }
+
+      if(visibleCount < allItems.length){
+        const moreBtn = document.createElement("button");
+        moreBtn.className = "ghost";
+        moreBtn.textContent = `Cargar más (${allItems.length - visibleCount} restantes)`;
+        moreBtn.style.cssText = "grid-column:1/-1;justify-self:center;margin:6px 0;";
+        moreBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          visibleCount = Math.min(visibleCount + 30, allItems.length);
+          renderBatch();
+          observeThumbs();
+        });
+        grid.appendChild(moreBtn);
+      }
+
+      status.textContent = `${allItems.length} vídeos encontrados (${items.length} mostrados).`;
     }
+
+    renderBatch();
+    observeThumbs();
   } catch(err){
     status.textContent = "Error: "+err.message;
   }
