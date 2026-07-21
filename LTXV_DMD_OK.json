@@ -291,7 +291,7 @@
   "616": {
     "inputs": {
       "text_encoder": "gemma-3-12b-it-ablit-norms-biproj-fp8mixed.safetensors",
-      "ckpt_name": "10Eros_v1.3_fp8mixed_learned.safetensors",
+      "ckpt_name": "10Eros_v1.4_bf16.safetensors",
       "device": "default"
     },
     "class_type": "LTXAVTextEncoderLoader",
@@ -301,7 +301,7 @@
   },
   "617": {
     "inputs": {
-      "ckpt_name": "10Eros_v1.3_fp8mixed_learned.safetensors"
+      "ckpt_name": "10Eros_v1.4_bf16.safetensors"
     },
     "class_type": "LTXVAudioVAELoader",
     "_meta": {
@@ -321,7 +321,7 @@
   },
   "646": {
     "inputs": {
-      "ckpt_name": "10Eros_v1.3_fp8mixed_learned.safetensors"
+      "ckpt_name": "10Eros_v1.4_bf16.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {

@@ -28,7 +28,7 @@ def main():
             (MODELS_DIR, 'ltxv'),
             (SD_MODELS_DIR, ''),
         ],
-        'model_fallback': '10Eros_v1.3_fp8mixed_learned.safetensors',
+        'model_fallback': '10Eros_v1.4_bf16.safetensors',
         'model_exclude': ('StableAudio/', 'HiDream/', 'sam3.1_multiplex_fp16', 'lens_turbo_bf16'),
         'lora_dir': LORAS_DIR,
         'lora_fallback': 'ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors',
