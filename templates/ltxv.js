@@ -8,7 +8,7 @@ const CONFIG = {
   SERVERURL_KEY: 'ltxv_serverUrl',
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
-  DEFAULT_MODEL: "10Eros_v1.3_fp8mixed_learned.safetensors",
+  DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
   N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
