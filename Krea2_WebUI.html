@@ -118,7 +118,8 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .collapsible-body.open{max-height:5000px;}
 .enhancer-row{margin-bottom:10px;}
 .enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
-.enhancer-row select{width:100%;}
+.enhancer-row select,.enhancer-row input[type=number]{width:100%;}
+.enhancer-row .slider-row input[type=range]{flex:1;}
 .enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
 .enhancer-output:focus{border-color:var(--accent);}
 .enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
@@ -228,7 +229,23 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
             <select id="enhancerStyle"></select>
           </div>
           <div class="enhancer-row">
+            <label>Cadena de mejora</label>
+            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">Ollama</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Temperatura LTX2 <span class="hint">(Generate LTX2 Prompt)</span></label>
+            <div class="slider-row"><input type="range" id="ltx2Temperature" min="0" max="1.5" step="0.05" value="0.7"><div class="slider-val" id="ltx2TemperatureVal">0.70</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Seed LTX2</label>
+            <input type="number" id="ltx2Seed" value="2" step="1">
+          </div>
+          <div class="enhancer-row">
             <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
+          </div>
+          <div class="enhancer-row">
+            <label>Previsualización LTX2 <span class="hint">(sin ejecutar)</span></label>
+            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="El prompt final (Ollama + LTX2) aparecerá aquí tras pulsar Mejorar prompt..."></textarea>
           </div>
           <div class="enhancer-row">
             <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado aparecerá aquí..."></textarea>
@@ -241,6 +258,33 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
         </div>
       </div>
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="evolveToggle">
+          <span class="arrow">▶</span> Evolve / Transmutar prompt
+        </div>
+        <div class="collapsible-body" id="evolveBody">
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="evolveMode"><option value="words">Palabras</option><option value="internal">Palabras del prompt</option><option value="synonyms">Sinónimos cinematográficos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Probabilidad <span class="hint">(% de tokens cambiados)</span></label>
+            <div class="slider-row"><input type="range" id="evolveStrength" min="0" max="100" step="1" value="10"><div class="slider-val" id="evolveStrengthVal">10%</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Variantes</label>
+            <input type="number" id="evolveCount" value="4" min="1" max="16" step="1">
+          </div>
+          <div class="btn-row">
+            <button id="btnEvolve" class="primary" style="flex:1">Transmutar</button>
+            <button id="btnEvolveUse" class="ghost" style="flex:1">Usar #1</button>
+          </div>
+          <div class="enhancer-row">
+            <textarea class="enhancer-output" id="evolveOutput" readonly placeholder="Las variantes aparecerán aquí..."></textarea>
+          </div>
+        </div>
+      </div>
 
       <div class="panel"><h2>Resolución</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.1" max="4.0" step="0.1" value="1.0"><div class="slider-val" id="mpVal">1.00</div></div><div class="row"><label>Aspect Ratio</label><select id="aspectRatio"><option value="1:1 (Square)">1:1 (Square)</option><option value="2:3 (Portrait Photo)">2:3 (Portrait Photo)</option><option value="3:2 (Photo)">3:2 (Photo)</option><option value="3:4 (Portrait Standard)">3:4 (Portrait Standard)</option><option value="4:3 (Standard)">4:3 (Standard)</option><option value="9:16 (Portrait Widescreen)">9:16 (Portrait Widescreen)</option><option value="16:9 (Widescreen)" selected>16:9 (Widescreen)</option><option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option></select></div></div>
 
@@ -3032,6 +3076,131 @@ $("btnLoadMeta").addEventListener("click", async () => {
   } finally {
     $("btnLoadMeta").disabled = false;
     $("btnLoadMeta").textContent = "Cargar metadatos";
+  }
+});
+
+// --- EVOLVE / TRANSMUTAR PROMPT ---
+const EVOLVE_VOCAB = [
+  "cinematic","dramatic","atmospheric","moody","ethereal","surreal","hyperrealistic","photorealistic","volumetric",
+  "noir","neon","golden","misty","stormy","serene","tense","epic","intimate","melancholic","euphoric",
+  "ominous","dreamlike","futuristic","rustic","decayed","luxurious","desolate","lush","intricate","minimalist",
+  "dynamic","static","fluid","fragmented","seamless","chaotic","ordered","warm","cold","vibrant","muted",
+  "wide shot","close up","extreme close up","medium shot","overhead","low angle","dutch angle","tracking","handheld","static tripod",
+  "golden hour","blue hour","midday","night","dusk","dawn","backlit","rim light","soft light","hard light",
+  "film grain","lens flare","bokeh","motion blur","sharp focus","shallow depth of field","deep focus",
+  "anamorphic","35mm","16mm","IMAX","digital","vintage","celluloid",
+  "orchestral","electronic","ambient","silence","distant","nearby","echoing","muffled","crisp",
+  "slow motion","time lapse","real time","long take","quick cut","montage"
+];
+
+const EVOLVE_SYNONYMS = {
+  "big": ["massive","enormous","colossal","immense","towering"],
+  "small": ["tiny","minuscule","petite","compact","diminutive"],
+  "fast": ["rapid","swift","quick","accelerated","hurried"],
+  "slow": ["leisurely","gradual","deliberate","unhurried","languid"],
+  "happy": ["joyful","elated","euphoric","content","radiant"],
+  "sad": ["melancholic","somber","mournful","forlorn","sorrowful"],
+  "angry": ["furious","irate","livid","incensed","wrathful"],
+  "scared": ["terrified","petrified","horrified","alarmed","panicked"],
+  "beautiful": ["gorgeous","stunning","breathtaking","exquisite","radiant"],
+  "ugly": ["grotesque","unsightly","repulsive","hideous","monstrous"],
+  "dark": ["dim","shadowy","murky","tenebrous","obscure"],
+  "light": ["luminous","radiant","brilliant","gleaming","ethereal"],
+  "old": ["ancient","weathered","aged","antique","timeworn"],
+  "new": ["pristine","modern","novel","recent","fresh"],
+  "loud": ["deafening","thunderous","cacophonous","boisterous","clamorous"],
+  "quiet": ["silent","hushed","muffled","subdued","tranquil"],
+  "hot": ["scorching","blazing","searing","sweltering","torrid"],
+  "cold": ["frigid","freezing","icy","glacial","wintry"],
+  "good": ["excellent","superb","magnificent","stellar","remarkable"],
+  "bad": ["dreadful","abysmal","atrocious","deplorable","lamentable"],
+  "run": ["sprint","dash","race","bolt","charge"],
+  "walk": ["stride","stroll","saunter","march","amble"],
+  "look": ["gaze","stare","glance","peer","behold"],
+  "say": ["whisper","shout","declare","mutter","proclaim"],
+  "make": ["craft","forge","construct","assemble","create"],
+  "break": ["shatter","fracture","splinter","rupture","demolish"],
+  "give": ["bestow","grant","present","hand","deliver"],
+  "take": ["seize","grab","snatch","claim","capture"],
+  "find": ["discover","locate","uncover","detect","unearth"],
+  "lose": ["misplace","forfeit","surrender","relinquish","abandon"],
+  "begin": ["commence","initiate","launch","embark","inaugurate"],
+  "end": ["conclude","terminate","cease","finalize","culminate"],
+  "come": ["arrive","approach","enter","emerge","appear"],
+  "go": ["depart","leave","exit","vanish","disappear"],
+  "know": ["understand","comprehend","grasp","recognize","perceive"],
+  "think": ["ponder","contemplate","reflect","deliberate","meditate"],
+  "want": ["desire","crave","yearn","covet","long for"],
+  "need": ["require","demand","necessitate","warrant","call for"],
+  "feel": ["sense","perceive","experience","detect","intuit"],
+  "see": ["observe","witness","behold","discern","sight"],
+  "hear": ["perceive","detect","listen","catch","make out"],
+  "love": ["adore","cherish","treasure","revere","idolize"],
+  "hate": ["despise","loathe","abhor","detest","execrate"]
+};
+
+function evolveWords(prompt, strength){
+  const words = prompt.split(/\b/);
+  return words.map(w => {
+    if(!/^[a-zA-Z]+$/.test(w) || Math.random() * 100 >= strength) return w;
+    return EVOLVE_VOCAB[Math.floor(Math.random() * EVOLVE_VOCAB.length)];
+  }).join("");
+}
+
+function evolveInternal(prompt, strength){
+  const rawWords = prompt.match(/[a-zA-Z]+/g) || [];
+  if(rawWords.length < 2) return prompt;
+  const words = prompt.split(/\b/);
+  return words.map(w => {
+    if(!/^[a-zA-Z]+$/.test(w) || Math.random() * 100 >= strength) return w;
+    return rawWords[Math.floor(Math.random() * rawWords.length)];
+  }).join("");
+}
+
+function evolveSynonyms(prompt, strength){
+  const words = prompt.split(/\b/);
+  return words.map(w => {
+    const lower = w.toLowerCase();
+    const syns = EVOLVE_SYNONYMS[lower];
+    if(!syns || Math.random() * 100 >= strength) return w;
+    const repl = syns[Math.floor(Math.random() * syns.length)];
+    return w[0] === w[0].toUpperCase() ? repl.charAt(0).toUpperCase() + repl.slice(1) : repl;
+  }).join("");
+}
+
+function generateEvolved(prompt, mode, strength, count){
+  const variants = [];
+  for(let i = 0; i < count; i++){
+    let v;
+    if(mode === "words") v = evolveWords(prompt, strength);
+    else if(mode === "internal") v = evolveInternal(prompt, strength);
+    else v = evolveSynonyms(prompt, strength);
+    variants.push(v.trim().replace(/\s+/g, " "));
+  }
+  return variants;
+}
+
+makeCollapsible("evolveToggle", "evolveBody");
+$("evolveStrength")?.addEventListener("input", (e) => {
+  $("evolveStrengthVal").textContent = e.target.value + "%";
+});
+$("btnEvolve")?.addEventListener("click", () => {
+  const prompt = $("prompt").value.trim();
+  if(!prompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+  const mode = $("evolveMode").value;
+  const strength = parseInt($("evolveStrength").value, 10);
+  const count = parseInt($("evolveCount").value, 10) || 4;
+  const variants = generateEvolved(prompt, mode, strength, count);
+  $("evolveOutput").value = variants.map((v, i) => `--- Variant ${i + 1} ---\n${v}`).join("\n\n");
+  log(`🧬 ${count} variantes generadas (${mode}, ${strength}%)`, "l-ok");
+});
+$("btnEvolveUse")?.addEventListener("click", () => {
+  const text = $("evolveOutput").value.trim();
+  if(!text){ log("⚠️ Genera variantes primero", "l-err"); return; }
+  const first = text.split(/--- Variant \d+ ---/)[1]?.trim() || text.split("\n\n")[0]?.trim();
+  if(first){
+    $("prompt").value = first;
+    log("✏️ Prompt actualizado con la variante #1", "l-ok");
   }
 });
 </script>
