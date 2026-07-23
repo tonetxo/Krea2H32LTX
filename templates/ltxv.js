@@ -185,6 +185,46 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   const firstPassOnly = job ? job.firstPassOnly : true;
   const varIndex = (job && job.currentVariantIndex != null) ? job.currentVariantIndex : (variantCounter + 1);
 
+  // Modo "full" (1er pase + final en un solo grafo): ComfyUI ejecuta ambos
+  // samplers dentro del mismo prompt_id y dispara un único execution_success
+  // con ambos outputs (FIRST_SAVE y FINAL_SAVE) disponibles. No hay un segundo
+  // prompt_id para el "paso 2"; debemos mostrar ambos vídeos ahora y finalizar.
+  // Si por alguna razón FINAL_SAVE aún no está disponible, devolvemos
+  // { foundOutput: false } para que pollFallback reintente la consulta.
+  const isFullGraph = !firstPassOnly && isStep1;
+  if(isFullGraph){
+    if(!media2){
+      return { foundOutput: false };
+    }
+    if(media1){
+      showVideo(1, media1, { variantIndex: varIndex });
+      addToVariantGallery(media1, realSeed, tTotal || "", 1, varIndex);
+    }
+    showVideo(2, media2, { variantIndex: varIndex });
+    paint(2, "final", tTotal || "—");
+    addToVariantGallery(media2, realSeed, tTotal || "", 2, varIndex);
+    if(media1) paint(1, "1er", tTotal || "—");
+
+    delete promptSteps[promptId];
+    delete pendingSeeds[promptId];
+    generationStep = 0;
+    firstPromptId = null;
+    finalVariantIndex = null;
+    handledPrompts.add(promptId);
+
+    currentBatchIndex++;
+    if(job) job.currentVariantIndex = null;
+    if(currentBatchIndex < totalBatchSize){
+      log(`➡️ Iniciando flujo ${currentBatchIndex + 1}/${totalBatchSize} del job...`, "l-ok");
+      await runSingleGeneration(currentBatchIndex);
+    } else {
+      log(`🏁 Job completado (${totalBatchSize} flujo(s)).`, "l-ok");
+      finishCurrentJob();
+    }
+    return true;
+  }
+
+  // Modo "first" (solo 1er pase) o "second" (paso 2 separado en el grafo).
   if(isStep1){
     if(media1){
       showVideo(1, media1, { variantIndex: varIndex });
@@ -1782,7 +1822,20 @@ $("btnEnhance").addEventListener("click", async () => {
       if(chainMode === LTX2_CHAIN_BOTH){
         log("⏳ Ejecutando previsualización LTX2 en ComfyUI...", "l-info");
         const ltx2Text = await runLTX2Preview(text);
-        $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n${ltx2Text || "(no se pudo previsualizar)"}`;
+        if(!ltx2Text){
+          $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n(no se pudo previsualizar)`;
+        } else if(ltx2Text.trim() === text.trim()){
+          $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n(texto idéntico al de Ollama)`;
+        } else {
+          const score = ltx2ChangeScore(text, ltx2Text);
+          const onlyAppended = (score.prefix >= text.trim().length - 1) && score.suffix === 0;
+          const note = onlyAppended
+            ? ` (sólo añadió al final; se mantiene Ollama)`
+            : "";
+          $("ltx2PreviewText").value =
+            `[Ollama · ${text.length} chars]\n${text}\n\n` +
+            `[LTX2 · ${ltx2Text.length} chars · Δ ${score.chars} (${(score.pct*100).toFixed(1)}%)]${note}\n${ltx2Text}`;
+        }
       }
     }
     log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
@@ -1794,6 +1847,51 @@ $("btnEnhance").addEventListener("click", async () => {
     $("btnEnhance").textContent = "Mejorar prompt";
   }
 });
+
+// Umbral para considerar que LTX2 aportó un cambio significativo sobre el prompt
+// de Ollama. Si el cambio es menor (en caracteres o en porcentaje), mantenemos el
+// prompt de Ollama y se lo indicamos al usuario. El sistema LTX2 está entrenado
+// para no hacer cambios mayores si el input ya es muy detallado, lo que puede
+// dar la falsa impresión de que "no hizo nada".
+const LTX2_MIN_CHANGE_CHARS = 30;
+const LTX2_MIN_CHANGE_PCT = 0.05; // 5% del texto de Ollama
+
+// Calcula el "score" de cambio entre dos prompts. La métrica se basa en el
+// longest common prefix + suffix, que es robusto ante:
+//   - inserciones al final (caso típico de LTX2 añadiendo audio)
+//   - pequeñas sustituciones en el cuerpo del prompt
+//   - cambios de mayúsculas/minúsculas o espacios extra
+//
+// Devuelve { chars, pct, identical, prefix, suffix } donde:
+//   - chars: caracteres diferentes aproximadamente
+//   - pct: ratio de cambio respecto al texto original
+function ltx2ChangeScore(a, b){
+  if(!a || !b) return { chars: 0, pct: 0, identical: !a && !b };
+  const at = a.trim(), bt = b.trim();
+  if(at === bt) return { chars: 0, pct: 0, identical: true };
+  // Longest common prefix
+  let pref = 0;
+  const minLen = Math.min(at.length, bt.length);
+  while(pref < minLen && at[pref] === bt[pref]) pref++;
+  // Longest common suffix (sin solapar con el prefijo)
+  let suf = 0;
+  while(suf < (minLen - pref) && at[at.length - 1 - suf] === bt[bt.length - 1 - suf]) suf++;
+  // Zona intermedia = caracteres realmente cambiados
+  const middleA = at.slice(pref, at.length - suf);
+  const middleB = bt.slice(pref, bt.length - suf);
+  const middleMax = Math.max(middleA.length, middleB.length);
+  const chars = middleMax + Math.abs(at.length - bt.length);
+  const pct = at.length > 0 ? chars / at.length : 0;
+  return {
+    chars,
+    pct,
+    identical: false,
+    prefix: pref,
+    suffix: suf,
+    addedAtStart: pref === 0 && suf < at.length,
+    addedAtEnd: suf === 0 && pref < at.length,
+  };
+}
 
 async function runLTX2Preview(ollamaText){
   const savedJob = activeJob;
@@ -1813,13 +1911,33 @@ async function runLTX2Preview(ollamaText){
     const pid = data.prompt_id;
     log("⏳ Esperando prompt LTX2...", "l-info");
     const text = await waitForLTX2Preview(pid, 120);
-    if(text){
-      $("prompt").value = text;
-      log("✏️ Prompt actualizado desde LTX2.", "l-ok");
-      if(ollamaText && text.trim() === ollamaText.trim()){
-        log("ℹ️ LTX2 no modificó el prompt de Ollama (ya estaba optimizado).", "l-info");
+    if(!text){
+      log("⚠️ LTX2 no devolvió texto. Se mantiene el prompt de Ollama.", "l-warn");
+      return "";
+    }
+    // Si Ollama estaba vacío (modo visión sin prompt manual) aceptamos el output
+    // de LTX2 tal cual; si no, decidimos si el cambio es significativo.
+    if(ollamaText && ollamaText.trim()){
+      const score = ltx2ChangeScore(ollamaText, text);
+      const minChars = Math.max(LTX2_MIN_CHANGE_CHARS, Math.floor(ollamaText.length * LTX2_MIN_CHANGE_PCT));
+      // Caso especial: LTX2 mantuvo todo el texto de Ollama intacto y sólo añadió
+      // texto al final (típicamente descripciones de audio). El system prompt
+      // LTX2 está entrenado para hacer esto cuando el input ya es muy detallado.
+      const onlyAppended = (score.prefix >= ollamaText.trim().length - 1) && score.suffix === 0;
+      if(onlyAppended){
+        log(`ℹ️ LTX2 sólo añadió texto al final (+${text.length - ollamaText.length} chars de audio/continuación); se mantiene Ollama.`, "l-info");
+        $("prompt").value = ollamaText;
+        return ollamaText;
+      }
+      if(score.chars < minChars){
+        log(`ℹ️ LTX2 modificó el prompt mínimamente (Δ ${score.chars} chars, ${(score.pct*100).toFixed(1)}%); se mantiene Ollama.`, "l-info");
+        $("prompt").value = ollamaText;
+        return ollamaText;
       }
     }
+    $("prompt").value = text;
+    const score = ltx2ChangeScore(ollamaText || "", text);
+    log(`✏️ Prompt actualizado desde LTX2 (Δ ${score.chars} chars, ${(score.pct*100).toFixed(1)}%).`, "l-ok");
     return text;
   } catch(e) {
     log("❌ Error previsualizando LTX2: "+e.message, "l-err");
