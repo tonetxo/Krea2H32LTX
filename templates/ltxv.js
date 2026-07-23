@@ -9,7 +9,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -1111,6 +1111,20 @@ function buildGraph(mode){
     if(g[N.CREATE_VIDEO_1]) delete g[N.CREATE_VIDEO_1]; // 922
     if(g[N.REFERENCE_1]) delete g[N.REFERENCE_1]; // 860
   }
+  else if(mode === "ltx2preview"){
+    // Grafo mnimo solo para generar el prompt con TextGenerateLTX2Prompt.
+    // Preservamos checkpoint, sage, loras y text encoder; el resto se elimina.
+    for(const k of Object.keys(g)){
+      const keep = [
+        N.CHECKPOINT, N.SAGE_PATCH, N.LORA, N.LTX2_PROMPT, N.LTX2_PREVIEW, N.RAW_PROMPT, N.LTXAV_TEXT_ENCODER
+      ];
+      if(!keep.includes(k)) delete g[k];
+    }
+    // Asegurar que el nodo preview recibe el texto generado.
+    if(g[N.LTX2_PREVIEW] && g[N.LTX2_PROMPT]){
+      g[N.LTX2_PREVIEW].inputs.source = [N.LTX2_PROMPT, 0];
+    }
+  }
   // mode "full" mantiene ambos save nodes para ejecutar 1er pase + final de una vez.
   return g;
 }
@@ -1694,12 +1708,14 @@ $("btnFull").addEventListener("click",()=>enqueueGeneration(false));
 // --- ENHANCER (LTXV vision-mode uses localFile) ---
 $("btnEnhance").addEventListener("click", async () => {
   const chainMode = $("enhancerChainMode").value;
-  if(chainMode === LTX2_CHAIN_LTX2){
-    log("⚠️ Modo 'LTX2 Prompt' activo: Ollama no se usa; el prompt se mejorará en el grafo de ComfyUI.", "l-warn");
+  if(chainMode === LTX2_CHAIN_OFF){
+    log("⚠️ Cadena de mejora desactivada. Activa 'Ollama', 'LTX2' o 'Ambos' para usar el botón.", "l-warn");
     return;
   }
-  if(chainMode === LTX2_CHAIN_OFF){
-    log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' o 'Ambos' para usar el botón.", "l-warn");
+
+  // Modo LTX2 puro: ejecutar solo el nodo TextGenerateLTX2Prompt en ComfyUI.
+  if(chainMode === LTX2_CHAIN_LTX2){
+    await runLTX2Preview();
     return;
   }
 
@@ -1750,10 +1766,10 @@ $("btnEnhance").addEventListener("click", async () => {
       log("✏️ Prompt actualizado desde Ollama.", "l-ok");
       // Previsualizacin del prompt final con LTX2 (sin ejecutar ComfyUI)
       if(chainMode === LTX2_CHAIN_BOTH){
-        $("ltx2PreviewText").value = `[Ollama ya aplicado]\n\n[LTX2] Se aplicar este prompt al ejecutar en ComfyUI (no se puede previsualizar sin ejecutar).`;
+        log("⏳ Ejecutando previsualización LTX2 en ComfyUI...", "l-info");
+        const ltx2Text = await runLTX2Preview();
+        $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n${ltx2Text || "(no se pudo previsualizar)"}`;
       }
-    } else if(chainMode === LTX2_CHAIN_LTX2){
-      $("ltx2PreviewText").value = `[LTX2] Se generar en ComfyUI al pulsar Generar.`;
     }
     log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
   } catch(e) {
@@ -1764,6 +1780,62 @@ $("btnEnhance").addEventListener("click", async () => {
     $("btnEnhance").textContent = "Mejorar prompt";
   }
 });
+
+async function runLTX2Preview(){
+  const savedJob = activeJob;
+  if(!activeJob) activeJob = { firstPassOnly: false, seedMode: seedMode, seedValue: parseInt($("seedVal").value || "12345", 10), batchSize: 1, loras: loras };
+  try {
+    const graph = buildGraph("ltx2preview");
+    const r = await fetch(server()+"/prompt", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({prompt: graph, client_id: CLIENT_ID})
+    });
+    if(!r.ok){
+      const t = await r.text().catch(()=>"");
+      throw new Error("HTTP "+r.status+" "+t.slice(0,300));
+    }
+    const data = await r.json();
+    if(data.error) throw new Error(JSON.stringify(data.error));
+    const pid = data.prompt_id;
+    log("⏳ Esperando prompt LTX2...", "l-info");
+    const text = await waitForLTX2Preview(pid, 120);
+    if(text){
+      $("prompt").value = text;
+      log("✏️ Prompt actualizado desde LTX2.", "l-ok");
+    }
+    return text;
+  } catch(e) {
+    log("❌ Error previsualizando LTX2: "+e.message, "l-err");
+    return "";
+  } finally {
+    activeJob = savedJob;
+  }
+}
+
+async function waitForLTX2Preview(promptId, maxTries){
+  for(let i = 0; i < maxTries; i++){
+    await new Promise(r => setTimeout(r, 1000));
+    try {
+      const hr = await fetch(server()+"/history/"+promptId);
+      if(!hr.ok) continue;
+      const hist = await hr.json();
+      const entry = hist[promptId];
+      if(!entry) continue;
+      if(entry.status && entry.status.status_str === "error"){
+        throw new Error(entry.status.exception_message || "error en LTX2 preview");
+      }
+      const out = entry.outputs && entry.outputs[N.LTX2_PREVIEW];
+      if(out && out.text && out.text.length){
+        const txt = out.text[out.text.length - 1];
+        if(typeof txt === "string" && txt.trim()) return txt.trim();
+      }
+    } catch(e) {
+      if(e.message.includes("error en LTX2 preview")) throw e;
+      // otherwise retry
+    }
+  }
+  return "";
+}
 
 // --- INIT ---
 updateDuration();
