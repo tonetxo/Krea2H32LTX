@@ -1973,6 +1973,33 @@ initCommon();
 let currentOutputMedia = null;
 let currentRefVariantIndex = -1;
 
+// Krea2 no usa el nodo TextGenerateLTX2Prompt de LTXV, así que la cadena de
+// mejora solo tiene sentido en modo Ollama. Limitamos el selector y ocultamos
+// los controles exclusivos de LTX2 para no confundir al usuario.
+(function initKrea2EnhancerUI(){
+  const chain = $("enhancerChainMode");
+  if(chain){
+    chain.innerHTML = `
+      <option value="off">Desactivado</option>
+      <option value="ollama">Ollama</option>
+    `;
+    chain.value = "ollama";
+  }
+  const ltx2Controls = ["ltx2Temperature", "ltx2Seed", "ltx2PreviewText"];
+  for(const id of ltx2Controls){
+    const el = $(id);
+    const row = el?.closest(".enhancer-row");
+    if(row) row.style.display = "none";
+  }
+  const ltx2Labels = document.querySelectorAll(".enhancer-row label");
+  for(const lbl of ltx2Labels){
+    if(lbl.textContent.includes("LTX2")){
+      const row = lbl.closest(".enhancer-row");
+      if(row) row.style.display = "none";
+    }
+  }
+})();
+
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
   for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
@@ -2822,7 +2849,8 @@ async function runSingleGeneration(index) {
         const seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("samplerSeed").value, 10);
         graph[N.SAMPLER].inputs.seed = seedUsed;
 
-        log(`🚀 Procesando variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize}) (seed ${seedUsed})...`);
+        const varIndex = variantCounter + 1;
+        log(`🚀 Procesando variante ${varIndex} (batch ${index + 1}/${totalBatchSize}) (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
@@ -2849,6 +2877,7 @@ async function queueAndWait(){
   connectSocket();
   totalBatchSize = parseInt($("batchSize")?.value || "1", 10);
   currentBatchIndex = 0;
+  variantCounter = 0;
   batchSeedMode = $("segSamplerRandom").classList.contains("on") ? "random" : "fixed";
   setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
   $("btnGenerate").disabled=true;
@@ -2930,38 +2959,48 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
 }
 
 // --- ENHANCER (Krea2 btnEnhance uses fetchWithRetry) ---
-$("btnEnhance").addEventListener("click", async () => {
-  const model = $("enhancerModel").value;
-  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
-  const mode = $("enhancerMode").value;
-  const styleKey = $("enhancerStyle").value;
-  const data = loadSysPrompts();
-  const system = getCurrentSysPrompt(data, mode, styleKey);
-  const userPrompt = $("prompt").value.trim();
-  if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+  $("btnEnhance").addEventListener("click", async () => {
+    const chainMode = $("enhancerChainMode")?.value || "ollama";
+    if(chainMode === "off"){
+      log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' para usar el botón.", "l-warn");
+      return;
+    }
+    const model = $("enhancerModel").value;
+    if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+    const mode = $("enhancerMode").value;
+    const styleKey = $("enhancerStyle").value;
+    const data = loadSysPrompts();
+    const system = getCurrentSysPrompt(data, mode, styleKey);
+    const userPrompt = $("prompt").value.trim();
+    if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
-  const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
+    const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
 
-  $("btnEnhance").disabled = true;
-  $("btnEnhance").textContent = "Mejorando...";
-  $("enhancerOutput").value = "";
-  try {
-    const r = await fetchWithRetry("/api/generate", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload),
-    });
-    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,200)); }
-    const result = await r.json();
-    $("enhancerOutput").value = (result.response || "").trim();
-    log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
-  } catch(e) {
-    log("❌ Error al mejorar: "+e.message, "l-err");
-    $("enhancerOutput").value = "Error: "+e.message;
-  } finally {
-    $("btnEnhance").disabled = false;
-    $("btnEnhance").textContent = "Mejorar prompt";
-  }
-});
+    $("btnEnhance").disabled = true;
+    $("btnEnhance").textContent = "Mejorando...";
+    $("enhancerOutput").value = "";
+    try {
+      const r = await fetchWithRetry("/api/generate", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload),
+      });
+      if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,200)); }
+      const result = await r.json();
+      const text = (result.response || "").trim();
+      $("enhancerOutput").value = text;
+      if(text){
+        $("prompt").value = text;
+        log("✏️ Prompt actualizado desde Ollama.", "l-ok");
+      }
+      log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
+    } catch(e) {
+      log("❌ Error al mejorar: "+e.message, "l-err");
+      $("enhancerOutput").value = "Error: "+e.message;
+    } finally {
+      $("btnEnhance").disabled = false;
+      $("btnEnhance").textContent = "Mejorar prompt";
+    }
+  });
 
 // --- CAPTION (Krea2-specific) ---
 $("btnCaption").addEventListener("click", async () => {
@@ -2996,10 +3035,11 @@ $("btnCaption").addEventListener("click", async () => {
       log("⚠️ Respuesta vacía. Keys: "+Object.keys(result).join(",")+" err="+err, "l-err");
       $("enhancerOutput").value = "El modelo no devolvió texto. Error: "+err+"\n\nRespuesta cruda: "+JSON.stringify(result).slice(0,500);
     } else {
-      const think = text.match(/<think>([\s\S]*?)<\/think>/i);
+      const think = text.match(/<think>[\s\S]*?<\/think>/i);
       if(think) text = text.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
       $("enhancerOutput").value = text;
-      log("🖼️ Caption generado ("+model+", "+mode+"/"+styleKey+", "+text.length+" chars).", "l-ok");
+      log("🖼️ Caption Ollama generado ("+model+", "+mode+"/"+styleKey+", "+text.length+" chars).", "l-ok");
+      log("💡 Pulsa 'Usar como prompt' para aplicarlo, o pulsa 'Generar' si ya está activo.", "l-info");
     }
   } catch(e) {
     log("❌ Error en caption: "+e.message, "l-err");
