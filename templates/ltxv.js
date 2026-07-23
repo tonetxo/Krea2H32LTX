@@ -102,16 +102,18 @@ CONFIG.onSeedUpdate = updateSeedUI;
 CONFIG.onPromptError = function(pid){
   delete promptSteps[pid];
   if(generationStep === 1) generationStep = 0;
+  finishCurrentJob();
 };
 CONFIG.startNextVariant = function(index){
-  generationStep = window.currentBatchMode ? 0 : 1;
+  // LTXV gestiona sus propios pasos; este callback solo se usa por common.js
+  // en caso de error o borde. Empezamos siempre en paso 1.
+  generationStep = 1;
   firstPromptId = null;
   finalVariantIndex = null;
   runSingleGeneration(index);
 };
 CONFIG.onBatchComplete = function(){
-  // El fin real del job se maneja en displayResult/finishCurrentJob para
-  // encadenar con la cola. Aquí no liberamos los botones si hay cola pendiente.
+  // LTXV gestiona el fin del job vía displayResult/finishCurrentJob.
   if(jobQueue.length === 0 && !activeJob){
     $("btnFirstPass").disabled=false;
     $("btnFull").disabled=false;
@@ -124,6 +126,7 @@ CONFIG.onStopCurrent = function(pid){
     generationStep = 0;
     if(firstPromptId) handledPrompts.add(firstPromptId);
   }
+  finishCurrentJob();
 };
 CONFIG.onStopAll = function(){
   for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);
@@ -136,7 +139,6 @@ CONFIG.onStopAll = function(){
   currentPromptId = null;
   firstPromptId = null;
   generationStep = 0;
-  currentBatchIndex = totalBatchSize;
   // Vaciar cola pendiente al parar todo.
   jobQueue = [];
   updateQueueUI();
@@ -161,7 +163,7 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   }
 
   const step = promptSteps[promptId] || "1";
-  const isFirstOnly = (step === "1");
+  const isStep1 = (step === "1");
   const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
   const media2 = entry.outputs[N.FINAL_SAVE] ? CONFIG.findMedia(entry.outputs[N.FINAL_SAVE]) : null;
 
@@ -177,53 +179,61 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
     }
   } catch(_){}
 
-  if(isFirstOnly){
+  if(isStep1){
     if(media1){
-      showVideo(1, media1, { variantIndex: variantCounter + 1 });
+      showVideo(1, media1, { variantIndex: currentBatchIndex + 1 });
       paint(1, "1er", tTotal || "—");
-      addToVariantGallery(media1, realSeed, tTotal || "", 1, variantCounter + 1);
+      addToVariantGallery(media1, realSeed, tTotal || "", 1, currentBatchIndex + 1);
     }
   } else {
     if(media2){
-      const finalIdx = finalVariantIndex != null ? (finalVariantIndex + 1) : (variantCounter + 1);
-      showVideo(2, media2, { variantIndex: finalIdx });
+      showVideo(2, media2, { variantIndex: currentBatchIndex + 1 });
       paint(2, "final", tTotal || "—");
-      addToVariantGallery(media2, realSeed, tTotal || "", 2, finalIdx);
+      addToVariantGallery(media2, realSeed, tTotal || "", 2, currentBatchIndex + 1);
     }
   }
 
   delete promptSteps[promptId];
 
+  // LTXV gestiona su propio flujo de pasos; devolvemos true para que common.js
+  // no incremente currentBatchIndex ni llame processNextBatch.
+  const job = activeJob;
+  const firstPassOnly = job ? job.firstPassOnly : true;
+
   // --- ¿Continuamos con el paso 2? ---
-  if(generationStep === 1 && step === "1" && window.currentBatchMode === false){
+  if(isStep1 && !firstPassOnly){
     log(`➡️ Paso 1 completado, iniciando paso 2 (2º pase)...`, "l-ok");
     generationStep = 2;
     const step1Seed = pendingSeeds[promptId];
     delete pendingSeeds[promptId];
-    // Solo transferimos la seed al prompt del paso 2 si firstPromptId es válido;
-    // si por algún borde raro firstPromptId es null (p.ej. /prompt falló y luego
-    // llegó un execution_success tardío), no contaminamos pendingSeeds con clave "null".
+    // Solo transferimos la seed al prompt del paso 2 si firstPromptId es válido.
     if(firstPromptId && step1Seed != null){
       pendingSeeds[firstPromptId] = step1Seed;
     } else {
       log("⚠️ No se pudo encadenar el paso 2: firstPromptId no asignado.", "l-warn");
     }
-    finalVariantIndex = variantCounter;
     runSingleGeneration(currentBatchIndex);
-    // Marcamos el prompt del paso 1 como handled para que pollFallback no lo reprocese
-    // como paso 2 si llega otro execution_success/poll tardío.
     handledPrompts.add(promptId);
     return true;
   }
 
+  // Fin de un flujo completo (paso 1 en modo solo-1er-pase, o paso 2 en modo completo).
   delete pendingSeeds[promptId];
   generationStep = 0;
   firstPromptId = null;
   finalVariantIndex = null;
 
-  // Al terminar un job (batch completo + paso 2 si aplica), iniciar siguiente de la cola.
-  finishCurrentJob();
-  return false;
+  // Avanzamos al siguiente flujo del job actual, o terminamos el job.
+  currentBatchIndex++;
+  variantCounter++;
+  if(currentBatchIndex < totalBatchSize){
+    log(`➡️ Iniciando flujo ${currentBatchIndex + 1}/${totalBatchSize} del job...`, "l-ok");
+    runSingleGeneration(currentBatchIndex);
+  } else {
+    log(`🏁 Job completado (${totalBatchSize} flujo(s)).`, "l-ok");
+    finishCurrentJob();
+  }
+  return true;
 };
 
 // --- RESOLUCIÓN ---
@@ -1564,7 +1574,7 @@ async function runSingleGeneration(index) {
         }
         graph[N.SEED].inputs.seed = seedUsed;
 
-        const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize})`);
+        const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (activeJob?.firstPassOnly ? `1er pase ${currentBatchIndex + 1}/${totalBatchSize}` : `paso 1/2 (flujo ${currentBatchIndex + 1}/${totalBatchSize})`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
@@ -1587,11 +1597,8 @@ async function runSingleGeneration(index) {
         pollFallback(data.prompt_id);
     } catch(err) {
         log(`❌ No se pudo encolar: ${err.message || err}`, "l-err");
-        if(generationStep === 1){
-            generationStep = 0;
-        }
-        currentBatchIndex++;
-        processNextBatch();
+        generationStep = 0;
+        finishCurrentJob();
     }
 }
 
@@ -1600,13 +1607,15 @@ async function startJob(job){
   restoreJob(job);
   connectSocket();
   await ensureImageUploaded();
-  totalBatchSize = job.batchSize;
+  totalBatchSize = job.batchSize || 1;
   currentBatchIndex = 0;
+  variantCounter = 0;
   batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
-  window.currentBatchMode = job.firstPassOnly;
-  generationStep = job.firstPassOnly ? 0 : 1;
+  // LTXV gestiona sus propios pasos; para common.js el flujo es siempre "completo".
+  window.currentBatchMode = false;
+  generationStep = 1;
   firstPromptId = null;
-  setRun("busy", `Job en cola · ${job.firstPassOnly ? "1er pase" : "completo"} · ${job.batchSize} variantes...`);
+  setRun("busy", `Job en cola · ${job.firstPassOnly ? "1er pase" : "completo"} · ${job.batchSize} flujo(s)...`);
   $("btnFirstPass").disabled=true;
   $("btnFull").disabled=true;
   enableStopButtons(true);
