@@ -3690,6 +3690,18 @@ function buildGraph(firstPassOnly){
     }
   }
 
+  // Si la cadena está desactivada u Ollama, el nodo LTX2 no está conectado a nada útil,
+  // así que lo desconectamos explícitamente para que ComfyUI no lo ejecute.
+  if(chainMode === LTX2_CHAIN_OFF || chainMode === LTX2_CHAIN_OLLAMA){
+    if(g[N.LTX2_PROMPT] && g[N.LTX2_PROMPT].inputs){
+      // Marcamos el prompt de entrada vacío y desconectamos el clip para evitar que el nodo corra.
+      g[N.LTX2_PROMPT].inputs.prompt = "";
+      if(g[N.LTX2_PREVIEW] && g[N.LTX2_PREVIEW].inputs){
+        delete g[N.LTX2_PREVIEW];
+      }
+    }
+  }
+
   // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
   if(dmdBypass && g[N.LORA] && g[N.LORA].inputs.model){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
