@@ -1113,12 +1113,18 @@ function buildGraph(mode){
   }
   else if(mode === "ltx2preview"){
     // Grafo mnimo solo para generar el prompt con TextGenerateLTX2Prompt.
-    // Preservamos checkpoint, sage, loras y text encoder; el resto se elimina.
+    // Preservamos checkpoint, loras y text encoder; el resto se elimina.
     for(const k of Object.keys(g)){
       const keep = [
-        N.CHECKPOINT, N.SAGE_PATCH, N.LORA, N.LTX2_PROMPT, N.LTX2_PREVIEW, N.RAW_PROMPT, N.LTXAV_TEXT_ENCODER
+        N.CHECKPOINT, N.LORA, N.LTX2_PROMPT, N.LTX2_PREVIEW, N.RAW_PROMPT, N.LTXAV_TEXT_ENCODER
       ];
       if(!keep.includes(k)) delete g[k];
+    }
+    // LTX2 solo necesita clip (con LoRA aplicada). El PowerLoraLoader sigue
+    // necesitando una entrada de modelo vlida; la conectamos directamente al
+    // checkpoint para evitar dependencias de la rama de video.
+    if(g[N.LORA] && g[N.CHECKPOINT]){
+      g[N.LORA].inputs.model = [N.CHECKPOINT, 0];
     }
     // Asegurar que el nodo preview recibe el texto generado.
     if(g[N.LTX2_PREVIEW] && g[N.LTX2_PROMPT]){
