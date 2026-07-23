@@ -19,6 +19,32 @@
       </div>
 
       <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
+      <div class="panel">
+        <div class="collapsible-header" id="evolveToggle">
+          <span class="arrow">▶</span> Evolve / Transmutar prompt
+        </div>
+        <div class="collapsible-body" id="evolveBody">
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="evolveMode"><option value="words">Palabras</option><option value="internal">Palabras del prompt</option><option value="synonyms">Sinónimos cinematográficos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Probabilidad <span class="hint">(% de tokens cambiados)</span></label>
+            <div class="slider-row"><input type="range" id="evolveStrength" min="0" max="100" step="1" value="10"><div class="slider-val" id="evolveStrengthVal">10%</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Variantes</label>
+            <input type="number" id="evolveCount" value="4" min="1" max="16" step="1">
+          </div>
+          <div class="btn-row">
+            <button id="btnEvolve" class="primary" style="flex:1">Transmutar</button>
+            <button id="btnEvolveUse" class="ghost" style="flex:1">Usar #1</button>
+          </div>
+          <div class="enhancer-row">
+            <textarea class="enhancer-output" id="evolveOutput" readonly placeholder="Las variantes aparecerán aquí..."></textarea>
+          </div>
+        </div>
+      </div>
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
       <div class="panel"><h2>Tipo de atención Sage</h2><div class="row"><select id="sageAttentionType"><option value="auto">auto</option><option value="sageattn" selected>sageattn</option><option value="sageattn2">sageattn2</option><option value="sageattn3">sageattn3</option><option value="sageattn_qk">sageattn_qk</option></select></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>

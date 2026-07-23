@@ -1584,3 +1584,128 @@ $("btnEnhance").addEventListener("click", async () => {
 updateDuration();
 // Default enhancer chain for fresh sessions: Ollama usable out of the box.
 if(!$("enhancerChainMode").value) $("enhancerChainMode").value = LTX2_CHAIN_OLLAMA;
+
+// --- EVOLVE / TRANSMUTAR PROMPT ---
+const EVOLVE_VOCAB = [
+  "cinematic","dramatic","atmospheric","moody","ethereal","surreal","hyperrealistic","photorealistic","volumetric",
+  "noir","neon","golden","misty","stormy","serene","tense","epic","intimate","melancholic","euphoric",
+  "ominous","dreamlike","futuristic","rustic","decayed","luxurious","desolate","lush","intricate","minimalist",
+  "dynamic","static","fluid","fragmented","seamless","chaotic","ordered","warm","cold","vibrant","muted",
+  "wide shot","close up","extreme close up","medium shot","overhead","low angle","dutch angle","tracking","handheld","static tripod",
+  "golden hour","blue hour","midday","night","dusk","dawn","backlit","rim light","soft light","hard light",
+  "film grain","lens flare","bokeh","motion blur","sharp focus","shallow depth of field","deep focus",
+  "anamorphic","35mm","16mm","IMAX","digital","vintage","celluloid",
+  "orchestral","electronic","ambient","silence","distant","nearby","echoing","muffled","crisp",
+  "slow motion","time lapse","real time","long take","quick cut","montage"
+];
+
+const EVOLVE_SYNONYMS = {
+  "big": ["massive","enormous","colossal","immense","towering"],
+  "small": ["tiny","minuscule","petite","compact","diminutive"],
+  "fast": ["rapid","swift","quick","accelerated","hurried"],
+  "slow": ["leisurely","gradual","deliberate","unhurried","languid"],
+  "happy": ["joyful","elated","euphoric","content","radiant"],
+  "sad": ["melancholic","somber","mournful","forlorn","sorrowful"],
+  "angry": ["furious","irate","livid","incensed","wrathful"],
+  "scared": ["terrified","petrified","horrified","alarmed","panicked"],
+  "beautiful": ["gorgeous","stunning","breathtaking","exquisite","radiant"],
+  "ugly": ["grotesque","unsightly","repulsive","hideous","monstrous"],
+  "dark": ["dim","shadowy","murky","tenebrous","obscure"],
+  "light": ["luminous","radiant","brilliant","gleaming","ethereal"],
+  "old": ["ancient","weathered","aged","antique","timeworn"],
+  "new": ["pristine","modern","novel","recent","fresh"],
+  "loud": ["deafening","thunderous","cacophonous","boisterous","clamorous"],
+  "quiet": ["silent","hushed","muffled","subdued","tranquil"],
+  "hot": ["scorching","blazing","searing","sweltering","torrid"],
+  "cold": ["frigid","freezing","icy","glacial","wintry"],
+  "good": ["excellent","superb","magnificent","stellar","remarkable"],
+  "bad": ["dreadful","abysmal","atrocious","deplorable","lamentable"],
+  "run": ["sprint","dash","race","bolt","charge"],
+  "walk": ["stride","stroll","saunter","march","amble"],
+  "look": ["gaze","stare","glance","peer","behold"],
+  "say": ["whisper","shout","declare","mutter","proclaim"],
+  "make": ["craft","forge","construct","assemble","create"],
+  "break": ["shatter","fracture","splinter","rupture","demolish"],
+  "give": ["bestow","grant","present","hand","deliver"],
+  "take": ["seize","grab","snatch","claim","capture"],
+  "find": ["discover","locate","uncover","detect","unearth"],
+  "lose": ["misplace","forfeit","surrender","relinquish","abandon"],
+  "begin": ["commence","initiate","launch","embark","inaugurate"],
+  "end": ["conclude","terminate","cease","finalize","culminate"],
+  "come": ["arrive","approach","enter","emerge","appear"],
+  "go": ["depart","leave","exit","vanish","disappear"],
+  "know": ["understand","comprehend","grasp","recognize","perceive"],
+  "think": ["ponder","contemplate","reflect","deliberate","meditate"],
+  "want": ["desire","crave","yearn","covet","long for"],
+  "need": ["require","demand","necessitate","warrant","call for"],
+  "feel": ["sense","perceive","experience","detect","intuit"],
+  "see": ["observe","witness","behold","discern","sight"],
+  "hear": ["perceive","detect","listen","catch","make out"],
+  "love": ["adore","cherish","treasure","revere","idolize"],
+  "hate": ["despise","loathe","abhor","detest","execrate"]
+};
+
+function evolveWords(prompt, strength){
+  const words = prompt.split(/\b/);
+  return words.map(w => {
+    if(!/^[a-zA-Z]+$/.test(w) || Math.random() * 100 >= strength) return w;
+    return EVOLVE_VOCAB[Math.floor(Math.random() * EVOLVE_VOCAB.length)];
+  }).join("");
+}
+
+function evolveInternal(prompt, strength){
+  const rawWords = prompt.match(/[a-zA-Z]+/g) || [];
+  if(rawWords.length < 2) return prompt;
+  const words = prompt.split(/\b/);
+  return words.map(w => {
+    if(!/^[a-zA-Z]+$/.test(w) || Math.random() * 100 >= strength) return w;
+    return rawWords[Math.floor(Math.random() * rawWords.length)];
+  }).join("");
+}
+
+function evolveSynonyms(prompt, strength){
+  const words = prompt.split(/\b/);
+  return words.map(w => {
+    const lower = w.toLowerCase();
+    const syns = EVOLVE_SYNONYMS[lower];
+    if(!syns || Math.random() * 100 >= strength) return w;
+    const repl = syns[Math.floor(Math.random() * syns.length)];
+    return w[0] === w[0].toUpperCase() ? repl.charAt(0).toUpperCase() + repl.slice(1) : repl;
+  }).join("");
+}
+
+function generateEvolved(prompt, mode, strength, count){
+  const variants = [];
+  for(let i = 0; i < count; i++){
+    let v;
+    if(mode === "words") v = evolveWords(prompt, strength);
+    else if(mode === "internal") v = evolveInternal(prompt, strength);
+    else v = evolveSynonyms(prompt, strength);
+    variants.push(v.trim().replace(/\s+/g, " "));
+  }
+  return variants;
+}
+
+makeCollapsible("evolveToggle", "evolveBody");
+$("evolveStrength")?.addEventListener("input", (e) => {
+  $("evolveStrengthVal").textContent = e.target.value + "%";
+});
+$("btnEvolve")?.addEventListener("click", () => {
+  const prompt = $("prompt").value.trim();
+  if(!prompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+  const mode = $("evolveMode").value;
+  const strength = parseInt($("evolveStrength").value, 10);
+  const count = parseInt($("evolveCount").value, 10) || 4;
+  const variants = generateEvolved(prompt, mode, strength, count);
+  $("evolveOutput").value = variants.map((v, i) => `--- Variant ${i + 1} ---\n${v}`).join("\n\n");
+  log(`🧬 ${count} variantes generadas (${mode}, ${strength}%)`, "l-ok");
+});
+$("btnEvolveUse")?.addEventListener("click", () => {
+  const text = $("evolveOutput").value.trim();
+  if(!text){ log("⚠️ Genera variantes primero", "l-err"); return; }
+  const first = text.split(/--- Variant \d+ ---/)[1]?.trim() || text.split("\n\n")[0]?.trim();
+  if(first){
+    $("prompt").value = first;
+    log("✏️ Prompt actualizado con la variante #1", "l-ok");
+  }
+});
