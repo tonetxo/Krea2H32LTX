@@ -1545,6 +1545,7 @@ $("btnEnhance").addEventListener("click", async () => {
   $("btnEnhance").disabled = true;
   $("btnEnhance").textContent = "Mejorando...";
   $("enhancerOutput").value = "";
+  $("ltx2PreviewText").value = "";
   try {
     const r = await fetch("/api/generate", {
       method: "POST",
@@ -1562,6 +1563,12 @@ $("btnEnhance").addEventListener("click", async () => {
     if(chainMode === LTX2_CHAIN_OLLAMA || chainMode === LTX2_CHAIN_BOTH){
       $("prompt").value = text;
       log("✏️ Prompt actualizado desde Ollama.", "l-ok");
+      // Previsualización del prompt final con LTX2 (sin ejecutar ComfyUI)
+      if(chainMode === LTX2_CHAIN_BOTH){
+        $("ltx2PreviewText").value = `[Ollama + LTX2] ${text}`;
+      }
+    } else if(chainMode === LTX2_CHAIN_LTX2){
+      $("ltx2PreviewText").value = `[LTX2] ${$("prompt").value.trim()}`;
     }
     log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
   } catch(e) {
