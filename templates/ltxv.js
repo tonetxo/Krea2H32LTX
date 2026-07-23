@@ -1750,10 +1750,10 @@ $("btnEnhance").addEventListener("click", async () => {
       log("✏️ Prompt actualizado desde Ollama.", "l-ok");
       // Previsualizacin del prompt final con LTX2 (sin ejecutar ComfyUI)
       if(chainMode === LTX2_CHAIN_BOTH){
-        $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2] Se aplicar este prompt al ejecutar en ComfyUI (no se puede previsualizar sin ejecutar).`;
+        $("ltx2PreviewText").value = `[Ollama ya aplicado]\n\n[LTX2] Se aplicar este prompt al ejecutar en ComfyUI (no se puede previsualizar sin ejecutar).`;
       }
     } else if(chainMode === LTX2_CHAIN_LTX2){
-      $("ltx2PreviewText").value = `[LTX2] ${$("prompt").value.trim()}\n\nSe generar en ComfyUI al pulsar Generar.`;
+      $("ltx2PreviewText").value = `[LTX2] Se generar en ComfyUI al pulsar Generar.`;
     }
     log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
   } catch(e) {

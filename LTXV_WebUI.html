@@ -280,7 +280,8 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
             <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="El prompt final (Ollama + LTX2) aparecerá aquí tras pulsar Mejorar prompt..."></textarea>
           </div>
           <div class="enhancer-row">
-            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado aparecerá aquí..."></textarea>
+            <label>Resultado Ollama</label>
+            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado de Ollama aparecerá aquí..."></textarea>
           </div>
           <div class="enhancer-actions">
             <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
@@ -4538,10 +4539,10 @@ $("btnEnhance").addEventListener("click", async () => {
       log("✏️ Prompt actualizado desde Ollama.", "l-ok");
       // Previsualizacin del prompt final con LTX2 (sin ejecutar ComfyUI)
       if(chainMode === LTX2_CHAIN_BOTH){
-        $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2] Se aplicar este prompt al ejecutar en ComfyUI (no se puede previsualizar sin ejecutar).`;
+        $("ltx2PreviewText").value = `[Ollama ya aplicado]\n\n[LTX2] Se aplicar este prompt al ejecutar en ComfyUI (no se puede previsualizar sin ejecutar).`;
       }
     } else if(chainMode === LTX2_CHAIN_LTX2){
-      $("ltx2PreviewText").value = `[LTX2] ${$("prompt").value.trim()}\n\nSe generar en ComfyUI al pulsar Generar.`;
+      $("ltx2PreviewText").value = `[LTX2] Se generar en ComfyUI al pulsar Generar.`;
     }
     log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
   } catch(e) {
