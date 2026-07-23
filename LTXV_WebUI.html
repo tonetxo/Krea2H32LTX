@@ -2797,7 +2797,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -3879,8 +3879,26 @@ function buildGraph(mode){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
   }
 
-  if(mode === "first"){ delete g[N.FINAL_SAVE]; delete g[N.PURGE_VRAM]; }
-  else if(mode === "second"){ delete g[N.FIRST_SAVE]; }
+  if(mode === "first"){
+    // Solo 1er pase: el sampler 888 genera el preview y lo guarda en 923.
+    delete g[N.FINAL_SAVE];
+    delete g[N.PURGE_VRAM];
+    // Desconectar la rama del segundo sampler para que no se ejecute.
+    if(g[N.SAMPLER_2]) delete g[N.SAMPLER_2]; // 891
+    if(g[N.LATENT_UPSAMPLER]) delete g[N.LATENT_UPSAMPLER]; // 744
+    if(g[N.IMG2VIDEO_2]) delete g[N.IMG2VIDEO_2]; // 770
+    if(g[N.RTX_SR]) delete g[N.RTX_SR]; // 921
+    if(g[N.CREATE_VIDEO_2]) delete g[N.CREATE_VIDEO_2]; // 919
+    if(g[N.REFERENCE_2]) delete g[N.REFERENCE_2]; // 870
+  }
+  else if(mode === "second"){
+    delete g[N.FIRST_SAVE];
+    // Desconectar la rama del primer sampler; el segundo reutiliza el resultado
+    // del primero a través del grafo del backend si se envía junto.
+    if(g[N.SAMPLER_1]) delete g[N.SAMPLER_1]; // 888
+    if(g[N.CREATE_VIDEO_1]) delete g[N.CREATE_VIDEO_1]; // 922
+    if(g[N.REFERENCE_1]) delete g[N.REFERENCE_1]; // 860
+  }
   // mode "full" mantiene ambos save nodes para ejecutar 1er pase + final de una vez.
   return g;
 }
