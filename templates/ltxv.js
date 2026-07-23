@@ -486,13 +486,25 @@ function applyWorkflow(workflow, opts={}){
 
   const textEncoders = findAllByClass("CLIPTextEncode");
   function isNegativePrompt(t){
+    if(typeof t !== "string") return false;
     const startsNeg = /^\s*(blurry|low quality|distorted|ugly|watermark|worst|overexposed|underexposed|grainy|noise|out of focus|deformed|jpeg|nsfw|mutation|cropped)/i.test(t);
     const manyNegWords = (t.match(/\b(blurry|low quality|distorted|ugly|watermark|worst|overexposed|underexposed|grainy|deformed|mutation|artifacts)\b/gi) || []).length >= 3;
     return startsNeg || manyNegWords;
   }
   let promptSet = false;
   for(const {node} of textEncoders){
-    const t = (node.inputs && node.inputs.text) || "";
+    let t = (node.inputs && node.inputs.text) || "";
+    // Si el text es una referencia de nodo (array), seguimos el enlace al nodo fuente.
+    if(Array.isArray(t)){
+      const srcId = String(t[0]);
+      const srcNode = workflow[srcId];
+      if(srcNode && srcNode.inputs && typeof srcNode.inputs.value === "string"){
+        t = srcNode.inputs.value;
+      } else {
+        continue;
+      }
+    }
+    if(typeof t !== "string") continue;
     if(!isNegativePrompt(t) && t.length > 50){
       // Only set from CLIPTextEncode if no raw prompt primitive already restored it
       if(!$("prompt").value.trim()) $("prompt").value = t;
@@ -500,12 +512,22 @@ function applyWorkflow(workflow, opts={}){
     }
   }
   if(!promptSet && textEncoders.length){
-    let longest = textEncoders[0].node;
+    let longest = null, longestText = "";
     for(const {node} of textEncoders){
-      if((node.inputs?.text || "").length > (longest.inputs?.text || "").length) longest = node;
+      let t = node.inputs?.text || "";
+      if(Array.isArray(t)){
+        const srcId = String(t[0]);
+        const srcNode = workflow[srcId];
+        if(srcNode && srcNode.inputs && typeof srcNode.inputs.value === "string") t = srcNode.inputs.value;
+        else continue;
+      }
+      if(typeof t === "string" && t.length > longestText.length){
+        longest = node;
+        longestText = t;
+      }
     }
-    if(!$("prompt").value.trim()) $("prompt").value = longest.inputs?.text || "";
-    promptSet = !!$("prompt").value;
+    if(!$("prompt").value.trim()) $("prompt").value = longestText;
+    promptSet = !!$("prompt").value.trim();
   }
   if(promptSet || $("prompt").value.trim()) setApplied("prompt"); else setMissing("prompt");
 
