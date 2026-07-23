@@ -201,19 +201,13 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
 
   delete promptSteps[promptId];
 
-  // --- ¿Continuamos con el paso 2? ---
+  // En modo completo "full" (1er + final en un solo grafo) el paso 1 no inicia
+  // un segundo prompt; el mismo grafo genera ambos videos. Aquí sólo marcamos
+  // que ya no estamos en paso 1 y dejamos que la ejecución continúe.
   if(isStep1 && !firstPassOnly){
-    log(`➡️ Paso 1 completado, iniciando paso 2 (2º pase)...`, "l-ok");
+    log(`➡️ Paso 1 completado dentro del grafo completo, esperando paso 2...`, "l-ok");
     generationStep = 2;
-    const step1Seed = pendingSeeds[promptId];
     delete pendingSeeds[promptId];
-    // Solo transferimos la seed al prompt del paso 2 si firstPromptId es válido.
-    if(firstPromptId && step1Seed != null){
-      pendingSeeds[firstPromptId] = step1Seed;
-    } else {
-      log("⚠️ No se pudo encadenar el paso 2: firstPromptId no asignado.", "l-warn");
-    }
-    runSingleGeneration(currentBatchIndex);
     handledPrompts.add(promptId);
     return true;
   }
@@ -223,13 +217,14 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   generationStep = 0;
   firstPromptId = null;
   finalVariantIndex = null;
+  handledPrompts.add(promptId);
 
   // Avanzamos al siguiente flujo del job actual, o terminamos el job.
   currentBatchIndex++;
   if(job) job.currentVariantIndex = null;
   if(currentBatchIndex < totalBatchSize){
     log(`➡️ Iniciando flujo ${currentBatchIndex + 1}/${totalBatchSize} del job...`, "l-ok");
-    runSingleGeneration(currentBatchIndex);
+    await runSingleGeneration(currentBatchIndex);
   } else {
     log(`🏁 Job completado (${totalBatchSize} flujo(s)).`, "l-ok");
     finishCurrentJob();
@@ -1029,7 +1024,8 @@ async function ensureImageUploaded(){
   log("Imagen subida al servidor: "+uploadedImage.name,"l-ok");
 }
 
-function buildGraph(firstPassOnly){
+function buildGraph(mode){
+  // mode: "first" | "second" | "full"
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
   if(uploadedImage) g[N.IMAGE].inputs.image = uploadedImage.name;
   if($("prompt").value.trim())g[N.PROMPT].inputs.text=$("prompt").value.trim();
@@ -1095,7 +1091,9 @@ function buildGraph(firstPassOnly){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
   }
 
-  if(firstPassOnly){delete g[N.FINAL_SAVE]; delete g[N.PURGE_VRAM];}
+  if(mode === "first"){ delete g[N.FINAL_SAVE]; delete g[N.PURGE_VRAM]; }
+  else if(mode === "second"){ delete g[N.FIRST_SAVE]; }
+  // mode "full" mantiene ambos save nodes para ejecutar 1er pase + final de una vez.
   return g;
 }
 
@@ -1563,8 +1561,8 @@ async function loadVideoHistory(){
 async function runSingleGeneration(index) {
     try {
         const isStep2 = (generationStep === 2);
-        const firstPassOnly = isStep2 ? false : (activeJob ? activeJob.firstPassOnly : true);
-        const graph = buildGraph(firstPassOnly);
+        const mode = isStep2 ? "second" : (activeJob ? (activeJob.firstPassOnly ? "first" : "full") : "first");
+        const graph = buildGraph(mode);
         let seedUsed;
         if(isStep2 && firstPromptId && pendingSeeds[firstPromptId] != null){
             seedUsed = pendingSeeds[firstPromptId];
@@ -1582,7 +1580,7 @@ async function runSingleGeneration(index) {
         }
         const varIndex = activeJob?.currentVariantIndex || (variantCounter + 1);
 
-        const stepLabel = isStep2 ? `paso 2/2 · Var ${varIndex}` : (activeJob?.firstPassOnly ? `1er pase · Var ${varIndex}` : `paso 1/2 · Var ${varIndex}`);
+        const stepLabel = isStep2 ? `paso 2/2 · Var ${varIndex}` : (activeJob?.firstPassOnly ? `1er pase · Var ${varIndex}` : `paso 1+2 · Var ${varIndex}`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
@@ -1601,7 +1599,10 @@ async function runSingleGeneration(index) {
         if(!isStep2 && generationStep === 1){
             firstPromptId = data.prompt_id;
         }
-        startTimer(data.prompt_id, isStep2 ? 2 : 1);
+        // En modo "full" mostramos el timer en el slot 2 (final); el preview del 1er pase
+        // sale como resultado intermedio pero no tiene timer propio.
+        const timerSlot = (mode === "full") ? 2 : (isStep2 ? 2 : 1);
+        startTimer(data.prompt_id, timerSlot);
         pollFallback(data.prompt_id);
     } catch(err) {
         log(`❌ No se pudo encolar: ${err.message || err}`, "l-err");
@@ -1691,9 +1692,9 @@ $("btnEnhance").addEventListener("click", async () => {
   const data = loadSysPrompts();
   const system = getCurrentSysPrompt(data, mode, styleKey);
   const userPrompt = $("prompt").value.trim();
-  if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+  if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
-  const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
+  const payload = { model, system, prompt: userPrompt || "Describe this image.", stream: false, options: { num_ctx: 8192 } };
   if(mode === "vision"){
     if(!localFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
     try {

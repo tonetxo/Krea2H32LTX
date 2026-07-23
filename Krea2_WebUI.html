@@ -3020,10 +3020,14 @@ $("btnCaption").addEventListener("click", async () => {
   $("enhancerOutput").value = "";
   try {
     const b64 = await getVisibleRegionBase64(refImgEl.src, "refWrap", 1280);
+    const userPrompt = $("prompt").value.trim();
+    const captionPrompt = userPrompt
+      ? `Describe this image. User guidance: ${userPrompt}`
+      : "Describe this image.";
     const r = await fetchWithRetry("/api/generate", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
-        model, system, prompt: "Describe this image.", images: [b64], stream: false,
+        model, system, prompt: captionPrompt, images: [b64], stream: false,
         options: { num_ctx: 8192, temperature: 0.4 }
       }),
     });
