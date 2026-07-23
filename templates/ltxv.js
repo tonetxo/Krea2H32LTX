@@ -1744,16 +1744,16 @@ $("btnEnhance").addEventListener("click", async () => {
     const result = await r.json();
     const text = (result.response || "").trim();
     $("enhancerOutput").value = text;
-    // Si el modo es Ollama o Ambos, actualizamos también el textbox principal
+    // Si el modo es Ollama o Ambos, actualizamos tambin el textbox principal
     if(chainMode === LTX2_CHAIN_OLLAMA || chainMode === LTX2_CHAIN_BOTH){
       $("prompt").value = text;
       log("✏️ Prompt actualizado desde Ollama.", "l-ok");
-      // Previsualización del prompt final con LTX2 (sin ejecutar ComfyUI)
+      // Previsualizacin del prompt final con LTX2 (sin ejecutar ComfyUI)
       if(chainMode === LTX2_CHAIN_BOTH){
-        $("ltx2PreviewText").value = `[Ollama + LTX2] ${text}`;
+        $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2] Se aplicar este prompt al ejecutar en ComfyUI (no se puede previsualizar sin ejecutar).`;
       }
     } else if(chainMode === LTX2_CHAIN_LTX2){
-      $("ltx2PreviewText").value = `[LTX2] ${$("prompt").value.trim()}`;
+      $("ltx2PreviewText").value = `[LTX2] ${$("prompt").value.trim()}\n\nSe generar en ComfyUI al pulsar Generar.`;
     }
     log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
   } catch(e) {
