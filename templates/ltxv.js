@@ -9,7 +9,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -719,6 +719,7 @@ function updateDzInfo(w, h){
 $("segRandom").addEventListener("click",()=>{seedMode="random";$("segRandom").classList.add("on");$("segFixed").classList.remove("on");$("seedVal").disabled=true;});
 $("segFixed").addEventListener("click",()=>{seedMode="fixed";$("segFixed").classList.add("on");$("segRandom").classList.remove("on");$("seedVal").disabled=false;});
 $("fidelitySlider").addEventListener("input",(e)=>{$("fidelityVal").textContent=parseFloat(e.target.value).toFixed(2);});
+$("firstPassSteps")?.addEventListener("input",(e)=>{$("firstPassStepsVal").textContent=e.target.value;});
 $("motionSlider").addEventListener("input",(e)=>{$("motionVal").textContent=parseFloat(e.target.value).toFixed(1);});
 $("mpSlider").addEventListener("input",()=>{recalcResolution();});
 $("frames").addEventListener("input",updateDuration);
@@ -933,6 +934,12 @@ function buildGraph(firstPassOnly){
   // Patch Sage Attention: tipo configurable, siempre activo
   const sageType = $("sageAttentionType")?.value || "sageattn";
   if(g[N.SAGE_PATCH] && g[N.SAGE_PATCH].inputs) g[N.SAGE_PATCH].inputs.sage_attention = sageType;
+
+  // Steps del primer pase: regenerar sigmas interpolando desde la curva base 10-step
+  const firstSteps = parseInt($("firstPassSteps")?.value || 10, 10);
+  if(g[N.FIRST_SIGMAS] && g[N.FIRST_SIGMAS].inputs){
+    g[N.FIRST_SIGMAS].inputs.sigmas = buildFirstPassSigmas(firstSteps);
+  }
 
   // Cadena de mejora: se rellena el raw prompt siempre
   const rawPrompt = $("prompt").value.trim();
@@ -1584,6 +1591,27 @@ $("btnEnhance").addEventListener("click", async () => {
 updateDuration();
 // Default enhancer chain for fresh sessions: Ollama usable out of the box.
 if(!$("enhancerChainMode").value) $("enhancerChainMode").value = LTX2_CHAIN_OLLAMA;
+
+// --- FIRST PASS SIGMAS ---
+// Curva base 10-step tal como está en el workflow original.
+const BASE_FIRST_SIGMAS = [1.000, 0.955, 0.893, 0.812, 0.715, 0.603, 0.482, 0.241, 0.121, 0.0];
+function lerp(a, b, t){ return a + (b - a) * t; }
+function buildFirstPassSigmas(steps){
+  steps = Math.max(4, Math.min(12, steps));
+  if(steps === BASE_FIRST_SIGMAS.length) return BASE_FIRST_SIGMAS.join(", ");
+  const positions = steps;
+  const out = [];
+  const maxIdx = BASE_FIRST_SIGMAS.length - 1;
+  for(let i = 0; i < positions; i++){
+    const rawPos = (i / (positions - 1)) * maxIdx;
+    const idx = Math.floor(rawPos);
+    const t = rawPos - idx;
+    const a = BASE_FIRST_SIGMAS[idx];
+    const b = BASE_FIRST_SIGMAS[Math.min(idx + 1, maxIdx)];
+    out.push(lerp(a, b, t));
+  }
+  return out.map(s => s.toFixed(4).replace(/\.?0+$/,"")).join(", ");
+}
 
 // --- EVOLVE / TRANSMUTAR PROMPT ---
 const EVOLVE_VOCAB = [
