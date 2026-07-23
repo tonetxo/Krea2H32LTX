@@ -118,7 +118,8 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .collapsible-body.open{max-height:5000px;}
 .enhancer-row{margin-bottom:10px;}
 .enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
-.enhancer-row select{width:100%;}
+.enhancer-row select,.enhancer-row input[type=number]{width:100%;}
+.enhancer-row .slider-row input[type=range]{flex:1;}
 .enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
 .enhancer-output:focus{border-color:var(--accent);}
 .enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
@@ -260,6 +261,18 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
             <select id="enhancerStyle"></select>
           </div>
           <div class="enhancer-row">
+            <label>Cadena de mejora</label>
+            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">Ollama</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Temperatura LTX2 <span class="hint">(Generate LTX2 Prompt)</span></label>
+            <div class="slider-row"><input type="range" id="ltx2Temperature" min="0" max="1.5" step="0.05" value="0.7"><div class="slider-val" id="ltx2TemperatureVal">0.70</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Seed LTX2</label>
+            <input type="number" id="ltx2Seed" value="2" step="1">
+          </div>
+          <div class="enhancer-row">
             <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
           </div>
           <div class="enhancer-row">
@@ -286,6 +299,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
 
       <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
+      <div class="panel"><h2>Tipo de atención Sage</h2><div class="row"><select id="sageAttentionType"><option value="auto">auto</option><option value="sageattn" selected>sageattn</option><option value="sageattn2">sageattn2</option><option value="sageattn3">sageattn3</option><option value="sageattn_qk">sageattn_qk</option></select></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
       <div class="panel">
         <div class="collapsible-header" id="loraToggle">
@@ -301,7 +315,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       </div>
       <div class="panel"><h2>Resolución & duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
       <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
-      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
+      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
       <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
       <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnFirstPass">Solo 1er pase</button><button id="btnFull" class="primary">Generar completo</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar video</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
     </div>
@@ -469,7 +483,10 @@ const BASE_GRAPH = {
   },
   "536": {
     "inputs": {
-      "text": "The scene opens on a dimly lit, metallic tray table inside what appears to be the cramped interior of a submarine. The composition centers on a right hand in a dark navy uniform sleeve with gold braid trim at the cuff, holding a black and gold fountain pen poised over a sheet of cream-colored paper filled with cursive handwriting. To the left of the paper sits an empty clear glass bottle, a small square inkwell with black ink, and a brass pocket watch on a chain. To the right are a brass compass with its lid open, a wooden pipe, and a semi-automatic pistol with a brown grip. In the background, curved metal walls, pipes, valves, and a circular porthole suggest a confined, industrial maritime environment. A cot with rumpled bedding is visible in the upper left corner.\n\nThe camera begins a slow, smooth descent, tilting downward until it is nearly parallel to the surface of the tray, maintaining tight focus on the hand, the paper, and the bottle. As the camera moves, the hand accelerates slightly, completing the final flourish of the signature — a swift, elegant loop that ends with a sharp upward flick. The scratch of the nib against the fiber of the paper is crisp and audible, followed by the soft rustle as the fingers release the pen onto the tray.\n\nImmediately after signing, both hands enter the frame. The left hand steadies the paper while the right hand folds it lengthwise once, then rolls it tightly from bottom to top into a compact cylinder. The rolling motion is deliberate but efficient; the sound of parchment creasing and sliding against itself is faint but distinct. Once rolled, the right hand lifts the scroll, pinching it between thumb and forefinger.\n\nSimultaneously, the left hand reaches for the glass bottle, lifting it slightly off the tray. The right hand inserts the rolled manuscript into the mouth of the bottle, guiding it down with a gentle twisting motion until it disappears completely inside. The glass clinks softly against the metal tray as the bottle is set back down. Throughout this sequence, the ambient hum of submarine machinery persists — low-frequency thrumming punctuated by distant metallic clangs and the rhythmic whir of ventilation fans or engine components. No dialogue occurs. The mood is tense yet methodical, underscored by a minimalistic score: a single sustained cello note fading into silence, evoking isolation and urgency beneath the waves.",
+      "text": [
+        "1002",
+        0
+      ],
       "clip": [
         "616",
         0
@@ -1392,7 +1409,7 @@ const BASE_GRAPH = {
     "inputs": {
       "triton_kernels": true,
       "model": [
-        "646",
+        "1001",
         0
       ]
     },
@@ -1413,6 +1430,68 @@ const BASE_GRAPH = {
     "class_type": "LayerUtility: PurgeVRAM",
     "_meta": {
       "title": "LayerUtility: Purge VRAM"
+    }
+  },
+  "1001": {
+    "inputs": {
+      "sage_attention": "sageattn3",
+      "allow_compile": false,
+      "model": [
+        "646",
+        0
+      ]
+    },
+    "class_type": "PathchSageAttentionKJ",
+    "_meta": {
+      "title": "Patch Sage Attention KJ"
+    }
+  },
+  "1002": {
+    "inputs": {
+      "value": ""
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt (raw)"
+    }
+  },
+  "1003": {
+    "inputs": {
+      "prompt": [
+        "1002",
+        0
+      ],
+      "max_length": 2048,
+      "sampling_mode": "on",
+      "sampling_mode.temperature": 0.7,
+      "sampling_mode.top_k": 64,
+      "sampling_mode.top_p": 0.95,
+      "sampling_mode.min_p": 0.05,
+      "sampling_mode.repetition_penalty": 1.05,
+      "sampling_mode.seed": 2,
+      "sampling_mode.presence_penalty": 0,
+      "thinking": false,
+      "use_default_template": true,
+      "clip": [
+        "853",
+        1
+      ]
+    },
+    "class_type": "TextGenerateLTX2Prompt",
+    "_meta": {
+      "title": "Generate LTX2 Prompt"
+    }
+  },
+  "1004": {
+    "inputs": {
+      "source": [
+        "1003",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview LTX2 Prompt"
     }
   }
 };
@@ -2687,7 +2766,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -2709,9 +2788,14 @@ let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
 let dmdBypass = false;
-const DMD_LORA_NODE = "906";
-const DMD_MODEL_SOURCE = "868";
-let firstPromptId = null;
+  const DMD_LORA_NODE = "906";
+  const DMD_MODEL_SOURCE = "868";
+  let firstPromptId = null;
+  const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk"];
+  const LTX2_CHAIN_OFF = "off";
+  const LTX2_CHAIN_OLLAMA = "ollama";
+  const LTX2_CHAIN_LTX2 = "ltx2";
+  const LTX2_CHAIN_BOTH = "both";
 let finalVariantIndex = null;
 let promptSteps = {};
 const BITDEPTH_KEY = "ltxv_bit_depth";
@@ -2750,9 +2834,11 @@ CONFIG.renderVariantMedia = function(card, url, media){
 };
 // Metadata para el tooltip de la variant-card: captura los sliders/LoRAs en el
 // momento de crear la tarjeta (no al hacer hover, que podría haber cambiado).
-CONFIG.variantMeta = function(){
+  CONFIG.variantMeta = function(){
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
+    ["Sage", $("sageAttentionType")?.value || "sageattn"],
+    ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
     ["Frames", $("frames")?.value || ""],
     ["Fidelidad", parseFloat($("fidelitySlider")?.value || 0).toFixed(2)],
@@ -2824,6 +2910,18 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   const isFirstOnly = (step === "1");
   const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
   const media2 = entry.outputs[N.FINAL_SAVE] ? CONFIG.findMedia(entry.outputs[N.FINAL_SAVE]) : null;
+
+  // Mostrar el prompt final generado por LTX2 si está disponible
+  try {
+    const ltx2Preview = entry.outputs[N.LTX2_PREVIEW];
+    if(ltx2Preview && ltx2Preview.text?.length){
+      const finalText = ltx2Preview.text[ltx2Preview.text.length - 1];
+      if(typeof finalText === "string" && finalText.trim()){
+        $("enhancerOutput").value = finalText.trim();
+        log(`✏️ Prompt final LTX2 (slot ${step}): ${finalText.trim().slice(0,120)}...`, "l-ok");
+      }
+    }
+  } catch(_){}
 
   if(isFirstOnly){
     if(media1){
@@ -3153,7 +3251,8 @@ function applyWorkflow(workflow, opts={}){
   for(const {node} of textEncoders){
     const t = (node.inputs && node.inputs.text) || "";
     if(!isNegativePrompt(t) && t.length > 50){
-      $("prompt").value = t;
+      // Only set from CLIPTextEncode if no raw prompt primitive already restored it
+      if(!$("prompt").value.trim()) $("prompt").value = t;
       promptSet = true; break;
     }
   }
@@ -3162,10 +3261,10 @@ function applyWorkflow(workflow, opts={}){
     for(const {node} of textEncoders){
       if((node.inputs?.text || "").length > (longest.inputs?.text || "").length) longest = node;
     }
-    $("prompt").value = longest.inputs?.text || "";
+    if(!$("prompt").value.trim()) $("prompt").value = longest.inputs?.text || "";
     promptSet = !!$("prompt").value;
   }
-  if(promptSet) setApplied("prompt"); else setMissing("prompt");
+  if(promptSet || $("prompt").value.trim()) setApplied("prompt"); else setMissing("prompt");
 
   let modelSet = false;
   const checkpoint = findByClass("CheckpointLoaderSimple");
@@ -3233,6 +3332,38 @@ function applyWorkflow(workflow, opts={}){
   if(mot != null){ $("motionSlider").value = mot; $("motionVal").textContent = parseFloat(mot).toFixed(1); setApplied("movimiento"); } else setMissing("movimiento");
   if(w && h) applyAspectRatio(w, h);
   updateDuration();
+
+  // Restaurar Patch Sage Attention
+  const sageNode = findByClass("PathchSageAttentionKJ");
+  if(sageNode && sageNode.inputs && sageNode.inputs.sage_attention && SAGE_TYPES.includes(sageNode.inputs.sage_attention)){
+    $("sageAttentionType").value = sageNode.inputs.sage_attention;
+    setApplied("sage attention");
+  } else { setMissing("sage attention"); }
+
+  // Restaurar TextGenerateLTX2Prompt settings
+  const ltx2Node = findByClass("TextGenerateLTX2Prompt");
+  if(ltx2Node && ltx2Node.inputs){
+    const ltx2Temp = ltx2Node.inputs["sampling_mode.temperature"];
+    const ltx2Seed = ltx2Node.inputs["sampling_mode.seed"];
+    if(typeof ltx2Temp === "number"){ $("ltx2Temperature").value = ltx2Temp; $("ltx2TemperatureVal").textContent = ltx2Temp.toFixed(2); }
+    if(typeof ltx2Seed === "number") $("ltx2Seed").value = ltx2Seed;
+    // Cadena: si CLIPTextEncode lee del LTX2_PROMPT => activo
+    const promptTextSource = workflow[N.PROMPT]?.inputs?.text;
+    if(Array.isArray(promptTextSource) && promptTextSource[0] === N.LTX2_PROMPT){
+      $("enhancerChainMode").value = LTX2_CHAIN_LTX2;
+      setApplied("cadena LTX2");
+    } else {
+      $("enhancerChainMode").value = LTX2_CHAIN_OFF;
+      setApplied("cadena off");
+    }
+  } else { setMissing("LTX2 Prompt"); }
+
+  // Restaurar raw prompt si existe
+  const rawPromptNode = findByClass("PrimitiveStringMultiline");
+  if(rawPromptNode && rawPromptNode.inputs && typeof rawPromptNode.inputs.value === "string" && rawPromptNode.inputs.value.length > 0){
+    $("prompt").value = rawPromptNode.inputs.value;
+    setApplied("prompt raw");
+  }
 
   const powerLora = findByClass("Power Lora Loader (rgthree)");
   if(powerLora && powerLora.inputs){
@@ -3333,6 +3464,11 @@ $("dmdBypassSwitch").addEventListener("click",()=>{
   dmdBypass = !dmdBypass;
   $("dmdBypassSwitch").classList.toggle("on", !dmdBypass);
   log(dmdBypass ? "DMD LoRA desactivada" : "DMD LoRA activada", "l-ok");
+});
+
+// LTX2 temperature slider label
+$("ltx2Temperature")?.addEventListener("input", (e)=>{
+  $("ltx2TemperatureVal").textContent = parseFloat(e.target.value).toFixed(2);
 });
 
 // Zoom/pan/fullscreen para imagen de entrada
@@ -3528,10 +3664,37 @@ function buildGraph(firstPassOnly){
   const bitDepth = getBitDepth();
   if(g[N.CREATE_VIDEO_1] && g[N.CREATE_VIDEO_1].inputs) g[N.CREATE_VIDEO_1].inputs.bit_depth = bitDepth;
   if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;
+
+  // Patch Sage Attention: tipo configurable, siempre activo
+  const sageType = $("sageAttentionType")?.value || "sageattn";
+  if(g[N.SAGE_PATCH] && g[N.SAGE_PATCH].inputs) g[N.SAGE_PATCH].inputs.sage_attention = sageType;
+
+  // Cadena de mejora: se rellena el raw prompt siempre
+  const rawPrompt = $("prompt").value.trim();
+  if(g[N.RAW_PROMPT] && g[N.RAW_PROMPT].inputs) g[N.RAW_PROMPT].inputs.value = rawPrompt;
+
+  // Configurar nodo TextGenerateLTX2Prompt (siempre presente en el grafo)
+  if(g[N.LTX2_PROMPT] && g[N.LTX2_PROMPT].inputs){
+    g[N.LTX2_PROMPT].inputs["sampling_mode.temperature"] = parseFloat($("ltx2Temperature")?.value || 0.7);
+    g[N.LTX2_PROMPT].inputs["sampling_mode.seed"] = parseInt($("ltx2Seed")?.value || 2, 10);
+  }
+
+  const chainMode = $("enhancerChainMode")?.value || "off";
+  // Si la cadena es LTX2 o Ambos, CLIPTextEncode lee del nodo Generate LTX2 Prompt;
+  // si es off u Ollama, lee directamente del raw prompt (Ollama ya ha actualizado el textbox).
+  if(g[N.PROMPT] && g[N.PROMPT].inputs){
+    if(chainMode === LTX2_CHAIN_LTX2 || chainMode === LTX2_CHAIN_BOTH){
+      g[N.PROMPT].inputs.text = [N.LTX2_PROMPT, 0];
+    } else {
+      g[N.PROMPT].inputs.text = [N.RAW_PROMPT, 0];
+    }
+  }
+
   // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
   if(dmdBypass && g[N.LORA] && g[N.LORA].inputs.model){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
   }
+
   if(firstPassOnly){delete g[N.FINAL_SAVE]; delete g[N.PURGE_VRAM];}
   return g;
 }
@@ -4012,6 +4175,7 @@ async function runSingleGeneration(index) {
 
         const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize})`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
+        // Log what prompt source is actually wired in the graph
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
@@ -4067,6 +4231,16 @@ $("btnFull").addEventListener("click",()=>runGeneration(false));
 
 // --- ENHANCER (LTXV vision-mode uses localFile) ---
 $("btnEnhance").addEventListener("click", async () => {
+  const chainMode = $("enhancerChainMode").value;
+  if(chainMode === LTX2_CHAIN_LTX2){
+    log("⚠️ Modo 'LTX2 Prompt' activo: Ollama no se usa; el prompt se mejorará en el grafo de ComfyUI.", "l-warn");
+    return;
+  }
+  if(chainMode === LTX2_CHAIN_OFF){
+    log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' o 'Ambos' para usar el botón.", "l-warn");
+    return;
+  }
+
   const model = $("enhancerModel").value;
   if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
   const mode = $("enhancerMode").value;
@@ -4107,6 +4281,11 @@ $("btnEnhance").addEventListener("click", async () => {
     const result = await r.json();
     const text = (result.response || "").trim();
     $("enhancerOutput").value = text;
+    // Si el modo es Ollama o Ambos, actualizamos también el textbox principal
+    if(chainMode === LTX2_CHAIN_OLLAMA || chainMode === LTX2_CHAIN_BOTH){
+      $("prompt").value = text;
+      log("✏️ Prompt actualizado desde Ollama.", "l-ok");
+    }
     log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
   } catch(e) {
     log("❌ Error al mejorar: "+e.message, "l-err");
@@ -4119,6 +4298,8 @@ $("btnEnhance").addEventListener("click", async () => {
 
 // --- INIT ---
 updateDuration();
+// Default enhancer chain for fresh sessions: Ollama usable out of the box.
+if(!$("enhancerChainMode").value) $("enhancerChainMode").value = LTX2_CHAIN_OLLAMA;
 </script>
 </body>
 </html>

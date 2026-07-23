@@ -20,6 +20,7 @@
 
       <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
+      <div class="panel"><h2>Tipo de atención Sage</h2><div class="row"><select id="sageAttentionType"><option value="auto">auto</option><option value="sageattn" selected>sageattn</option><option value="sageattn2">sageattn2</option><option value="sageattn3">sageattn3</option><option value="sageattn_qk">sageattn_qk</option></select></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
       <div class="panel">
         <div class="collapsible-header" id="loraToggle">
@@ -35,7 +36,7 @@
       </div>
       <div class="panel"><h2>Resolución & duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
       <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
-      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
+      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
       <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
       <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnFirstPass">Solo 1er pase</button><button id="btnFull" class="primary">Generar completo</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar video</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
     </div>

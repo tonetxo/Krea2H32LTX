@@ -9,7 +9,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -31,9 +31,14 @@ let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
 let dmdBypass = false;
-const DMD_LORA_NODE = "906";
-const DMD_MODEL_SOURCE = "868";
-let firstPromptId = null;
+  const DMD_LORA_NODE = "906";
+  const DMD_MODEL_SOURCE = "868";
+  let firstPromptId = null;
+  const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk"];
+  const LTX2_CHAIN_OFF = "off";
+  const LTX2_CHAIN_OLLAMA = "ollama";
+  const LTX2_CHAIN_LTX2 = "ltx2";
+  const LTX2_CHAIN_BOTH = "both";
 let finalVariantIndex = null;
 let promptSteps = {};
 const BITDEPTH_KEY = "ltxv_bit_depth";
@@ -72,9 +77,11 @@ CONFIG.renderVariantMedia = function(card, url, media){
 };
 // Metadata para el tooltip de la variant-card: captura los sliders/LoRAs en el
 // momento de crear la tarjeta (no al hacer hover, que podría haber cambiado).
-CONFIG.variantMeta = function(){
+  CONFIG.variantMeta = function(){
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
+    ["Sage", $("sageAttentionType")?.value || "sageattn"],
+    ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
     ["Frames", $("frames")?.value || ""],
     ["Fidelidad", parseFloat($("fidelitySlider")?.value || 0).toFixed(2)],
@@ -146,6 +153,18 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   const isFirstOnly = (step === "1");
   const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
   const media2 = entry.outputs[N.FINAL_SAVE] ? CONFIG.findMedia(entry.outputs[N.FINAL_SAVE]) : null;
+
+  // Mostrar el prompt final generado por LTX2 si está disponible
+  try {
+    const ltx2Preview = entry.outputs[N.LTX2_PREVIEW];
+    if(ltx2Preview && ltx2Preview.text?.length){
+      const finalText = ltx2Preview.text[ltx2Preview.text.length - 1];
+      if(typeof finalText === "string" && finalText.trim()){
+        $("enhancerOutput").value = finalText.trim();
+        log(`✏️ Prompt final LTX2 (slot ${step}): ${finalText.trim().slice(0,120)}...`, "l-ok");
+      }
+    }
+  } catch(_){}
 
   if(isFirstOnly){
     if(media1){
@@ -475,7 +494,8 @@ function applyWorkflow(workflow, opts={}){
   for(const {node} of textEncoders){
     const t = (node.inputs && node.inputs.text) || "";
     if(!isNegativePrompt(t) && t.length > 50){
-      $("prompt").value = t;
+      // Only set from CLIPTextEncode if no raw prompt primitive already restored it
+      if(!$("prompt").value.trim()) $("prompt").value = t;
       promptSet = true; break;
     }
   }
@@ -484,10 +504,10 @@ function applyWorkflow(workflow, opts={}){
     for(const {node} of textEncoders){
       if((node.inputs?.text || "").length > (longest.inputs?.text || "").length) longest = node;
     }
-    $("prompt").value = longest.inputs?.text || "";
+    if(!$("prompt").value.trim()) $("prompt").value = longest.inputs?.text || "";
     promptSet = !!$("prompt").value;
   }
-  if(promptSet) setApplied("prompt"); else setMissing("prompt");
+  if(promptSet || $("prompt").value.trim()) setApplied("prompt"); else setMissing("prompt");
 
   let modelSet = false;
   const checkpoint = findByClass("CheckpointLoaderSimple");
@@ -555,6 +575,38 @@ function applyWorkflow(workflow, opts={}){
   if(mot != null){ $("motionSlider").value = mot; $("motionVal").textContent = parseFloat(mot).toFixed(1); setApplied("movimiento"); } else setMissing("movimiento");
   if(w && h) applyAspectRatio(w, h);
   updateDuration();
+
+  // Restaurar Patch Sage Attention
+  const sageNode = findByClass("PathchSageAttentionKJ");
+  if(sageNode && sageNode.inputs && sageNode.inputs.sage_attention && SAGE_TYPES.includes(sageNode.inputs.sage_attention)){
+    $("sageAttentionType").value = sageNode.inputs.sage_attention;
+    setApplied("sage attention");
+  } else { setMissing("sage attention"); }
+
+  // Restaurar TextGenerateLTX2Prompt settings
+  const ltx2Node = findByClass("TextGenerateLTX2Prompt");
+  if(ltx2Node && ltx2Node.inputs){
+    const ltx2Temp = ltx2Node.inputs["sampling_mode.temperature"];
+    const ltx2Seed = ltx2Node.inputs["sampling_mode.seed"];
+    if(typeof ltx2Temp === "number"){ $("ltx2Temperature").value = ltx2Temp; $("ltx2TemperatureVal").textContent = ltx2Temp.toFixed(2); }
+    if(typeof ltx2Seed === "number") $("ltx2Seed").value = ltx2Seed;
+    // Cadena: si CLIPTextEncode lee del LTX2_PROMPT => activo
+    const promptTextSource = workflow[N.PROMPT]?.inputs?.text;
+    if(Array.isArray(promptTextSource) && promptTextSource[0] === N.LTX2_PROMPT){
+      $("enhancerChainMode").value = LTX2_CHAIN_LTX2;
+      setApplied("cadena LTX2");
+    } else {
+      $("enhancerChainMode").value = LTX2_CHAIN_OFF;
+      setApplied("cadena off");
+    }
+  } else { setMissing("LTX2 Prompt"); }
+
+  // Restaurar raw prompt si existe
+  const rawPromptNode = findByClass("PrimitiveStringMultiline");
+  if(rawPromptNode && rawPromptNode.inputs && typeof rawPromptNode.inputs.value === "string" && rawPromptNode.inputs.value.length > 0){
+    $("prompt").value = rawPromptNode.inputs.value;
+    setApplied("prompt raw");
+  }
 
   const powerLora = findByClass("Power Lora Loader (rgthree)");
   if(powerLora && powerLora.inputs){
@@ -655,6 +707,11 @@ $("dmdBypassSwitch").addEventListener("click",()=>{
   dmdBypass = !dmdBypass;
   $("dmdBypassSwitch").classList.toggle("on", !dmdBypass);
   log(dmdBypass ? "DMD LoRA desactivada" : "DMD LoRA activada", "l-ok");
+});
+
+// LTX2 temperature slider label
+$("ltx2Temperature")?.addEventListener("input", (e)=>{
+  $("ltx2TemperatureVal").textContent = parseFloat(e.target.value).toFixed(2);
 });
 
 // Zoom/pan/fullscreen para imagen de entrada
@@ -850,10 +907,37 @@ function buildGraph(firstPassOnly){
   const bitDepth = getBitDepth();
   if(g[N.CREATE_VIDEO_1] && g[N.CREATE_VIDEO_1].inputs) g[N.CREATE_VIDEO_1].inputs.bit_depth = bitDepth;
   if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;
+
+  // Patch Sage Attention: tipo configurable, siempre activo
+  const sageType = $("sageAttentionType")?.value || "sageattn";
+  if(g[N.SAGE_PATCH] && g[N.SAGE_PATCH].inputs) g[N.SAGE_PATCH].inputs.sage_attention = sageType;
+
+  // Cadena de mejora: se rellena el raw prompt siempre
+  const rawPrompt = $("prompt").value.trim();
+  if(g[N.RAW_PROMPT] && g[N.RAW_PROMPT].inputs) g[N.RAW_PROMPT].inputs.value = rawPrompt;
+
+  // Configurar nodo TextGenerateLTX2Prompt (siempre presente en el grafo)
+  if(g[N.LTX2_PROMPT] && g[N.LTX2_PROMPT].inputs){
+    g[N.LTX2_PROMPT].inputs["sampling_mode.temperature"] = parseFloat($("ltx2Temperature")?.value || 0.7);
+    g[N.LTX2_PROMPT].inputs["sampling_mode.seed"] = parseInt($("ltx2Seed")?.value || 2, 10);
+  }
+
+  const chainMode = $("enhancerChainMode")?.value || "off";
+  // Si la cadena es LTX2 o Ambos, CLIPTextEncode lee del nodo Generate LTX2 Prompt;
+  // si es off u Ollama, lee directamente del raw prompt (Ollama ya ha actualizado el textbox).
+  if(g[N.PROMPT] && g[N.PROMPT].inputs){
+    if(chainMode === LTX2_CHAIN_LTX2 || chainMode === LTX2_CHAIN_BOTH){
+      g[N.PROMPT].inputs.text = [N.LTX2_PROMPT, 0];
+    } else {
+      g[N.PROMPT].inputs.text = [N.RAW_PROMPT, 0];
+    }
+  }
+
   // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
   if(dmdBypass && g[N.LORA] && g[N.LORA].inputs.model){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
   }
+
   if(firstPassOnly){delete g[N.FINAL_SAVE]; delete g[N.PURGE_VRAM];}
   return g;
 }
@@ -1334,6 +1418,7 @@ async function runSingleGeneration(index) {
 
         const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize})`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
+        // Log what prompt source is actually wired in the graph
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
@@ -1389,6 +1474,16 @@ $("btnFull").addEventListener("click",()=>runGeneration(false));
 
 // --- ENHANCER (LTXV vision-mode uses localFile) ---
 $("btnEnhance").addEventListener("click", async () => {
+  const chainMode = $("enhancerChainMode").value;
+  if(chainMode === LTX2_CHAIN_LTX2){
+    log("⚠️ Modo 'LTX2 Prompt' activo: Ollama no se usa; el prompt se mejorará en el grafo de ComfyUI.", "l-warn");
+    return;
+  }
+  if(chainMode === LTX2_CHAIN_OFF){
+    log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' o 'Ambos' para usar el botón.", "l-warn");
+    return;
+  }
+
   const model = $("enhancerModel").value;
   if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
   const mode = $("enhancerMode").value;
@@ -1429,6 +1524,11 @@ $("btnEnhance").addEventListener("click", async () => {
     const result = await r.json();
     const text = (result.response || "").trim();
     $("enhancerOutput").value = text;
+    // Si el modo es Ollama o Ambos, actualizamos también el textbox principal
+    if(chainMode === LTX2_CHAIN_OLLAMA || chainMode === LTX2_CHAIN_BOTH){
+      $("prompt").value = text;
+      log("✏️ Prompt actualizado desde Ollama.", "l-ok");
+    }
     log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
   } catch(e) {
     log("❌ Error al mejorar: "+e.message, "l-err");
@@ -1441,3 +1541,5 @@ $("btnEnhance").addEventListener("click", async () => {
 
 // --- INIT ---
 updateDuration();
+// Default enhancer chain for fresh sessions: Ollama usable out of the box.
+if(!$("enhancerChainMode").value) $("enhancerChainMode").value = LTX2_CHAIN_OLLAMA;
