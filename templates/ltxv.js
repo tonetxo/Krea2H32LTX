@@ -31,19 +31,22 @@ let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
 let dmdBypass = false;
-  const DMD_LORA_NODE = "906";
-  const DMD_MODEL_SOURCE = "868";
-  let firstPromptId = null;
-  const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk"];
-  const LTX2_CHAIN_OFF = "off";
-  const LTX2_CHAIN_OLLAMA = "ollama";
-  const LTX2_CHAIN_LTX2 = "ltx2";
-  const LTX2_CHAIN_BOTH = "both";
+const DMD_LORA_NODE = "906";
+const DMD_MODEL_SOURCE = "868";
+let firstPromptId = null;
+const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk"];
+const LTX2_CHAIN_OFF = "off";
+const LTX2_CHAIN_OLLAMA = "ollama";
+const LTX2_CHAIN_LTX2 = "ltx2";
+const LTX2_CHAIN_BOTH = "both";
 let finalVariantIndex = null;
 let promptSteps = {};
 const BITDEPTH_KEY = "ltxv_bit_depth";
 // Exposed for common.js WS error handler.
 window.currentBatchMode = false;
+// Cola de jobs pendientes.
+let jobQueue = [];
+let activeJob = null;
 
 function getBitDepth(){
   return ($("segBitDepth10")?.classList.contains("on") ? 10 : 8);
@@ -107,9 +110,13 @@ CONFIG.startNextVariant = function(index){
   runSingleGeneration(index);
 };
 CONFIG.onBatchComplete = function(){
-  $("btnFirstPass").disabled=false;
-  $("btnFull").disabled=false;
-  enableStopButtons(false);
+  // El fin real del job se maneja en displayResult/finishCurrentJob para
+  // encadenar con la cola. Aquí no liberamos los botones si hay cola pendiente.
+  if(jobQueue.length === 0 && !activeJob){
+    $("btnFirstPass").disabled=false;
+    $("btnFull").disabled=false;
+    enableStopButtons(false);
+  }
 };
 CONFIG.onStopCurrent = function(pid){
   delete promptSteps[pid];
@@ -130,6 +137,10 @@ CONFIG.onStopAll = function(){
   firstPromptId = null;
   generationStep = 0;
   currentBatchIndex = totalBatchSize;
+  // Vaciar cola pendiente al parar todo.
+  jobQueue = [];
+  updateQueueUI();
+  activeJob = null;
   enableStopButtons(false);
   $("btnFirstPass").disabled=false;
   $("btnFull").disabled=false;
@@ -209,13 +220,16 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   generationStep = 0;
   firstPromptId = null;
   finalVariantIndex = null;
+
+  // Al terminar un job (batch completo + paso 2 si aplica), iniciar siguiente de la cola.
+  finishCurrentJob();
   return false;
 };
 
 // --- RESOLUCIÓN ---
 function nearest32(v){ return Math.round(v / 32) * 32; }
 
-function recalcResolution(){
+  function recalcResolution(){
   const mp = parseFloat($("mpSlider").value) || 0.9;
   const totalPx = mp * 1_000_000;
   let w = nearest32(Math.sqrt(totalPx * currentAspectRatio));
@@ -226,6 +240,97 @@ function recalcResolution(){
   $("width").value = w;
   $("height").value = h;
   $("mpVal").textContent = mp.toFixed(2);
+}
+
+function updateQueueUI(){
+  const count = jobQueue.length;
+  const el = $("queueCount");
+  const hint = $("queueHint");
+  const clearBtn = $("btnClearQueue");
+  if(el) el.textContent = `Cola: ${count}`;
+  if(hint) hint.textContent = count > 0 ? `${count} job(s) esperando` : "";
+  if(clearBtn) clearBtn.disabled = count === 0;
+}
+
+function snapshotJob(firstPassOnly){
+  // Captura de todos los parámetros necesarios para reproducir el job más tarde.
+  return {
+    firstPassOnly: !!firstPassOnly,
+    prompt: $("prompt").value,
+    seedMode,
+    seedValue: parseInt($("seedVal").value || "12345", 10),
+    width: parseInt($("width").value, 10),
+    height: parseInt($("height").value, 10),
+    frames: parseInt($("frames").value, 10),
+    mp: $("mpSlider").value,
+    fidelity: $("fidelitySlider").value,
+    motion: $("motionSlider").value,
+    firstPassSteps: $("firstPassSteps")?.value || "10",
+    model: $("modelSelect")?.value,
+    sageType: $("sageAttentionType")?.value,
+    bitDepth: getBitDepth(),
+    loras: JSON.parse(JSON.stringify(loras)),
+    dmdBypass: !!dmdBypass,
+    chainMode: $("enhancerChainMode")?.value,
+    ltx2Temperature: $("ltx2Temperature")?.value,
+    ltx2Seed: $("ltx2Seed")?.value,
+    batchSize: parseInt($("batchSize")?.value || "1", 10),
+    uploadedImage: uploadedImage ? {...uploadedImage} : null,
+    localFile: localFile,
+    aspectRatio: currentAspectRatio,
+    createdAt: Date.now(),
+  };
+}
+
+function restoreJob(job){
+  $("prompt").value = job.prompt || "";
+  seedMode = job.seedMode || "random";
+  if(seedMode === "random"){
+    $("segRandom")?.classList.add("on");
+    $("segFixed")?.classList.remove("on");
+    $("seedVal").disabled = true;
+  } else {
+    $("segFixed")?.classList.add("on");
+    $("segRandom")?.classList.remove("on");
+    $("seedVal").disabled = false;
+    $("seedVal").value = job.seedValue;
+  }
+  $("width").value = job.width;
+  $("height").value = job.height;
+  $("frames").value = job.frames;
+  $("mpSlider").value = job.mp;
+  $("mpVal").textContent = parseFloat(job.mp).toFixed(2);
+  $("fidelitySlider").value = job.fidelity;
+  $("fidelityVal").textContent = parseFloat(job.fidelity).toFixed(2);
+  $("motionSlider").value = job.motion;
+  $("motionVal").textContent = parseFloat(job.motion).toFixed(1);
+  $("firstPassSteps").value = job.firstPassSteps;
+  $("firstPassStepsVal").textContent = job.firstPassSteps;
+  if($("modelSelect") && job.model) $("modelSelect").value = job.model;
+  if($("sageAttentionType") && job.sageType) $("sageAttentionType").value = job.sageType;
+  setBitDepthUI(job.bitDepth);
+  saveBitDepth(job.bitDepth);
+  loras = job.loras || loras;
+  renderLoras();
+  saveLoraState();
+  dmdBypass = !!job.dmdBypass;
+  $("dmdBypassSwitch")?.classList.toggle("on", !dmdBypass);
+  if($("enhancerChainMode") && job.chainMode) $("enhancerChainMode").value = job.chainMode;
+  if($("ltx2Temperature") && job.ltx2Temperature) $("ltx2Temperature").value = job.ltx2Temperature;
+  if($("ltx2Seed") && job.ltx2Seed) $("ltx2Seed").value = job.ltx2Seed;
+  $("batchSize").value = job.batchSize;
+  uploadedImage = job.uploadedImage;
+  localFile = job.localFile;
+  currentAspectRatio = job.aspectRatio || (job.width / job.height) || 16/9;
+  if(uploadedImage || localFile){
+    // Si hay imagen local, mostramos vista previa si es posible; en caso contrario el job la resubirá.
+    if(localFile){
+      const reader = new FileReader();
+      reader.onload = (e) => showInputImage(e.target.result);
+      reader.readAsDataURL(localFile);
+    }
+  }
+  updateDuration();
 }
 
 // --- CHAIN ---
@@ -1447,19 +1552,20 @@ async function loadVideoHistory(){
 async function runSingleGeneration(index) {
     try {
         const isStep2 = (generationStep === 2);
-        const firstPassOnly = isStep2 ? false : true;
+        const firstPassOnly = isStep2 ? false : (activeJob ? activeJob.firstPassOnly : true);
         const graph = buildGraph(firstPassOnly);
         let seedUsed;
         if(isStep2 && firstPromptId && pendingSeeds[firstPromptId] != null){
             seedUsed = pendingSeeds[firstPromptId];
         } else {
-            seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("seedVal").value, 10);
+            const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
+            const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
+            seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
         }
         graph[N.SEED].inputs.seed = seedUsed;
 
         const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (generationStep === 1 ? "paso 1/2 (1er pase)" : `variante ${variantCounter + 1} (batch ${index + 1}/${totalBatchSize})`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
-        // Log what prompt source is actually wired in the graph
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
@@ -1489,29 +1595,60 @@ async function runSingleGeneration(index) {
     }
 }
 
-async function queueAndWait(firstPassOnly){
+async function startJob(job){
+  activeJob = job;
+  restoreJob(job);
   connectSocket();
   await ensureImageUploaded();
-  totalBatchSize = parseInt($("batchSize").value || "1", 10);
+  totalBatchSize = job.batchSize;
   currentBatchIndex = 0;
-  batchSeedMode = $("segRandom").classList.contains("on") ? "random" : "fixed";
-  window.currentBatchMode = firstPassOnly;
-  generationStep = firstPassOnly ? 0 : 1;
+  batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
+  window.currentBatchMode = job.firstPassOnly;
+  generationStep = job.firstPassOnly ? 0 : 1;
   firstPromptId = null;
-  setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
+  setRun("busy", `Job en cola · ${job.firstPassOnly ? "1er pase" : "completo"} · ${job.batchSize} variantes...`);
   $("btnFirstPass").disabled=true;
   $("btnFull").disabled=true;
   enableStopButtons(true);
   runSingleGeneration(0);
 }
 
-async function runGeneration(fp){
-  try{ await queueAndWait(fp); }
-  catch(err){ setRun("bad","error");log("Error: "+err.message,"l-err"); $("btnFirstPass").disabled=false;$("btnFull").disabled=false; }
+function finishCurrentJob(){
+  activeJob = null;
+  if(jobQueue.length > 0){
+    const next = jobQueue.shift();
+    updateQueueUI();
+    log(`⏭️ Iniciando siguiente job de la cola...`, "l-info");
+    startJob(next);
+  } else {
+    setRun("ok", "en reposo");
+    log("🏁 Cola vacía. Todos los jobs completados.", "l-ok");
+    $("btnFirstPass").disabled=false;
+    $("btnFull").disabled=false;
+    enableStopButtons(false);
+  }
 }
 
-$("btnFirstPass").addEventListener("click",()=>runGeneration(true));
-$("btnFull").addEventListener("click",()=>runGeneration(false));
+async function enqueueGeneration(firstPassOnly){
+  const job = snapshotJob(firstPassOnly);
+  if(activeJob || (currentPromptId && !handledPrompts.has(currentPromptId))){
+    jobQueue.push(job);
+    updateQueueUI();
+    log(`📥 Job añadido a la cola (total ${jobQueue.length}). Cambia parámetros libremente.`, "l-info");
+  } else {
+    await startJob(job);
+  }
+}
+
+$("btnClearQueue")?.addEventListener("click", () => {
+  const count = jobQueue.length;
+  jobQueue = [];
+  updateQueueUI();
+  if(count) log(`🧹 Cola vacía (${count} job(s) eliminados).`, "l-ok");
+});
+
+$("btnFirstPass").addEventListener("click",()=>enqueueGeneration(true));
+$("btnFull").addEventListener("click",()=>enqueueGeneration(false));
 
 // --- ENHANCER (LTXV vision-mode uses localFile) ---
 $("btnEnhance").addEventListener("click", async () => {
@@ -1589,6 +1726,7 @@ $("btnEnhance").addEventListener("click", async () => {
 
 // --- INIT ---
 updateDuration();
+updateQueueUI();
 // Default enhancer chain for fresh sessions: Ollama usable out of the box.
 if(!$("enhancerChainMode").value) $("enhancerChainMode").value = LTX2_CHAIN_OLLAMA;
 
