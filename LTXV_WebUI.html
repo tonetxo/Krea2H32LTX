@@ -4516,6 +4516,7 @@ $("btnEnhance").addEventListener("click", async () => {
 
   const model = $("enhancerModel").value;
   if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
   const mode = $("enhancerMode").value;
   const styleKey = $("enhancerStyle").value;
   const data = loadSysPrompts();
@@ -4562,7 +4563,7 @@ $("btnEnhance").addEventListener("click", async () => {
       // Previsualizacin del prompt final con LTX2 (sin ejecutar ComfyUI)
       if(chainMode === LTX2_CHAIN_BOTH){
         log("⏳ Ejecutando previsualización LTX2 en ComfyUI...", "l-info");
-        const ltx2Text = await runLTX2Preview();
+        const ltx2Text = await runLTX2Preview(text);
         $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n${ltx2Text || "(no se pudo previsualizar)"}`;
       }
     }
@@ -4576,7 +4577,7 @@ $("btnEnhance").addEventListener("click", async () => {
   }
 });
 
-async function runLTX2Preview(){
+async function runLTX2Preview(ollamaText){
   const savedJob = activeJob;
   if(!activeJob) activeJob = { firstPassOnly: false, seedMode: seedMode, seedValue: parseInt($("seedVal").value || "12345", 10), batchSize: 1, loras: loras };
   try {
@@ -4597,6 +4598,9 @@ async function runLTX2Preview(){
     if(text){
       $("prompt").value = text;
       log("✏️ Prompt actualizado desde LTX2.", "l-ok");
+      if(ollamaText && text.trim() === ollamaText.trim()){
+        log("ℹ️ LTX2 no modificó el prompt de Ollama (ya estaba optimizado).", "l-info");
+      }
     }
     return text;
   } catch(e) {
