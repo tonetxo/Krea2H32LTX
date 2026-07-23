@@ -179,26 +179,27 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
     }
   } catch(_){}
 
-  if(isStep1){
-    if(media1){
-      showVideo(1, media1, { variantIndex: currentBatchIndex + 1 });
-      paint(1, "1er", tTotal || "—");
-      addToVariantGallery(media1, realSeed, tTotal || "", 1, currentBatchIndex + 1);
-    }
-  } else {
-    if(media2){
-      showVideo(2, media2, { variantIndex: currentBatchIndex + 1 });
-      paint(2, "final", tTotal || "—");
-      addToVariantGallery(media2, realSeed, tTotal || "", 2, currentBatchIndex + 1);
-    }
-  }
-
-  delete promptSteps[promptId];
-
   // LTXV gestiona su propio flujo de pasos; devolvemos true para que common.js
   // no incremente currentBatchIndex ni llame processNextBatch.
   const job = activeJob;
   const firstPassOnly = job ? job.firstPassOnly : true;
+  const varIndex = (job && job.currentVariantIndex != null) ? job.currentVariantIndex : (variantCounter + 1);
+
+  if(isStep1){
+    if(media1){
+      showVideo(1, media1, { variantIndex: varIndex });
+      paint(1, "1er", tTotal || "—");
+      addToVariantGallery(media1, realSeed, tTotal || "", 1, varIndex);
+    }
+  } else {
+    if(media2){
+      showVideo(2, media2, { variantIndex: varIndex });
+      paint(2, "final", tTotal || "—");
+      addToVariantGallery(media2, realSeed, tTotal || "", 2, varIndex);
+    }
+  }
+
+  delete promptSteps[promptId];
 
   // --- ¿Continuamos con el paso 2? ---
   if(isStep1 && !firstPassOnly){
@@ -225,7 +226,7 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
 
   // Avanzamos al siguiente flujo del job actual, o terminamos el job.
   currentBatchIndex++;
-  variantCounter++;
+  if(job) job.currentVariantIndex = null;
   if(currentBatchIndex < totalBatchSize){
     log(`➡️ Iniciando flujo ${currentBatchIndex + 1}/${totalBatchSize} del job...`, "l-ok");
     runSingleGeneration(currentBatchIndex);
@@ -1574,7 +1575,14 @@ async function runSingleGeneration(index) {
         }
         graph[N.SEED].inputs.seed = seedUsed;
 
-        const stepLabel = isStep2 ? "paso 2/2 (2º pase)" : (activeJob?.firstPassOnly ? `1er pase ${currentBatchIndex + 1}/${totalBatchSize}` : `paso 1/2 (flujo ${currentBatchIndex + 1}/${totalBatchSize})`);
+        // Reservamos un índice de variante global al inicio de cada flujo nuevo.
+        if(activeJob && activeJob.currentVariantIndex == null){
+          variantCounter++;
+          activeJob.currentVariantIndex = variantCounter;
+        }
+        const varIndex = activeJob?.currentVariantIndex || (variantCounter + 1);
+
+        const stepLabel = isStep2 ? `paso 2/2 · Var ${varIndex}` : (activeJob?.firstPassOnly ? `1er pase · Var ${varIndex}` : `paso 1/2 · Var ${varIndex}`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
@@ -1609,12 +1617,17 @@ async function startJob(job){
   await ensureImageUploaded();
   totalBatchSize = job.batchSize || 1;
   currentBatchIndex = 0;
-  variantCounter = 0;
   batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
   // LTXV gestiona sus propios pasos; para common.js el flujo es siempre "completo".
   window.currentBatchMode = false;
   generationStep = 1;
   firstPromptId = null;
+  job.currentVariantIndex = null;
+  // Limpiamos tiempos de jobs anteriores para evitar confusión visual.
+  $("time1").textContent = "";
+  $("time1").classList.remove("live");
+  $("time2").textContent = "";
+  $("time2").classList.remove("live");
   setRun("busy", `Job en cola · ${job.firstPassOnly ? "1er pase" : "completo"} · ${job.batchSize} flujo(s)...`);
   $("btnFirstPass").disabled=true;
   $("btnFull").disabled=true;
