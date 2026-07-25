@@ -144,10 +144,14 @@ function connectSocket() {
     socket = new WebSocket(url);
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
+        // ComfyUI sends some frames as binary Blobs (e.g. progress previews).
+        // Ignore them instead of closing the socket.
+        if(event.data instanceof Blob){
+          return;
+        }
         let msg;
         try { msg = JSON.parse(event.data); } catch(e) {
-            console.warn("WS mensaje no-JSON, cerrando:", event.data.slice(0,80));
-            socket.close();
+            console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
             return;
         }
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);

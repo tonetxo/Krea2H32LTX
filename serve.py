@@ -103,64 +103,118 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     # ---- WebSocket proxy (/ws) ----
     def _ws_proxy(self):
-        """Upgrade the client connection to WebSocket and relay to backend WS."""
-        # We need raw sockets and HTTP handshake handling. http.server's handler
-        # has already parsed the request line/headers. We complete the handshake
-        # and then bridge bytes between client and backend.
+        """Upgrade the client connection to WebSocket and relay to backend WS.
+
+        Stdlib only: open a raw TCP socket to the backend, perform the WS
+        handshake ourselves (forwarding the client's Sec-WebSocket-Key so the
+        backend computes the matching Sec-WebSocket-Accept), then bridge raw
+        bytes between browser and backend until either side closes. We do not
+        parse WS framing: close-frame handling and (de)compression are
+        negotiated end-to-end between the browser and the backend.
+        """
         client = self.connection
         backend_host, backend_port = self._parse_backend_ws_host_port()
         query = self.path.split("?", 1)[1] if "?" in self.path else ""
         backend_path = "/ws" + ("?" + query if query else "")
+
+        # Connect a raw socket to the backend WS endpoint.
         try:
             backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             backend.connect((backend_host, backend_port))
         except OSError as e:
             sys.stderr.write(f"[serve] WS backend connect failed: {e}\n")
-            self.send_response(502)
-            self.end_headers()
+            try:
+                self.send_response(502)
+                self.end_headers()
+            except OSError:
+                pass
             return
 
-        # Build backend HTTP handshake request
-        headers = {
-            "Host": f"{backend_host}:{backend_port}",
-            "Upgrade": "websocket",
-            "Connection": "Upgrade",
-            "Sec-WebSocket-Key": self.headers.get("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ=="),
-            "Sec-WebSocket-Version": self.headers.get("Sec-WebSocket-Version", "13"),
-        }
-        lines = [f"GET {backend_path} HTTP/1.1"]
-        for k, v in headers.items():
-            lines.append(f"{k}: {v}")
-        lines.append("")
-        lines.append("")
-        backend.sendall("\r\n".join(lines).encode("latin-1"))
-
-        # Read backend handshake response
-        backend.settimeout(10)
-        resp_data = b""
-        while b"\r\n\r\n" not in resp_data:
-            chunk = backend.recv(4096)
-            if not chunk:
-                break
-            resp_data += chunk
-        backend.settimeout(None)
-        if not resp_data.startswith(b"HTTP/1.1 101"):
-            sys.stderr.write(f"[serve] WS backend handshake failed: {resp_data[:120]!r}\n")
+        # Build the upgrade request. Forward the client's Sec-WebSocket-Key
+        # verbatim so the backend's Sec-WebSocket-Accept matches what the
+        # browser expects, and forward Protocol/Extensions so subprotocol and
+        # permessage-deflate are negotiated end-to-end.
+        ws_key = self.headers.get("Sec-WebSocket-Key") or "dGhlIHNhbXBsZSBub25jZQ=="
+        ws_version = self.headers.get("Sec-WebSocket-Version", "13")
+        ws_protocol = self.headers.get("Sec-WebSocket-Protocol")
+        ws_extensions = self.headers.get("Sec-WebSocket-Extensions")
+        req_lines = [
+            f"GET {backend_path} HTTP/1.1",
+            f"Host: {backend_host}:{backend_port}",
+            "Upgrade: websocket",
+            "Connection: Upgrade",
+            f"Sec-WebSocket-Key: {ws_key}",
+            f"Sec-WebSocket-Version: {ws_version}",
+        ]
+        if ws_protocol:
+            req_lines.append(f"Sec-WebSocket-Protocol: {ws_protocol}")
+        if ws_extensions:
+            req_lines.append(f"Sec-WebSocket-Extensions: {ws_extensions}")
+        req_lines.append("")
+        req_lines.append("")
+        try:
+            backend.sendall("\r\n".join(req_lines).encode("latin-1"))
+        except OSError as e:
+            sys.stderr.write(f"[serve] WS backend send handshake failed: {e}\n")
             backend.close()
-            self.send_response(502)
-            self.end_headers()
             return
 
-        # Forward backend handshake to client verbatim (includes correct
-        # Sec-WebSocket-Accept) and switch to raw socket bridge.
-        client.sendall(resp_data)
-        client.settimeout(None)
+        # Read the backend's 101 Switching Protocols response (headers only,
+        # but keep any trailing bytes that may be the start of a WS frame).
+        backend.settimeout(10)
+        resp = b""
+        try:
+            while b"\r\n\r\n" not in resp:
+                chunk = backend.recv(4096)
+                if not chunk:
+                    break
+                resp += chunk
+        except socket.timeout:
+            sys.stderr.write("[serve] WS backend handshake timed out\n")
+            backend.close()
+            return
+        finally:
+            backend.settimeout(None)
+
+        if not resp.startswith(b"HTTP/1.1 101"):
+            sys.stderr.write(f"[serve] WS backend handshake failed: {resp[:120]!r}\n")
+            backend.close()
+            try:
+                self.send_response(502)
+                self.end_headers()
+            except OSError:
+                pass
+            return
+
+        # Split the 101 headers from any piggybacked WS frame bytes.
+        sep = resp.find(b"\r\n\r\n") + 4
+        handshake = resp[:sep]
+        leftover = resp[sep:]
+
+        # Forward the 101 verbatim to the browser (correct Sec-WebSocket-Accept).
+        # From here on we bypass http.server's response machinery.
+        try:
+            client.sendall(handshake)
+        except OSError as e:
+            sys.stderr.write(f"[serve] WS client send handshake failed: {e}\n")
+            backend.close()
+            return
+
+        if leftover:
+            try:
+                client.sendall(leftover)
+            except OSError:
+                pass
+
+        # Tell http.server we've taken over the socket; do not handle another
+        # request on it.
         self.close_connection = True
 
-        # Bridge bytes between client and backend.
+        # Bidirectional raw byte bridge until either side closes.
+        socks = [client, backend]
         try:
             while True:
-                readable, _, _ = select.select([client, backend], [], [], 60)
+                readable, _, _ = select.select(socks, [], [], 60.0)
                 if not readable:
                     continue
                 for s in readable:
@@ -170,19 +224,17 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     except OSError:
                         data = b""
                     if not data:
-                        raise StopIteration
-                    other.sendall(data)
-        except (StopIteration, OSError, ValueError):
-            pass
+                        return
+                    try:
+                        other.sendall(data)
+                    except OSError:
+                        return
         finally:
-            try:
-                backend.close()
-            except OSError:
-                pass
-            try:
-                client.close()
-            except OSError:
-                pass
+            for s in (backend, client):
+                try:
+                    s.close()
+                except OSError:
+                    pass
 
     def _parse_backend_ws_host_port(self):
         """Return (host, port) for the backend WebSocket from BACKEND URL."""

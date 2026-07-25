@@ -844,13 +844,20 @@ function connectSocket() {
     socket = new WebSocket(url);
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
+        // ComfyUI sends some frames as binary Blobs (e.g. progress previews).
+        // Ignore them instead of closing the socket.
+        if(event.data instanceof Blob){
+          return;
+        }
         let msg;
         try { msg = JSON.parse(event.data); } catch(e) {
-            console.warn("WS mensaje no-JSON, cerrando:", event.data.slice(0,80));
-            socket.close();
+            console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
             return;
         }
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
+        if(msg.type === 'executed' && CONFIG.onNodeExecuted){
+          try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
+        }
         if(msg.type === 'execution_error') {
             const pid = msg.data && msg.data.prompt_id;
             log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
@@ -929,8 +936,10 @@ async function handlePromptDone(promptId) {
     const clientResult = stopTimer(promptId);
     const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
                    (clientResult ? fmtMs(clientResult.total) : null);
+    const t1 = (timings && timings.t1 != null) ? fmtMs(timings.t1) : null;
+    const t2 = (timings && timings.t2 != null) ? fmtMs(timings.t2) : null;
 
-    const displayResult = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
+    const displayResult = await CONFIG.displayResult(entry, realSeed, tTotal, promptId, { t1, t2 });
     const skipFinalize = displayResult === true || (displayResult && displayResult.skipFinalize === true);
     const foundOutput = !(displayResult && displayResult.foundOutput === false);
 
