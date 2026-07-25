@@ -142,6 +142,17 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .modal-actions button{min-width:100px;flex:0;}
 @keyframes seedFlash{0%{background-color:var(--panel-2);border-color:var(--border);}50%{background-color:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 10px var(--accent);}100%{background-color:var(--panel-2);border-color:var(--border);}}
 .seed-updated{animation:seedFlash 1.5s ease-out;}
+
+/* Drag hacia fuera: cursor de agarrar en medios arrastrables */
+[draggable="true"]{cursor:grab;}
+[draggable="true"]:active{cursor:grabbing;}
+/* Los <video> ya tienen controles; el cursor grab solo en el borde */
+video[draggable="true"]{cursor:grab;}
+video[draggable="true"]:active{cursor:grabbing;}
+/* Las tarjetas de galería/variantes ya tienen cursor:pointer; mantenemos pointer
+   y dejamos que el navegador muestre el ghost de arrastre. */
+.variant-card[draggable="true"],.gallery-item[draggable="true"]{cursor:grab;}
+.variant-card[draggable="true"]:active,.gallery-item[draggable="true"]:active{cursor:grabbing;}
 /* ============================================================
    krea2.css — CSS específico de Krea2 (generar_krea2.py)
    ============================================================ */
@@ -158,6 +169,8 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .img-wrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:#000;min-height:120px;max-height:45vh;display:flex;align-items:center;justify-content:center;}
 .img-wrap:active{cursor:grabbing;}
 .img-wrap img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;}
+.img-wrap img[draggable="true"]{-webkit-user-drag:element;pointer-events:auto;cursor:grab;}
+.img-wrap img[draggable="true"]:active{cursor:grabbing;}
 .img-wrap:fullscreen, .img-wrap:-webkit-full-screen{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;background:#000;border-radius:0;display:flex;align-items:center;justify-content:center;padding:0;margin:0;z-index:99999;}
 .img-wrap:fullscreen img, .img-wrap:-webkit-full-screen img{max-width:100vw!important;max-height:100vh!important;width:auto!important;height:auto!important;object-fit:contain!important;display:block;}
 
@@ -244,8 +257,8 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
             <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
           </div>
           <div class="enhancer-row">
-            <label>Previsualización LTX2 <span class="hint">(sin ejecutar)</span></label>
-            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="El prompt final (Ollama + LTX2) aparecerá aquí tras pulsar Mejorar prompt..."></textarea>
+            <label>Cadena Ollama + LTX2 <span class="hint">(comparativa)</span></label>
+            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt de Ollama y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
           </div>
           <div class="enhancer-row">
             <label>Resultado Ollama</label>
@@ -334,7 +347,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
         </div>
         <div class="empty" id="empty1">sin generar</div>
         <div class="img-wrap" id="imgWrap">
-          <img class="output" id="outputImg" style="display:none">
+          <img class="output" id="outputImg" style="display:none" draggable="true">
         </div>
         <div class="img-footer">
           <span class="time-tag" id="time1"></span>
@@ -358,7 +371,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
           <div class="ph" id="refPlaceholder" style="flex:1;min-width:120px;font-size:10.5px;color:var(--muted-2);padding:0;text-align:left;">arrastra imagen o clic en Navegar</div>
         </div>
         <div class="img-wrap" id="refWrap" style="display:none;background:var(--panel-2);margin-top:10px;">
-          <img id="refImg" style="display:none;width:100%;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;">
+          <img id="refImg" style="display:none;width:100%;height:auto;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true">
         </div>
         <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
         <div class="ref-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -683,7 +696,7 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-int4_convrot.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b-nvfp4.safetensors", "flux-2-klein-9b.safetensors", "krea2_raw_int8_convrot.safetensors", "krea2_turbo_convrot_int4_fast.safetensors", "krea2_turbo_fp8_scaled.safetensors", "krea2_turbo_int4_tensorwise_mixed.safetensors"];
-const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
+const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "GalKrea.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
 const LTXV_UI_PORT = "8000";
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
 //
@@ -1630,6 +1643,9 @@ function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, s
     card.addEventListener("mousemove", (e) => positionVariantTooltip(e));
   }
 
+  // Hacer la tarjeta arrastrable hacia fuera (otra UI, escritorio, etc.).
+  makeCardDraggable(card);
+
   grid.appendChild(card);
   return card;
 }
@@ -1940,6 +1956,117 @@ function initCommon(){
           connectSocket();
           log("Conexión OK","l-ok");
       }catch(err){setConn("bad","sin conexión");log("Error: "+err.message,"l-err");}
+  });
+}
+
+// --- DRAG HACIA FUERA (drag-out) ---
+// Permite arrastrar medios mostrados (vídeos/imágenes) hacia otras ventanas
+// (LTXV ↔ Krea2) o hacia el sistema operativo (escritorio, otras apps).
+//
+// - En dragstart: establece text/uri-list (URL del backend), DownloadURL
+//   (para arrastrar al filesystem como descarga) y application/x-ltxv-media
+//   (JSON con {filename, subfolder, type} para drag entre las dos UIs).
+// - En drop: si no hay archivos del OS pero hay text/uri-list o el MIME
+//   custom, hace fetch de la URL y llama al handler de archivo del destino.
+
+const LTXV_MEDIA_MIME = "application/x-ltxv-media";
+
+// Registra un elemento <video>/<img> como fuente arrastrable.
+// `getMedia` debe devolver un objeto {filename, subfolder, type} o null.
+function makeDragSource(el, getMedia){
+  if(!el) return;
+  el.addEventListener("dragstart", (e) => {
+    const media = getMedia();
+    if(!media || !media.filename) { e.preventDefault(); return; }
+    const url = mediaViewUrl(media, { anchor: "" });
+    const display = media.filename || "media";
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.setData("text/plain", url);
+    e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+    // DownloadURL permite arrastrar al escritorio como archivo descargado.
+    // El navegador exige el formato: mime:filename:URL
+    const isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(media.filename);
+    const mime = isVideo ? "video/mp4" : "image/png";
+    e.dataTransfer.setData("DownloadURL", `${mime}:${display}:${url}`);
+  });
+}
+
+// Registra una tarjeta (.variant-card / .gallery-item) como fuente arrastrable.
+// Lee los datos del dataset del card.
+function makeCardDraggable(card){
+  if(!card) return;
+  card.setAttribute("draggable", "true");
+  card.addEventListener("dragstart", (e) => {
+    const media = {
+      filename: card.dataset.filename,
+      subfolder: card.dataset.subfolder || "",
+      type: card.dataset.type || "output",
+    };
+    if(!media.filename){ e.preventDefault(); return; }
+    const url = mediaViewUrl(media, { anchor: card.dataset.slot ? "" : "#t=0.1" });
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.setData("text/plain", url);
+    e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+    const isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(media.filename);
+    const mime = isVideo ? "video/mp4" : "image/png";
+    e.dataTransfer.setData("DownloadURL", `${mime}:${media.filename}:${url}`);
+  });
+}
+
+// Habilita un dropzone para aceptar drag entre UIs (no solo archivos del OS).
+// `onFile(file, filename)` se llama con un File descargado desde la URL arrastrada.
+// El dropzone ya debe tener sus listeners de drop para archivos del OS; este
+// helper añade lógica para leer text/uri-list o el MIME custom cuando no hay
+// files en dataTransfer.
+function enableInterUIDrop(el, onFile){
+  if(!el) return;
+  el.addEventListener("dragover", (e) => {
+    // Permitir drop de URLs (no solo archivos)
+    if(!e.dataTransfer.types.includes("Files")){
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  });
+  el.addEventListener("drop", async (e) => {
+    // Si hay archivos del OS, los maneja el listener existente.
+    if(e.dataTransfer.files && e.dataTransfer.files.length > 0) return;
+    // Si no hay archivos, intentamos leer una URL arrastrada desde otra UI.
+    const custom = e.dataTransfer.getData(LTXV_MEDIA_MIME);
+    const uri = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+    if(!uri && !custom) return;
+    e.preventDefault();
+    e.stopPropagation();
+    let media;
+    if(custom){
+      try { media = JSON.parse(custom); } catch(_){ media = null; }
+    }
+    // Caso 1: el medio trae un dataURL embebido (historial IndexedDB de Krea2).
+    // Lo convertimos directamente a File sin pasar por la red.
+    if(media && media._dataUrl && media._dataUrl.startsWith("data:")){
+      try {
+        const r = await fetch(media._dataUrl);
+        const blob = await r.blob();
+        const filename = media.filename || "dragged_media.png";
+        const file = new File([blob], filename, { type: blob.type || "image/png" });
+        onFile(file, filename);
+        return;
+      } catch(err){ log("❌ No se pudo cargar el medio arrastrado: "+err.message, "l-err"); return; }
+    }
+    // Caso 2: URL del backend (http). Descargamos y convertimos a File.
+    const url = uri || (media ? mediaViewUrl(media, { anchor: "" }) : null);
+    if(!url) return;
+    try {
+      const r = await fetch(url);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const blob = await r.blob();
+      const filename = (media && media.filename) || url.split("/").pop().split("?")[0] || "dragged_media";
+      const file = new File([blob], filename, { type: blob.type || (media && /\.(mp4|webm|mov)$/i.test(media.filename) ? "video/mp4" : "image/png") });
+      onFile(file, filename);
+    } catch(err){
+      log("❌ No se pudo cargar el medio arrastrado: "+err.message, "l-err");
+    }
   });
 }
 // krea2.js — Krea2-specific JavaScript.
@@ -2646,6 +2773,31 @@ async function renderGallery(){
       document.querySelectorAll(".gallery-item").forEach(i => i.classList.remove("selected"));
       div.classList.add("selected");
     });
+
+    // Arrastrar hacia fuera: las imágenes del historial viven en IndexedDB
+    // como base64, así que usamos el dataURL directamente. Para arrastrar a
+    // LTXV necesitamos un File; lo creamos al vuelo en dragstart si el
+    // navegador lo permite, o pasamos la URL para que el destino haga fetch.
+    div.setAttribute("draggable", "true");
+    div.addEventListener("dragstart", (e) => {
+      const dataUrl = item.full || item.thumb;
+      if(!dataUrl){ e.preventDefault(); return; }
+      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData("text/uri-list", dataUrl);
+      e.dataTransfer.setData("text/plain", dataUrl);
+      // Las imágenes del historial no tienen filename del backend; inventamos
+      // uno para el DownloadURL y para el MIME custom.
+      const fakeName = `krea2_history_${item.hash || Date.now()}.png`;
+      e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify({
+        filename: fakeName,
+        subfolder: "",
+        type: "input",
+        _dataUrl: dataUrl,
+      }));
+      // DownloadURL no funciona con dataURLs (>2KB), pero lo intentamos por si
+      // la imagen es pequeña; el navegador lo ignorará silenciosamente si no.
+      try { e.dataTransfer.setData("DownloadURL", `image/png:${fakeName}:${dataUrl}`); } catch(_){}
+    });
     grid.appendChild(div);
   });
 }
@@ -3248,6 +3400,45 @@ $("btnEvolveUse")?.addEventListener("click", () => {
     log("✏️ Prompt actualizado con la variante #1", "l-ok");
   }
 });
+
+// --- DRAG HACIA FUERA (Krea2) ---
+// Imagen final e imagen de referencia: arrastrables hacia LTXV (dropzone de
+// entrada), otra pestaña, o el escritorio.
+makeDragSource($("outputImg"), () => currentOutputMedia || null);
+// #refImg tiene pointer-events:none (para zoom/pan), así que escuchamos en
+// #refWrap que sí recibe eventos.
+$("refWrap")?.addEventListener("dragstart", (e) => {
+  const src = $("refImg")?.src;
+  if(!src){ e.preventDefault(); return; }
+  // Intentar extraer filename/subfolder/type de la query string del backend.
+  let media = null;
+  try {
+    const u = new URL(src);
+    const filename = u.searchParams.get("filename");
+    if(filename){
+      media = {
+        filename,
+        subfolder: u.searchParams.get("subfolder") || "",
+        type: u.searchParams.get("type") || "output",
+      };
+    }
+  } catch(_){}
+  if(!media){ e.preventDefault(); return; }
+  const url = mediaViewUrl(media, { anchor: "" });
+  e.dataTransfer.effectAllowed = "copy";
+  e.dataTransfer.setData("text/uri-list", url);
+  e.dataTransfer.setData("text/plain", url);
+  e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+  const isVideo = /\.(mp4|webm|mov|mkv|avi)$/i.test(media.filename);
+  const mime = isVideo ? "video/mp4" : "image/png";
+  e.dataTransfer.setData("DownloadURL", `${mime}:${media.filename}:${url}`);
+});
+
+// Dropzone de referencia de Krea2: aceptar drag desde LTXV (vídeo frame o
+// imagen de entrada) o desde el historial de LTXV. Si no hay archivos del OS,
+// descargamos la URL arrastrada y la cargamos como referencia.
+enableInterUIDrop($("refDropzone"), (file, filename) => handleRefFile(file));
+enableInterUIDrop($("refWrap"), (file, filename) => handleRefFile(file));
 </script>
 </body>
 </html>

@@ -6,8 +6,7 @@ reach the backend through the same port 8000 (no extra firewall
 rules, no CORS issues).
 
 Backend routes proxied:
-  /system_stats, /prompt, /history/*, /view, /upload/image
-  /ws -> returns 426 (pollFallback handles it)
+  /system_stats, /prompt, /history/*, /view, /upload/image, /ws
 
 Custom routes:
   /api/krea2_list -> lists PNGs in KREA2_OUTPUT_DIR (default: ComfyUI/output/krea2)
@@ -21,6 +20,8 @@ import glob
 import http.server
 import json
 import os
+import select
+import socket
 import socketserver
 import sys
 import time
@@ -100,54 +101,96 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         sys.stderr.write("[serve] " + (format % args) + "\n")
 
-    # ---- dispatch ----
-    def do_GET(self):
-        if self._is_ws():
-            self._ws_reject()
-        elif self._is_krea2_list():
-            self._do_krea2_list()
-        elif self._is_ltxv_list():
-            self._do_ltxv_list()
-        elif self._is_ollama_route():
-            self._proxy("GET", OLLAMA)
-        elif self._is_proxy_route():
-            self._proxy("GET", BACKEND)
-        else:
-            super().do_GET()
+    # ---- WebSocket proxy (/ws) ----
+    def _ws_proxy(self):
+        """Upgrade the client connection to WebSocket and relay to backend WS."""
+        # We need raw sockets and HTTP handshake handling. http.server's handler
+        # has already parsed the request line/headers. We complete the handshake
+        # and then bridge bytes between client and backend.
+        client = self.connection
+        backend_host, backend_port = self._parse_backend_ws_host_port()
+        query = self.path.split("?", 1)[1] if "?" in self.path else ""
+        backend_path = "/ws" + ("?" + query if query else "")
+        try:
+            backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            backend.connect((backend_host, backend_port))
+        except OSError as e:
+            sys.stderr.write(f"[serve] WS backend connect failed: {e}\n")
+            self.send_response(502)
+            self.end_headers()
+            return
 
-    def do_POST(self):
-        if self._is_ws():
-            self._ws_reject()
-        elif self._is_krea2_list():
-            self._send_json(405, {"error": "method not allowed"})
-        elif self._is_ltxv_list():
-            self._send_json(405, {"error": "method not allowed"})
-        elif self._is_file_delete():
-            self._do_file_delete()
-        elif self._is_krea2_upload():
-            self._do_krea2_upload()
-        elif self._is_ollama_route():
-            self._proxy("POST", OLLAMA)
-        elif self._is_proxy_route():
-            self._proxy("POST", BACKEND)
-        else:
-            self.send_error(405, "Method Not Allowed")
+        # Build backend HTTP handshake request
+        headers = {
+            "Host": f"{backend_host}:{backend_port}",
+            "Upgrade": "websocket",
+            "Connection": "Upgrade",
+            "Sec-WebSocket-Key": self.headers.get("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ=="),
+            "Sec-WebSocket-Version": self.headers.get("Sec-WebSocket-Version", "13"),
+        }
+        lines = [f"GET {backend_path} HTTP/1.1"]
+        for k, v in headers.items():
+            lines.append(f"{k}: {v}")
+        lines.append("")
+        lines.append("")
+        backend.sendall("\r\n".join(lines).encode("latin-1"))
 
-    def do_OPTIONS(self):
-        if self._is_ws():
-            self._ws_reject()
-        elif self._is_ollama_route():
-            # Ollama rechaza preflight CORS desde orígenes no-localhost con 403.
-            # Respondemos nosotros con los headers CORS correctos para que el
-            # navegador deje pasar la POST real.
-            self._cors_preflight()
-        elif self._is_proxy_route():
-            self._proxy("OPTIONS", BACKEND)
-        elif self._is_krea2_upload() or self._is_file_delete() or self._is_krea2_list() or self._is_ltxv_list():
-            # Endpoints custom también necesitan preflight same-origin.
-            self._cors_preflight()
-        else:
-            self.send_error(405, "Method Not Allowed")
+        # Read backend handshake response
+        backend.settimeout(10)
+        resp_data = b""
+        while b"\r\n\r\n" not in resp_data:
+            chunk = backend.recv(4096)
+            if not chunk:
+                break
+            resp_data += chunk
+        backend.settimeout(None)
+        if not resp_data.startswith(b"HTTP/1.1 101"):
+            sys.stderr.write(f"[serve] WS backend handshake failed: {resp_data[:120]!r}\n")
+            backend.close()
+            self.send_response(502)
+            self.end_headers()
+            return
+
+        # Forward backend handshake to client verbatim (includes correct
+        # Sec-WebSocket-Accept) and switch to raw socket bridge.
+        client.sendall(resp_data)
+        client.settimeout(None)
+        self.close_connection = True
+
+        # Bridge bytes between client and backend.
+        try:
+            while True:
+                readable, _, _ = select.select([client, backend], [], [], 60)
+                if not readable:
+                    continue
+                for s in readable:
+                    other = backend if s is client else client
+                    try:
+                        data = s.recv(65536)
+                    except OSError:
+                        data = b""
+                    if not data:
+                        raise StopIteration
+                    other.sendall(data)
+        except (StopIteration, OSError, ValueError):
+            pass
+        finally:
+            try:
+                backend.close()
+            except OSError:
+                pass
+            try:
+                client.close()
+            except OSError:
+                pass
+
+    def _parse_backend_ws_host_port(self):
+        """Return (host, port) for the backend WebSocket from BACKEND URL."""
+        from urllib.parse import urlparse
+        parsed = urlparse(BACKEND)
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        return host, port
 
     def _allowed_origin(self):
         """Devuelve el Origin del cliente si coincide con el host de esta petición
@@ -188,7 +231,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_HEAD(self):
         if self._is_ws():
-            self._ws_reject()
+            self._ws_proxy()
         elif self._is_ollama_route():
             self._proxy("HEAD", OLLAMA)
         elif self._is_proxy_route():
@@ -323,11 +366,53 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def _is_ws(self):
         return self.path.split("?")[0].startswith(WS_PREFIX)
 
-    def _ws_reject(self):
-        self.send_response(426, "Upgrade Required")
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"WebSocket not proxied; pollFallback handles it.\n")
+    def do_GET(self):
+        if self._is_ws():
+            self._ws_proxy()
+        elif self._is_krea2_list():
+            self._do_krea2_list()
+        elif self._is_ltxv_list():
+            self._do_ltxv_list()
+        elif self._is_ollama_route():
+            self._proxy("GET", OLLAMA)
+        elif self._is_proxy_route():
+            self._proxy("GET", BACKEND)
+        else:
+            super().do_GET()
+
+    def do_POST(self):
+        if self._is_ws():
+            self._ws_proxy()
+        elif self._is_krea2_list():
+            self._send_json(405, {"error": "method not allowed"})
+        elif self._is_ltxv_list():
+            self._send_json(405, {"error": "method not allowed"})
+        elif self._is_file_delete():
+            self._do_file_delete()
+        elif self._is_krea2_upload():
+            self._do_krea2_upload()
+        elif self._is_ollama_route():
+            self._proxy("POST", OLLAMA)
+        elif self._is_proxy_route():
+            self._proxy("POST", BACKEND)
+        else:
+            self.send_error(405, "Method Not Allowed")
+
+    def do_OPTIONS(self):
+        if self._is_ws():
+            self._ws_proxy()
+        elif self._is_ollama_route():
+            # Ollama rechaza preflight CORS desde orígenes no-localhost con 403.
+            # Respondemos nosotros con los headers CORS correctos para que el
+            # navegador deje pasar la POST real.
+            self._cors_preflight()
+        elif self._is_proxy_route():
+            self._proxy("OPTIONS", BACKEND)
+        elif self._is_krea2_upload() or self._is_file_delete() or self._is_krea2_list() or self._is_ltxv_list():
+            # Endpoints custom también necesitan preflight same-origin.
+            self._cors_preflight()
+        else:
+            self.send_error(405, "Method Not Allowed")
 
     def _do_krea2_list(self):
         """List PNGs in KREA2_OUTPUT_DIR, newest first, max 50."""

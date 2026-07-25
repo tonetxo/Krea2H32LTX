@@ -151,6 +151,9 @@ function connectSocket() {
             return;
         }
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
+        if(msg.type === 'executed' && CONFIG.onNodeExecuted){
+          try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
+        }
         if(msg.type === 'execution_error') {
             const pid = msg.data && msg.data.prompt_id;
             log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
@@ -229,8 +232,10 @@ async function handlePromptDone(promptId) {
     const clientResult = stopTimer(promptId);
     const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
                    (clientResult ? fmtMs(clientResult.total) : null);
+    const t1 = (timings && timings.t1 != null) ? fmtMs(timings.t1) : null;
+    const t2 = (timings && timings.t2 != null) ? fmtMs(timings.t2) : null;
 
-    const displayResult = await CONFIG.displayResult(entry, realSeed, tTotal, promptId);
+    const displayResult = await CONFIG.displayResult(entry, realSeed, tTotal, promptId, { t1, t2 });
     const skipFinalize = displayResult === true || (displayResult && displayResult.skipFinalize === true);
     const foundOutput = !(displayResult && displayResult.foundOutput === false);
 
@@ -943,6 +948,9 @@ function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, s
     card.addEventListener("mousemove", (e) => positionVariantTooltip(e));
   }
 
+  // Hacer la tarjeta arrastrable hacia fuera (otra UI, escritorio, etc.).
+  makeCardDraggable(card);
+
   grid.appendChild(card);
   return card;
 }
@@ -1253,5 +1261,116 @@ function initCommon(){
           connectSocket();
           log("Conexión OK","l-ok");
       }catch(err){setConn("bad","sin conexión");log("Error: "+err.message,"l-err");}
+  });
+}
+
+// --- DRAG HACIA FUERA (drag-out) ---
+// Permite arrastrar medios mostrados (vídeos/imágenes) hacia otras ventanas
+// (LTXV ↔ Krea2) o hacia el sistema operativo (escritorio, otras apps).
+//
+// - En dragstart: establece text/uri-list (URL del backend), DownloadURL
+//   (para arrastrar al filesystem como descarga) y application/x-ltxv-media
+//   (JSON con {filename, subfolder, type} para drag entre las dos UIs).
+// - En drop: si no hay archivos del OS pero hay text/uri-list o el MIME
+//   custom, hace fetch de la URL y llama al handler de archivo del destino.
+
+const LTXV_MEDIA_MIME = "application/x-ltxv-media";
+
+// Registra un elemento <video>/<img> como fuente arrastrable.
+// `getMedia` debe devolver un objeto {filename, subfolder, type} o null.
+function makeDragSource(el, getMedia){
+  if(!el) return;
+  el.addEventListener("dragstart", (e) => {
+    const media = getMedia();
+    if(!media || !media.filename) { e.preventDefault(); return; }
+    const url = mediaViewUrl(media, { anchor: "" });
+    const display = media.filename || "media";
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.setData("text/plain", url);
+    e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+    // DownloadURL permite arrastrar al escritorio como archivo descargado.
+    // El navegador exige el formato: mime:filename:URL
+    const isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(media.filename);
+    const mime = isVideo ? "video/mp4" : "image/png";
+    e.dataTransfer.setData("DownloadURL", `${mime}:${display}:${url}`);
+  });
+}
+
+// Registra una tarjeta (.variant-card / .gallery-item) como fuente arrastrable.
+// Lee los datos del dataset del card.
+function makeCardDraggable(card){
+  if(!card) return;
+  card.setAttribute("draggable", "true");
+  card.addEventListener("dragstart", (e) => {
+    const media = {
+      filename: card.dataset.filename,
+      subfolder: card.dataset.subfolder || "",
+      type: card.dataset.type || "output",
+    };
+    if(!media.filename){ e.preventDefault(); return; }
+    const url = mediaViewUrl(media, { anchor: card.dataset.slot ? "" : "#t=0.1" });
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.setData("text/plain", url);
+    e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+    const isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(media.filename);
+    const mime = isVideo ? "video/mp4" : "image/png";
+    e.dataTransfer.setData("DownloadURL", `${mime}:${media.filename}:${url}`);
+  });
+}
+
+// Habilita un dropzone para aceptar drag entre UIs (no solo archivos del OS).
+// `onFile(file, filename)` se llama con un File descargado desde la URL arrastrada.
+// El dropzone ya debe tener sus listeners de drop para archivos del OS; este
+// helper añade lógica para leer text/uri-list o el MIME custom cuando no hay
+// files en dataTransfer.
+function enableInterUIDrop(el, onFile){
+  if(!el) return;
+  el.addEventListener("dragover", (e) => {
+    // Permitir drop de URLs (no solo archivos)
+    if(!e.dataTransfer.types.includes("Files")){
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  });
+  el.addEventListener("drop", async (e) => {
+    // Si hay archivos del OS, los maneja el listener existente.
+    if(e.dataTransfer.files && e.dataTransfer.files.length > 0) return;
+    // Si no hay archivos, intentamos leer una URL arrastrada desde otra UI.
+    const custom = e.dataTransfer.getData(LTXV_MEDIA_MIME);
+    const uri = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+    if(!uri && !custom) return;
+    e.preventDefault();
+    e.stopPropagation();
+    let media;
+    if(custom){
+      try { media = JSON.parse(custom); } catch(_){ media = null; }
+    }
+    // Caso 1: el medio trae un dataURL embebido (historial IndexedDB de Krea2).
+    // Lo convertimos directamente a File sin pasar por la red.
+    if(media && media._dataUrl && media._dataUrl.startsWith("data:")){
+      try {
+        const r = await fetch(media._dataUrl);
+        const blob = await r.blob();
+        const filename = media.filename || "dragged_media.png";
+        const file = new File([blob], filename, { type: blob.type || "image/png" });
+        onFile(file, filename);
+        return;
+      } catch(err){ log("❌ No se pudo cargar el medio arrastrado: "+err.message, "l-err"); return; }
+    }
+    // Caso 2: URL del backend (http). Descargamos y convertimos a File.
+    const url = uri || (media ? mediaViewUrl(media, { anchor: "" }) : null);
+    if(!url) return;
+    try {
+      const r = await fetch(url);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const blob = await r.blob();
+      const filename = (media && media.filename) || url.split("/").pop().split("?")[0] || "dragged_media";
+      const file = new File([blob], filename, { type: blob.type || (media && /\.(mp4|webm|mov)$/i.test(media.filename) ? "video/mp4" : "image/png") });
+      onFile(file, filename);
+    } catch(err){
+      log("❌ No se pudo cargar el medio arrastrado: "+err.message, "l-err");
+    }
   });
 }

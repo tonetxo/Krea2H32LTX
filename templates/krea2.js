@@ -702,6 +702,31 @@ async function renderGallery(){
       document.querySelectorAll(".gallery-item").forEach(i => i.classList.remove("selected"));
       div.classList.add("selected");
     });
+
+    // Arrastrar hacia fuera: las imágenes del historial viven en IndexedDB
+    // como base64, así que usamos el dataURL directamente. Para arrastrar a
+    // LTXV necesitamos un File; lo creamos al vuelo en dragstart si el
+    // navegador lo permite, o pasamos la URL para que el destino haga fetch.
+    div.setAttribute("draggable", "true");
+    div.addEventListener("dragstart", (e) => {
+      const dataUrl = item.full || item.thumb;
+      if(!dataUrl){ e.preventDefault(); return; }
+      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData("text/uri-list", dataUrl);
+      e.dataTransfer.setData("text/plain", dataUrl);
+      // Las imágenes del historial no tienen filename del backend; inventamos
+      // uno para el DownloadURL y para el MIME custom.
+      const fakeName = `krea2_history_${item.hash || Date.now()}.png`;
+      e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify({
+        filename: fakeName,
+        subfolder: "",
+        type: "input",
+        _dataUrl: dataUrl,
+      }));
+      // DownloadURL no funciona con dataURLs (>2KB), pero lo intentamos por si
+      // la imagen es pequeña; el navegador lo ignorará silenciosamente si no.
+      try { e.dataTransfer.setData("DownloadURL", `image/png:${fakeName}:${dataUrl}`); } catch(_){}
+    });
     grid.appendChild(div);
   });
 }
@@ -1304,3 +1329,42 @@ $("btnEvolveUse")?.addEventListener("click", () => {
     log("✏️ Prompt actualizado con la variante #1", "l-ok");
   }
 });
+
+// --- DRAG HACIA FUERA (Krea2) ---
+// Imagen final e imagen de referencia: arrastrables hacia LTXV (dropzone de
+// entrada), otra pestaña, o el escritorio.
+makeDragSource($("outputImg"), () => currentOutputMedia || null);
+// #refImg tiene pointer-events:none (para zoom/pan), así que escuchamos en
+// #refWrap que sí recibe eventos.
+$("refWrap")?.addEventListener("dragstart", (e) => {
+  const src = $("refImg")?.src;
+  if(!src){ e.preventDefault(); return; }
+  // Intentar extraer filename/subfolder/type de la query string del backend.
+  let media = null;
+  try {
+    const u = new URL(src);
+    const filename = u.searchParams.get("filename");
+    if(filename){
+      media = {
+        filename,
+        subfolder: u.searchParams.get("subfolder") || "",
+        type: u.searchParams.get("type") || "output",
+      };
+    }
+  } catch(_){}
+  if(!media){ e.preventDefault(); return; }
+  const url = mediaViewUrl(media, { anchor: "" });
+  e.dataTransfer.effectAllowed = "copy";
+  e.dataTransfer.setData("text/uri-list", url);
+  e.dataTransfer.setData("text/plain", url);
+  e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+  const isVideo = /\.(mp4|webm|mov|mkv|avi)$/i.test(media.filename);
+  const mime = isVideo ? "video/mp4" : "image/png";
+  e.dataTransfer.setData("DownloadURL", `${mime}:${media.filename}:${url}`);
+});
+
+// Dropzone de referencia de Krea2: aceptar drag desde LTXV (vídeo frame o
+// imagen de entrada) o desde el historial de LTXV. Si no hay archivos del OS,
+// descargamos la URL arrastrada y la cargamos como referencia.
+enableInterUIDrop($("refDropzone"), (file, filename) => handleRefFile(file));
+enableInterUIDrop($("refWrap"), (file, filename) => handleRefFile(file));

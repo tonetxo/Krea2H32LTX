@@ -41,6 +41,14 @@ const LTX2_CHAIN_LTX2 = "ltx2";
 const LTX2_CHAIN_BOTH = "both";
 let finalVariantIndex = null;
 let promptSteps = {};
+// Mapa prompt_id -> índice de variante, para que tanto WS como fallback
+// sepan a qué variante pertenece cada resultado.
+let promptVariantMap = {};
+// Set para evitar duplicados en la galería: clave = filename|subfolder|slot.
+const displayedGalleryFiles = new Set();
+// Slots ya mostrados en vivo por prompt_id (evita que displayResult vuelva a
+// machacar el reproductor y el tiempo cuando llega el fallback).
+const displayedSlots = {};
 const BITDEPTH_KEY = "ltxv_bit_depth";
 // Exposed for common.js WS error handler.
 window.currentBatchMode = false;
@@ -99,8 +107,93 @@ CONFIG.renderVariantMedia = function(card, url, media){
   return { title: "Parámetros LTXV", rows, loras: lorasMeta };
 };
 CONFIG.onSeedUpdate = updateSeedUI;
+// Recibe eventos `executed` del WebSocket por cada nodo que completa. En modo
+// "full" (1er + final en un solo grafo) no hay un segundo prompt_id, así que
+// aprovechamos estos eventos para mostrar el 1er pase en cuanto esté listo y
+// mover el timer al slot 2 para que cuente solo el tiempo del 2º pase.
+function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true } = {}){
+  if(!media || !media.filename) return;
+  const varIndex = promptVariantMap[promptId] != null
+    ? promptVariantMap[promptId]
+    : (activeJob?.currentVariantIndex != null ? activeJob.currentVariantIndex : (variantCounter + 1));
+  const key = `${media.filename}|${media.subfolder || ""}|${slot}`;
+  const isNewGallery = !displayedGalleryFiles.has(key);
+
+  if(allowShow){
+    showVideo(slot, media, { variantIndex: varIndex });
+  }
+  if(isNewGallery){
+    displayedGalleryFiles.add(key);
+    addToVariantGallery(media, pendingSeeds[promptId] ?? null, timeText || "", slot, varIndex);
+  }
+}
+
+CONFIG.onNodeExecuted = function(data){
+  if(!data || !data.node || !data.prompt_id) return;
+  const pid = data.prompt_id;
+  // Solo nos interesan los save nodes del job activo en modo full.
+  const job = activeJob;
+  if(!job || job.firstPassOnly) return;
+  if(!(pid in pendingSeeds)) return;
+  const realSeed = pendingSeeds[pid];
+
+  // FIRST_SAVE (923): el 1er pase está listo. Lo mostramos, registramos su
+  // tiempo y movemos el timer al slot 2 para contar solo el 2º pase.
+  if(data.node === N.FIRST_SAVE && data.output){
+    const media = CONFIG.findMedia(data.output);
+    if(media){
+      if(!displayedSlots[pid]) displayedSlots[pid] = new Set();
+      const isFirstLive = !displayedSlots[pid].has(1);
+      if(isFirstLive){
+        displayedSlots[pid].add(1);
+        const t = timers[pid];
+        if(t){
+          const elapsed = Date.now() - t.start;
+          const el1 = $("time1");
+          if(el1){ el1.textContent = `⏱ 1er ${fmtMs(elapsed)}`; el1.classList.remove("live"); }
+          // Reiniciar el timer en el slot 2 para contar solo el 2º pase.
+          clearInterval(t.iv);
+          t.start = Date.now();
+          const el2 = $("time2");
+          t.iv = setInterval(() => {
+            if(!timers[pid]) return;
+            const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
+            if(el2){ el2.textContent = live; el2.classList.add("live"); }
+          }, 500);
+        }
+        log(`✅ 1er pase listo (esperando 2º pase)...`, "l-ok");
+      }
+      // Si ya se había mostrado por fallback, no volvemos a cambiar el reproductor;
+      // solo aseguramos la tarjeta de galería.
+      displayVariantMedia(media, 1, pid, "", { allowShow: isFirstLive });
+    }
+  }
+
+  // FINAL_SAVE (920): el 2º pase está listo. Lo mostramos y detenemos el timer.
+  if(data.node === N.FINAL_SAVE && data.output){
+    const media = CONFIG.findMedia(data.output);
+    if(media){
+      if(!displayedSlots[pid]) displayedSlots[pid] = new Set();
+      const isFinalLive = !displayedSlots[pid].has(2);
+      if(isFinalLive){
+        displayedSlots[pid].add(2);
+        const t = timers[pid];
+        if(t){
+          const elapsed = Date.now() - t.start;
+          const el2 = $("time2");
+          if(el2){ el2.textContent = `⏱ final ${fmtMs(elapsed)}`; el2.classList.remove("live"); }
+        }
+        log(`✅ 2º pase listo.`, "l-ok");
+      }
+      displayVariantMedia(media, 2, pid, "", { allowShow: isFinalLive });
+    }
+  }
+};
 CONFIG.onPromptError = function(pid){
   delete promptSteps[pid];
+  delete pendingSeeds[pid];
+  delete promptVariantMap[pid];
+  delete displayedSlots[pid];
   if(generationStep === 1) generationStep = 0;
   finishCurrentJob();
 };
@@ -122,10 +215,10 @@ CONFIG.onBatchComplete = function(){
 };
 CONFIG.onStopCurrent = function(pid){
   delete promptSteps[pid];
-  if(generationStep === 1){
-    generationStep = 0;
-    if(firstPromptId) handledPrompts.add(firstPromptId);
-  }
+  delete pendingSeeds[pid];
+  delete promptVariantMap[pid];
+  delete displayedSlots[pid];
+  generationStep = 0;
   finishCurrentJob();
 };
 CONFIG.onStopAll = function(){
@@ -134,6 +227,9 @@ CONFIG.onStopAll = function(){
   if(firstPromptId) handledPrompts.add(firstPromptId);
   for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   pendingSeeds = {};
+  promptVariantMap = {};
+  displayedGalleryFiles.clear();
+  for(const k of Object.keys(displayedSlots)) delete displayedSlots[k];
   promptSteps = {};
   processingPrompts.clear();
   currentPromptId = null;
@@ -149,7 +245,7 @@ CONFIG.onStopAll = function(){
 };
 
 // --- LTXV displayResult callback (handles step 1 -> step 2 logic) ---
-CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
+CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings){
   function paint(slot, label, value){
     const el = $("time"+slot);
     if(!el) return;
@@ -163,7 +259,6 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
   }
 
   const step = promptSteps[promptId] || "1";
-  const isStep1 = (step === "1");
   const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
   const media2 = entry.outputs[N.FINAL_SAVE] ? CONFIG.findMedia(entry.outputs[N.FINAL_SAVE]) : null;
 
@@ -179,87 +274,49 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
     }
   } catch(_){}
 
-  // LTXV gestiona su propio flujo de pasos; devolvemos true para que common.js
-  // no incremente currentBatchIndex ni llame processNextBatch.
   const job = activeJob;
   const firstPassOnly = job ? job.firstPassOnly : true;
-  const varIndex = (job && job.currentVariantIndex != null) ? job.currentVariantIndex : (variantCounter + 1);
+  const t1 = timings && timings.t1;
+  const t2 = timings && timings.t2;
+
+  if(!displayedSlots[promptId]) displayedSlots[promptId] = new Set();
+  const already1 = displayedSlots[promptId].has(1);
+  const already2 = displayedSlots[promptId].has(2);
 
   // Modo "full" (1er pase + final en un solo grafo): ComfyUI ejecuta ambos
-  // samplers dentro del mismo prompt_id y dispara un único execution_success
-  // con ambos outputs (FIRST_SAVE y FINAL_SAVE) disponibles. No hay un segundo
-  // prompt_id para el "paso 2"; debemos mostrar ambos vídeos ahora y finalizar.
-  // Si por alguna razón FINAL_SAVE aún no está disponible, devolvemos
-  // { foundOutput: false } para que pollFallback reintente la consulta.
-  const isFullGraph = !firstPassOnly && isStep1;
-  if(isFullGraph){
-    if(!media2){
-      return { foundOutput: false };
+  // samplers dentro del mismo prompt_id y dispara un único execution_success.
+  // Los vídeos se muestran incrementalmente vía onNodeExecuted (evento executed
+  // del WS) en cuanto cada save node completa. Aquí actuamos como respaldo
+  // solo si el WS no llegó a mostrar ese slot.
+  if(!firstPassOnly){
+    if(media1 && !already1){
+      displayedSlots[promptId].add(1);
+      displayVariantMedia(media1, 1, promptId, t1 || "", { allowShow: true });
+      paint(1, "1er", t1 || "—");
     }
-    if(media1){
-      showVideo(1, media1, { variantIndex: varIndex });
-      addToVariantGallery(media1, realSeed, tTotal || "", 1, varIndex);
-    }
-    showVideo(2, media2, { variantIndex: varIndex });
-    paint(2, "final", tTotal || "—");
-    addToVariantGallery(media2, realSeed, tTotal || "", 2, varIndex);
-    if(media1) paint(1, "1er", tTotal || "—");
-
-    delete promptSteps[promptId];
-    delete pendingSeeds[promptId];
-    generationStep = 0;
-    firstPromptId = null;
-    finalVariantIndex = null;
-    handledPrompts.add(promptId);
-
-    currentBatchIndex++;
-    if(job) job.currentVariantIndex = null;
-    if(currentBatchIndex < totalBatchSize){
-      log(`➡️ Iniciando flujo ${currentBatchIndex + 1}/${totalBatchSize} del job...`, "l-ok");
-      await runSingleGeneration(currentBatchIndex);
-    } else {
-      log(`🏁 Job completado (${totalBatchSize} flujo(s)).`, "l-ok");
-      finishCurrentJob();
-    }
-    return true;
-  }
-
-  // Modo "first" (solo 1er pase) o "second" (paso 2 separado en el grafo).
-  if(isStep1){
-    if(media1){
-      showVideo(1, media1, { variantIndex: varIndex });
-      paint(1, "1er", tTotal || "—");
-      addToVariantGallery(media1, realSeed, tTotal || "", 1, varIndex);
+    if(media2 && !already2){
+      displayedSlots[promptId].add(2);
+      displayVariantMedia(media2, 2, promptId, t2 || tTotal || "", { allowShow: true });
+      paint(2, "final", t2 || tTotal || "—");
     }
   } else {
-    if(media2){
-      showVideo(2, media2, { variantIndex: varIndex });
-      paint(2, "final", tTotal || "—");
-      addToVariantGallery(media2, realSeed, tTotal || "", 2, varIndex);
+    // Modo "first" (solo 1er pase).
+    if(media1 && !already1){
+      displayedSlots[promptId].add(1);
+      displayVariantMedia(media1, 1, promptId, t1 || tTotal || "", { allowShow: true });
+      paint(1, "1er", t1 || tTotal || "—");
     }
   }
 
   delete promptSteps[promptId];
-
-  // En modo completo "full" (1er + final en un solo grafo) el paso 1 no inicia
-  // un segundo prompt; el mismo grafo genera ambos videos. Aquí sólo marcamos
-  // que ya no estamos en paso 1 y dejamos que la ejecución continúe.
-  if(isStep1 && !firstPassOnly){
-    log(`➡️ Paso 1 completado dentro del grafo completo, esperando paso 2...`, "l-ok");
-    generationStep = 2;
-    delete pendingSeeds[promptId];
-    handledPrompts.add(promptId);
-    return true;
-  }
-
-  // Fin de un flujo completo (paso 1 en modo solo-1er-pase, o paso 2 en modo completo).
   delete pendingSeeds[promptId];
+  delete promptVariantMap[promptId];
+  delete displayedSlots[promptId];
   generationStep = 0;
   firstPromptId = null;
   finalVariantIndex = null;
   handledPrompts.add(promptId);
 
-  // Avanzamos al siguiente flujo del job actual, o terminamos el job.
   currentBatchIndex++;
   if(job) job.currentVariantIndex = null;
   if(currentBatchIndex < totalBatchSize){
@@ -1143,14 +1200,6 @@ function buildGraph(mode){
     if(g[N.CREATE_VIDEO_2]) delete g[N.CREATE_VIDEO_2]; // 919
     if(g[N.REFERENCE_2]) delete g[N.REFERENCE_2]; // 870
   }
-  else if(mode === "second"){
-    delete g[N.FIRST_SAVE];
-    // Desconectar la rama del primer sampler; el segundo reutiliza el resultado
-    // del primero a través del grafo del backend si se envía junto.
-    if(g[N.SAMPLER_1]) delete g[N.SAMPLER_1]; // 888
-    if(g[N.CREATE_VIDEO_1]) delete g[N.CREATE_VIDEO_1]; // 922
-    if(g[N.REFERENCE_1]) delete g[N.REFERENCE_1]; // 860
-  }
   else if(mode === "ltx2preview"){
     // Grafo mnimo solo para generar el prompt con TextGenerateLTX2Prompt.
     // Preservamos la cadena de modelo real (checkpoint + sage + reference enable)
@@ -1567,6 +1616,7 @@ async function loadVideoHistory(){
         card.dataset.filename = item.filename;
         card.dataset.subfolder = item.subfolder;
         card.dataset.type = item.type;
+        makeCardDraggable(card);
 
         card.addEventListener("click", () => {
           const slot = item.filename.includes("_prev") ? 1 : 2;
@@ -1645,17 +1695,11 @@ async function loadVideoHistory(){
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
     try {
-        const isStep2 = (generationStep === 2);
-        const mode = isStep2 ? "second" : (activeJob ? (activeJob.firstPassOnly ? "first" : "full") : "first");
+        const mode = activeJob ? (activeJob.firstPassOnly ? "first" : "full") : "first";
         const graph = buildGraph(mode);
-        let seedUsed;
-        if(isStep2 && firstPromptId && pendingSeeds[firstPromptId] != null){
-            seedUsed = pendingSeeds[firstPromptId];
-        } else {
-            const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
-            const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
-            seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
-        }
+        const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
+        const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
+        const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
         graph[N.SEED].inputs.seed = seedUsed;
 
         // Reservamos un índice de variante global al inicio de cada flujo nuevo.
@@ -1665,7 +1709,7 @@ async function runSingleGeneration(index) {
         }
         const varIndex = activeJob?.currentVariantIndex || (variantCounter + 1);
 
-        const stepLabel = isStep2 ? `paso 2/2 · Var ${varIndex}` : (activeJob?.firstPassOnly ? `1er pase · Var ${varIndex}` : `paso 1+2 · Var ${varIndex}`);
+        const stepLabel = (activeJob?.firstPassOnly ? `1er pase · Var ${varIndex}` : `paso 1+2 · Var ${varIndex}`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
@@ -1679,15 +1723,13 @@ async function runSingleGeneration(index) {
         if(data.error) throw new Error(JSON.stringify(data.error));
 
         pendingSeeds[data.prompt_id] = seedUsed;
+        promptVariantMap[data.prompt_id] = varIndex;
         currentPromptId = data.prompt_id;
-        promptSteps[data.prompt_id] = isStep2 ? "2" : "1";
-        if(!isStep2 && generationStep === 1){
-            firstPromptId = data.prompt_id;
-        }
-        // En modo "full" mostramos el timer en el slot 2 (final); el preview del 1er pase
-        // sale como resultado intermedio pero no tiene timer propio.
-        const timerSlot = (mode === "full") ? 2 : (isStep2 ? 2 : 1);
-        startTimer(data.prompt_id, timerSlot);
+        promptSteps[data.prompt_id] = "1";
+        // En modo "full" el timer va en el slot 1 (1er pase) y al final
+        // displayResult repartirá los tiempos: t1 en slot 1, t2 en slot 2.
+        // En modo "first" el timer también va en el slot 1.
+        startTimer(data.prompt_id, 1);
         pollFallback(data.prompt_id);
     } catch(err) {
         log(`❌ No se pudo encolar: ${err.message || err}`, "l-err");
@@ -2123,3 +2165,40 @@ $("btnEvolveUse")?.addEventListener("click", () => {
     log("✏️ Prompt actualizado con la variante #1", "l-ok");
   }
 });
+
+// --- DRAG HACIA FUERA (LTXV) ---
+// Vídeos de los slots 1 y 2: arrastrables hacia Krea2, otra pestaña, o el escritorio.
+makeDragSource($("video1"), () => currentMedia[1] || null);
+makeDragSource($("video2"), () => currentMedia[2] || null);
+
+// Imagen de entrada: arrastrable hacia Krea2 (ref) u otra pestaña.
+// Si es un File local, usamos DownloadURL con el dataURL; si vino del backend,
+// usamos la URL del servidor.
+// Nota: #inputImg tiene pointer-events:none (para que el zoom/pan funcione en
+// el wrap), así que escuchamos dragstart en #inputWrap que sí recibe eventos.
+$("inputWrap")?.addEventListener("dragstart", (e) => {
+  if(!localFile){ e.preventDefault(); return; }
+  const url = $("inputImg").src;
+  e.dataTransfer.effectAllowed = "copy";
+  e.dataTransfer.setData("text/uri-list", url);
+  e.dataTransfer.setData("text/plain", url);
+  // Si es dataURL, el DownloadURL no funciona bien; en ese caso pasamos el File
+  // directamente vía DataTransferItem (cuando el navegador lo permite).
+  const isVideo = /\.(mp4|webm|mov|mkv|avi)$/i.test(localFile.name);
+  const mime = isVideo ? "video/mp4" : (localFile.type || "image/png");
+  if(!url.startsWith("data:")){
+    e.dataTransfer.setData("DownloadURL", `${mime}:${localFile.name}:${url}`);
+  }
+  // MIME custom para drag entre UIs (Krea2 lo lee y hace fetch si no es dataURL).
+  e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify({
+    filename: localFile.name,
+    subfolder: "",
+    type: "input",
+    _dataUrl: url.startsWith("data:") ? url : undefined,
+  }));
+});
+
+// Dropzone de LTXV: aceptar drag desde Krea2 (imagen final o ref) o desde el
+// historial de Krea2. Si no hay archivos del OS, descargamos la URL arrastrada.
+enableInterUIDrop($("dropzone"), (file, filename) => handleFile(file, true));
+enableInterUIDrop($("inputWrap"), (file, filename) => handleFile(file, true));

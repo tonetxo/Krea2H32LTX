@@ -135,3 +135,14 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .modal-actions button{min-width:100px;flex:0;}
 @keyframes seedFlash{0%{background-color:var(--panel-2);border-color:var(--border);}50%{background-color:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 10px var(--accent);}100%{background-color:var(--panel-2);border-color:var(--border);}}
 .seed-updated{animation:seedFlash 1.5s ease-out;}
+
+/* Drag hacia fuera: cursor de agarrar en medios arrastrables */
+[draggable="true"]{cursor:grab;}
+[draggable="true"]:active{cursor:grabbing;}
+/* Los <video> ya tienen controles; el cursor grab solo en el borde */
+video[draggable="true"]{cursor:grab;}
+video[draggable="true"]:active{cursor:grabbing;}
+/* Las tarjetas de galería/variantes ya tienen cursor:pointer; mantenemos pointer
+   y dejamos que el navegador muestre el ghost de arrastre. */
+.variant-card[draggable="true"],.gallery-item[draggable="true"]{cursor:grab;}
+.variant-card[draggable="true"]:active,.gallery-item[draggable="true"]:active{cursor:grabbing;}
