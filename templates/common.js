@@ -687,6 +687,7 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
       void img.offsetWidth;
     }
     wrap.style.cursor = "grab";
+    bindImgTouch();
   }
 
   function applyZoom(){
@@ -740,6 +741,119 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
     zoomDragging = false;
     wrap.style.cursor = "grab";
   });
+
+  // --- Soporte táctil: pinch-zoom + pan + swipe (móvil) ---
+  let touchPinching = false, touchStartDist = 0, touchStartZoom = 1;
+  let touchStartCenterX = 0, touchStartCenterY = 0, touchStartPanX = 0, touchStartPanY = 0;
+  let touchPanning = false, touchStartT1X = 0, touchStartT1Y = 0;
+  let swipeFn = null;
+  let swipeStartX = 0, swipeStartY = 0, swipeStartT = 0, swipeTracking = false;
+
+  function touchDist(t1, t2){
+    const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function onTouchStart(e){
+    const img = getImg();
+    if(!img || img.style.display === "none") return;
+    if(e.touches.length === 2){
+      e.preventDefault();
+      touchPinching = true; touchPanning = false; zoomDragging = false; panMoved = true; swipeTracking = false;
+      touchStartDist = touchDist(e.touches[0], e.touches[1]);
+      touchStartZoom = zoomLevel;
+      const rect = wrap.getBoundingClientRect();
+      touchStartCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      touchStartCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      touchStartPanX = zoomPanX; touchStartPanY = zoomPanY;
+    } else if(e.touches.length === 1 && zoomLevel > 1){
+      e.preventDefault();
+      touchPanning = true; touchPinching = false; panMoved = false; zoomDragging = false; swipeTracking = false;
+      touchStartT1X = e.touches[0].clientX; touchStartT1Y = e.touches[0].clientY;
+      touchStartPanX = zoomPanX; touchStartPanY = zoomPanY;
+    } else if(e.touches.length === 1 && zoomLevel <= 1){
+      // Swipe horizontal para cambiar de imagen (solo cuando no hay zoom)
+      swipeTracking = true; touchPinching = false; touchPanning = false;
+      swipeStartX = e.touches[0].clientX; swipeStartY = e.touches[0].clientY;
+      swipeStartT = Date.now();
+    }
+  }
+
+  function onTouchMove(e){
+    if(swipeTracking && e.touches.length === 1 && zoomLevel <= 1){
+      // Solo prevenir el scroll si el movimiento es mayormente horizontal (swipe)
+      const dx = e.touches[0].clientX - swipeStartX;
+      const dy = e.touches[0].clientY - swipeStartY;
+      if(Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5){
+        e.preventDefault();
+      }
+    } else if(touchPinching && e.touches.length === 2){
+      e.preventDefault();
+      const rect = wrap.getBoundingClientRect();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      const visRect = getImageVisibleRect(getImg());
+      const ax = cx, ay = cy;
+      const wrapCx = visRect.width / 2, wrapCy = visRect.height / 2;
+      const mx = ax - visRect.left, my = ay - visRect.top;
+      const dist = touchDist(e.touches[0], e.touches[1]);
+      if(touchStartDist > 0){
+        zoomLevel = Math.max(1, Math.min(20, touchStartZoom * (dist / touchStartDist)));
+      }
+      // pan según desplazamiento del centro respecto al inicio
+      zoomPanX = touchStartPanX + (cx - touchStartCenterX);
+      zoomPanY = touchStartPanY + (cy - touchStartCenterY);
+      applyZoom();
+    } else if(touchPanning && e.touches.length === 1){
+      e.preventDefault();
+      const dx = e.touches[0].clientX - touchStartT1X;
+      const dy = e.touches[0].clientY - touchStartT1Y;
+      if(Math.abs(dx) > 3 || Math.abs(dy) > 3) panMoved = true;
+      zoomPanX = touchStartPanX + dx;
+      zoomPanY = touchStartPanY + dy;
+      applyZoom();
+    }
+  }
+
+  function onTouchEnd(e){
+    if(e.touches.length === 0){
+      touchPinching = false; touchPanning = false;
+      if(swipeTracking && swipeFn){
+        const dx = (e.changedTouches[0] ? e.changedTouches[0].clientX : 0) - swipeStartX;
+        const dy = (e.changedTouches[0] ? e.changedTouches[0].clientY : 0) - swipeStartY;
+        const dt = Date.now() - swipeStartT;
+        if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 800){
+          swipeFn(dx < 0 ? 1 : -1);
+        }
+      }
+      swipeTracking = false;
+    } else if(e.touches.length === 1){
+      // queda un dedo: pasar a pan con el dedo restante
+      touchPinching = false;
+      if(zoomLevel > 1){
+        touchPanning = true; panMoved = false;
+        touchStartT1X = e.touches[0].clientX; touchStartT1Y = e.touches[0].clientY;
+        touchStartPanX = zoomPanX; touchStartPanY = zoomPanY;
+      } else { touchPanning = false; }
+    }
+  }
+  function onTouchCancel(){ touchPinching = false; touchPanning = false; swipeTracking = false; }
+
+  function bindImgTouch(){
+    const img = getImg();
+    if(!img || img._zoomTouchBound) return;
+    img.addEventListener("touchstart", onTouchStart, { passive: false });
+    img.addEventListener("touchmove", onTouchMove, { passive: false });
+    img.addEventListener("touchend", onTouchEnd);
+    img.addEventListener("touchcancel", onTouchCancel);
+    img._zoomTouchBound = true;
+  }
+  bindImgTouch();
+
+  wrap.addEventListener("touchstart", onTouchStart, { passive: false });
+  wrap.addEventListener("touchmove", onTouchMove, { passive: false });
+  wrap.addEventListener("touchend", onTouchEnd);
+  wrap.addEventListener("touchcancel", onTouchCancel);
 
   if(resetBtnId){
     const btn = $(resetBtnId);
@@ -811,7 +925,9 @@ function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
   // Retornar también si el último mousedown+mouseup fue un pan (para que el caller pueda ignorar el click)
   function wasPan(){ return panMoved; }
 
-  return { resetZoom, getState, isFullscreen, wasPan };
+  function onSwipe(fn){ swipeFn = fn; }
+
+  return { resetZoom, getState, isFullscreen, wasPan, onSwipe };
 }
 
 // --- SHARED GALLERY HELPERS ---

@@ -125,6 +125,18 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
   if(isNewGallery){
     displayedGalleryFiles.add(key);
     addToVariantGallery(media, pendingSeeds[promptId] ?? null, timeText || "", slot, varIndex);
+  } else if(timeText){
+    // La tarjeta ya existe (creada en caliente por onNodeExecuted sin tiempo);
+    // actualizar el tiempo con el valor real del backend.
+    const cards = document.querySelectorAll(`.variant-card[data-slot="${slot}"]`);
+    for(const card of cards){
+      if(card.dataset.filename === media.filename
+         && (card.dataset.subfolder || "") === (media.subfolder || "")){
+        const timeSpan = card.querySelector(".variant-time");
+        if(timeSpan) timeSpan.textContent = `⏱ ${timeText}`;
+        break;
+      }
+    }
   }
 }
 
@@ -144,13 +156,15 @@ CONFIG.onNodeExecuted = function(data){
     if(media){
       if(!displayedSlots[pid]) displayedSlots[pid] = new Set();
       const isFirstLive = !displayedSlots[pid].has(1);
+      let firstElapsedStr = "";
       if(isFirstLive){
         displayedSlots[pid].add(1);
         const t = timers[pid];
         if(t){
           const elapsed = Date.now() - t.start;
+          firstElapsedStr = fmtMs(elapsed);
           const el1 = $("time1");
-          if(el1){ el1.textContent = `⏱ 1er ${fmtMs(elapsed)}`; el1.classList.remove("live"); }
+          if(el1){ el1.textContent = `⏱ 1er ${firstElapsedStr}`; el1.classList.remove("live"); }
           // Reiniciar el timer en el slot 2 para contar solo el 2º pase.
           clearInterval(t.iv);
           t.start = Date.now();
@@ -164,8 +178,9 @@ CONFIG.onNodeExecuted = function(data){
         log(`✅ 1er pase listo (esperando 2º pase)...`, "l-ok");
       }
       // Si ya se había mostrado por fallback, no volvemos a cambiar el reproductor;
-      // solo aseguramos la tarjeta de galería.
-      displayVariantMedia(media, 1, pid, "", { allowShow: isFirstLive });
+      // solo aseguramos la tarjeta de galería. Pasamos el tiempo medido por el
+      // timer del cliente porque el backend no siempre registra t1 en el history.
+      displayVariantMedia(media, 1, pid, firstElapsedStr, { allowShow: isFirstLive });
     }
   }
 
@@ -175,17 +190,19 @@ CONFIG.onNodeExecuted = function(data){
     if(media){
       if(!displayedSlots[pid]) displayedSlots[pid] = new Set();
       const isFinalLive = !displayedSlots[pid].has(2);
+      let finalElapsedStr = "";
       if(isFinalLive){
         displayedSlots[pid].add(2);
         const t = timers[pid];
         if(t){
           const elapsed = Date.now() - t.start;
+          finalElapsedStr = fmtMs(elapsed);
           const el2 = $("time2");
-          if(el2){ el2.textContent = `⏱ final ${fmtMs(elapsed)}`; el2.classList.remove("live"); }
+          if(el2){ el2.textContent = `⏱ final ${finalElapsedStr}`; el2.classList.remove("live"); }
         }
         log(`✅ 2º pase listo.`, "l-ok");
       }
-      displayVariantMedia(media, 2, pid, "", { allowShow: isFinalLive });
+      displayVariantMedia(media, 2, pid, finalElapsedStr, { allowShow: isFinalLive });
     }
   }
 };
@@ -287,23 +304,36 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
   // samplers dentro del mismo prompt_id y dispara un único execution_success.
   // Los vídeos se muestran incrementalmente vía onNodeExecuted (evento executed
   // del WS) en cuanto cada save node completa. Aquí actuamos como respaldo
-  // solo si el WS no llegó a mostrar ese slot.
+  // solo si el WS no llegó a mostrar ese slot, pero siempre actualizamos el
+  // tiempo de la tarjeta de galería con el valor real del backend.
   if(!firstPassOnly){
-    if(media1 && !already1){
-      displayedSlots[promptId].add(1);
-      displayVariantMedia(media1, 1, promptId, t1 || "", { allowShow: true });
+    if(media1){
+      if(!already1){
+        displayedSlots[promptId].add(1);
+        displayVariantMedia(media1, 1, promptId, t1 || "", { allowShow: true });
+      } else if(t1){
+        displayVariantMedia(media1, 1, promptId, t1, { allowShow: false });
+      }
       paint(1, "1er", t1 || "—");
     }
-    if(media2 && !already2){
-      displayedSlots[promptId].add(2);
-      displayVariantMedia(media2, 2, promptId, t2 || tTotal || "", { allowShow: true });
+    if(media2){
+      if(!already2){
+        displayedSlots[promptId].add(2);
+        displayVariantMedia(media2, 2, promptId, t2 || tTotal || "", { allowShow: true });
+      } else if(t2 || tTotal){
+        displayVariantMedia(media2, 2, promptId, t2 || tTotal || "", { allowShow: false });
+      }
       paint(2, "final", t2 || tTotal || "—");
     }
   } else {
     // Modo "first" (solo 1er pase).
-    if(media1 && !already1){
-      displayedSlots[promptId].add(1);
-      displayVariantMedia(media1, 1, promptId, t1 || tTotal || "", { allowShow: true });
+    if(media1){
+      if(!already1){
+        displayedSlots[promptId].add(1);
+        displayVariantMedia(media1, 1, promptId, t1 || tTotal || "", { allowShow: true });
+      } else if(t1 || tTotal){
+        displayVariantMedia(media1, 1, promptId, t1 || tTotal || "", { allowShow: false });
+      }
       paint(1, "1er", t1 || tTotal || "—");
     }
   }
@@ -568,7 +598,11 @@ async function loadKrea2Recent(){
       const div = document.createElement("div");
       div.className = "gallery-item";
       div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${tsTxt} · ${sizeKB}KB</div>`;
-      div.addEventListener("click", () => loadKrea2ImageAsInput(url, it.filename));
+      div.addEventListener("click", () => {
+        const items = Array.from(grid.querySelectorAll(".gallery-item"));
+        krea2RecentIndex = items.indexOf(div);
+        loadKrea2ImageAsInput(url, it.filename);
+      });
       grid.appendChild(div);
     }
     grid.dataset.loaded = "1";
@@ -948,6 +982,44 @@ $("ltx2Temperature")?.addEventListener("input", (e)=>{
 // Zoom/pan/fullscreen para imagen de entrada
 const inputZoom = setupZoomPan("inputWrap", "inputImg", "btnResetZoomInput", "btnFullscreenInput");
 
+// Navegación cíclica por imágenes Krea2 recientes (flechas PC + swipe móvil)
+let krea2RecentIndex = -1;
+let krea2NavTimer = null;
+
+function getKrea2RecentItems(){
+  const grid = $("krea2RecentGrid");
+  if(!grid || !grid.dataset.loaded) return [];
+  return Array.from(grid.querySelectorAll(".gallery-item"));
+}
+
+function navigateKrea2Recent(dir){
+  const items = getKrea2RecentItems();
+  if(!items.length) return;
+  if(krea2RecentIndex < 0 || krea2RecentIndex >= items.length) krea2RecentIndex = 0;
+  let newIdx = krea2RecentIndex + dir;
+  if(newIdx < 0) newIdx = items.length - 1;
+  if(newIdx >= items.length) newIdx = 0;
+  krea2RecentIndex = newIdx;
+  const item = items[newIdx];
+  const img = item.querySelector("img");
+  if(!img || !img.src) return;
+  showInputImage(img.src);
+  const info = item.querySelector(".info-tag");
+  if(info) log("🖼️ " + (info.textContent || ""), "l-info");
+}
+
+document.addEventListener("keydown", (e) => {
+  if(!inputZoom.isFullscreen()) return;
+  if(e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if(e.key === "ArrowLeft" || e.key === "ArrowRight"){
+    e.preventDefault();
+    if(krea2NavTimer) return;
+    navigateKrea2Recent(e.key === "ArrowRight" ? 1 : -1);
+    krea2NavTimer = setTimeout(() => { krea2NavTimer = null; }, 250);
+  }
+});
+inputZoom.onSwipe((dir) => { if(inputZoom.isFullscreen()) navigateKrea2Recent(dir); });
+
 // Click en el wrap de la imagen de entrada -> abrir file dialog para reemplazar
 $("inputWrap").addEventListener("click", (e) => {
   if(inputZoom.isFullscreen()) return;
@@ -977,7 +1049,7 @@ function handleFile(f, shouldSaveToGallery = true){
   if(isVideo){
     // Mostrar dropzone, ocultar wrap de imagen
     $("dropzone").style.display = "";
-    $("inputWrap").style.display = "none";
+    $("inputWrap").style.visibility = "hidden";
     $("imgInputActions").style.display = "none";
     handleVideoFile(f, shouldSaveToGallery);
     return;
@@ -1009,7 +1081,7 @@ function showInputImage(src){
   img.onerror = (e) => console.error("[LTXV] inputImg error", e);
   img.src = src;
   img.style.display = "block";
-  wrap.style.display = "flex";
+  wrap.style.visibility = "visible";
   actions.style.display = "flex";
   const dz = $("dropzone");
   if(dz) dz.style.display = "none";
@@ -1237,18 +1309,22 @@ function showVideo(slot, media, options={}){
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
   v.crossOrigin = "anonymous";
   v.src = url;
-  v.load();
   v.style.display = "block";
   empty.style.display = "none";
-  v.play().catch(err => console.log("Autoplay blocked:", err));
+  if(options.autoplay !== false) v.play().catch(err => console.log("Autoplay blocked:", err));
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   if(badge){
-    const varIndex = options.variantIndex != null ? options.variantIndex : (currentBatchIndex + 1);
-    const typeLabel = slot === 1 ? "1er" : "final";
-    badge.textContent = `Var ${varIndex} · ${typeLabel}`;
+    const typeLabel = slot === 1 ? "1er pase" : "final";
+    if(options.badge != null){
+      badge.textContent = options.badge;
+    } else if(options.variantIndex != null){
+      badge.textContent = `Var ${options.variantIndex} · ${slot === 1 ? "1er" : "final"}`;
+    } else {
+      badge.textContent = typeLabel;
+    }
   }
   const resEl=$("res"+slot);
   if(resEl){
@@ -1621,7 +1697,8 @@ async function loadVideoHistory(){
         card.addEventListener("click", () => {
           const slot = item.filename.includes("_prev") ? 1 : 2;
           const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
-          showVideo(slot, media, { variantIndex: 0 });
+          const baseName = item.filename.replace(/\.[^.]+$/, "");
+          requestAnimationFrame(() => showVideo(slot, media, { badge: baseName, autoplay: false }));
           log("▶ Reproduciendo: "+item.filename, "l-ok");
         });
 

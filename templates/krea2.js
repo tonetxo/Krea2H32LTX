@@ -173,10 +173,14 @@ function navigateRefVariant(dir){
 }
 
 document.addEventListener("keydown", (e) => {
-  if(!refZoom.isFullscreen()) return;
+  if(!outputZoom.isFullscreen() && !refZoom.isFullscreen()) return;
   if(e.key === "ArrowLeft"){ e.preventDefault(); navigateRefVariant(-1); }
   if(e.key === "ArrowRight"){ e.preventDefault(); navigateRefVariant(1); }
 });
+
+// Swipe táctil para cambiar de imagen (móvil)
+outputZoom.onSwipe((dir) => navigateRefVariant(dir));
+refZoom.onSwipe((dir) => navigateRefVariant(dir));
 
 $("btnSendLtxv").addEventListener("click", () => {
   if(!currentOutputMedia || !currentOutputMedia.filename){
@@ -272,7 +276,7 @@ function loadRefImage(url){
   refZoom.resetZoom();
   newImg.src = url;
   newImg.style.display = "block";
-  wrap.style.display = "block";
+  wrap.style.visibility = "visible";
   ph.style.display = "none";
   dz.style.display = "flex";
   dz.style.padding = "4px 8px";
