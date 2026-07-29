@@ -341,6 +341,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
       </div>
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
+      <div class="panel"><h2>VAE</h2><div class="row"><select id="vaeSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">"Checkpoint" usa el VAE del modelo. Otro valor lo sustituye.</div></div>
       <div class="panel"><h2>Tipo de atención Sage</h2><div class="row"><select id="sageAttentionType"><option value="auto">auto</option><option value="sageattn" selected>sageattn</option><option value="sageattn2">sageattn2</option><option value="sageattn3">sageattn3</option><option value="sageattn_qk">sageattn_qk</option></select></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
       <div class="panel">
@@ -800,7 +801,7 @@ const BASE_GRAPH = {
     },
     "class_type": "LTXVLatentUpsamplerTiled",
     "_meta": {
-      "title": "🔍 LTX Latent Upsampler (Tiled)"
+      "title": "\ud83d\udd0d LTX Latent Upsampler (Tiled)"
     }
   },
   "770": {
@@ -946,7 +947,7 @@ const BASE_GRAPH = {
         "lora": "ltxv/anal-insertion-i2v.safetensors",
         "strength": 0.65
       },
-      "➕ Add Lora": "",
+      "\u2795 Add Lora": "",
       "model": [
         "906",
         0
@@ -985,7 +986,7 @@ const BASE_GRAPH = {
     },
     "class_type": "LTXReferenceConditioning",
     "_meta": {
-      "title": "🎴 LTX Reference Conditioning"
+      "title": "\ud83c\udfb4 LTX Reference Conditioning"
     }
   },
   "868": {
@@ -999,7 +1000,7 @@ const BASE_GRAPH = {
     },
     "class_type": "LTXReferenceEnable",
     "_meta": {
-      "title": "🔗 LTX Reference Enable"
+      "title": "\ud83d\udd17 LTX Reference Enable"
     }
   },
   "870": {
@@ -1026,7 +1027,7 @@ const BASE_GRAPH = {
     },
     "class_type": "LTXReferenceConditioning",
     "_meta": {
-      "title": "🎴 LTX Reference Conditioning"
+      "title": "\ud83c\udfb4 LTX Reference Conditioning"
     }
   },
   "871": {
@@ -1262,7 +1263,7 @@ const BASE_GRAPH = {
   },
   "906": {
     "inputs": {
-      "lora_name": "Ligazón para Lora/ltxv/LTX2.3_DMD_reshaped_r256.safetensors",
+      "lora_name": "Ligaz\u00f3n para Lora/ltxv/LTX2.3_DMD_reshaped_r256.safetensors",
       "strength_model": 1,
       "model": [
         "868",
@@ -1536,10 +1537,20 @@ const BASE_GRAPH = {
     "_meta": {
       "title": "Preview LTX2 Prompt"
     }
+  },
+  "1005": {
+    "inputs": {
+      "vae_name": "pruna_ltx2.3_vae_comfy_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE (custom)"
+    }
   }
 };
 const AVAILABLE_MODELS = ["10Eros_v1.4_DMD_int8_convrot.safetensors", "10Eros_v1.4_bf16.safetensors", "ltx-2.3-22b-distilled-1.1.safetensors", "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors", "ltxv/sulphur_distil_bf16.safetensors"];
 const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "IvoriLTX_000000250.safetensors", "IvoriLTX_000000750.safetensors", "IvoriLTX_000001000.safetensors", "IvoriLTX_000001250.safetensors", "IvoriLTX_000001500.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "Post_Apocalyptic.safetensors", "anal-insertion-i2v.safetensors", "beauty_of_rain_ltx23.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-distilled-lora-1.1_rank96_energy.safetensors", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors", "ltx-2.3-22b-distilled-lora-fro90_ceil72.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi2ltxv.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001250.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_000001750.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
+const AVAILABLE_VAES = ["Ligaz\u00f3n para VAE/AceStep/ace_1.5_vae.safetensors", "Ligaz\u00f3n para VAE/Flux/ae.safetensors", "Ligaz\u00f3n para VAE/Flux/flux2-vae.safetensors", "Ligaz\u00f3n para VAE/Flux/ultra_flux1.safetensors", "Ligaz\u00f3n para VAE/LTX-2/LTX23_audio_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/LTX23_video_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX23_audio_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX23_video_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX2_audio_vae.safetensors", "Ligaz\u00f3n para VAE/QwenImage/REPA-E_qwen.safetensors", "Ligaz\u00f3n para VAE/QwenImage/qwen_image_vae.safetensors", "Ligaz\u00f3n para VAE/Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Ligaz\u00f3n para VAE/Wan/wan_2.1_vae.safetensors", "Ligaz\u00f3n para VAE/ace_1.5_vae.safetensors", "Ligaz\u00f3n para VAE/ema_vae_fp16.safetensors", "Ligaz\u00f3n para VAE/flux2-vae.safetensors", "Ligaz\u00f3n para VAE/lumina2_vae_fp32.safetensors", "Ligaz\u00f3n para VAE/qwen_image_vae.safetensors", "Ligaz\u00f3n para VAE/sd3_vae.safetensors", "Ligaz\u00f3n para VAE/sdxl_vae.safetensors", "Ligaz\u00f3n para VAE/taeltx2_3.safetensors", "Ligaz\u00f3n para VAE/wan/wan_2.1_vae.safetensors"];
 const LTXV_UI_PORT = "8000";
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
 //
@@ -1836,7 +1847,7 @@ function _readPromptStore(){
   try {
     const parsed = JSON.parse(raw);
     if(parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-  } catch(e){ /* JSON corrupto: ignoramos y reseteamos */ }
+    } catch(e){ console.warn("Prompt store corrupto, reseteado:", e); }
   try { localStorage.removeItem(CONFIG.PROMPTS_KEY); } catch(_){}
   log("⚠️ Prompts guardados corruptos, reseteados.", "l-warn");
   return {};
@@ -2132,10 +2143,10 @@ function renderSysPromptEditor(){
     row.innerHTML = `
       <div class="spr-top">
         <span class="spr-name">${key}</span>
-        <input type="text" class="spr-name-input" value="${entry.name}" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:11px;">
+        <input type="text" class="spr-name-input" value="${escapeHtml(entry.name)}" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:11px;">
         ${isDefault ? "" : '<button class="spr-del" data-key="'+key+'">×</button>'}
       </div>
-      <textarea data-key="${key}">${entry.prompt}</textarea>
+      <textarea data-key="${key}">${escapeHtml(entry.prompt)}</textarea>
     `;
     container.appendChild(row);
   }
@@ -2163,7 +2174,7 @@ async function stopCurrentVideo(){
       method:"POST", headers:{"Content-Type":"application/json"},
       body:JSON.stringify({delete:[pid]})
     });
-  } catch(e) { /* si falla, igual limpiamos local */ }
+  } catch(e) { console.warn("stopCurrentVideo: fallo al interrumpir backend:", e); }
   discardTimer(pid);
   delete pendingSeeds[pid];
   handledPrompts.add(pid);
@@ -3048,7 +3059,8 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616"},
+  DEFAULT_VAE: "Checkpoint",
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -3130,6 +3142,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
   CONFIG.variantMeta = function(){
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
+    ["VAE", $("vaeSelect")?.value || "Checkpoint"],
     ["Sage", $("sageAttentionType")?.value || "sageattn"],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
@@ -3439,6 +3452,7 @@ function snapshotJob(firstPassOnly){
     motion: $("motionSlider").value,
     firstPassSteps: $("firstPassSteps")?.value || "10",
     model: $("modelSelect")?.value,
+    vae: $("vaeSelect")?.value,
     sageType: $("sageAttentionType")?.value,
     bitDepth: getBitDepth(),
     loras: JSON.parse(JSON.stringify(loras)),
@@ -3479,6 +3493,7 @@ function restoreJob(job){
   $("firstPassSteps").value = job.firstPassSteps;
   $("firstPassStepsVal").textContent = job.firstPassSteps;
   if($("modelSelect") && job.model) $("modelSelect").value = job.model;
+  if($("vaeSelect") && job.vae) $("vaeSelect").value = job.vae;
   if($("sageAttentionType") && job.sageType) $("sageAttentionType").value = job.sageType;
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
@@ -3827,6 +3842,22 @@ function applyWorkflow(workflow, opts={}){
   }
   if(modelSet) setApplied("modelo"); else setMissing("modelo");
 
+  // Restaurar VAE: si existe VAELoader en el workflow, intentar seleccionarlo.
+  let vaeSet = false;
+  const vaeLoader = findByClass("VAELoader");
+  const vaeSel = $("vaeSelect");
+  if(vaeLoader && vaeLoader.inputs && vaeLoader.inputs.vae_name && vaeSel){
+    const vaeName = vaeLoader.inputs.vae_name;
+    for(const opt of vaeSel.options){
+      if(opt.value === vaeName || vaeName.endsWith("/"+opt.value)){
+        opt.selected = true; vaeSet = true; break;
+      }
+    }
+    // Si no está en la lista pero hay un VAELoader, preferimos mostrar "Checkpoint"
+    // (porque el workflow embebido puede no incluir el nodo si usaba el del checkpoint).
+  }
+  if(vaeSet) setApplied("VAE"); else setMissing("VAE");
+
   function parseFrameValue(v){
     if(typeof v === "number") return v;
     if(Array.isArray(v)) return null;
@@ -4004,6 +4035,27 @@ $("firstPassSteps")?.addEventListener("input",(e)=>{$("firstPassStepsVal").textC
 $("motionSlider").addEventListener("input",(e)=>{$("motionVal").textContent=parseFloat(e.target.value).toFixed(1);});
 $("mpSlider").addEventListener("input",()=>{recalcResolution();});
 $("frames").addEventListener("input",updateDuration);
+
+function loadVaes(){
+  const sel = $("vaeSelect");
+  if(!sel) return;
+  sel.innerHTML = "";
+  const checkpointOpt = document.createElement("option");
+  checkpointOpt.value = "Checkpoint";
+  checkpointOpt.textContent = "Checkpoint (VAE del modelo)";
+  sel.appendChild(checkpointOpt);
+  for(const v of AVAILABLE_VAES){
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    sel.appendChild(opt);
+  }
+  const defaultVae = CONFIG.DEFAULT_VAE || "Checkpoint";
+  if(defaultVae && Array.from(sel.options).some(o => o.value === defaultVae)){
+    sel.value = defaultVae;
+  }
+}
+loadVaes();
 function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint").textContent=`(${f}/24fps=${(f/24).toFixed(1)}s)`;}
 
 // DMD bypass switch
@@ -4247,6 +4299,26 @@ function buildGraph(mode){
   g[N.LORA].inputs.lora_2={on:loras[1].on,lora:loras[1].lora,strength:loras[1].strength};
   g[N.LORA].inputs.lora_3={on:loras[2].on,lora:loras[2].lora,strength:loras[2].strength};
   if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs) g[N.CHECKPOINT].inputs.ckpt_name = $("modelSelect").value;
+
+  // VAE: "Checkpoint" mantiene el VAE del nodo CHECKPOINT; cualquier otro valor
+  // activa el VAELoader personalizado y redirige todas las entradas vae.
+  const vaeChoice = $("vaeSelect")?.value || "";
+  const useCustomVae = vaeChoice && vaeChoice !== "Checkpoint";
+  if(useCustomVae && g[N.CUSTOM_VAE] && g[N.CUSTOM_VAE].inputs){
+    g[N.CUSTOM_VAE].inputs.vae_name = vaeChoice;
+    const vaeRef = [N.CUSTOM_VAE, 0];
+    for(const k of Object.keys(g)){
+      const node = g[k];
+      if(!node || !node.inputs) continue;
+      for(const inputKey of Object.keys(node.inputs)){
+        const val = node.inputs[inputKey];
+        if(Array.isArray(val) && val.length >= 2 && String(val[0]) === N.CHECKPOINT && val[1] === 2){
+          node.inputs[inputKey] = vaeRef;
+        }
+      }
+    }
+  }
+
   const bitDepth = getBitDepth();
   if(g[N.CREATE_VIDEO_1] && g[N.CREATE_VIDEO_1].inputs) g[N.CREATE_VIDEO_1].inputs.bit_depth = bitDepth;
   if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;

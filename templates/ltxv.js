@@ -9,7 +9,8 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616"},
+  DEFAULT_VAE: "Checkpoint",
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -91,6 +92,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
   CONFIG.variantMeta = function(){
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
+    ["VAE", $("vaeSelect")?.value || "Checkpoint"],
     ["Sage", $("sageAttentionType")?.value || "sageattn"],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
@@ -400,6 +402,7 @@ function snapshotJob(firstPassOnly){
     motion: $("motionSlider").value,
     firstPassSteps: $("firstPassSteps")?.value || "10",
     model: $("modelSelect")?.value,
+    vae: $("vaeSelect")?.value,
     sageType: $("sageAttentionType")?.value,
     bitDepth: getBitDepth(),
     loras: JSON.parse(JSON.stringify(loras)),
@@ -440,6 +443,7 @@ function restoreJob(job){
   $("firstPassSteps").value = job.firstPassSteps;
   $("firstPassStepsVal").textContent = job.firstPassSteps;
   if($("modelSelect") && job.model) $("modelSelect").value = job.model;
+  if($("vaeSelect") && job.vae) $("vaeSelect").value = job.vae;
   if($("sageAttentionType") && job.sageType) $("sageAttentionType").value = job.sageType;
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
@@ -788,6 +792,22 @@ function applyWorkflow(workflow, opts={}){
   }
   if(modelSet) setApplied("modelo"); else setMissing("modelo");
 
+  // Restaurar VAE: si existe VAELoader en el workflow, intentar seleccionarlo.
+  let vaeSet = false;
+  const vaeLoader = findByClass("VAELoader");
+  const vaeSel = $("vaeSelect");
+  if(vaeLoader && vaeLoader.inputs && vaeLoader.inputs.vae_name && vaeSel){
+    const vaeName = vaeLoader.inputs.vae_name;
+    for(const opt of vaeSel.options){
+      if(opt.value === vaeName || vaeName.endsWith("/"+opt.value)){
+        opt.selected = true; vaeSet = true; break;
+      }
+    }
+    // Si no está en la lista pero hay un VAELoader, preferimos mostrar "Checkpoint"
+    // (porque el workflow embebido puede no incluir el nodo si usaba el del checkpoint).
+  }
+  if(vaeSet) setApplied("VAE"); else setMissing("VAE");
+
   function parseFrameValue(v){
     if(typeof v === "number") return v;
     if(Array.isArray(v)) return null;
@@ -965,6 +985,27 @@ $("firstPassSteps")?.addEventListener("input",(e)=>{$("firstPassStepsVal").textC
 $("motionSlider").addEventListener("input",(e)=>{$("motionVal").textContent=parseFloat(e.target.value).toFixed(1);});
 $("mpSlider").addEventListener("input",()=>{recalcResolution();});
 $("frames").addEventListener("input",updateDuration);
+
+function loadVaes(){
+  const sel = $("vaeSelect");
+  if(!sel) return;
+  sel.innerHTML = "";
+  const checkpointOpt = document.createElement("option");
+  checkpointOpt.value = "Checkpoint";
+  checkpointOpt.textContent = "Checkpoint (VAE del modelo)";
+  sel.appendChild(checkpointOpt);
+  for(const v of AVAILABLE_VAES){
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    sel.appendChild(opt);
+  }
+  const defaultVae = CONFIG.DEFAULT_VAE || "Checkpoint";
+  if(defaultVae && Array.from(sel.options).some(o => o.value === defaultVae)){
+    sel.value = defaultVae;
+  }
+}
+loadVaes();
 function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint").textContent=`(${f}/24fps=${(f/24).toFixed(1)}s)`;}
 
 // DMD bypass switch
@@ -1208,6 +1249,26 @@ function buildGraph(mode){
   g[N.LORA].inputs.lora_2={on:loras[1].on,lora:loras[1].lora,strength:loras[1].strength};
   g[N.LORA].inputs.lora_3={on:loras[2].on,lora:loras[2].lora,strength:loras[2].strength};
   if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs) g[N.CHECKPOINT].inputs.ckpt_name = $("modelSelect").value;
+
+  // VAE: "Checkpoint" mantiene el VAE del nodo CHECKPOINT; cualquier otro valor
+  // activa el VAELoader personalizado y redirige todas las entradas vae.
+  const vaeChoice = $("vaeSelect")?.value || "";
+  const useCustomVae = vaeChoice && vaeChoice !== "Checkpoint";
+  if(useCustomVae && g[N.CUSTOM_VAE] && g[N.CUSTOM_VAE].inputs){
+    g[N.CUSTOM_VAE].inputs.vae_name = vaeChoice;
+    const vaeRef = [N.CUSTOM_VAE, 0];
+    for(const k of Object.keys(g)){
+      const node = g[k];
+      if(!node || !node.inputs) continue;
+      for(const inputKey of Object.keys(node.inputs)){
+        const val = node.inputs[inputKey];
+        if(Array.isArray(val) && val.length >= 2 && String(val[0]) === N.CHECKPOINT && val[1] === 2){
+          node.inputs[inputKey] = vaeRef;
+        }
+      }
+    }
+  }
+
   const bitDepth = getBitDepth();
   if(g[N.CREATE_VIDEO_1] && g[N.CREATE_VIDEO_1].inputs) g[N.CREATE_VIDEO_1].inputs.bit_depth = bitDepth;
   if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;

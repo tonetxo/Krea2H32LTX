@@ -11,6 +11,9 @@ OUTPUT_HTML = os.environ.get("LTXV_OUTPUT_HTML", "LTXV_WebUI.html")
 LORAS_DIR = os.environ.get("LTXV_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/ltxv")
 MODELS_DIR = os.environ.get("LTXV_MODELS_DIR", "/media/tonetxo/datos/ltxv")
 SD_MODELS_DIR = os.environ.get("LTXV_SD_MODELS_DIR", "/home/tonetxo/SwarmUI/Models/Stable-Diffusion")
+VAE_DIR = os.environ.get("LTXV_VAE_DIR", "/home/tonetxo/SwarmUI/Models/VAE")
+VAE_PREFIX = os.environ.get("LTXV_VAE_PREFIX", "Ligazón para VAE")
+VAE_FALLBACK = os.environ.get("LTXV_VAE_FALLBACK", "Ligazón para VAE/LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors")
 # Puerto donde se sirve la UI LTXV (para el botón "enviar a LTXV" de Krea2).
 LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
 # ---------------------
@@ -30,6 +33,8 @@ def main():
         ],
         'model_fallback': '10Eros_v1.4_bf16.safetensors',
         'model_exclude': ('StableAudio/', 'HiDream/', 'sam3.1_multiplex_fp16', 'lens_turbo_bf16'),
+        'vae_dir': [(VAE_DIR, VAE_PREFIX)],
+        'vae_fallback': VAE_FALLBACK,
         'lora_dir': LORAS_DIR,
         'lora_fallback': 'ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors',
         'header_title': 'LTXV',

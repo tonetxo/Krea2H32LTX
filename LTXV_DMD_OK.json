@@ -378,7 +378,7 @@
     },
     "class_type": "LTXVLatentUpsamplerTiled",
     "_meta": {
-      "title": "🔍 LTX Latent Upsampler (Tiled)"
+      "title": "\ud83d\udd0d LTX Latent Upsampler (Tiled)"
     }
   },
   "770": {
@@ -524,7 +524,7 @@
         "lora": "ltxv/anal-insertion-i2v.safetensors",
         "strength": 0.65
       },
-      "➕ Add Lora": "",
+      "\u2795 Add Lora": "",
       "model": [
         "906",
         0
@@ -563,7 +563,7 @@
     },
     "class_type": "LTXReferenceConditioning",
     "_meta": {
-      "title": "🎴 LTX Reference Conditioning"
+      "title": "\ud83c\udfb4 LTX Reference Conditioning"
     }
   },
   "868": {
@@ -577,7 +577,7 @@
     },
     "class_type": "LTXReferenceEnable",
     "_meta": {
-      "title": "🔗 LTX Reference Enable"
+      "title": "\ud83d\udd17 LTX Reference Enable"
     }
   },
   "870": {
@@ -604,7 +604,7 @@
     },
     "class_type": "LTXReferenceConditioning",
     "_meta": {
-      "title": "🎴 LTX Reference Conditioning"
+      "title": "\ud83c\udfb4 LTX Reference Conditioning"
     }
   },
   "871": {
@@ -840,7 +840,7 @@
   },
   "906": {
     "inputs": {
-      "lora_name": "Ligazón para Lora/ltxv/LTX2.3_DMD_reshaped_r256.safetensors",
+      "lora_name": "Ligaz\u00f3n para Lora/ltxv/LTX2.3_DMD_reshaped_r256.safetensors",
       "strength_model": 1,
       "model": [
         "868",
@@ -1113,6 +1113,15 @@
     "class_type": "PreviewAny",
     "_meta": {
       "title": "Preview LTX2 Prompt"
+    }
+  },
+  "1005": {
+    "inputs": {
+      "vae_name": "pruna_ltx2.3_vae_comfy_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE (custom)"
     }
   }
 }

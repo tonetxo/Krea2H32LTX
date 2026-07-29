@@ -56,6 +56,10 @@ def get_lora_list(directory, fallback="ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safet
     return loras if loras else ["No LoRAs found"]
 
 
+def get_vae_list(directory, fallback="Ligazón para VAE/LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors"):
+    return get_file_list(directory, fallback=fallback)
+
+
 def _read_template(name):
     """Read a template file from the templates/ directory."""
     path = os.path.join(TEMPLATES_DIR, name)
@@ -95,7 +99,7 @@ def generate_html(config):
     with open(config['json_file'], 'r', encoding='utf-8') as f:
         graph_json = f.read()
 
-    # --- Build model and LoRA lists ---
+    # --- Build model, LoRA and VAE lists ---
     raw_models = get_file_list(config['model_dirs'], fallback=config['model_fallback'])
     exclude = config.get('model_exclude', ())
     model_files = [m for m in raw_models if not any(m.startswith(x) for x in exclude)]
@@ -103,6 +107,9 @@ def generate_html(config):
 
     lora_files = get_lora_list(config['lora_dir'], fallback=config.get('lora_fallback'))
     lora_js_array = json.dumps(lora_files)
+
+    vae_files = get_vae_list(config.get('vae_dir'), fallback=config.get('vae_fallback'))
+    vae_js_array = json.dumps(vae_files)
 
     ltxv_ui_port = config.get('ltxv_ui_port', '8000')
 
@@ -124,6 +131,7 @@ def generate_html(config):
         "const BASE_GRAPH = __GRAPH_JSON__;\n"
         "const AVAILABLE_MODELS = __MODEL_LIST__;\n"
         "const AVAILABLE_LORAS = __LORA_LIST__;\n"
+        "const AVAILABLE_VAES = __VAE_LIST__;\n"
         "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
         + common_js + "\n"
         + ui_js
@@ -159,6 +167,7 @@ def generate_html(config):
     html = html.replace('__GRAPH_JSON__', graph_json)
     html = html.replace('__MODEL_LIST__', model_js_array)
     html = html.replace('__LORA_LIST__', lora_js_array)
+    html = html.replace('__VAE_LIST__', vae_js_array)
     html = html.replace('__LTXV_UI_PORT__', json.dumps(ltxv_ui_port))
 
     # --- Write output ---

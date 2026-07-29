@@ -293,7 +293,7 @@ function _readPromptStore(){
   try {
     const parsed = JSON.parse(raw);
     if(parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-  } catch(e){ /* JSON corrupto: ignoramos y reseteamos */ }
+    } catch(e){ console.warn("Prompt store corrupto, reseteado:", e); }
   try { localStorage.removeItem(CONFIG.PROMPTS_KEY); } catch(_){}
   log("⚠️ Prompts guardados corruptos, reseteados.", "l-warn");
   return {};
@@ -589,10 +589,10 @@ function renderSysPromptEditor(){
     row.innerHTML = `
       <div class="spr-top">
         <span class="spr-name">${key}</span>
-        <input type="text" class="spr-name-input" value="${entry.name}" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:11px;">
+        <input type="text" class="spr-name-input" value="${escapeHtml(entry.name)}" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:11px;">
         ${isDefault ? "" : '<button class="spr-del" data-key="'+key+'">×</button>'}
       </div>
-      <textarea data-key="${key}">${entry.prompt}</textarea>
+      <textarea data-key="${key}">${escapeHtml(entry.prompt)}</textarea>
     `;
     container.appendChild(row);
   }
@@ -620,7 +620,7 @@ async function stopCurrentVideo(){
       method:"POST", headers:{"Content-Type":"application/json"},
       body:JSON.stringify({delete:[pid]})
     });
-  } catch(e) { /* si falla, igual limpiamos local */ }
+  } catch(e) { console.warn("stopCurrentVideo: fallo al interrumpir backend:", e); }
   discardTimer(pid);
   delete pendingSeeds[pid];
   handledPrompts.add(pid);
