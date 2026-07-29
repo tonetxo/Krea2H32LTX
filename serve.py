@@ -11,10 +11,11 @@ Backend routes proxied:
 Custom routes:
   /api/krea2_list -> lists PNGs in KREA2_OUTPUT_DIR (default: ComfyUI/output/krea2)
 
-Usage: python3 serve.py [PORT] [BACKEND_URL] [KREA2_OUTPUT_DIR]
+Usage: python3 serve.py [PORT] [BACKEND_URL] [KREA2_OUTPUT_DIR] [HOST]
   PORT              default 8000
   BACKEND_URL       default http://127.0.0.1:7821
   KREA2_OUTPUT_DIR  default auto-detected
+  HOST              default 127.0.0.1 (use 0.0.0.0 for LAN access)
 """
 import glob
 import http.server
@@ -29,6 +30,7 @@ import urllib.request
 import urllib.error
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+HOST = sys.argv[4] if len(sys.argv) > 4 else os.environ.get("HOST", "127.0.0.1")
 BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
 OLLAMA = "http://127.0.0.1:11434"
 
@@ -112,6 +114,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         parse WS framing: close-frame handling and (de)compression are
         negotiated end-to-end between the browser and the backend.
         """
+        # Validar origen: solo same-origin puede conectar WebSocket.
+        if not self._allowed_origin():
+            sys.stderr.write("[serve] WS rechazado: origen no permitido\n")
+            try:
+                self.send_response(403)
+                self.end_headers()
+            except OSError:
+                pass
+            return
         client = self.connection
         backend_host, backend_port = self._parse_backend_ws_host_port()
         query = self.path.split("?", 1)[1] if "?" in self.path else ""
@@ -376,6 +387,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         data = img["data"]
         if len(data) == 0:
             self._send_json(400, {"error": "imagen vacía"})
+            return
+        if len(data) > 20 * 1024 * 1024:
+            self._send_json(413, {"error": "imagen demasiado grande (máx 20 MB)"})
             return
         # Determinar extensión por Content-Type o filename original.
         ct = ""
@@ -740,9 +754,9 @@ class ReusableServer(socketserver.ThreadingTCPServer):
 
 def main():
     try:
-        with ReusableServer(("0.0.0.0", PORT), ProxyHandler) as httpd:
+        with ReusableServer((HOST, PORT), ProxyHandler) as httpd:
             sys.stderr.write(
-                f"[serve] Sirviendo en 0.0.0.0:{PORT} (proxy -> {BACKEND}, krea2 -> {KREA2_OUTPUT_DIR}, delete-allowed -> {ALLOWED_DELETE_DIRS}, no-cache)\n"
+                f"[serve] Sirviendo en {HOST}:{PORT} (proxy -> {BACKEND}, krea2 -> {KREA2_OUTPUT_DIR}, delete-allowed -> {ALLOWED_DELETE_DIRS}, no-cache)\n"
             )
             sys.stderr.flush()
             httpd.serve_forever()
