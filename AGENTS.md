@@ -33,8 +33,8 @@ do not hand-edit the HTML for things the generator controls.
 | `templates/krea2_html.html` | Krea2-only HTML (output image, ref image, Krea2 enhancer, RBG variance, sampler). | Yes. |
 | `LTXV_DMD_OK.json` | LTXV workflow graph. | Rarely. |
 | `Krea2_OK.json` | Krea2 workflow graph. | Rarely. |
-| `lanzar_ltxv.sh` | Launches `serve.py` on port 8000, opens `LTXV_WebUI.html`. | Edit `BROWSER` and `PORT`. |
-| `lanzar_krea2.sh` | Launches `serve.py` on port 8001, opens `Krea2_WebUI.html`. | Edit `BROWSER` and `PORT`. |
+| `lanzar_ltxv.sh` | Launches `serve.py` on port 8000, opens `LTXV_WebUI.html`. Binds to `0.0.0.0` via `HOST` env var. | Edit `BROWSER` and `PORT`. |
+| `lanzar_krea2.sh` | Launches `serve.py` on port 8001, opens `Krea2_WebUI.html`. Binds to `0.0.0.0` via `HOST` env var. | Edit `BROWSER` and `PORT`. |
 | `serve.py` | Static file server + HTTP proxy to ComfyUI + Ollama. | Yes, for proxy routes or backend URL. |
 
 ## How to run
@@ -108,11 +108,15 @@ Each UI sets a `CONFIG` global before `common.js` runs. Required fields:
 - WebSocket (`/ws`) is rejected with 426; `pollFallback` handles it via polling every 4s.
 - The user can type a custom backend URL to bypass the proxy.
 
-## LAN access gotcha (móvil / otro PC)
+## LAN access (móvil / otro PC)
 
-`serve.py` binds to `0.0.0.0`, so the UI is reachable on the LAN.
+`lanzar_ltxv.sh` and `lanzar_krea2.sh` launch `serve.py` with `HOST=0.0.0.0`,
+so the UI is reachable on the LAN at `http://<IP_LAN>:8000/LTXV_WebUI.html`
+(or `:8001/...`). If you run `serve.py` manually, set `HOST=0.0.0.0` to
+allow LAN access; otherwise it defaults to `127.0.0.1`.
+
 **ComfyUI binds to `127.0.0.1:<port>` by default** — launch it with
-`--listen 0.0.0.0` to make it accessible from other devices.
+`--listen 0.0.0.0` to make the backend accessible from other devices.
 `lanzar_ltxv.sh` and `lanzar_krea2.sh` both check `ss` and warn when
 the backend is on a loopback address.
 

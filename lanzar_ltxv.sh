@@ -44,7 +44,8 @@ echo "🌐 Abriendo navegador en http://localhost:$PORT/$HTML_FILE ..."
 
 # Servidor: serve.py añade Cache-Control: no-store a todas las respuestas
 # para que el móvil siempre recargue la UI al cambiar de versión.
+# HOST=0.0.0.0 permite acceder desde otros dispositivos en la LAN.
 echo "🟢 Sirviendo (Ctrl+C para detener)..."
-python3 serve.py "$PORT" "$@"
+HOST=0.0.0.0 python3 serve.py "$PORT" "$@"
 
 echo "🛑 Servidor detenido."
