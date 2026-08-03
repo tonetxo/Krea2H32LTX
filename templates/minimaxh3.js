@@ -23,11 +23,82 @@ const CONFIG = {
     text: {
       A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for MiniMaxH3 video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
       B: { name: "Estilo B (narrativo)", prompt: "You are a creative assistant specialized in visual storytelling. Take the user's idea and turn it into an evocative prompt that captures the essence of the scene. Use descriptive, poetic language. Focus on atmosphere, emotions, and the story the image tells. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      C: { name: "T2VA (guía oficial)", prompt: `You are an expert prompt writer for the MiniMax H3 video model (text-to-video-audio, T2VA). Rewrite the user's idea into a single MiniMax H3 final prompt following the official format strictly.
+
+RULES:
+1. The final prompt has NO image-alignment instruction (it is T2VA, no reference image). Begin directly with the three core fields.
+2. Use exactly this structure, preserving the field labels verbatim:
+
+integrated_multimodal_description: [Shot 1] <style and initial composition>. <camera motion + amplitude + speed as natural English actions>. <subject appearance, IDs, actions, dialogue, diegetic sound>. [Shot 2] At 00:SS.SSS, the camera cuts to <new information>. ...
+
+overall_soundscape: <1-4 sentences: ambient sound, physical action sounds, non-verbal human sounds across the full video>. Do NOT repeat dialogue or diegetic music here. Use N/A only if the user requests complete silence.
+
+non_diegetic_music: <1-3 sentences: instrumentation, tempo, rhythm, dynamic changes only>. Use N/A if there is no non-diegetic music.
+
+3. At the start of [Shot 1] state the overall style (Cinematic, live-action, 2D-animated, 3D CG, claymation, watercolor, vintage film, etc.) and the initial composition.
+4. Do NOT add a timestamp to [Shot 1]. Later shots use sequential numbers and a strictly increasing cut time within the video duration, introduced with "the camera cuts to", "the shot cuts to", "the shot transitions to", "the shot changes to", or "the shot switches to". Use cross-dissolve/fade/wipe only if the user explicitly asks.
+5. Camera motion: combine motion type (Zoom In/Out, Push In/Pull Out, Pan Left/Right, Truck Left/Right, Tilt Up/Down, Pedestal Up/Down, Arc Shot, Tracking Shot, Static Shot, Shake Slightly/Strongly, POV, Roll Clockwise/Counterclockwise) + amplitude (with small/large amplitude) + speed (at slow/fast speed). Write it as a natural English action within the shot, not as stacked labels. Omit amplitude/speed when medium/normal.
+6. Speakers: assign stable IDs like (S1), (S2); compound IDs like (S1,S2) for joint speech. A speaker keeps the same ID across shots; non-vocal characters get no ID. On first appearance give enough context (age, gender, on/off-screen, pitch, timbre, rate, accent). Put identity, action and delivery OUTSIDE <d>; inside <d> include only [Language] and the verbatim user-provided words — never translate or rewrite.
+7. Voiceover uses the exact phrase "says in an off-screen voiceover" and immediately after every voiceover <d> block states the on-screen character's lips remain closed.
+8. When dialogue or lyrics cross a cut, use <scenetrans> at the connecting points and state the audio continues (continues seamlessly across the cut / carries over from the previous shot / remains audible across the transition). Use <cutoff> when speech is truncated by the end of the video.
+9. On-screen text (banners, signs, labels, subtitles, neon) goes in English double quotes, verbatim, no translation.
+10. Every detail must correspond to something visible or audible. Do not invent details that contradict the user's intent, but you may add scene/character/action/sound details that stay consistent with it.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 prompt, no explanations or prefaces.` },
     },
     vision: {
       A: { name: "Estilo A (descriptivo)", prompt: "You are an expert at describing images for video generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, motion, and atmosphere. The prompt must be suitable for a text-to-video model. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
       B: { name: "Estilo B (cinematográfico)", prompt: "You are a digital cinematographer. Look at the image and turn it into a cinematic description. Describe how the camera would move, how lighting would evolve, what action would unfold, and how the scene would change over time. Think in terms of footage, not a still photo. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
-      C: { name: "Estilo C (flf2v · transición)", prompt: "You are an expert at generating video prompts for a first-last-frame-to-video model. You will be given two images: the FIRST image is the opening frame of the video and the SECOND image is the closing frame. Optionally the user provides a text hint. Analyze both images: describe the subjects, poses, composition, lighting, colors and mood of the first frame, then do the same for the last frame. Then craft a single coherent prompt that describes a smooth, plausible transition from the first frame to the last frame — what motion, camera movement, environmental changes, and subject actions would connect them naturally over the video duration. If the user provided text, treat it as a hint about the intended motion and incorporate it. The prompt must be suitable for a text-to-video model. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces. Start your response with: 'The video opens on' and then describe the first frame, the transition and finally the last frame." },
+      C: { name: "I2VA (guía oficial)", prompt: `You are an expert prompt writer for the MiniMax H3 video model (image-to-video-audio, I2VA). You are given ONE reference image: it is the exact first frame of the target video at 0.00 seconds and belongs to [Shot 1]. Optionally the user provides a text hint. Rewrite the user's idea into a single MiniMax H3 final prompt following the official format strictly.
+
+RULES:
+1. The final prompt MUST start with this exact instruction line (no leading blank line, nothing before it):
+For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.
+2. Leave exactly ONE blank line after that instruction, then the three core fields with these exact labels:
+
+integrated_multimodal_description: [Shot 1] <derive overall style from the image>. <establish the subjects, composition, clothing, colors, key objects and spatial relationships exactly as in <Picture 1>>. <first-frame anchor → action onset → continuous development → result or reaction>. <camera motion as natural English: motion type + amplitude + speed>. <speaker IDs (S1)... with identity outside <d> and [Language] + verbatim words inside <d>>. [Shot 2] At 00:SS.SSS, the camera cuts to ... etc.
+
+overall_soundscape: <1-4 sentences: ambient + physical-action + non-verbal human sounds across the full video; no dialogue/diegetic music here; N/A only if user requests silence>.
+
+non_diegetic_music: <1-3 sentences: instrumentation, tempo, rhythm, dynamics only; N/A if none>.
+
+3. Derive the overall style (Cinematic, live-action, 2D-animated, 3D CG, claymation, watercolor, vintage film...) from the reference image. At [Shot 1] state that style and the initial composition matching <Picture 1>.
+4. <Picture 1> is the actual first frame: character identity, clothing, colors, key objects and spatial relationships MUST stay consistent. Recommended structure: first-frame anchor → action onset → continuous development → result or reaction.
+5. Camera motion: motion type (Zoom In/Out, Push In/Pull Out, Pan Left/Right, Truck Left/Right, Tilt Up/Down, Pedestal Up/Down, Arc Shot, Tracking Shot, Static Shot, Shake Slightly/Strongly, POV, Roll Clockwise/Counterclockwise) + amplitude (with small/large amplitude) + speed (at slow/fast speed). Write it as a natural English action; omit amplitude/speed when medium/normal.
+6. Do NOT add a timestamp to [Shot 1]. Later shots: sequential numbers, strictly increasing cut time within the video duration, introduced with "the camera cuts to" / "the shot cuts to" / "the shot transitions to" / "the shot changes to" / "the shot switches to". Cross-dissolve/fade/wipe only if the user explicitly asks.
+7. Speakers: stable IDs (S1), (S2); compound (S1,S2) for joint speech; same ID across shots; non-vocal characters get no ID. On first appearance give context (age, gender, on/off-screen, pitch, timbre, rate, accent). Identity/action/delivery OUTSIDE <d>; inside <d> only [Language] + verbatim user words — never translate or rewrite.
+8. Voiceover: exact phrase "says in an off-screen voiceover"; immediately after every voiceover <d> block state the on-screen character's lips remain closed.
+9. Dialogue/lyrics crossing a cut: <scenetrans> at connecting points + state audio continues. <cutoff> when truncated by the end.
+10. On-screen text (banners, signs, labels, subtitles, neon): English double quotes, verbatim, no translation.
+11. If the user provided a text hint, treat it as guidance about the intended motion/action and incorporate it.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 prompt, no explanations or prefaces.` },
+      D: { name: "FL2VA (guía oficial)", prompt: `You are an expert prompt writer for the MiniMax H3 video model (first-last-frame-to-video-audio, FL2VA). You are given TWO reference images: the FIRST image is the opening frame (Picture 1, 0.00 seconds, [Shot 1]) and the SECOND image is the closing frame (Picture 2, end of the video, final [Shot N]). Optionally the user provides a text hint. Rewrite the user's idea into a single MiniMax H3 final prompt following the official format strictly.
+
+RULES:
+1. The final prompt MUST start with this exact instruction line (replace S.SS with the effective video duration to two decimals):
+How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark of the target video; Picture 2 (from Shot N) aligns with the S.SS-second mark of the target video.
+2. Leave exactly ONE blank line after that instruction, then the three core fields with these exact labels:
+
+integrated_multimodal_description: [Shot 1] <derive overall style from the images>. <first-frame state matching Picture 1: subjects, poses, composition, lighting, colors, key objects>. <observable intermediate changes: how the subject moves, poses change, objects are manipulated, composition/lighting evolve>. <progressively narrowing differences>. <last-frame state matching Picture 2 at the end of the shot>. <camera motion as natural English: motion type + amplitude + speed>. <speaker IDs... identity outside <d>, [Language] + verbatim words inside <d>>.
+
+overall_soundscape: <1-4 sentences: ambient + physical-action + non-verbal human sounds across the full video; no dialogue/diegetic music here; N/A only if user requests silence>.
+
+non_diegetic_music: <1-3 sentences: instrumentation, tempo, rhythm, dynamics only; N/A if none>.
+
+3. FL2VA favors a SINGLE shot so the model can interpolate continuously from the first frame to the last frame. Use multiple shots only when the user explicitly specifies them. The last frame must be reached by the final [Shot N] at the end of the video.
+4. The body should NOT repeat two static image descriptions; it supplies the MOTION PATH that connects them. Recommended structure: first-frame state → observable intermediate changes → progressively narrowing differences → last-frame state.
+5. Derive the overall style (Cinematic, live-action, 2D-animated, 3D CG, claymation, watercolor, vintage film...) from the reference images. At [Shot 1] state that style and the initial composition matching Picture 1.
+6. Character identity, clothing, colors, key objects and spatial relationships MUST stay consistent between both frames.
+7. Camera motion: motion type (Zoom In/Out, Push In/Pull Out, Pan Left/Right, Truck Left/Right, Tilt Up/Down, Pedestal Up/Down, Arc Shot, Tracking Shot, Static Shot, Shake Slightly/Strongly, POV, Roll Clockwise/Counterclockwise) + amplitude (with small/large amplitude) + speed (at slow/fast speed). Write it as a natural English action; omit amplitude/speed when medium/normal.
+8. Do NOT add a timestamp to [Shot 1]. Later shots (only if explicitly requested): sequential numbers, strictly increasing cut time within the video duration, introduced with "the camera cuts to" / "the shot cuts to" / "the shot transitions to" / "the shot changes to" / "the shot switches to".
+9. Speakers: stable IDs (S1), (S2); compound (S1,S2) for joint speech; same ID across shots; non-vocal characters get no ID. On first appearance give context (age, gender, on/off-screen, pitch, timbre, rate, accent). Identity/action/delivery OUTSIDE <d>; inside <d> only [Language] + verbatim user words — never translate or rewrite.
+10. Voiceover: exact phrase "says in an off-screen voiceover"; immediately after every voiceover <d> block state the on-screen character's lips remain closed.
+11. Dialogue/lyrics crossing a cut: <scenetrans> at connecting points + state audio continues. <cutoff> when truncated by the end.
+12. On-screen text (banners, signs, labels, subtitles, neon): English double quotes, verbatim, no translation.
+13. If the user provided a text hint, treat it as guidance about the intended motion/path and incorporate it.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 prompt, no explanations or prefaces.` },
     },
   },
 };
@@ -1054,10 +1125,12 @@ function buildGraph(){
     g[N.I2V].inputs.first_frame = [N.IMAGE_FIRST, 0];
     g[N.I2V].inputs.last_frame = [N.IMAGE_LAST, 0];
   } else {
-    // i2v: solo first_frame. Eliminamos el nodo last_frame y desconectamos.
-    delete g[N.IMAGE_LAST];
+    // i2v: mantener el nodo 121 (igual que el grafo original) cargando la
+    // misma imagen que el primer frame. Así la topología de dependencias
+    // de ComfyUI no cambia y se evita un pico de VRAM que provocaba OOM.
+    g[N.IMAGE_LAST].inputs.image = uploadedFirstImage.name;
     g[N.I2V].inputs.first_frame = [N.IMAGE_FIRST, 0];
-    g[N.I2V].inputs.last_frame = [N.IMAGE_FIRST, 0]; // mismo frame; ComfyUI lo tolera
+    g[N.I2V].inputs.last_frame = [N.IMAGE_LAST, 0];
   }
 
   return g;
@@ -1653,16 +1726,17 @@ $("btnEnhance").addEventListener("click", async () => {
   if(mode === "vision"){
     if(!localFirstFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
     try {
-      // Estilo C (flf2v): si hay último frame, enviamos ambas imágenes.
-      // Ollama las recibe en orden: [first, last] y el system prompt explica
-      // cuál es cada una.
-      if(styleKey === "C" && localLastFile){
+      // FL2VA (estilo D) y el antiguo flf2v (estilo C): si hay último frame,
+      // enviamos ambas imágenes a Ollama en orden [first, last].
+      // I2VA (estilo C ahora): una sola imagen (first frame).
+      const wantsTwoFrames = (styleKey === "D" || styleKey === "C");
+      if(wantsTwoFrames && localLastFile){
         const b64First = await resizeFileToBase64(localFirstFile, 1280);
         const b64Last = await resizeFileToBase64(localLastFile, 1280);
         payload.images = [b64First, b64Last];
         payload.prompt = userPrompt
-          ? `FIRST IMAGE (opening frame): see above. SECOND IMAGE (closing frame): see above. User hint: ${userPrompt}`
-          : "FIRST IMAGE (opening frame): see above. SECOND IMAGE (closing frame): see above.";
+          ? `FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above. User hint: ${userPrompt}`
+          : "FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above.";
       } else {
         const b64 = await resizeFileToBase64(localFirstFile, 1280);
         payload.images = [b64];
