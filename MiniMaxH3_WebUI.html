@@ -2251,6 +2251,7 @@ const CONFIG = {
     vision: {
       A: { name: "Estilo A (descriptivo)", prompt: "You are an expert at describing images for video generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, motion, and atmosphere. The prompt must be suitable for a text-to-video model. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
       B: { name: "Estilo B (cinematográfico)", prompt: "You are a digital cinematographer. Look at the image and turn it into a cinematic description. Describe how the camera would move, how lighting would evolve, what action would unfold, and how the scene would change over time. Think in terms of footage, not a still photo. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      C: { name: "Estilo C (flf2v · transición)", prompt: "You are an expert at generating video prompts for a first-last-frame-to-video model. You will be given two images: the FIRST image is the opening frame of the video and the SECOND image is the closing frame. Optionally the user provides a text hint. Analyze both images: describe the subjects, poses, composition, lighting, colors and mood of the first frame, then do the same for the last frame. Then craft a single coherent prompt that describes a smooth, plausible transition from the first frame to the last frame — what motion, camera movement, environmental changes, and subject actions would connect them naturally over the video duration. If the user provided text, treat it as a hint about the intended motion and incorporate it. The prompt must be suitable for a text-to-video model. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces. Start your response with: 'The video opens on' and then describe the first frame, the transition and finally the last frame." },
     },
   },
 };
@@ -3876,8 +3877,20 @@ $("btnEnhance").addEventListener("click", async () => {
   if(mode === "vision"){
     if(!localFirstFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
     try {
-      const b64 = await resizeFileToBase64(localFirstFile, 1280);
-      payload.images = [b64];
+      // Estilo C (flf2v): si hay último frame, enviamos ambas imágenes.
+      // Ollama las recibe en orden: [first, last] y el system prompt explica
+      // cuál es cada una.
+      if(styleKey === "C" && localLastFile){
+        const b64First = await resizeFileToBase64(localFirstFile, 1280);
+        const b64Last = await resizeFileToBase64(localLastFile, 1280);
+        payload.images = [b64First, b64Last];
+        payload.prompt = userPrompt
+          ? `FIRST IMAGE (opening frame): see above. SECOND IMAGE (closing frame): see above. User hint: ${userPrompt}`
+          : "FIRST IMAGE (opening frame): see above. SECOND IMAGE (closing frame): see above.";
+      } else {
+        const b64 = await resizeFileToBase64(localFirstFile, 1280);
+        payload.images = [b64];
+      }
     } catch(e) {
       log("⚠️ No se pudo leer la imagen: "+(e.message || e), "l-err");
       return;
