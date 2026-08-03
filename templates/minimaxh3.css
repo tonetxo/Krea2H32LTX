@@ -1,0 +1,79 @@
+/* ============================================================
+   minimaxh3.css — CSS específico de MiniMaxH3 (generar_minimaxh3.py)
+   Reutiliza casi todo de ltxv.css; añade estilos para el toggle
+   i2v/flf2v y el panel del último frame.
+   ============================================================ */
+
+/* Cadena de nodos del pipeline (imagen → cond → sampler → upscale → final) */
+.chain{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 22px;flex-wrap:wrap;}
+.chain .node{padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--panel);}
+.chain .node.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent-dim) inset;}
+.chain .arrow{color:var(--muted-2);}
+
+/* input.ro (readonly) */
+input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
+
+/* Dropzone */
+.dropzone{border:1.5px dashed var(--border);border-radius:7px;padding:14px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;color:var(--muted);font-size:12px;position:relative;overflow:hidden;}
+.dropzone.drag{border-color:var(--accent);background:var(--accent-dim);}
+.dropzone img{max-width:100%;max-height:360px;border-radius:5px;display:block;margin:0 auto;}
+.dropzone .ph{padding:22px 0;font-family:var(--mono);font-size:11px;letter-spacing:.04em;}
+.dropzone input{display:none;}
+
+/* Selector de frame (1er / último) para vídeos cargados como entrada */
+.frame-selector{display:flex;gap:8px;margin-top:8px;}
+.frame-selector button{flex:1;min-width:auto;}
+.frame-selector button.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+
+/* Estructura vidbox (reproductor de vídeo) */
+.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column; position: relative;contain:layout style;}
+.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px; gap: 10px;}
+.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px; flex:1;}
+.vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
+.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
+.vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px; gap: 10px; flex-wrap:wrap;}
+.res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
+
+/* Vídeo principal y badges */
+video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh;will-change:contents;min-height:140px;}
+.video-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin-bottom:6px;pointer-events:none;}
+
+/* Empty */
+.empty{height:140px;}
+
+/* Pantalla completa del vidbox */
+.vidbox:fullscreen, .vidbox:-webkit-full-screen, .vidbox:-moz-full-screen {
+  width: 100vw !important; height: 100vh !important; max-height: none !important;
+  background: #000; border: none; border-radius: 0; padding: 0; position: fixed; top: 0; left: 0; z-index: 9999;
+}
+.vidbox:fullscreen video, .vidbox:-webkit-full-screen video, .vidbox:-moz-full-screen video {
+  width: 100%; height: 100%; object-fit: contain; max-height: none; border-radius: 0;
+}
+.vidbox:fullscreen .vid-header, .vidbox:fullscreen .vid-footer, .vidbox:fullscreen .empty {
+  display: none !important;
+}
+
+/* Variantes (vídeo) */
+.variant-card video,.variant-card .thumb-img{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;min-height:120px;display:block;transition:transform .2s,opacity .2s;}
+.variant-card:hover .thumb-img{transform:scale(1.03);}
+.variant-card .thumb-wrap{position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;}
+.variant-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:10px;padding:3px 6px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin:4px 6px 0;pointer-events:none;}
+.variant-meta-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
+.variant-meta-btn:hover{color:var(--accent);background:rgba(87,232,201,.12);}
+
+/* dz-info */
+.dz-info{font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:8px;letter-spacing:.03em;}
+
+/* Wrap para imagen de entrada con zoom/pan/fullscreen */
+.img-input-actions{display:flex;align-items:center;justify-content:flex-end;}
+#inputWrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:var(--panel-2);min-height:80px;max-height:45vh;display:flex;align-items:center;justify-content:center;margin-top:8px;}
+#inputWrap img{display:block;max-width:100%;max-height:45vh;width:auto;height:auto;object-fit:contain;margin:0 auto;}
+#inputWrap:fullscreen,#inputWrap:-webkit-full-screen{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;background:#000;border-radius:0;display:flex;align-items:center;justify-content:center;padding:0;margin:0;z-index:99999;}
+#inputWrap:fullscreen img,#inputWrap:-webkit-full-screen img{max-width:100vw!important;max-height:100vh!important;width:auto!important;height:auto!important;object-fit:contain!important;display:block;}
+
+/* Último frame (flf2v) — mismo estilo que inputWrap */
+#lastFrameWrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:var(--panel-2);min-height:80px;max-height:45vh;display:flex;align-items:center;justify-content:center;margin-top:8px;}
+#lastFrameWrap img{display:block;max-width:100%;max-height:45vh;width:auto;height:auto;object-fit:contain;margin:0 auto;}
+#lastFrameWrap:fullscreen,#lastFrameWrap:-webkit-full-screen{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;background:#000;border-radius:0;display:flex;align-items:center;justify-content:center;padding:0;margin:0;z-index:99999;}
+#lastFrameWrap:fullscreen img,#lastFrameWrap:-webkit-full-screen img{max-width:100vw!important;max-height:100vh!important;width:auto!important;height:auto!important;object-fit:contain!important;display:block;}

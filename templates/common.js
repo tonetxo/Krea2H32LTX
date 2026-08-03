@@ -488,7 +488,9 @@ function loadModels(){
   }
 }
 function renderLoras(){
-  const wrap=$("loraList"); wrap.innerHTML="";
+  const wrap=$("loraList");
+  if(!wrap) return;
+  wrap.innerHTML="";
   loras.forEach((l,i)=>{
     const box=document.createElement("div");
     box.className="lora"+(l.on?"":" off");

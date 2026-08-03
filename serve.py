@@ -35,7 +35,7 @@ BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/file_delete", "/api/krea2_upload")
+CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/file_delete", "/api/krea2_upload")
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
@@ -319,6 +319,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         return path == "/api/ltxv_list"
 
+    def _is_minimaxh3_list(self):
+        path = self.path.split("?")[0]
+        return path == "/api/minimaxh3_list"
+
     def _is_krea2_upload(self):
         path = self.path.split("?")[0]
         return path == "/api/krea2_upload"
@@ -439,6 +443,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_krea2_list()
         elif self._is_ltxv_list():
             self._do_ltxv_list()
+        elif self._is_minimaxh3_list():
+            self._do_minimaxh3_list()
         elif self._is_ollama_route():
             self._proxy("GET", OLLAMA)
         elif self._is_proxy_route():
@@ -452,6 +458,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         elif self._is_krea2_list():
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_ltxv_list():
+            self._send_json(405, {"error": "method not allowed"})
+        elif self._is_minimaxh3_list():
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_file_delete():
             self._do_file_delete()
@@ -474,7 +482,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._cors_preflight()
         elif self._is_proxy_route():
             self._proxy("OPTIONS", BACKEND)
-        elif self._is_krea2_upload() or self._is_file_delete() or self._is_krea2_list() or self._is_ltxv_list():
+        elif self._is_krea2_upload() or self._is_file_delete() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list():
             # Endpoints custom también necesitan preflight same-origin.
             self._cors_preflight()
         else:
@@ -581,6 +589,50 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             "items": items,
         }
 
+    def _do_minimaxh3_list(self):
+        """List MP4s in ComfyUI output/video/MiniMax_H3, newest first, max 100."""
+        cached = _LIST_CACHE.get("minimaxh3")
+        if cached and cached[0] > time.time():
+            self._send_json(200, cached[1])
+            return
+        result = self._build_minimaxh3_list()
+        _LIST_CACHE["minimaxh3"] = (time.time() + LIST_CACHE_TTL, result)
+        self._send_json(200, result)
+
+    def _build_minimaxh3_list(self):
+        items = []
+        base_dir = os.path.join(COMFYUI_ROOT, "output", "video", "MiniMax_H3")
+        try:
+            paths = glob.glob(os.path.join(base_dir, "*.mp4"))
+            paths_with_time = []
+            for p in paths:
+                try:
+                    paths_with_time.append((os.path.getmtime(p), p))
+                except OSError:
+                    continue
+            paths_with_time.sort(key=lambda x: x[0], reverse=True)
+            paths = [p for _, p in paths_with_time][:100]
+
+            for p in paths:
+                try:
+                    st = os.stat(p)
+                    items.append({
+                        "filename": os.path.basename(p),
+                        "subfolder": "video/MiniMax_H3",
+                        "type": "output",
+                        "mtime": int(st.st_mtime),
+                        "size": st.st_size,
+                    })
+                except OSError:
+                    continue
+        except OSError as e:
+            sys.stderr.write(f"[serve] minimaxh3_list error: {e}\n")
+        return {
+            "dir": base_dir,
+            "count": len(items),
+            "items": items,
+        }
+
     def _do_file_delete(self):
         """Delete a file inside ComfyUI's output/ or temp/. Validates path and origin."""
         # Same-origin estricto: bloquea que una web externa abierta en el navegador
@@ -627,6 +679,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             # Invalidar cachés de listado para que el siguiente /api/*_list refleje el borrado.
             _LIST_CACHE.pop("krea2", None)
             _LIST_CACHE.pop("ltxv", None)
+            _LIST_CACHE.pop("minimaxh3", None)
             self._send_json(200, {"ok": True, "deleted": target})
         except OSError as e:
             self._send_json(500, {"error": str(e)})

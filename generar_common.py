@@ -45,15 +45,17 @@ def get_file_list(directory, ext='.safetensors', fallback=None):
 
 def get_lora_list(directory, fallback="ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors"):
     loras = []
-    if not os.path.exists(directory):
-        return [fallback]
+    if not directory or not os.path.exists(directory):
+        return [fallback] if fallback else []
     for root, _, files in os.walk(directory):
         for file in files:
             if file.endswith('.safetensors'):
                 rel_path = os.path.relpath(os.path.join(root, file), directory)
                 loras.append(rel_path.replace('\\', '/'))
     loras.sort()
-    return loras if loras else ["No LoRAs found"]
+    if loras:
+        return loras
+    return [fallback] if fallback else []
 
 
 def get_vae_list(directory, fallback="Ligazón para VAE/LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors"):
@@ -86,6 +88,12 @@ def generate_html(config):
         model_exclude:   tuple of prefixes to exclude from model list
         lora_dir:        directory for LoRAs
         lora_fallback:   fallback LoRA name
+        unet_dirs:       optional dir or list of (dir, prefix) for UNet models
+        unet_fallback:   fallback UNet name
+        unet_exclude:    tuple of prefixes to exclude from UNet list
+        clip_dirs:       optional dir or list of (dir, prefix) for CLIP models
+        clip_fallback:   fallback CLIP name
+        clip_exclude:    tuple of prefixes to exclude from CLIP list
         header_title:    e.g. "LTXV" or "Krea2"
         header_sub:      e.g. "grafo: LTXV_DMD_OK"
         model_count_label: "modelos" or "" (for the success message)
@@ -111,6 +119,25 @@ def generate_html(config):
     vae_files = get_vae_list(config.get('vae_dir'), fallback=config.get('vae_fallback'))
     vae_js_array = json.dumps(vae_files)
 
+    # --- UNet / CLIP lists (optional, used by MiniMaxH3) ---
+    if config.get('unet_dirs'):
+        raw_unets = get_file_list(config['unet_dirs'], fallback=config.get('unet_fallback'))
+        unet_exclude = config.get('unet_exclude', ())
+        # Para UNet/CLIP usamos coincidencia por subcadena (el path incluye
+        # el prefijo "Ligazón para diffusion_models/..."), no por prefijo.
+        unet_files = [m for m in raw_unets if not any(x in m for x in unet_exclude)]
+    else:
+        unet_files = []
+    unet_js_array = json.dumps(unet_files)
+
+    if config.get('clip_dirs'):
+        raw_clips = get_file_list(config['clip_dirs'], fallback=config.get('clip_fallback'))
+        clip_exclude = config.get('clip_exclude', ())
+        clip_files = [m for m in raw_clips if not any(x in m for x in clip_exclude)]
+    else:
+        clip_files = []
+    clip_js_array = json.dumps(clip_files)
+
     ltxv_ui_port = config.get('ltxv_ui_port', '8000')
 
     # --- Assemble CSS ---
@@ -132,6 +159,8 @@ def generate_html(config):
         "const AVAILABLE_MODELS = __MODEL_LIST__;\n"
         "const AVAILABLE_LORAS = __LORA_LIST__;\n"
         "const AVAILABLE_VAES = __VAE_LIST__;\n"
+        "const AVAILABLE_UNETS = __UNET_LIST__;\n"
+        "const AVAILABLE_CLIPS = __CLIP_LIST__;\n"
         "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
         + common_js + "\n"
         + ui_js
@@ -168,6 +197,8 @@ def generate_html(config):
     html = html.replace('__MODEL_LIST__', model_js_array)
     html = html.replace('__LORA_LIST__', lora_js_array)
     html = html.replace('__VAE_LIST__', vae_js_array)
+    html = html.replace('__UNET_LIST__', unet_js_array)
+    html = html.replace('__CLIP_LIST__', clip_js_array)
     html = html.replace('__LTXV_UI_PORT__', json.dumps(ltxv_ui_port))
 
     # --- Write output ---
