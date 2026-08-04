@@ -13,7 +13,7 @@ const CONFIG = {
   N: {
     IMAGE_FIRST:"114", IMAGE_LAST:"121", IMG_SCALE:"119", GET_SIZE:"120",
     UNET:"105:6", CLIP:"105:13", VAE_VIDEO:"105:11", VAE_AUDIO:"105:24",
-    SAGE:"105:123", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
+    SAGE:"105:123", SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
     SCHEDULER:"105:9", SAMPLER_SELECT:"105:17", I2V:"105:104", GUIDER:"105:16",
     SAMPLER:"105:14", DECODE_VIDEO:"105:10", DECODE_AUDIO:"105:23",
     RTX_SR:"105:121", CREATE_VIDEO:"105:91", SAVE:"92",
@@ -114,6 +114,7 @@ let currentMedia = {};
 const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk"];
 const BITDEPTH_KEY = "minimaxh3_bit_depth";
 const MODE_KEY = "minimaxh3_mode";
+const SPECTRUM_KEY = "minimaxh3_spectrum";
 let currentMode = "i2v"; // "i2v" | "flf2v"
 window.currentBatchMode = false;
 let jobQueue = [];
@@ -141,6 +142,40 @@ function loadBitDepth(){
 setBitDepthUI(loadBitDepth());
 $("segBitDepth8")?.addEventListener("click", () => { setBitDepthUI(8); saveBitDepth(8); });
 $("segBitDepth10")?.addEventListener("click", () => { setBitDepthUI(10); saveBitDepth(10); });
+
+// --- SPECTRUM (MiniMax H3) ---
+const SPECTRUM_DEFAULTS = { enabled: true, blend: 0.5, flex: 0.75, warmup: 5, historyStorage: "system_ram" };
+function loadSpectrum(){
+  try { return Object.assign({}, SPECTRUM_DEFAULTS, JSON.parse(localStorage.getItem(SPECTRUM_KEY) || "{}")); }
+  catch(_) { return {...SPECTRUM_DEFAULTS}; }
+}
+function saveSpectrum(s){ try { localStorage.setItem(SPECTRUM_KEY, JSON.stringify(s)); } catch(_){} }
+function setSpectrumUI(s){
+  const on = $("segSpectrumOn"), off = $("segSpectrumOff");
+  if(s.enabled){ on?.classList.add("on"); off?.classList.remove("on"); }
+  else { off?.classList.add("on"); on?.classList.remove("on"); }
+  if($("spectrumBlend")){ $("spectrumBlend").value = s.blend; $("spectrumBlendVal").textContent = parseFloat(s.blend).toFixed(2); }
+  if($("spectrumFlex")){ $("spectrumFlex").value = s.flex; $("spectrumFlexVal").textContent = parseFloat(s.flex).toFixed(2); }
+  if($("spectrumWarmup")){ $("spectrumWarmup").value = s.warmup; $("spectrumWarmupVal").textContent = s.warmup; }
+  if($("spectrumHistoryStorage")) $("spectrumHistoryStorage").value = s.historyStorage;
+}
+function getSpectrumState(){
+  return {
+    enabled: $("segSpectrumOn")?.classList.contains("on") ?? true,
+    blend: parseFloat($("spectrumBlend")?.value ?? "0.5"),
+    flex: parseFloat($("spectrumFlex")?.value ?? "0.75"),
+    warmup: parseInt($("spectrumWarmup")?.value ?? "5", 10),
+    historyStorage: $("spectrumHistoryStorage")?.value || "system_ram",
+  };
+}
+const _spectrumState = loadSpectrum();
+setSpectrumUI(_spectrumState);
+$("segSpectrumOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.enabled = true; setSpectrumUI(s); saveSpectrum(s); });
+$("segSpectrumOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.enabled = false; setSpectrumUI(s); saveSpectrum(s); });
+$("spectrumBlend")?.addEventListener("input", (e) => { $("spectrumBlendVal").textContent = parseFloat(e.target.value).toFixed(2); const s = getSpectrumState(); s.blend = parseFloat(e.target.value); saveSpectrum(s); });
+$("spectrumFlex")?.addEventListener("input", (e) => { $("spectrumFlexVal").textContent = parseFloat(e.target.value).toFixed(2); const s = getSpectrumState(); s.flex = parseFloat(e.target.value); saveSpectrum(s); });
+$("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").textContent = e.target.value; const s = getSpectrumState(); s.warmup = parseInt(e.target.value, 10); saveSpectrum(s); });
+$("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); });
 
 // --- MODO i2v / flf2v ---
 function setModeUI(mode){
@@ -177,10 +212,12 @@ CONFIG.renderVariantMedia = function(card, url, media){
   return `<video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
 };
 CONFIG.variantMeta = function(){
+  const s = getSpectrumState();
   const rows = [
     ["UNet", $("unetSelect")?.value || ""],
     ["CLIP", $("clipSelect")?.value || ""],
     ["Sage", $("sageAttentionType")?.value || "sageattn3"],
+    ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
     ["Steps", $("stepsSlider")?.value || "20"],
@@ -361,6 +398,7 @@ function snapshotJob(){
     steps: $("stepsSlider")?.value,
     bitDepth: getBitDepth(),
     mode: currentMode,
+    spectrum: getSpectrumState(),
     batchSize: parseInt($("batchSize")?.value || "1", 10),
     uploadedFirstImage: uploadedFirstImage ? {...uploadedFirstImage} : null,
     uploadedLastImage: uploadedLastImage ? {...uploadedLastImage} : null,
@@ -397,6 +435,7 @@ function restoreJob(job){
   if($("stepsSlider") && job.steps){ $("stepsSlider").value = job.steps; $("stepsVal").textContent = job.steps; }
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
+  if(job.spectrum){ setSpectrumUI(job.spectrum); saveSpectrum(job.spectrum); }
   setModeUI(job.mode || "i2v");
   $("batchSize").value = job.batchSize;
   uploadedFirstImage = job.uploadedFirstImage;
@@ -680,6 +719,24 @@ function applyWorkflow(workflow, opts={}){
     $("sageAttentionType").value = sageNode.inputs.sage_attention;
     setApplied("sage attention");
   } else { setMissing("sage attention"); }
+
+  // Spectrum
+  const spectrumNode = findByClass("SpectrumApplyMiniMaxH3");
+  if(spectrumNode && spectrumNode.inputs){
+    const s = {
+      enabled: spectrumNode.inputs.enabled !== false,
+      blend: typeof spectrumNode.inputs.blend_weight === "number" ? spectrumNode.inputs.blend_weight : 0.5,
+      flex: typeof spectrumNode.inputs.flex_window === "number" ? spectrumNode.inputs.flex_window : 0.75,
+      warmup: typeof spectrumNode.inputs.warmup_steps === "number" ? spectrumNode.inputs.warmup_steps : 5,
+      historyStorage: spectrumNode.inputs.history_storage || "system_ram",
+    };
+    setSpectrumUI(s);
+    saveSpectrum(s);
+    setApplied("spectrum");
+  } else if(spectrumNode === null){
+    // Sin nodo Spectrum en el workflow: no tocar el estado guardado.
+    setMissing("spectrum");
+  }
 
   // Sampler
   const samplerSel = findByClass("KSamplerSelect");
@@ -1104,6 +1161,15 @@ function buildGraph(){
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
   // Sage attention
   if(g[N.SAGE] && g[N.SAGE].inputs) g[N.SAGE].inputs.sage_attention = $("sageAttentionType").value;
+  // Spectrum
+  if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
+    const s = getSpectrumState();
+    g[N.SPECTRUM].inputs.enabled = s.enabled;
+    g[N.SPECTRUM].inputs.blend_weight = s.blend;
+    g[N.SPECTRUM].inputs.flex_window = s.flex;
+    g[N.SPECTRUM].inputs.warmup_steps = s.warmup;
+    g[N.SPECTRUM].inputs.history_storage = s.historyStorage;
+  }
   // Sampler
   if(g[N.SAMPLER_SELECT] && g[N.SAMPLER_SELECT].inputs) g[N.SAMPLER_SELECT].inputs.sampler_name = $("samplerName").value;
   // Scheduler + steps

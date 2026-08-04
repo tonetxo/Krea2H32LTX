@@ -152,13 +152,36 @@
       "title": "Math Expression"
     }
   },
+  "105:124": {
+    "inputs": {
+      "enabled": true,
+      "blend_weight": 0.5,
+      "degree": 4,
+      "ridge_lambda": 0.1,
+      "window_size": 2.0,
+      "flex_window": 0.75,
+      "warmup_steps": 5,
+      "tail_actual_steps": 1,
+      "max_history": 8,
+      "debug": false,
+      "history_storage": "system_ram",
+      "model": [
+        "105:123",
+        0
+      ]
+    },
+    "class_type": "SpectrumApplyMiniMaxH3",
+    "_meta": {
+      "title": "Spectrum Apply MiniMax H3"
+    }
+  },
   "105:9": {
     "inputs": {
       "scheduler": "simple",
       "steps": 20,
       "denoise": 1,
       "model": [
-        "105:123",
+        "105:124",
         0
       ]
     },
@@ -207,7 +230,7 @@
   "105:16": {
     "inputs": {
       "model": [
-        "105:123",
+        "105:124",
         0
       ],
       "conditioning": [
