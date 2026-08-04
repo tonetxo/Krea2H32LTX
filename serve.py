@@ -103,6 +103,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, format, *args):
         sys.stderr.write("[serve] " + (format % args) + "\n")
 
+    def handle(self):
+        # Silenciar ConnectionResetError / BrokenPipeError cuando el navegador
+        # cancela peticiones (típico al hacer scroll en la galería de thumbnails:
+        # el IntersectionObserver dispara muchas /view y el navegador las aborta).
+        try:
+            super().handle()
+        except (ConnectionResetError, BrokenPipeError):
+            pass
+
     # ---- WebSocket proxy (/ws) ----
     def _ws_proxy(self):
         """Upgrade the client connection to WebSocket and relay to backend WS.
@@ -601,11 +610,14 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def _build_minimaxh3_list(self):
         items = []
-        base_dir = os.path.join(COMFYUI_ROOT, "output", "video", "MiniMax_H3")
+        # SaveVideo con filename_prefix="video/MiniMax_H3" guarda como
+        # "MiniMax_H3_NNNN_.mp4" dentro de output/video/ (el prefijo "video/"
+        # se interpreta como subfolder, "MiniMax_H3" como base del nombre).
+        video_dir = os.path.join(COMFYUI_ROOT, "output", "video")
         try:
-            paths = glob.glob(os.path.join(base_dir, "*.mp4"))
+            all_mp4 = glob.glob(os.path.join(video_dir, "MiniMax_H3_*.mp4"))
             paths_with_time = []
-            for p in paths:
+            for p in all_mp4:
                 try:
                     paths_with_time.append((os.path.getmtime(p), p))
                 except OSError:
@@ -618,7 +630,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     st = os.stat(p)
                     items.append({
                         "filename": os.path.basename(p),
-                        "subfolder": "video/MiniMax_H3",
+                        "subfolder": "video",
                         "type": "output",
                         "mtime": int(st.st_mtime),
                         "size": st.st_size,
@@ -628,7 +640,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         except OSError as e:
             sys.stderr.write(f"[serve] minimaxh3_list error: {e}\n")
         return {
-            "dir": base_dir,
+            "dir": video_dir,
             "count": len(items),
             "items": items,
         }
@@ -803,6 +815,16 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 class ReusableServer(socketserver.ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        # Silenciar tracebacks por conexiones canceladas por el cliente
+        # (ConnectionResetError, BrokenPipeError: típicos al hacer scroll
+        # en galerías de thumbnails donde el navegador aborta /view).
+        import sys as _sys
+        e = _sys.exc_info()[1]
+        if isinstance(e, (ConnectionResetError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
 
 
 def main():
