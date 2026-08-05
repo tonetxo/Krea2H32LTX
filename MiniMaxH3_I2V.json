@@ -127,16 +127,14 @@
   },
   "105:123": {
     "inputs": {
-      "sage_attention": "sageattn3",
-      "allow_compile": false,
       "model": [
         "105:6",
         0
       ]
     },
-    "class_type": "PathchSageAttentionKJ",
+    "class_type": "MiniMaxH3MemoryEfficientSageAttentionPatch",
     "_meta": {
-      "title": "Patch Sage Attention KJ"
+      "title": "MiniMax H3 Mem Eff Sage Attention"
     }
   },
   "105:107": {

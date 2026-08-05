@@ -111,7 +111,7 @@ let localFirstFile=null, localLastFile=null;
 let seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
-const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk"];
+const SAGE_TYPES = [];
 const BITDEPTH_KEY = "minimaxh3_bit_depth";
 const MODE_KEY = "minimaxh3_mode";
 const SPECTRUM_KEY = "minimaxh3_spectrum";
@@ -216,7 +216,7 @@ CONFIG.variantMeta = function(){
   const rows = [
     ["UNet", $("unetSelect")?.value || ""],
     ["CLIP", $("clipSelect")?.value || ""],
-    ["Sage", $("sageAttentionType")?.value || "sageattn3"],
+    ["Sage", "mem_eff (H3)"],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
@@ -392,7 +392,6 @@ function snapshotJob(){
     mp: $("mpSlider").value,
     unet: $("unetSelect")?.value,
     clip: $("clipSelect")?.value,
-    sageType: $("sageAttentionType")?.value,
     samplerName: $("samplerName")?.value,
     schedulerName: $("schedulerName")?.value,
     steps: $("stepsSlider")?.value,
@@ -429,7 +428,6 @@ function restoreJob(job){
   $("mpVal").textContent = parseFloat(job.mp).toFixed(2);
   if($("unetSelect") && job.unet) $("unetSelect").value = job.unet;
   if($("clipSelect") && job.clip) $("clipSelect").value = job.clip;
-  if($("sageAttentionType") && job.sageType) $("sageAttentionType").value = job.sageType;
   if($("samplerName") && job.samplerName) $("samplerName").value = job.samplerName;
   if($("schedulerName") && job.schedulerName) $("schedulerName").value = job.schedulerName;
   if($("stepsSlider") && job.steps){ $("stepsSlider").value = job.steps; $("stepsVal").textContent = job.steps; }
@@ -713,12 +711,10 @@ function applyWorkflow(workflow, opts={}){
   }
   if(clipSet) setApplied("CLIP"); else setMissing("CLIP");
 
-  // Sage Attention
-  const sageNode = findByClass("PathchSageAttentionKJ");
-  if(sageNode && sageNode.inputs && sageNode.inputs.sage_attention && SAGE_TYPES.includes(sageNode.inputs.sage_attention)){
-    $("sageAttentionType").value = sageNode.inputs.sage_attention;
-    setApplied("sage attention");
-  } else { setMissing("sage attention"); }
+  // Sage Attention (Mem Eff: sin parámetros)
+  const sageNode = findByClass("MiniMaxH3MemoryEfficientSageAttentionPatch");
+  if(sageNode) setApplied("sage attention (mem eff)");
+  else setMissing("sage attention");
 
   // Spectrum
   const spectrumNode = findByClass("SpectrumApplyMiniMaxH3");
@@ -1159,8 +1155,7 @@ function buildGraph(){
   if(g[N.UNET] && g[N.UNET].inputs) g[N.UNET].inputs.unet_name = $("unetSelect").value;
   // CLIP
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
-  // Sage attention
-  if(g[N.SAGE] && g[N.SAGE].inputs) g[N.SAGE].inputs.sage_attention = $("sageAttentionType").value;
+  // Sage attention (nodo Mem Eff: sin parámetros, siempre aplicado)
   // Spectrum
   if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
     const s = getSpectrumState();
