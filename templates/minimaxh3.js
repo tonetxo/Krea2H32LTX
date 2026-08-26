@@ -374,21 +374,51 @@ CONFIG.onNodeExecuted = function(data){
   }
 };
 
+CONFIG.onProgress = function(value, max, prompt_id, node){
+  const b = $("previewStep1");
+  const t = $("previewStepText1");
+  if(b && t){
+    const pct = Math.round((value / max) * 100);
+    t.textContent = `Paso ${value}/${max} · ${pct}%`;
+    b.style.display = "inline-flex";
+  }
+  if(prompt_id && promptVariantMap[prompt_id]){
+    const varIdx = promptVariantMap[prompt_id];
+    const cardBadge = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-progress-badge`);
+    if(cardBadge){
+      const pct = Math.round((value / max) * 100);
+      cardBadge.textContent = `${value}/${max} (${pct}%)`;
+      cardBadge.style.display = "block";
+    }
+  }
+};
+
 CONFIG.onPreview = function(url, meta){
-  const p = $("previewImg1"), e = $("empty1"), v = $("video1");
+  const p = $("previewImg1"), e = $("empty1"), v = $("video1"), w = $("previewWrap1");
   if(p && e){
     p.src = url;
+    if(w) w.style.display = "block";
     p.style.display = "block";
     e.style.display = "none";
     if(v && (!displayedSlots[currentPromptId] || !displayedSlots[currentPromptId].has(1))){
       v.style.display = "none";
     }
   }
+  if(currentPromptId && promptVariantMap[currentPromptId]){
+    const varIdx = promptVariantMap[currentPromptId];
+    const cardImg = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-live-thumb`);
+    if(cardImg){
+      cardImg.src = url;
+      cardImg.style.opacity = "1";
+    }
+  }
 };
 
 CONFIG.onClearPreview = function(){
-  const p1 = $("previewImg1");
+  const p1 = $("previewImg1"), w = $("previewWrap1"), b = $("previewStep1");
   if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
+  if(w) w.style.display = "none";
+  if(b) b.style.display = "none";
 };
 
 CONFIG.onPromptError = function(pid){
@@ -1520,8 +1550,10 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
-  const prev=$("previewImg"+slot);
+  const prev=$("previewImg"+slot), wrap=$("previewWrap"+slot), step=$("previewStep"+slot);
   if(prev) prev.style.display="none";
+  if(wrap) wrap.style.display="none";
+  if(step) step.style.display="none";
   v.crossOrigin = "anonymous";
   v.src = url;
   v.style.display = "block";
@@ -1703,6 +1735,36 @@ if(vidbox1){
 }
 
 // --- VARIANT GALLERY ---
+function createOrUpdatePlaceholderVariantCard(varIdx, seedUsed){
+    const box = $("variantGalleryBox");
+    const grid = $("variantGrid");
+    if(!box || !grid) return;
+    box.style.display = "block";
+
+    let card = grid.querySelector(`.variant-card[data-variant-index="${varIdx}"]`);
+    if(!card){
+        card = document.createElement("div");
+        card.className = "variant-card variant-card-generating";
+        card.dataset.variantIndex = String(varIdx);
+        card.innerHTML = `
+          <span class="variant-badge">Var ${varIdx} · procesando...</span>
+          <span class="variant-progress-badge" style="display:none;"></span>
+          <div class="thumb-wrap" style="position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;">
+            <img class="variant-live-thumb" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:0.4;transition:opacity 0.2s;">
+          </div>
+          <div class="variant-info">
+            <span class="variant-seed-display" title="Semilla">
+              <span class="seed-text">${seedUsed}</span>
+            </span>
+            <span class="variant-time" title="Estado">⏳ En curso...</span>
+          </div>
+        `;
+        grid.appendChild(card);
+        const remaining = grid.querySelectorAll(".variant-card").length;
+        $("variantCount").textContent = `(${remaining})`;
+    }
+}
+
 function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     if(!media || !media.filename) {
         log("⚠️ No se encontró vídeo de salida para añadir a la galería de variantes.", "l-err");
@@ -1711,6 +1773,10 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     const box = $("variantGalleryBox");
     const grid = $("variantGrid");
     box.style.display = "block";
+
+    // Si existía tarjeta placeholder para esta variante, eliminarla antes de insertar la tarjeta interactiva final
+    const existingPlaceholder = grid.querySelector(`.variant-card[data-variant-index="${variantIndex}"]`);
+    if(existingPlaceholder) existingPlaceholder.remove();
 
     const typeShort = "final";
     const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
@@ -2007,6 +2073,7 @@ async function runSingleGeneration(index) {
         pendingSeeds[data.prompt_id] = seedUsed;
         promptVariantMap[data.prompt_id] = varIndex;
         currentPromptId = data.prompt_id;
+        createOrUpdatePlaceholderVariantCard(varIndex, seedUsed);
         startTimer(data.prompt_id, 1);
         pollFallback(data.prompt_id);
     } catch(err) {

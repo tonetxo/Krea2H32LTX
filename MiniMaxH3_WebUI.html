@@ -55,7 +55,13 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .time-tag.live{color:var(--warn);}
 .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em;flex-shrink:0;white-space:nowrap;}
 .empty{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+.preview-wrap{position:relative;width:100%;text-align:center;}
 .preview-img{width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);display:block;margin:0 auto;}
+.preview-step-badge{position:absolute;top:12px;left:12px;background:rgba(13,17,23,0.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;pointer-events:none;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.6);letter-spacing:0.5px;display:inline-flex;align-items:center;gap:6px;animation:fadeIn .2s ease;}
+.preview-step-badge .spinner-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulseDot 1s infinite alternate;}
+@keyframes pulseDot{0%{opacity:.4;transform:scale(.85);}100%{opacity:1;transform:scale(1.15);}}
+.variant-card-generating{border-color:var(--accent-dim);box-shadow:0 0 0 1px var(--accent-dim);}
+.variant-progress-badge{position:absolute;top:6px;right:6px;background:rgba(13,17,23,0.9);color:var(--accent);font-family:var(--mono);font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid var(--accent);z-index:3;letter-spacing:.02em;}
 .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
 .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
 .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
@@ -429,7 +435,10 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
         <div class="empty" id="empty1">sin generar</div>
-        <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa vídeo">
+        <div class="preview-wrap" id="previewWrap1" style="display:none;">
+          <div class="preview-step-badge" id="previewStep1" style="display:none;"><span class="spinner-dot"></span><span id="previewStepText1">Paso 0/0 · 0%</span></div>
+          <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa vídeo">
+        </div>
         <span class="video-badge" id="badge1"></span>
         <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
         <div class="vid-footer">
@@ -2992,21 +3001,51 @@ CONFIG.onNodeExecuted = function(data){
   }
 };
 
+CONFIG.onProgress = function(value, max, prompt_id, node){
+  const b = $("previewStep1");
+  const t = $("previewStepText1");
+  if(b && t){
+    const pct = Math.round((value / max) * 100);
+    t.textContent = `Paso ${value}/${max} · ${pct}%`;
+    b.style.display = "inline-flex";
+  }
+  if(prompt_id && promptVariantMap[prompt_id]){
+    const varIdx = promptVariantMap[prompt_id];
+    const cardBadge = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-progress-badge`);
+    if(cardBadge){
+      const pct = Math.round((value / max) * 100);
+      cardBadge.textContent = `${value}/${max} (${pct}%)`;
+      cardBadge.style.display = "block";
+    }
+  }
+};
+
 CONFIG.onPreview = function(url, meta){
-  const p = $("previewImg1"), e = $("empty1"), v = $("video1");
+  const p = $("previewImg1"), e = $("empty1"), v = $("video1"), w = $("previewWrap1");
   if(p && e){
     p.src = url;
+    if(w) w.style.display = "block";
     p.style.display = "block";
     e.style.display = "none";
     if(v && (!displayedSlots[currentPromptId] || !displayedSlots[currentPromptId].has(1))){
       v.style.display = "none";
     }
   }
+  if(currentPromptId && promptVariantMap[currentPromptId]){
+    const varIdx = promptVariantMap[currentPromptId];
+    const cardImg = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-live-thumb`);
+    if(cardImg){
+      cardImg.src = url;
+      cardImg.style.opacity = "1";
+    }
+  }
 };
 
 CONFIG.onClearPreview = function(){
-  const p1 = $("previewImg1");
+  const p1 = $("previewImg1"), w = $("previewWrap1"), b = $("previewStep1");
   if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
+  if(w) w.style.display = "none";
+  if(b) b.style.display = "none";
 };
 
 CONFIG.onPromptError = function(pid){
@@ -4138,8 +4177,10 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
-  const prev=$("previewImg"+slot);
+  const prev=$("previewImg"+slot), wrap=$("previewWrap"+slot), step=$("previewStep"+slot);
   if(prev) prev.style.display="none";
+  if(wrap) wrap.style.display="none";
+  if(step) step.style.display="none";
   v.crossOrigin = "anonymous";
   v.src = url;
   v.style.display = "block";
@@ -4321,6 +4362,36 @@ if(vidbox1){
 }
 
 // --- VARIANT GALLERY ---
+function createOrUpdatePlaceholderVariantCard(varIdx, seedUsed){
+    const box = $("variantGalleryBox");
+    const grid = $("variantGrid");
+    if(!box || !grid) return;
+    box.style.display = "block";
+
+    let card = grid.querySelector(`.variant-card[data-variant-index="${varIdx}"]`);
+    if(!card){
+        card = document.createElement("div");
+        card.className = "variant-card variant-card-generating";
+        card.dataset.variantIndex = String(varIdx);
+        card.innerHTML = `
+          <span class="variant-badge">Var ${varIdx} · procesando...</span>
+          <span class="variant-progress-badge" style="display:none;"></span>
+          <div class="thumb-wrap" style="position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;">
+            <img class="variant-live-thumb" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:0.4;transition:opacity 0.2s;">
+          </div>
+          <div class="variant-info">
+            <span class="variant-seed-display" title="Semilla">
+              <span class="seed-text">${seedUsed}</span>
+            </span>
+            <span class="variant-time" title="Estado">⏳ En curso...</span>
+          </div>
+        `;
+        grid.appendChild(card);
+        const remaining = grid.querySelectorAll(".variant-card").length;
+        $("variantCount").textContent = `(${remaining})`;
+    }
+}
+
 function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     if(!media || !media.filename) {
         log("⚠️ No se encontró vídeo de salida para añadir a la galería de variantes.", "l-err");
@@ -4329,6 +4400,10 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     const box = $("variantGalleryBox");
     const grid = $("variantGrid");
     box.style.display = "block";
+
+    // Si existía tarjeta placeholder para esta variante, eliminarla antes de insertar la tarjeta interactiva final
+    const existingPlaceholder = grid.querySelector(`.variant-card[data-variant-index="${variantIndex}"]`);
+    if(existingPlaceholder) existingPlaceholder.remove();
 
     const typeShort = "final";
     const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
@@ -4625,6 +4700,7 @@ async function runSingleGeneration(index) {
         pendingSeeds[data.prompt_id] = seedUsed;
         promptVariantMap[data.prompt_id] = varIndex;
         currentPromptId = data.prompt_id;
+        createOrUpdatePlaceholderVariantCard(varIndex, seedUsed);
         startTimer(data.prompt_id, 1);
         pollFallback(data.prompt_id);
     } catch(err) {
