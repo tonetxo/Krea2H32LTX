@@ -105,6 +105,19 @@ non_diegetic_music: <1-3 sentences: instrumentation, tempo, rhythm, dynamics onl
 13. If the user provided a text hint, treat it as guidance about the intended motion/path and incorporate it.
 
 The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 prompt, no explanations or prefaces.` },
+      E: { name: "R2VA (referencia completa)", prompt: `You are an expert prompt writer for the MiniMax H3 video model in FULL-REFERENCE mode. You are given reference images (<Picture N>), reference videos (<Video N>) and reference audio (<Audio N>) in order. Rewrite the user's idea into a single MiniMax H3 final prompt using the full-reference format.
+
+RULES:
+1. Output exactly SIX sections, in order: subject_definitions, summary, retention_analysis, detailed_description, overall_soundscape, non_diegetic_music.
+2. Use these reference labels consistently: <Subject N> (reusable visible content), <Picture N> (a concrete target frame/keyframe anchor), <Video N> (whole-video structure/edit/continuation source), <Audio N> (audio signal copied or referenced). Keep the same meaning everywhere.
+3. subject_definitions: one line per referenced item, stating its label, role, and key features to follow.
+4. summary: one short English paragraph prefixed with a task-type tag chosen from [keyframe completion], [reference generation], [video editing], [video continuation], [audio reuse], [audio reference]; combine with " + " when several apply.
+5. retention_analysis: one line per label with a relationship marker: fully_preserved, partially_preserved, attribute_transfer, weak_reference (visible); fully_copy, partially_copy, reference, weak_reference (audio).
+6. detailed_description: the main body, 350-500 English words, shot by shot in playback order with [Shot 1] (no timestamp) then [Shot N] At MM:SS.mmm. Write camera motion as natural English (motion type + amplitude + speed). Give vocal sources stable (S1),(S2) IDs; write dialogue as <d>[Language] ...</d> verbatim. Insert <Subject N>/<Picture N>/<Video N>/<Audio N> at their first appearance and where they apply. Use <scenetrans>/<cutoff> for dialogue across cuts. State the overall style in one or two English sentences before [Shot 1].
+7. overall_soundscape: 1-4 sentences of ambient/physical/non-verbal sound; cite <Audio N> copy/reference relationship when it matches that layer.
+8. non_diegetic_music: 1-3 sentences on instrumentation, tempo, dynamics; N/A if none.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 full-reference prompt, no explanations or prefaces.` },
     },
   },
 };
@@ -122,7 +135,7 @@ const MODE_KEY = "minimaxh3_mode";
 const SPECTRUM_KEY = "minimaxh3_spectrum";
 const H3OPT_KEY = "minimaxh3_h3opt";
 const SIGMASHIFT_KEY = "minimaxh3_sigma_shift";
-let currentMode = "i2v"; // "i2v" | "flf2v"
+let currentMode = "i2v"; // "i2v" | "flf2v" | "r2v"
 window.currentBatchMode = false;
 let jobQueue = [];
 let activeJob = null;
@@ -260,19 +273,32 @@ $("spectrumFlex")?.addEventListener("input", (e) => { $("spectrumFlexVal").textC
 $("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").textContent = e.target.value; const s = getSpectrumState(); s.warmup = parseInt(e.target.value, 10); saveSpectrum(s); });
 $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); });
 
-// --- MODO i2v / flf2v ---
+// --- MODO i2v / flf2v / r2v ---
 function setModeUI(mode){
   currentMode = mode;
-  const i2v = $("segI2V"), flf = $("segFLF2V");
+  const i2v = $("segI2V"), flf = $("segFLF2V"), r2v = $("segR2V");
   const lastPanel = $("lastFramePanel");
+  const r2vPanel = $("r2vPanel");
+  const startPanel = $("startImagePanel");
   const hint = $("modeHint");
+  i2v?.classList.remove("on"); flf?.classList.remove("on"); r2v?.classList.remove("on");
   if(mode === "flf2v"){
-    flf?.classList.add("on"); i2v?.classList.remove("on");
+    flf?.classList.add("on");
     if(lastPanel) lastPanel.style.display = "";
+    if(r2vPanel) r2vPanel.style.display = "none";
+    if(startPanel) startPanel.style.display = "";
     if(hint) hint.textContent = "1er frame + último frame → vídeo.";
-  } else {
-    i2v?.classList.add("on"); flf?.classList.remove("on");
+  } else if(mode === "r2v"){
+    r2v?.classList.add("on");
     if(lastPanel) lastPanel.style.display = "none";
+    if(r2vPanel) r2vPanel.style.display = "";
+    if(startPanel) startPanel.style.display = "none";
+    if(hint) hint.textContent = "Referencias (imágenes/vídeos/audios) → vídeo.";
+  } else {
+    i2v?.classList.add("on");
+    if(lastPanel) lastPanel.style.display = "none";
+    if(r2vPanel) r2vPanel.style.display = "none";
+    if(startPanel) startPanel.style.display = "";
     if(hint) hint.textContent = "Imagen de inicio → vídeo.";
   }
   try { localStorage.setItem(MODE_KEY, mode); } catch(_){}
@@ -283,6 +309,336 @@ function loadMode(){
 setModeUI(loadMode());
 $("segI2V")?.addEventListener("click", () => setModeUI("i2v"));
 $("segFLF2V")?.addEventListener("click", () => setModeUI("flf2v"));
+$("segR2V")?.addEventListener("click", () => setModeUI("r2v"));
+
+// --- MODO R2V: REFERENCIAS ---
+const R2V_MAX_IMAGES = 6;
+const R2V_MAX_VIDEOS = 3;
+const R2V_MAX_AUDIOS = 3;
+let refImages = [];          // [{local, uploaded, idx}] reordenables (6)
+let refVideos = [];          // [{local, uploaded, useAudio, settings}] (3)
+let refAudios = [];          // [{local, uploaded, volume}] (3)
+
+function refImageState(i){ return { local: null, uploaded: null, idx: i }; }
+function refVideoState(i){ return { file: null, local: null, uploaded: null, audioUploaded: null, useAudio: false, volume: 1.0, settings: { scale: 1, arLock: true, trimStart: "", trimEnd: "", skip: 1 }, idx: i }; }
+function refAudioState(i){ return { local: null, uploaded: null, volume: 1.0, idx: i }; }
+
+for(let i = 0; i < R2V_MAX_IMAGES; i++) refImages.push(refImageState(i));
+for(let i = 0; i < R2V_MAX_VIDEOS; i++) refVideos.push(refVideoState(i));
+for(let i = 0; i < R2V_MAX_AUDIOS; i++) refAudios.push(refAudioState(i));
+
+renderR2V();
+
+function _r2vInputFile(id, accept, onFile){
+  const inp = $(id);
+  if(!inp) return;
+  inp.accept = accept || "";
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0];
+    if(f) onFile(f);
+    inp.value = "";
+  };
+}
+
+// --- RENDER de la malla de imágenes de referencia ---
+function renderRefImages(){
+  const grid = $("refImgGrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  refImages.forEach((ref, i) => {
+    const slot = document.createElement("div");
+    slot.className = "ref-slot";
+    slot.dataset.refIdx = i;
+    slot.draggable = true;
+    const del = document.createElement("button");
+    del.className = "ref-del";
+    del.textContent = "×";
+    del.title = "Quitar imagen";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      ref.local = null; ref.uploaded = null;
+      renderRefImages();
+    });
+    const idx = document.createElement("span");
+    idx.className = "ref-idx";
+    idx.textContent = `P${i+1}`;
+    slot.appendChild(del);
+    slot.appendChild(idx);
+    if(ref.local){
+      const img = document.createElement("img");
+      img.src = ref.local;
+      img.alt = `Ref ${i+1}`;
+      slot.appendChild(img);
+    } else {
+      const ph = document.createElement("div");
+      ph.className = "ph";
+      ph.textContent = "imagen " + (i+1) + " o arrastra";
+      slot.appendChild(ph);
+    }
+    slot.addEventListener("click", () => {
+      const inp = $("r2vImgInput");
+      if(inp){ inp.dataset.target = i; inp.click(); }
+    });
+    // drag&drop para reordenar
+    slot.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", String(i));
+      slot.classList.add("dragging");
+    });
+    slot.addEventListener("dragend", () => slot.classList.remove("dragging"));
+    slot.addEventListener("dragover", (e) => { e.preventDefault(); slot.classList.add("drag"); });
+    slot.addEventListener("dragleave", () => slot.classList.remove("drag"));
+    slot.addEventListener("drop", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      slot.classList.remove("drag");
+      // Archivo arrastrado del SO
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(file && file.type.startsWith("image/")){
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          refImages[i].local = ev.target.result;
+          refImages[i].uploaded = null;
+          renderRefImages();
+          log(`🖼️ Imagen de referencia ${i+1}: ${file.name}`, "l-ok");
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+      // Reordenar entre slots
+      const from = parseInt(e.dataTransfer.getData("text/plain"), 10);
+      if(!isNaN(from) && from !== i){
+        const tmp = refImages[from]; refImages[from] = refImages[i]; refImages[i] = tmp;
+        renderRefImages();
+      }
+    });
+    grid.appendChild(slot);
+  });
+}
+
+// --- input único para imágenes r2v ---
+const r2vImgInput = document.createElement("input");
+r2vImgInput.type = "file";
+r2vImgInput.accept = "image/*";
+r2vImgInput.style.display = "none";
+r2vImgInput.id = "r2vImgInput";
+document.body.appendChild(r2vImgInput);
+r2vImgInput.addEventListener("change", () => {
+  const f = r2vImgInput.files && r2vImgInput.files[0];
+  const target = parseInt(r2vImgInput.dataset.target || "0", 10);
+  if(!f) return;
+  if(!refImages[target]) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    refImages[target].local = e.target.result;
+    refImages[target].uploaded = null;
+    renderRefImages();
+    log(`🖼️ Imagen de referencia ${target+1}: ${f.name}`, "l-ok");
+  };
+  reader.readAsDataURL(f);
+});
+
+// --- RENDER de vídeos de referencia ---
+function renderRefVideos(){
+  const wrap = $("refVideoList");
+  if(!wrap) return;
+  wrap.innerHTML = "";
+  refVideos.forEach((ref, i) => {
+    const card = document.createElement("div");
+    card.className = "ref-video-card";
+    const prev = document.createElement("div");
+    prev.className = "ref-video-preview";
+    prev.innerHTML = ref.local
+      ? `<video src="${ref.local}" muted loop playsinline></video>`
+      : `<div class="ph">vídeo ${i+1} — arrastra o clic</div>`;
+    prev.addEventListener("click", () => {
+      const inp = $("r2vVideoInput" + i);
+      if(inp) inp.click();
+    });
+    ["dragenter","dragover"].forEach(ev => prev.addEventListener(ev, e => { e.preventDefault(); prev.classList.add("drag"); }));
+    ["dragleave","drop"].forEach(ev => prev.addEventListener(ev, e => { e.preventDefault(); prev.classList.remove("drag"); }));
+    prev.addEventListener("drop", (e) => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f && f.type.startsWith("video/")){
+        if(ref.local) URL.revokeObjectURL(ref.local);
+        ref.file = f; ref.local = URL.createObjectURL(f);
+        ref.uploaded = null; ref.audioUploaded = null;
+        renderRefVideos();
+        log(`🎬 Vídeo de referencia ${i+1}: ${f.name}`, "l-ok");
+      }
+    });
+    const del = document.createElement("button");
+    del.className = "ref-del";
+    del.textContent = "×";
+    del.title = "Quitar vídeo";
+    del.style.display = "block";
+    del.style.position = "absolute";
+    del.style.top = "2px"; del.style.right = "2px";
+    prev.appendChild(del);
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if(ref.local) URL.revokeObjectURL(ref.local);
+      ref.file = null; ref.local = null; ref.uploaded = null; ref.audioUploaded = null;
+      ref.settings = refVideoState(i).settings;
+      renderRefVideos();
+    });
+
+    // controles de preprocesado
+    const ctrl = document.createElement("div");
+    ctrl.className = "ref-video-controls";
+    ctrl.innerHTML = `
+      <div class="preset-row"><label>Escala</label>
+        <select class="r2v-scale">
+          <option value="1" ${ref.settings.scale===1?"selected":""}>1x (original)</option>
+          <option value="0.5" ${ref.settings.scale===0.5?"selected":""}>0.5x</option>
+          <option value="0.25" ${ref.settings.scale===0.25?"selected":""}>0.25x</option>
+        </select>
+        <label style="min-width:auto;">A/R lock</label>
+        <input type="checkbox" class="r2v-ar" ${ref.settings.arLock?"checked":""}>
+      </div>
+      <div class="preset-row"><label>Trim inicio (s)</label><input type="number" class="r2v-trims" min="0" step="0.1" value="${ref.settings.trimStart}" placeholder="0"></div>
+      <div class="preset-row"><label>Trim fin (s)</label><input type="number" class="r2v-trime" min="0" step="0.1" value="${ref.settings.trimEnd}" placeholder="dur"></div>
+      <div class="preset-row"><label>Skip frames</label>
+        <select class="r2v-skip">
+          <option value="1" ${ref.settings.skip===1?"selected":""}>1 (ninguno)</option>
+          <option value="2" ${ref.settings.skip===2?"selected":""}>2</option>
+          <option value="4" ${ref.settings.skip===4?"selected":""}>4</option>
+        </select>
+      </div>
+      <div class="preset-row"><label>Volumen audio</label><input type="number" class="r2v-vol" min="0" step="0.1" value="${ref.volume}"></div>
+      <div class="preset-row"><label>Usar su audio</label><input type="checkbox" class="r2v-useaudio" ${ref.useAudio?"checked":""}></div>
+      <div class="preset-row"><button class="ghost mini-btn r2v-apply">Preparar vídeo</button><span class="ref-status"></span></div>
+    `;
+    // recoger settings en el botón
+    ctrl.querySelector(".r2v-apply").addEventListener("click", () => {
+      ref.settings.scale = parseFloat(ctrl.querySelector(".r2v-scale").value) || 1;
+      ref.settings.arLock = ctrl.querySelector(".r2v-ar").checked;
+      ref.settings.trimStart = ctrl.querySelector(".r2v-trims").value;
+      ref.settings.trimEnd = ctrl.querySelector(".r2v-trime").value;
+      ref.settings.skip = parseInt(ctrl.querySelector(".r2v-skip").value, 10) || 1;
+      ref.volume = parseFloat(ctrl.querySelector(".r2v-vol").value) || 1.0;
+      ref.useAudio = ctrl.querySelector(".r2v-useaudio").checked;
+      prepareRefVideo(i);
+    });
+    const volInp = ctrl.querySelector(".r2v-vol");
+    volInp.addEventListener("input", () => { ref.volume = parseFloat(volInp.value) || 1.0; });
+    const uaInp = ctrl.querySelector(".r2v-useaudio");
+    uaInp.addEventListener("change", () => { ref.useAudio = uaInp.checked; });
+
+    card.appendChild(prev);
+    card.appendChild(ctrl);
+    wrap.appendChild(card);
+
+    // input file para este vídeo
+    if(!$("r2vVideoInput" + i)){
+      const inp = document.createElement("input");
+      inp.type = "file"; inp.id = "r2vVideoInput" + i; inp.accept = "video/*";
+      inp.style.display = "none";
+      document.body.appendChild(inp);
+      inp.addEventListener("change", () => {
+        const f = inp.files && inp.files[0];
+        if(!f) return;
+        if(ref.local) URL.revokeObjectURL(ref.local);
+        ref.file = f;
+        ref.local = URL.createObjectURL(f);
+        ref.uploaded = null; ref.audioUploaded = null;
+        renderRefVideos();
+        log(`🎬 Vídeo de referencia ${i+1}: ${f.name}`, "l-ok");
+      });
+    }
+  });
+}
+
+// --- RENDER de audios de referencia ---
+function renderRefAudios(){
+  const grid = $("refAudioGrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+  refAudios.forEach((ref, i) => {
+    const slot = document.createElement("div");
+    slot.className = "ref-slot";
+    const del = document.createElement("button");
+    del.className = "ref-del"; del.textContent = "×";
+    del.title = "Quitar audio";
+    del.addEventListener("click", (e) => { e.stopPropagation(); ref.local=null; ref.uploaded=null; renderRefAudios(); });
+    const idx = document.createElement("span"); idx.className="ref-idx"; idx.textContent = `A${i+1}`;
+    const ph = document.createElement("div");
+    ph.className = "ph"; ph.textContent = ref.local ? (ref.local.name || "audio") : "audio " + (i+1);
+    const volRow = document.createElement("div");
+    volRow.style.cssText = "display:flex;align-items:center;gap:4px;padding:4px;font-size:9px;color:var(--muted);";
+    volRow.innerHTML = `<span>vol</span>`;
+    const volInp = document.createElement("input");
+    volInp.type = "number"; volInp.min = "0"; volInp.step = "0.1"; volInp.value = ref.volume;
+    volInp.style.cssText = "width:44px;font-size:10px;";
+    volInp.addEventListener("input", () => { ref.volume = parseFloat(volInp.value) || 1.0; });
+    volRow.appendChild(volInp);
+    slot.appendChild(del); slot.appendChild(idx); slot.appendChild(ph); slot.appendChild(volRow);
+    slot.addEventListener("click", () => {
+      const inp = $("r2vAudioInput" + i);
+      if(inp) inp.click();
+    });
+    ["dragenter","dragover"].forEach(ev => slot.addEventListener(ev, e => { e.preventDefault(); slot.classList.add("drag"); }));
+    ["dragleave","drop"].forEach(ev => slot.addEventListener(ev, e => { e.preventDefault(); slot.classList.remove("drag"); }));
+    slot.addEventListener("drop", (e) => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if(f && f.type.startsWith("audio/")){
+        ref.local = f; ref.uploaded = null;
+        renderRefAudios();
+        log(`🎵 Audio de referencia ${i+1}: ${f.name}`, "l-ok");
+      }
+    });
+    grid.appendChild(slot);
+    if(!$("r2vAudioInput" + i)){
+      const inp = document.createElement("input");
+      inp.type = "file"; inp.id = "r2vAudioInput" + i; inp.accept = "audio/*";
+      inp.style.display = "none";
+      document.body.appendChild(inp);
+      inp.addEventListener("change", () => {
+        const f = inp.files && inp.files[0];
+        if(!f) return;
+        ref.local = f; ref.uploaded = null;
+        renderRefAudios();
+        log(`🎵 Audio de referencia ${i+1}: ${f.name}`, "l-ok");
+      });
+    }
+  });
+}
+
+function renderR2V(){
+  renderRefImages();
+  renderRefVideos();
+  renderRefAudios();
+}
+
+// --- PREPARAR vídeo de referencia (ffmpeg backend) ---
+async function prepareRefVideo(i){
+  const ref = refVideos[i];
+  const statusEl = document.querySelectorAll(".ref-video-card")[i]?.querySelector(".ref-status");
+  if(!ref || !ref.file){
+    if(statusEl) statusEl.textContent = "Sin vídeo";
+    return;
+  }
+  if(statusEl) statusEl.textContent = "Preparando...";
+  const fd = new FormData();
+  fd.append("image", ref.file, ref.file.name || ("ref_video_"+i+".mp4"));
+  fd.append("scale", String(ref.settings.scale));
+  fd.append("ar_lock", ref.settings.arLock ? "true" : "false");
+  fd.append("trim_start", ref.settings.trimStart || "");
+  fd.append("trim_end", ref.settings.trimEnd || "");
+  fd.append("skip_frames", String(ref.settings.skip));
+  fd.append("use_audio", ref.useAudio ? "true" : "false");
+  fd.append("volume", String(ref.volume));
+  try {
+    const r = await fetch("/api/video_preprocess", { method: "POST", body: fd });
+    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,150)); }
+    const d = await r.json();
+    ref.uploaded = d.video || null;
+    ref.audioUploaded = d.audio || null;
+    if(statusEl) statusEl.textContent = ref.uploaded ? "✅ " + ref.uploaded.name : "⚠️ sin resultado";
+    log(`🎬 Vídeo de referencia ${i+1} preparado: ${ref.uploaded ? ref.uploaded.name : "—"}${ref.audioUploaded ? " (+audio)" : ""}`, "l-ok");
+  } catch(err){
+    if(statusEl) statusEl.textContent = "❌ " + (err.message || err);
+    log("❌ Error preparando vídeo ref: "+err.message, "l-err");
+  }
+}
 
 // --- ASPECT RATIO MODE (Auto vs Forzar 16:9) ---
 const AR_MODE_KEY = "minimaxh3_ar_mode";
@@ -584,6 +940,9 @@ function snapshotJob(){
     uploadedLastImage: uploadedLastImage ? {...uploadedLastImage} : null,
     localFirstFile: localFirstFile,
     localLastFile: localLastFile,
+    refImages: refImages.map(r => ({ local: r.local, uploaded: r.uploaded ? {...r.uploaded} : null })),
+    refVideos: refVideos.map(r => ({ file: r.file, local: r.local, uploaded: r.uploaded ? {...r.uploaded} : null, audioUploaded: r.audioUploaded ? {...r.audioUploaded} : null, useAudio: r.useAudio, volume: r.volume, settings: {...r.settings} })),
+    refAudios: refAudios.map(r => ({ local: r.local, uploaded: r.uploaded ? {...r.uploaded} : null, volume: r.volume })),
     aspectRatio: currentAspectRatio,
     createdAt: Date.now(),
   };
@@ -621,6 +980,17 @@ function restoreJob(job){
   uploadedLastImage = job.uploadedLastImage;
   localFirstFile = job.localFirstFile;
   localLastFile = job.localLastFile;
+  // Restaurar referencias r2v
+  if(Array.isArray(job.refImages)){
+    refImages.forEach((r, i) => { if(job.refImages[i]){ r.local = job.refImages[i].local; r.uploaded = job.refImages[i].uploaded; } });
+  }
+  if(Array.isArray(job.refVideos)){
+    refVideos.forEach((r, i) => { if(job.refVideos[i]){ r.file = job.refVideos[i].file; r.local = job.refVideos[i].local; r.uploaded = job.refVideos[i].uploaded; r.audioUploaded = job.refVideos[i].audioUploaded; r.useAudio = job.refVideos[i].useAudio; r.volume = job.refVideos[i].volume; r.settings = {...job.refVideos[i].settings}; } });
+  }
+  if(Array.isArray(job.refAudios)){
+    refAudios.forEach((r, i) => { if(job.refAudios[i]){ r.local = job.refAudios[i].local; r.uploaded = job.refAudios[i].uploaded; r.volume = job.refAudios[i].volume; } });
+  }
+  renderR2V();
   currentAspectRatio = job.aspectRatio || (job.width / job.height) || 16/9;
   if(localFirstFile){
     const reader = new FileReader();
@@ -852,10 +1222,19 @@ function applyWorkflow(workflow, opts={}){
   }
   if(promptFound) setApplied("prompt"); else setMissing("prompt");
 
-  // Modo i2v/flf2v: si el nodo tiene last_frame referencia a LoadImage y no es
-  // igual a first_frame, es flf2v.
+  // Modo i2v/flf2v/r2v
   let modeSet = false;
-  if(i2vNode && i2vNode.inputs){
+  if(ref2vNode && ref2vNode.inputs){
+    const hasVideo = ref2vNode.inputs["ref_videos.ref_video_0"] || ref2vNode.inputs["ref_videos.ref_video_1"] || ref2vNode.inputs["ref_videos.ref_video_2"];
+    const hasAudio = ref2vNode.inputs["ref_audios.ref_audio_0"] || ref2vNode.inputs["ref_audios.ref_audio_1"] || ref2vNode.inputs["ref_audios.ref_audio_2"];
+    const hasVideoAudio = ref2vNode.inputs["ref_video_audios.ref_video_audio_0"];
+    const imgCount = [ref2vNode.inputs["ref_images.ref_image_0"], ref2vNode.inputs["ref_images.ref_image_1"], ref2vNode.inputs["ref_images.ref_image_2"], ref2vNode.inputs["ref_images.ref_image_3"], ref2vNode.inputs["ref_images.ref_image_4"], ref2vNode.inputs["ref_images.ref_image_5"]].filter(Boolean).length;
+    if(hasVideo || hasAudio || hasVideoAudio || imgCount > 1){
+      setModeUI("r2v");
+      modeSet = true;
+    }
+  }
+  if(i2vNode && i2vNode.inputs && !modeSet){
     const ff = i2vNode.inputs.first_frame;
     const lf = i2vNode.inputs.last_frame;
     if(Array.isArray(lf) && Array.isArray(ff) && lf[0] !== ff[0]){
@@ -1377,9 +1756,75 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   vid.src = videoUrl;
 }
 
+// Convierte un local (data URL o File/Blob) a File y lo sube a /upload/image.
+async function _uploadOneHot(_kind, local, name){
+  let file;
+  if(typeof local === "string" && local.startsWith("data:")){
+    const r = await fetch(local);
+    const blob = await r.blob();
+    const ext = /image\/(png|jpeg|jpg|webp)/.exec(local.split(",")[0].slice(5))?.[1] || "png";
+    const extMap = {jpeg:"jpg", jpg:"jpg"};
+    file = new File([blob], name || ("ref_"+Date.now()+"."+(extMap[ext]||ext)), {type: blob.type || "image/png"});
+  } else if(local instanceof Blob){
+    file = new File([local], name || (local.name || "ref.png"), {type: local.type || "image/png"});
+  } else {
+    throw new Error("referencia inválida");
+  }
+  const fd = new FormData();
+  fd.append("image", file, file.name.replace(/^temp_\d+_/, '').replace(/^temp_last_\d+_/, ''));
+  fd.append("overwrite","true");
+  const r = await fetch(server()+"/upload/image",{method:"POST",body:fd});
+  if(!r.ok) throw new Error("fallo subida "+file.name);
+  const d = await r.json();
+  return {name:d.name, subfolder:d.subfolder||"", type:d.type||"input"};
+}
+
 async function ensureImagesUploaded(){
-  if(!localFirstFile) throw new Error("selecciona imagen de inicio");
   setRun("busy","subiendo...");
+
+  if(currentMode === "r2v"){
+    // Referencias: imágenes, vídeos (ya preparados via /api/video_preprocess) y audios
+    for(let i = 0; i < refImages.length; i++){
+      const ref = refImages[i];
+      if(ref.local && !ref.uploaded){
+        try {
+          ref.uploaded = await _uploadOneHot("image", ref.local, "ref_img_"+(i+1)+".png");
+        } catch(e){ throw new Error("fallo subida imagen ref "+(i+1)+": "+e.message); }
+      }
+    }
+    for(let i = 0; i < refVideos.length; i++){
+      const ref = refVideos[i];
+      // El vídeo debe haberse preparado (uploaded) con /api/video_preprocess antes.
+      if(ref.local && !ref.uploaded){
+        throw new Error("Prepara el vídeo de referencia "+(i+1)+" (botón 'Preparar vídeo')");
+      }
+    }
+    for(let i = 0; i < refAudios.length; i++){
+      const ref = refAudios[i];
+      if(ref.local && !ref.uploaded){
+        try {
+          // Volumen != 1 → procesar con ffmpeg primero (endpoint reutiliza video_preprocess sin vídeo)
+          if(ref.volume !== 1.0){
+            const fd = new FormData();
+            fd.append("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
+            fd.append("volume", String(ref.volume));
+            fd.append("use_audio","true");
+            const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
+            if(!r.ok) throw new Error("fallo ffmpeg audio");
+            const d = await r.json();
+            ref.uploaded = d.audio || null;
+            if(!ref.uploaded) throw new Error("ffmpeg no devolvió audio");
+          } else {
+            ref.uploaded = await _uploadOneHot("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
+          }
+        } catch(e){ throw new Error("fallo subida audio ref "+(i+1)+": "+e.message); }
+      }
+    }
+    log("Referencias subidas.","l-ok");
+    return;
+  }
+
+  if(!localFirstFile) throw new Error("selecciona imagen de inicio");
   // Imagen de inicio
   const fd1 = new FormData();
   fd1.append("image", localFirstFile, localFirstFile.name.replace(/^temp_\d+_/, ''));
@@ -1437,20 +1882,84 @@ function buildGraph(){
   if(g[N.UNET] && g[N.UNET].inputs) g[N.UNET].inputs.unet_name = $("unetSelect").value;
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
 
-  // Imagen de referencia (LoadImage node 137)
-  if(uploadedFirstImage && g[N.IMAGE_FIRST]){
+  if(currentMode === "r2v"){
+    // MODO R2V: construir referencias sobre el nodo MiniMaxH3ReferenceToVideo (136)
+    const r2v = g[N.REF2V];
+    if(r2v && r2v.inputs){
+      // Limpiar refs previas del grafo base
+      for(let i = 0; i < 9; i++){
+        delete r2v.inputs["ref_images.ref_image_"+i];
+      }
+      for(let i = 0; i < 3; i++){
+        delete r2v.inputs["ref_videos.ref_video_"+i];
+        delete r2v.inputs["ref_video_audios.ref_video_audio_"+i];
+        delete r2v.inputs["ref_audios.ref_audio_"+i];
+      }
+      // Imágenes de referencia (nodo 137 reutilizado para la 1ª; 200-205 para el resto)
+      const imgKeys = ["200","201","202","203","204","205"];
+      const usedImgKeys = new Set();
+      refImages.forEach((ref, i) => {
+        if(ref.uploaded){
+          const key = (i === 0) ? "137" : imgKeys[i-1];
+          g[key] = { class_type: "LoadImage", inputs: { image: (ref.uploaded.subfolder ? ref.uploaded.subfolder+"/" : "") + ref.uploaded.name }, _meta: { title: "Ref Image "+(i+1) } };
+          r2v.inputs["ref_images.ref_image_"+i] = [key, 0];
+          usedImgKeys.add(key);
+        }
+      });
+      // Si no hay imagen de referencia, eliminar el LoadImage por defecto del grafo base
+      if(!usedImgKeys.has("137") && g["137"]) delete g["137"];
+      // Vídeos de referencia + sus audios
+      for(let i = 0; i < refVideos.length; i++){
+        const v = refVideos[i];
+        if(v.uploaded){
+          const vidKey = "21"+i;
+          g[vidKey] = { class_type: "LoadVideo", inputs: { file: (v.uploaded.subfolder ? v.uploaded.subfolder+"/" : "") + v.uploaded.name }, _meta: { title: "Ref Video "+(i+1) } };
+          r2v.inputs["ref_videos.ref_video_"+i] = [vidKey, 0];
+          if(v.audioUploaded){
+            const audKey = "22" + i;
+            g[audKey] = { class_type: "LoadAudio", inputs: { audio: (v.audioUploaded.subfolder ? v.audioUploaded.subfolder+"/" : "") + v.audioUploaded.name }, _meta: { title: "Ref Video Audio "+(i+1) } };
+            r2v.inputs["ref_video_audios.ref_video_audio_"+i] = [audKey, 0];
+          }
+        }
+      }
+      // Audios independientes
+      for(let i = 0; i < refAudios.length; i++){
+        const a = refAudios[i];
+        if(a.uploaded){
+          const audKey = "23" + i;
+          g[audKey] = { class_type: "LoadAudio", inputs: { audio: (a.uploaded.subfolder ? a.uploaded.subfolder+"/" : "") + a.uploaded.name }, _meta: { title: "Ref Audio "+(i+1) } };
+          r2v.inputs["ref_audios.ref_audio_"+i] = [audKey, 0];
+        }
+      }
+    }
+  } else if(uploadedFirstImage && g[N.IMAGE_FIRST]){
+    // i2v / flf2v: imagen de inicio como referencia 0
     g[N.IMAGE_FIRST].inputs.image = uploadedFirstImage.name;
     if(g[N.REF2V] && g[N.REF2V].inputs){
       g[N.REF2V].inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
     }
   }
 
-  // Pipeline de Modelo:
-  // UNET (127) -> SparseAttn (158) -> SigmaShift (159) -> MemOpt (164) -> Spectrum (162) -> AttnBackend (147) -> LoRAs -> Scheduler (124) & Guider (126)
+  // Pipeline de Modelo (orden = dependencias):
+  // UNET (127) -> MemOpt (164) -> SparseAttn (158) -> SigmaShift (159) -> Spectrum (162) -> AttnBackend (147) -> LoRAs -> Scheduler (124) & Guider (126)
+  //
+  // IMPORTANTE: la nueva versión de H3-Optimizations crashea si H3SparseAttention
+  // va ANTES que H3MemoryOptimization en la cadena (el sparse llama a apply_plan
+  // con plan.memory=None y el custom node accede a memory.chunk_rows). Por eso
+  // MemOpt debe ir primero y, si el usuario desactiva memOpt, usar streaming "Off"
+  // (memory definida) en lugar de borrar el nodo.
   let currentModelNode = N.UNET;
-
-  // 1. Sparse Attention
   const h3opt = getH3OptState();
+
+  // 1. Memory Optimization (antes de Sparse)
+  if(g[N.MEM_OPT]){
+    g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+    g[N.MEM_OPT].inputs.qkv_streaming_mode = h3opt.memOptEnabled ? "Auto" : "Off";
+    g[N.MEM_OPT].inputs.precision_mode = "Auto";
+    currentModelNode = N.MEM_OPT;
+  }
+
+  // 2. Sparse Attention
   if(h3opt.sparseEnabled && g[N.SPARSE_ATTN]){
     g[N.SPARSE_ATTN].inputs.model = [currentModelNode, 0];
     g[N.SPARSE_ATTN].inputs.video_budget = h3opt.videoBudget;
@@ -1460,23 +1969,13 @@ function buildGraph(){
     delete g[N.SPARSE_ATTN];
   }
 
-  // 2. Sigma Shift (MiniMaxH3SigmaShift)
+  // 3. Sigma Shift (MiniMaxH3SigmaShift)
   if(g[N.SIGMA_SHIFT]){
     const ss = getSigmaShiftState();
     g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
     g[N.SIGMA_SHIFT].inputs.shift_video = ss.shiftVideo;
     g[N.SIGMA_SHIFT].inputs.shift_audio = ss.shiftAudio;
     currentModelNode = N.SIGMA_SHIFT;
-  }
-
-  // 3. Memory Optimization
-  if(h3opt.memOptEnabled && g[N.MEM_OPT]){
-    g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
-    g[N.MEM_OPT].inputs.qkv_streaming_mode = "Auto";
-    g[N.MEM_OPT].inputs.precision_mode = "Auto";
-    currentModelNode = N.MEM_OPT;
-  } else if(!h3opt.memOptEnabled && g[N.MEM_OPT]){
-    delete g[N.MEM_OPT];
   }
 
   // 4. Spectrum
@@ -2216,26 +2715,51 @@ $("btnEnhance").addEventListener("click", async () => {
 
   const payload = { model, system, prompt: userPrompt || "Describe this image.", stream: false, options: { num_ctx: 8192 } };
   if(mode === "vision"){
-    if(!localFirstFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
-    try {
-      // FL2VA (estilo D) y el antiguo flf2v (estilo C): si hay último frame,
-      // enviamos ambas imágenes a Ollama en orden [first, last].
-      // I2VA (estilo C ahora): una sola imagen (first frame).
-      const wantsTwoFrames = (styleKey === "D" || styleKey === "C");
-      if(wantsTwoFrames && localLastFile){
-        const b64First = await resizeFileToBase64(localFirstFile, 1280);
-        const b64Last = await resizeFileToBase64(localLastFile, 1280);
-        payload.images = [b64First, b64Last];
-        payload.prompt = userPrompt
-          ? `FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above. User hint: ${userPrompt}`
-          : "FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above.";
-      } else {
-        const b64 = await resizeFileToBase64(localFirstFile, 1280);
-        payload.images = [b64];
+    // Modo r2v: enviamos hasta 3 imágenes de referencia
+    if(currentMode === "r2v"){
+      const imgs = refImages.filter(r => r.local).slice(0, 3).map(r => r.local);
+      if(imgs.length === 0){
+        log("⚠️ Añade al menos 1 imagen de referencia para el enhancer R2VA", "l-err");
+        return;
       }
-    } catch(e) {
-      log("⚠️ No se pudo leer la imagen: "+(e.message || e), "l-err");
-      return;
+      try {
+        payload.images = [];
+        for(const src of imgs){
+          let f;
+          if(typeof src === "string" && src.startsWith("data:")){
+            const r = await fetch(src); const blob = await r.blob();
+            f = new File([blob], "ref.png", {type: blob.type || "image/png"});
+          } else if(src instanceof Blob){
+            f = new File([src], src.name || "ref.png", {type: src.type || "image/png"});
+          } else continue;
+          payload.images.push(await resizeFileToBase64(f, 768));
+        }
+        payload.prompt = userPrompt
+          ? `REFERENCE IMAGES (up to 3, in order, <Picture N>): see above. User hint: ${userPrompt}`
+          : "REFERENCE IMAGES (up to 3, in order, <Picture N>): see above.";
+      } catch(e){
+        log("⚠️ No se pudieron leer las imágenes de referencia: "+(e.message || e), "l-err");
+        return;
+      }
+    } else {
+      if(!localFirstFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
+      try {
+        const wantsTwoFrames = (styleKey === "D" || styleKey === "C");
+        if(wantsTwoFrames && localLastFile){
+          const b64First = await resizeFileToBase64(localFirstFile, 1280);
+          const b64Last = await resizeFileToBase64(localLastFile, 1280);
+          payload.images = [b64First, b64Last];
+          payload.prompt = userPrompt
+            ? `FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above. User hint: ${userPrompt}`
+            : "FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above.";
+        } else {
+          const b64 = await resizeFileToBase64(localFirstFile, 1280);
+          payload.images = [b64];
+        }
+      } catch(e) {
+        log("⚠️ No se pudo leer la imagen: "+(e.message || e), "l-err");
+        return;
+      }
     }
   }
 

@@ -21,9 +21,11 @@ import glob
 import http.server
 import json
 import os
+import re
 import select
 import socket
 import socketserver
+import subprocess
 import sys
 import time
 import urllib.request
@@ -35,7 +37,7 @@ BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/file_delete", "/api/krea2_upload")
+CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess")
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
@@ -340,6 +342,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         return path == "/api/file_delete"
 
+    def _is_video_preprocess(self):
+        path = self.path.split("?")[0]
+        return path == "/api/video_preprocess"
+
     def _parse_multipart_parts(self):
         """Parsea un POST multipart/form-data y devuelve un dict {field_name: {...}}."""
         import re
@@ -442,9 +448,172 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         except OSError as e:
             self._send_json(500, {"error": str(e)})
 
+    def _do_video_preprocess(self):
+        """Recibe un vídeo (mp4/webm/mov) + parámetros de preprocesado y lo
+        reduce con ffmpeg para evitar OOM/subir el original a ComfyUI.
+
+        Multipart: image=<file> + campos de texto: scale, ar_lock,
+        trim_start, trim_end, skip_frames. Devuelve JSON:
+          {video: {name, subfolder, type}, audio: {name, subfolder, type}|null}
+        El audio (cuando existe y se pide) sigue el mismo recorte que el vídeo.
+        """
+        if not self._allowed_origin():
+            self._send_json(403, {"error": "forbidden: solo same-origin puede subir archivos"})
+            return
+        parts = self._parse_multipart_parts()
+        if not parts or "image" not in parts:
+            self._send_json(400, {"error": "falta campo image"})
+            return
+        img = parts["image"]
+        data = img["data"]
+        if len(data) == 0:
+            self._send_json(400, {"error": "vídeo vacío"})
+            return
+        if len(data) > 256 * 1024 * 1024:
+            self._send_json(413, {"error": "vídeo demasiado grande (máx 256 MB)"})
+            return
+
+        def field(name, default):
+            f = parts.get(name)
+            if f is None or not f["data"]:
+                return default
+            return f["data"].decode("utf-8", "replace").strip()
+
+        scale = field("scale", "1") or "1"
+        ar_lock = field("ar_lock", "true").lower() in ("true", "1", "on")
+        trim_start = field("trim_start", "")
+        trim_end = field("trim_end", "")
+        skip_frames = field("skip_frames", "1")
+        use_audio = field("use_audio", "false").lower() in ("true", "1", "on")
+        volume = field("volume", "1")
+
+        try:
+            scale = float(scale)
+        except ValueError:
+            scale = 1.0
+        try:
+            skip = int(skip_frames)
+        except ValueError:
+            skip = 1
+        skip = max(1, min(skip, 60))
+        try:
+            vol = float(volume)
+        except ValueError:
+            vol = 1.0
+
+        input_dir = os.path.join(COMFYUI_ROOT, "input", "reference")
+        os.makedirs(input_dir, exist_ok=True)
+
+        base = "ref_" + str(int(time.time() * 1000))
+        src = os.path.join(input_dir, base + "_src.mp4")
+        out_video = os.path.join(input_dir, base + ".mp4")
+        out_audio = os.path.join(input_dir, base + "_audio.m4a")
+
+        try:
+            with open(src, "wb") as f:
+                f.write(data)
+
+            # --- dimensiones originales + detección de streams ---
+            vw = vh = 0
+            has_video = False
+            has_audio = False
+            try:
+                out = subprocess.run(
+                    ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                     "-show_entries", "stream=width,height", "-of", "csv=p=0", src],
+                    capture_output=True, text=True, timeout=60)
+                dims = out.stdout.strip().split(",")
+                if len(dims) == 2 and dims[0].isdigit() and dims[1].isdigit():
+                    vw, vh = int(dims[0]), int(dims[1])
+                    has_video = True
+            except Exception:
+                pass
+            try:
+                out = subprocess.run(
+                    ["ffprobe", "-v", "error", "-select_streams", "a:0",
+                     "-show_entries", "stream=codec_name", "-of", "csv=p=0", src],
+                    capture_output=True, text=True, timeout=60)
+                has_audio = bool(out.stdout.strip())
+            except Exception:
+                pass
+
+            # --- solo audio (pista sin vídeo) ---
+            if not has_video:
+                if not has_audio:
+                    raise RuntimeError("sin pista de vídeo ni audio")
+                acmd = ["ffmpeg", "-y", "-i", src]
+                if trim_start:
+                    acmd += ["-ss", trim_start]
+                if trim_end:
+                    acmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+                if vol != 1.0:
+                    acmd += ["-af", f"volume={vol}"]
+                acmd += ["-vn", "-c:a", "aac", "-b:a", "128k", out_audio]
+                subprocess.run(acmd, capture_output=True, timeout=300)
+                if not os.path.exists(out_audio) or os.path.getsize(out_audio) == 0:
+                    raise RuntimeError("ffmpeg no produjo audio de salida")
+                audio_result = {"name": base + "_audio.m4a", "subfolder": "reference", "type": "input"}
+                self._send_json(200, {"video": None, "audio": audio_result})
+                return
+
+            # --- vf (escalado + skip) ---
+            vf = []
+            if vw and vh and scale > 0 and scale != 1.0:
+                nw = max(2, int(vw * scale) // 2 * 2)
+                nh = max(2, int(vh * scale) // 2 * 2)
+                if ar_lock:
+                    vf.append(f"scale={nw}:{nh}")
+                else:
+                    vf.append(f"scale={nw}:{nh}")
+            if skip > 1:
+                vf.append(f"select='not(mod(n,{skip}))'")
+                vf.append("setpts=N/FRAME_RATE/TB")
+
+            cmd = ["ffmpeg", "-y", "-i", src]
+            if trim_start:
+                cmd += ["-ss", trim_start]
+            if trim_end:
+                cmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+            if vf:
+                cmd += ["-vf", ",".join(vf)]
+            cmd += ["-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                    "-pix_fmt", "yuv420p", out_video]
+
+            subprocess.run(cmd, capture_output=True, timeout=300)
+
+            if not os.path.exists(out_video) or os.path.getsize(out_video) == 0:
+                raise RuntimeError("ffmpeg no produjo vídeo de salida")
+
+            # --- audio (mismo trim) ---
+            audio_result = None
+            if use_audio:
+                acmd = ["ffmpeg", "-y", "-i", src]
+                if trim_start:
+                    acmd += ["-ss", trim_start]
+                if trim_end:
+                    acmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+                if vol != 1.0:
+                    acmd += ["-af", f"volume={vol}"]
+                acmd += ["-vn", "-c:a", "aac", "-b:a", "128k", out_audio]
+                subprocess.run(acmd, capture_output=True, timeout=300)
+                if os.path.exists(out_audio) and os.path.getsize(out_audio) > 0:
+                    audio_result = {"name": base + "_audio.m4a", "subfolder": "reference", "type": "input"}
+
+            video_result = {"name": base + ".mp4", "subfolder": "reference", "type": "input"}
+            self._send_json(200, {"video": video_result, "audio": audio_result})
+        except subprocess.TimeoutExpired:
+            self._send_json(500, {"error": "timeout procesando vídeo"})
+        except OSError as e:
+            self._send_json(500, {"error": str(e)})
+        finally:
+            try:
+                if os.path.exists(src):
+                    os.remove(src)
+            except OSError:
+                pass
+
     def _is_ws(self):
         return self.path.split("?")[0].startswith(WS_PREFIX)
-
     def do_GET(self):
         if self._is_ws():
             self._ws_proxy()
@@ -474,6 +643,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_file_delete()
         elif self._is_krea2_upload():
             self._do_krea2_upload()
+        elif self._is_video_preprocess():
+            self._do_video_preprocess()
         elif self._is_ollama_route():
             self._proxy("POST", OLLAMA)
         elif self._is_proxy_route():
@@ -491,7 +662,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._cors_preflight()
         elif self._is_proxy_route():
             self._proxy("OPTIONS", BACKEND)
-        elif self._is_krea2_upload() or self._is_file_delete() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list():
+        elif self._is_krea2_upload() or self._is_file_delete() or self._is_video_preprocess() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list():
             # Endpoints custom también necesitan preflight same-origin.
             self._cors_preflight()
         else:
