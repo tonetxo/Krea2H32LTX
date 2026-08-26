@@ -2745,10 +2745,9 @@ function nearest32(v){ return Math.round(v / 32) * 32; }
 
 function recalcResolution(){
   const mp = parseFloat($("mpSlider").value) || 0.7;
-  const totalPx = mp * 1_000_000;
+  const totalPx = mp * 1024 * 1024;
   let w = nearest32(Math.sqrt(totalPx * currentAspectRatio));
   let h = nearest32(Math.sqrt(totalPx / currentAspectRatio));
-  h = nearest32(w / currentAspectRatio);
   if(h < 256) h = 256;
   if(w < 256) w = 256;
   $("width").value = w;
