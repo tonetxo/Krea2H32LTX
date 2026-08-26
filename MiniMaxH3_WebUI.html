@@ -354,6 +354,14 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       </div>
       <div class="panel"><h2>Modelo UNet</h2><div class="row"><select id="unetSelect"></select></div></div>
       <div class="panel"><h2>Modelo CLIP</h2><div class="row"><select id="clipSelect"></select></div></div>
+      <div class="panel">
+        <div class="collapsible-header" id="loraToggle">
+          <span class="arrow">▶</span> LoRAs / Turbo LoRA
+        </div>
+        <div class="collapsible-body" id="loraBody">
+          <div id="loraList"></div>
+        </div>
+      </div>
       <div class="panel"><h2>Optimizaciones H3 (Sparse &amp; Mem)</h2>
         <div class="seed-toggle">
           <div class="seg on" id="segSparseOn" data-value="true">Sparse Activo</div>
@@ -548,11 +556,39 @@ const BASE_GRAPH = {
       "title": "Float (duration)"
     }
   },
+  "105:127": {
+    "inputs": {
+      "lora_name": "Ligazón para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "105:6",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA (Turbo)"
+    }
+  },
+  "105:128": {
+    "inputs": {
+      "lora_name": "",
+      "strength_model": 1,
+      "model": [
+        "105:127",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA 2"
+    }
+  },
   "105:122": {
     "inputs": {
       "attention": "comfy kitchen attention",
       "model": [
-        "105:6",
+        "105:128",
         0
       ]
     },
@@ -793,7 +829,7 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = [];
-const AVAILABLE_LORAS = [];
+const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
 const AVAILABLE_VAES = [];
 const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO_ref2va_beta2_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_fl2va_beta2_pruned_int8_convrot_skip_edges.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
@@ -2311,13 +2347,17 @@ const CONFIG = {
   N: {
     IMAGE_FIRST:"114", IMAGE_LAST:"121", IMG_SCALE:"119", GET_SIZE:"120",
     UNET:"105:6", CLIP:"105:13", VAE_VIDEO:"105:11", VAE_AUDIO:"105:24",
+    LORA1:"105:127", LORA2:"105:128",
     ATTN_BACKEND:"105:122", MEM_OPT:"105:125", SPARSE_ATTN:"105:126",
     SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
     SCHEDULER:"105:9", SAMPLER_SELECT:"105:17", I2V:"105:104", GUIDER:"105:16",
     SAMPLER:"105:14", DECODE_VIDEO:"105:10", DECODE_AUDIO:"105:23",
     RTX_SR:"105:121", CREATE_VIDEO:"105:91", SAVE:"92",
   },
-  loras: [],
+  loras: [
+    { on: false, lora: "", strength: 1.0 },
+    { on: false, lora: "", strength: 1.0 },
+  ],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
       A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for MiniMaxH3 video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
@@ -2555,9 +2595,11 @@ CONFIG.renderVariantMedia = function(card, url, media){
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
   const h = getH3OptState();
+  const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
   const rows = [
     ["UNet", $("unetSelect")?.value || ""],
     ["CLIP", $("clipSelect")?.value || ""],
+    ["LoRAs", activeLoras.length ? activeLoras.join(", ") : "ninguna"],
     ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
@@ -2568,7 +2610,7 @@ CONFIG.variantMeta = function(){
     ["Duración", `${$("duration")?.value || ""}s`],
     ["Modo", currentMode],
   ];
-  return { title: "Parámetros MiniMaxH3", rows, loras: [] };
+  return { title: "Parámetros MiniMaxH3", rows, loras: activeLoras };
 };
 CONFIG.onSeedUpdate = updateSeedUI;
 CONFIG.onNodeExecuted = function(data){
@@ -3054,6 +3096,35 @@ function applyWorkflow(workflow, opts={}){
   }
   if(clipSet) setApplied("CLIP"); else setMissing("CLIP");
 
+  // LoRAs
+  const loraNodesFound = findAllByClass("LoraLoaderModelOnly").concat(findAllByClass("LoraLoader"));
+  if(loraNodesFound.length > 0){
+    for(let i = 0; i < 2; i++){
+      if(i < loraNodesFound.length && loraNodesFound[i].node && loraNodesFound[i].node.inputs){
+        const inp = loraNodesFound[i].node.inputs;
+        const loraName = inp.lora_name || "";
+        const str = (typeof inp.strength_model === "number") ? inp.strength_model : ((typeof inp.strength === "number") ? inp.strength : 1.0);
+        if(loraName && loraName !== "None"){
+          loras[i].lora = loraName;
+          loras[i].on = true;
+          loras[i].strength = str;
+        } else {
+          loras[i].on = false;
+        }
+      } else {
+        loras[i].on = false;
+      }
+    }
+    renderLoras();
+    saveLoraState();
+    setApplied("LoRAs");
+  } else {
+    for(let i = 0; i < 2; i++) loras[i].on = false;
+    renderLoras();
+    saveLoraState();
+    setMissing("LoRAs");
+  }
+
   // H3 Optimizations (Sparse Attention & Memory Optimization)
   const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
   const memOptNode = findByClass("H3MemoryOptimization");
@@ -3524,9 +3595,41 @@ function buildGraph(){
   // CLIP
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
 
+  // Model Pipeline: UNet -> LoRAs -> ModelAttentionBackend -> H3 Memory -> H3 Sparse -> Spectrum -> Sampler
+  let currentModelNode = N.UNET;
+
+  // Proceso de LoRAs con bypass dinámico y resolución de nombres
+  const loraNodes = [N.LORA1, N.LORA2];
+  for(let i = 0; i < loraNodes.length; i++){
+    const nodeKey = loraNodes[i];
+    if(!g[nodeKey]) continue;
+    const loraObj = loras[i];
+    const name = loraObj ? loraObj.lora : "";
+
+    let resolvedName = name;
+    let exists = false;
+    if(name && typeof AVAILABLE_LORAS !== "undefined"){
+      const targetBase = name.replace(/^.*\//, "").toLowerCase();
+      const matched = AVAILABLE_LORAS.find(al => al.replace(/^.*\//, "").toLowerCase() === targetBase || al === name);
+      if(matched){
+        resolvedName = matched;
+        exists = true;
+      }
+    }
+
+    const shouldBypass = !loraObj || !loraObj.on || !exists || !resolvedName;
+    if(shouldBypass){
+      delete g[nodeKey];
+    } else {
+      g[nodeKey].inputs.model = [currentModelNode, 0];
+      g[nodeKey].inputs.lora_name = resolvedName;
+      g[nodeKey].inputs.strength_model = (typeof loraObj.strength === "number") ? loraObj.strength : 1.0;
+      currentModelNode = nodeKey;
+    }
+  }
+
   // Model Attention Backend & H3 Optimizations
   const h3opt = getH3OptState();
-  let currentModelNode = N.UNET;
 
   // 1. ModelAttentionBackend
   if(g[N.ATTN_BACKEND]){

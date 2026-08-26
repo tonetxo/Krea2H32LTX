@@ -52,6 +52,14 @@
       </div>
       <div class="panel"><h2>Modelo UNet</h2><div class="row"><select id="unetSelect"></select></div></div>
       <div class="panel"><h2>Modelo CLIP</h2><div class="row"><select id="clipSelect"></select></div></div>
+      <div class="panel">
+        <div class="collapsible-header" id="loraToggle">
+          <span class="arrow">▶</span> LoRAs / Turbo LoRA
+        </div>
+        <div class="collapsible-body" id="loraBody">
+          <div id="loraList"></div>
+        </div>
+      </div>
       <div class="panel"><h2>Optimizaciones H3 (Sparse &amp; Mem)</h2>
         <div class="seed-toggle">
           <div class="seg on" id="segSparseOn" data-value="true">Sparse Activo</div>

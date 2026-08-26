@@ -11,6 +11,8 @@ OUTPUT_HTML = os.environ.get("MINIMAXH3_OUTPUT_HTML", "MiniMaxH3_WebUI.html")
 UNET_DIR = os.environ.get("MINIMAXH3_UNET_DIR", "/home/tonetxo/SwarmUI/Models/diffusion_models")
 UNET_PREFIX = os.environ.get("MINIMAXH3_UNET_PREFIX", "Ligazón para diffusion_models")
 CLIP_DIR = os.environ.get("MINIMAXH3_CLIP_DIR", "/home/tonetxo/SwarmUI/Models/text_encoders")
+LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/h3")
+LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "Ligazón para Lora/h3")
 # Puerto donde se sirve esta UI (para el botón "enviar a ..." desde otras UIs).
 MINIMAXH3_UI_PORT = os.environ.get("MINIMAXH3_UI_PORT", "8002")
 # ---------------------
@@ -29,9 +31,9 @@ def main():
         'model_dirs': None,
         'model_fallback': '',
         'model_exclude': (),
-        # Sin LoRAs en el grafo.
-        'lora_dir': None,
-        'lora_fallback': '',
+        # LoRAs / Turbo LoRAs de MiniMaxH3
+        'lora_dirs': [(LORAS_DIR, LORAS_PREFIX)],
+        'lora_fallback': 'Ligazón para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors',
         # Sin selector de VAE: el workflow lleva 2 VAEs fijos (vídeo + audio).
         'vae_dir': None,
         'vae_fallback': '',

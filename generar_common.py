@@ -113,7 +113,10 @@ def generate_html(config):
     model_files = [m for m in raw_models if not any(m.startswith(x) for x in exclude)]
     model_js_array = json.dumps(model_files)
 
-    lora_files = get_lora_list(config['lora_dir'], fallback=config.get('lora_fallback'))
+    if config.get('lora_dirs'):
+        lora_files = get_file_list(config['lora_dirs'], fallback=config.get('lora_fallback'))
+    else:
+        lora_files = get_lora_list(config.get('lora_dir'), fallback=config.get('lora_fallback'))
     lora_js_array = json.dumps(lora_files)
 
     vae_files = get_vae_list(config.get('vae_dir'), fallback=config.get('vae_fallback'))

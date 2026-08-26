@@ -13,13 +13,17 @@ const CONFIG = {
   N: {
     IMAGE_FIRST:"114", IMAGE_LAST:"121", IMG_SCALE:"119", GET_SIZE:"120",
     UNET:"105:6", CLIP:"105:13", VAE_VIDEO:"105:11", VAE_AUDIO:"105:24",
+    LORA1:"105:127", LORA2:"105:128",
     ATTN_BACKEND:"105:122", MEM_OPT:"105:125", SPARSE_ATTN:"105:126",
     SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
     SCHEDULER:"105:9", SAMPLER_SELECT:"105:17", I2V:"105:104", GUIDER:"105:16",
     SAMPLER:"105:14", DECODE_VIDEO:"105:10", DECODE_AUDIO:"105:23",
     RTX_SR:"105:121", CREATE_VIDEO:"105:91", SAVE:"92",
   },
-  loras: [],
+  loras: [
+    { on: false, lora: "", strength: 1.0 },
+    { on: false, lora: "", strength: 1.0 },
+  ],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
       A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for MiniMaxH3 video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
@@ -257,9 +261,11 @@ CONFIG.renderVariantMedia = function(card, url, media){
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
   const h = getH3OptState();
+  const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
   const rows = [
     ["UNet", $("unetSelect")?.value || ""],
     ["CLIP", $("clipSelect")?.value || ""],
+    ["LoRAs", activeLoras.length ? activeLoras.join(", ") : "ninguna"],
     ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
@@ -270,7 +276,7 @@ CONFIG.variantMeta = function(){
     ["Duración", `${$("duration")?.value || ""}s`],
     ["Modo", currentMode],
   ];
-  return { title: "Parámetros MiniMaxH3", rows, loras: [] };
+  return { title: "Parámetros MiniMaxH3", rows, loras: activeLoras };
 };
 CONFIG.onSeedUpdate = updateSeedUI;
 CONFIG.onNodeExecuted = function(data){
@@ -756,6 +762,35 @@ function applyWorkflow(workflow, opts={}){
   }
   if(clipSet) setApplied("CLIP"); else setMissing("CLIP");
 
+  // LoRAs
+  const loraNodesFound = findAllByClass("LoraLoaderModelOnly").concat(findAllByClass("LoraLoader"));
+  if(loraNodesFound.length > 0){
+    for(let i = 0; i < 2; i++){
+      if(i < loraNodesFound.length && loraNodesFound[i].node && loraNodesFound[i].node.inputs){
+        const inp = loraNodesFound[i].node.inputs;
+        const loraName = inp.lora_name || "";
+        const str = (typeof inp.strength_model === "number") ? inp.strength_model : ((typeof inp.strength === "number") ? inp.strength : 1.0);
+        if(loraName && loraName !== "None"){
+          loras[i].lora = loraName;
+          loras[i].on = true;
+          loras[i].strength = str;
+        } else {
+          loras[i].on = false;
+        }
+      } else {
+        loras[i].on = false;
+      }
+    }
+    renderLoras();
+    saveLoraState();
+    setApplied("LoRAs");
+  } else {
+    for(let i = 0; i < 2; i++) loras[i].on = false;
+    renderLoras();
+    saveLoraState();
+    setMissing("LoRAs");
+  }
+
   // H3 Optimizations (Sparse Attention & Memory Optimization)
   const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
   const memOptNode = findByClass("H3MemoryOptimization");
@@ -1226,9 +1261,41 @@ function buildGraph(){
   // CLIP
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
 
+  // Model Pipeline: UNet -> LoRAs -> ModelAttentionBackend -> H3 Memory -> H3 Sparse -> Spectrum -> Sampler
+  let currentModelNode = N.UNET;
+
+  // Proceso de LoRAs con bypass dinámico y resolución de nombres
+  const loraNodes = [N.LORA1, N.LORA2];
+  for(let i = 0; i < loraNodes.length; i++){
+    const nodeKey = loraNodes[i];
+    if(!g[nodeKey]) continue;
+    const loraObj = loras[i];
+    const name = loraObj ? loraObj.lora : "";
+
+    let resolvedName = name;
+    let exists = false;
+    if(name && typeof AVAILABLE_LORAS !== "undefined"){
+      const targetBase = name.replace(/^.*\//, "").toLowerCase();
+      const matched = AVAILABLE_LORAS.find(al => al.replace(/^.*\//, "").toLowerCase() === targetBase || al === name);
+      if(matched){
+        resolvedName = matched;
+        exists = true;
+      }
+    }
+
+    const shouldBypass = !loraObj || !loraObj.on || !exists || !resolvedName;
+    if(shouldBypass){
+      delete g[nodeKey];
+    } else {
+      g[nodeKey].inputs.model = [currentModelNode, 0];
+      g[nodeKey].inputs.lora_name = resolvedName;
+      g[nodeKey].inputs.strength_model = (typeof loraObj.strength === "number") ? loraObj.strength : 1.0;
+      currentModelNode = nodeKey;
+    }
+  }
+
   // Model Attention Backend & H3 Optimizations
   const h3opt = getH3OptState();
-  let currentModelNode = N.UNET;
 
   // 1. ModelAttentionBackend
   if(g[N.ATTN_BACKEND]){
