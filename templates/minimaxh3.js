@@ -13,7 +13,8 @@ const CONFIG = {
   N: {
     IMAGE_FIRST:"114", IMAGE_LAST:"121", IMG_SCALE:"119", GET_SIZE:"120",
     UNET:"105:6", CLIP:"105:13", VAE_VIDEO:"105:11", VAE_AUDIO:"105:24",
-    SAGE:"105:123", SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
+    ATTN_BACKEND:"105:122", MEM_OPT:"105:125", SPARSE_ATTN:"105:126",
+    SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
     SCHEDULER:"105:9", SAMPLER_SELECT:"105:17", I2V:"105:104", GUIDER:"105:16",
     SAMPLER:"105:14", DECODE_VIDEO:"105:10", DECODE_AUDIO:"105:23",
     RTX_SR:"105:121", CREATE_VIDEO:"105:91", SAVE:"92",
@@ -111,10 +112,10 @@ let localFirstFile=null, localLastFile=null;
 let seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
-const SAGE_TYPES = [];
 const BITDEPTH_KEY = "minimaxh3_bit_depth";
 const MODE_KEY = "minimaxh3_mode";
 const SPECTRUM_KEY = "minimaxh3_spectrum";
+const H3OPT_KEY = "minimaxh3_h3opt";
 let currentMode = "i2v"; // "i2v" | "flf2v"
 window.currentBatchMode = false;
 let jobQueue = [];
@@ -122,6 +123,48 @@ let activeJob = null;
 let promptVariantMap = {};
 const displayedGalleryFiles = new Set();
 const displayedSlots = {};
+
+// --- H3 OPTIMIZATIONS (Sparse Attention & Memory Optimization) ---
+const H3OPT_DEFAULTS = { sparseEnabled: true, videoBudget: 0.30, memOptEnabled: true };
+function loadH3Opt(){
+  try { return Object.assign({}, H3OPT_DEFAULTS, JSON.parse(localStorage.getItem(H3OPT_KEY) || "{}")); }
+  catch(_) { return {...H3OPT_DEFAULTS}; }
+}
+function saveH3Opt(state){
+  try { localStorage.setItem(H3OPT_KEY, JSON.stringify(state)); } catch(_){}
+}
+function getH3OptState(){
+  return {
+    sparseEnabled: $("segSparseOn")?.classList.contains("on") ?? true,
+    videoBudget: parseFloat($("h3VideoBudget")?.value || "0.30"),
+    memOptEnabled: $("segMemOptOn")?.classList.contains("on") ?? true,
+  };
+}
+function setH3OptUI(state){
+  const sOn = $("segSparseOn"), sOff = $("segSparseOff");
+  if(state.sparseEnabled){ sOn?.classList.add("on"); sOff?.classList.remove("on"); }
+  else { sOff?.classList.add("on"); sOn?.classList.remove("on"); }
+  if($("h3VideoBudget")){
+    $("h3VideoBudget").value = state.videoBudget;
+    const pct = Math.round(state.videoBudget * 100);
+    if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${pct}%`;
+  }
+  const mOn = $("segMemOptOn"), mOff = $("segMemOptOff");
+  if(state.memOptEnabled){ mOn?.classList.add("on"); mOff?.classList.remove("on"); }
+  else { mOff?.classList.add("on"); mOn?.classList.remove("on"); }
+}
+const _h3OptState = loadH3Opt();
+setH3OptUI(_h3OptState);
+$("segSparseOn")?.addEventListener("click", () => { const s = getH3OptState(); s.sparseEnabled = true; setH3OptUI(s); saveH3Opt(s); });
+$("segSparseOff")?.addEventListener("click", () => { const s = getH3OptState(); s.sparseEnabled = false; setH3OptUI(s); saveH3Opt(s); });
+$("h3VideoBudget")?.addEventListener("input", (e) => {
+  const val = parseFloat(e.target.value);
+  const pct = Math.round(val * 100);
+  if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${pct}%`;
+  const s = getH3OptState(); s.videoBudget = val; saveH3Opt(s);
+});
+$("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); });
+$("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); });
 
 function getBitDepth(){
   return ($("segBitDepth10")?.classList.contains("on") ? 10 : 8);
@@ -213,10 +256,12 @@ CONFIG.renderVariantMedia = function(card, url, media){
 };
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
+  const h = getH3OptState();
   const rows = [
     ["UNet", $("unetSelect")?.value || ""],
     ["CLIP", $("clipSelect")?.value || ""],
-    ["Sage", "mem_eff (H3)"],
+    ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
+    ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
@@ -711,10 +756,35 @@ function applyWorkflow(workflow, opts={}){
   }
   if(clipSet) setApplied("CLIP"); else setMissing("CLIP");
 
-  // Sage Attention (Mem Eff: sin parámetros)
-  const sageNode = findByClass("MiniMaxH3MemoryEfficientSageAttentionPatch");
-  if(sageNode) setApplied("sage attention (mem eff)");
-  else setMissing("sage attention");
+  // H3 Optimizations (Sparse Attention & Memory Optimization)
+  const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
+  const memOptNode = findByClass("H3MemoryOptimization");
+  const h3State = loadH3Opt();
+  let h3Changed = false;
+
+  if(sparseNode && sparseNode.inputs){
+    h3State.sparseEnabled = true;
+    if(typeof sparseNode.inputs.video_budget === "number"){
+      h3State.videoBudget = sparseNode.inputs.video_budget;
+    }
+    h3Changed = true;
+    setApplied(`h3 sparse (${Math.round(h3State.videoBudget * 100)}%)`);
+  } else if(sparseNode === null){
+    setMissing("h3 sparse attention");
+  }
+
+  if(memOptNode){
+    h3State.memOptEnabled = true;
+    h3Changed = true;
+    setApplied("h3 memory opt");
+  } else if(memOptNode === null){
+    setMissing("h3 memory opt");
+  }
+
+  if(h3Changed){
+    setH3OptUI(h3State);
+    saveH3Opt(h3State);
+  }
 
   // Spectrum
   const spectrumNode = findByClass("SpectrumApplyMiniMaxH3");
@@ -1155,10 +1225,42 @@ function buildGraph(){
   if(g[N.UNET] && g[N.UNET].inputs) g[N.UNET].inputs.unet_name = $("unetSelect").value;
   // CLIP
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
-  // Sage attention (nodo Mem Eff: sin parámetros, siempre aplicado)
-  // Spectrum
+
+  // Model Attention Backend & H3 Optimizations
+  const h3opt = getH3OptState();
+  let currentModelNode = N.UNET;
+
+  // 1. ModelAttentionBackend
+  if(g[N.ATTN_BACKEND]){
+    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
+    g[N.ATTN_BACKEND].inputs.attention = "comfy kitchen attention";
+    currentModelNode = N.ATTN_BACKEND;
+  }
+
+  // 2. H3MemoryOptimization
+  if(h3opt.memOptEnabled && g[N.MEM_OPT]){
+    g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+    g[N.MEM_OPT].inputs.qkv_streaming_mode = "Auto";
+    g[N.MEM_OPT].inputs.precision_mode = "Auto";
+    currentModelNode = N.MEM_OPT;
+  } else if(!h3opt.memOptEnabled && g[N.MEM_OPT]){
+    delete g[N.MEM_OPT];
+  }
+
+  // 3. H3SparseAttention
+  if(h3opt.sparseEnabled && g[N.SPARSE_ATTN]){
+    g[N.SPARSE_ATTN].inputs.model = [currentModelNode, 0];
+    g[N.SPARSE_ATTN].inputs.video_budget = h3opt.videoBudget;
+    g[N.SPARSE_ATTN].inputs.denser_early_late_steps = false;
+    currentModelNode = N.SPARSE_ATTN;
+  } else if(!h3opt.sparseEnabled && g[N.SPARSE_ATTN]){
+    delete g[N.SPARSE_ATTN];
+  }
+
+  // 4. Spectrum
   if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
     const s = getSpectrumState();
+    g[N.SPECTRUM].inputs.model = [currentModelNode, 0];
     g[N.SPECTRUM].inputs.enabled = s.enabled;
     g[N.SPECTRUM].inputs.blend_weight = s.blend;
     g[N.SPECTRUM].inputs.flex_window = s.flex;

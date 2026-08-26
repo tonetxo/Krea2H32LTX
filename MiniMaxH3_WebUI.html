@@ -354,6 +354,25 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       </div>
       <div class="panel"><h2>Modelo UNet</h2><div class="row"><select id="unetSelect"></select></div></div>
       <div class="panel"><h2>Modelo CLIP</h2><div class="row"><select id="clipSelect"></select></div></div>
+      <div class="panel"><h2>Optimizaciones H3 (Sparse &amp; Mem)</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segSparseOn" data-value="true">Sparse Activo</div>
+          <div class="seg" id="segSparseOff" data-value="false">Desactivado</div>
+        </div>
+        <div class="row slider-row" id="h3BudgetRow">
+          <label>Video Attention Budget <span class="hint">(30% por defecto)</span></label>
+          <input type="range" id="h3VideoBudget" min="0.05" max="1.0" step="0.01" value="0.30">
+          <div class="slider-val" id="h3VideoBudgetVal">30%</div>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label>Memory Optimization</label>
+          <div class="seed-toggle" style="margin-top:4px;">
+            <div class="seg on" id="segMemOptOn" data-value="true">Activo</div>
+            <div class="seg" id="segMemOptOff" data-value="false">Desactivado</div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:6px;font-size:10px;">Acelera la atención (Kitchen INT8 64x64) y reduce el consumo de VRAM (QKV &amp; MLP chunking). Menor budget = más rápido.</div>
+      </div>
       <div class="panel"><h2>Spectrum (MiniMax H3)</h2><div class="seed-toggle"><div class="seg on" id="segSpectrumOn" data-value="true">Activo</div><div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div></div><div class="row slider-row"><label>Blend weight <span class="hint">(peso espectral)</span></label><input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5"><div class="slider-val" id="spectrumBlendVal">0.50</div></div><div class="row slider-row"><label>Flex window <span class="hint">(ajuste intervalo)</span></label><input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75"><div class="slider-val" id="spectrumFlexVal">0.75</div></div><div class="row slider-row"><label>Warmup steps <span class="hint">(pasos nativos iniciales)</span></label><input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="5"><div class="slider-val" id="spectrumWarmupVal">5</div></div><div class="row"><label>Historial en <span class="hint">(VRAM más rápido, más memoria)</span></label><select id="spectrumHistoryStorage"><option value="system_ram" selected>RAM sistema</option><option value="vram">VRAM</option></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div></div>
       <div class="panel"><h2>Sampler</h2><div class="row"><select id="samplerName"><option value="res_multistep">res_multistep</option><option value="res_multistep_cfg_pp">res_multistep_cfg_pp</option><option value="euler">euler</option><option value="euler_ancestral">euler_ancestral</option><option value="dpmpp_2m">dpmpp_2m</option><option value="dpmpp_2m_sde">dpmpp_2m_sde</option><option value="dpmpp_3m_sde">dpmpp_3m_sde</option><option value="lcm">lcm</option></select></div></div>
       <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple">simple</option><option value="normal">normal</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="sgm_uniform">sgm_uniform</option><option value="beta">beta</option></select></div></div>
@@ -529,16 +548,50 @@ const BASE_GRAPH = {
       "title": "Float (duration)"
     }
   },
-  "105:123": {
+  "105:122": {
     "inputs": {
+      "attention": "comfy kitchen attention",
       "model": [
         "105:6",
         0
       ]
     },
-    "class_type": "MiniMaxH3MemoryEfficientSageAttentionPatch",
+    "class_type": "ModelAttentionBackend",
     "_meta": {
-      "title": "MiniMax H3 Mem Eff Sage Attention"
+      "title": "ModelAttentionBackend"
+    }
+  },
+  "105:125": {
+    "inputs": {
+      "chunk_rows": 4096,
+      "fused_qkv": "auto",
+      "mlp_memory": "auto",
+      "precision_mode": "Auto",
+      "preserve_precision": true,
+      "qkv_streaming_mode": "Auto",
+      "model": [
+        "105:122",
+        0
+      ]
+    },
+    "class_type": "H3MemoryOptimization",
+    "_meta": {
+      "title": "H3 Memory Optimization"
+    }
+  },
+  "105:126": {
+    "inputs": {
+      "denser_early_late_steps": false,
+      "layer_video_budgets": "",
+      "video_budget": 0.3,
+      "model": [
+        "105:125",
+        0
+      ]
+    },
+    "class_type": "H3SparseAttention",
+    "_meta": {
+      "title": "H3 Sparse Attention"
     }
   },
   "105:107": {
@@ -568,7 +621,7 @@ const BASE_GRAPH = {
       "debug": false,
       "history_storage": "system_ram",
       "model": [
-        "105:123",
+        "105:126",
         0
       ]
     },
@@ -742,7 +795,7 @@ const BASE_GRAPH = {
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = [];
 const AVAILABLE_VAES = [];
-const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors"];
+const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO_ref2va_beta2_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_fl2va_beta2_pruned_int8_convrot_skip_edges.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const LTXV_UI_PORT = "8002";
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
@@ -2258,7 +2311,8 @@ const CONFIG = {
   N: {
     IMAGE_FIRST:"114", IMAGE_LAST:"121", IMG_SCALE:"119", GET_SIZE:"120",
     UNET:"105:6", CLIP:"105:13", VAE_VIDEO:"105:11", VAE_AUDIO:"105:24",
-    SAGE:"105:123", SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
+    ATTN_BACKEND:"105:122", MEM_OPT:"105:125", SPARSE_ATTN:"105:126",
+    SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
     SCHEDULER:"105:9", SAMPLER_SELECT:"105:17", I2V:"105:104", GUIDER:"105:16",
     SAMPLER:"105:14", DECODE_VIDEO:"105:10", DECODE_AUDIO:"105:23",
     RTX_SR:"105:121", CREATE_VIDEO:"105:91", SAVE:"92",
@@ -2356,10 +2410,10 @@ let localFirstFile=null, localLastFile=null;
 let seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
-const SAGE_TYPES = [];
 const BITDEPTH_KEY = "minimaxh3_bit_depth";
 const MODE_KEY = "minimaxh3_mode";
 const SPECTRUM_KEY = "minimaxh3_spectrum";
+const H3OPT_KEY = "minimaxh3_h3opt";
 let currentMode = "i2v"; // "i2v" | "flf2v"
 window.currentBatchMode = false;
 let jobQueue = [];
@@ -2367,6 +2421,48 @@ let activeJob = null;
 let promptVariantMap = {};
 const displayedGalleryFiles = new Set();
 const displayedSlots = {};
+
+// --- H3 OPTIMIZATIONS (Sparse Attention & Memory Optimization) ---
+const H3OPT_DEFAULTS = { sparseEnabled: true, videoBudget: 0.30, memOptEnabled: true };
+function loadH3Opt(){
+  try { return Object.assign({}, H3OPT_DEFAULTS, JSON.parse(localStorage.getItem(H3OPT_KEY) || "{}")); }
+  catch(_) { return {...H3OPT_DEFAULTS}; }
+}
+function saveH3Opt(state){
+  try { localStorage.setItem(H3OPT_KEY, JSON.stringify(state)); } catch(_){}
+}
+function getH3OptState(){
+  return {
+    sparseEnabled: $("segSparseOn")?.classList.contains("on") ?? true,
+    videoBudget: parseFloat($("h3VideoBudget")?.value || "0.30"),
+    memOptEnabled: $("segMemOptOn")?.classList.contains("on") ?? true,
+  };
+}
+function setH3OptUI(state){
+  const sOn = $("segSparseOn"), sOff = $("segSparseOff");
+  if(state.sparseEnabled){ sOn?.classList.add("on"); sOff?.classList.remove("on"); }
+  else { sOff?.classList.add("on"); sOn?.classList.remove("on"); }
+  if($("h3VideoBudget")){
+    $("h3VideoBudget").value = state.videoBudget;
+    const pct = Math.round(state.videoBudget * 100);
+    if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${pct}%`;
+  }
+  const mOn = $("segMemOptOn"), mOff = $("segMemOptOff");
+  if(state.memOptEnabled){ mOn?.classList.add("on"); mOff?.classList.remove("on"); }
+  else { mOff?.classList.add("on"); mOn?.classList.remove("on"); }
+}
+const _h3OptState = loadH3Opt();
+setH3OptUI(_h3OptState);
+$("segSparseOn")?.addEventListener("click", () => { const s = getH3OptState(); s.sparseEnabled = true; setH3OptUI(s); saveH3Opt(s); });
+$("segSparseOff")?.addEventListener("click", () => { const s = getH3OptState(); s.sparseEnabled = false; setH3OptUI(s); saveH3Opt(s); });
+$("h3VideoBudget")?.addEventListener("input", (e) => {
+  const val = parseFloat(e.target.value);
+  const pct = Math.round(val * 100);
+  if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${pct}%`;
+  const s = getH3OptState(); s.videoBudget = val; saveH3Opt(s);
+});
+$("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); });
+$("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); });
 
 function getBitDepth(){
   return ($("segBitDepth10")?.classList.contains("on") ? 10 : 8);
@@ -2458,10 +2554,12 @@ CONFIG.renderVariantMedia = function(card, url, media){
 };
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
+  const h = getH3OptState();
   const rows = [
     ["UNet", $("unetSelect")?.value || ""],
     ["CLIP", $("clipSelect")?.value || ""],
-    ["Sage", "mem_eff (H3)"],
+    ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
+    ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
@@ -2956,10 +3054,35 @@ function applyWorkflow(workflow, opts={}){
   }
   if(clipSet) setApplied("CLIP"); else setMissing("CLIP");
 
-  // Sage Attention (Mem Eff: sin parámetros)
-  const sageNode = findByClass("MiniMaxH3MemoryEfficientSageAttentionPatch");
-  if(sageNode) setApplied("sage attention (mem eff)");
-  else setMissing("sage attention");
+  // H3 Optimizations (Sparse Attention & Memory Optimization)
+  const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
+  const memOptNode = findByClass("H3MemoryOptimization");
+  const h3State = loadH3Opt();
+  let h3Changed = false;
+
+  if(sparseNode && sparseNode.inputs){
+    h3State.sparseEnabled = true;
+    if(typeof sparseNode.inputs.video_budget === "number"){
+      h3State.videoBudget = sparseNode.inputs.video_budget;
+    }
+    h3Changed = true;
+    setApplied(`h3 sparse (${Math.round(h3State.videoBudget * 100)}%)`);
+  } else if(sparseNode === null){
+    setMissing("h3 sparse attention");
+  }
+
+  if(memOptNode){
+    h3State.memOptEnabled = true;
+    h3Changed = true;
+    setApplied("h3 memory opt");
+  } else if(memOptNode === null){
+    setMissing("h3 memory opt");
+  }
+
+  if(h3Changed){
+    setH3OptUI(h3State);
+    saveH3Opt(h3State);
+  }
 
   // Spectrum
   const spectrumNode = findByClass("SpectrumApplyMiniMaxH3");
@@ -3400,10 +3523,42 @@ function buildGraph(){
   if(g[N.UNET] && g[N.UNET].inputs) g[N.UNET].inputs.unet_name = $("unetSelect").value;
   // CLIP
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
-  // Sage attention (nodo Mem Eff: sin parámetros, siempre aplicado)
-  // Spectrum
+
+  // Model Attention Backend & H3 Optimizations
+  const h3opt = getH3OptState();
+  let currentModelNode = N.UNET;
+
+  // 1. ModelAttentionBackend
+  if(g[N.ATTN_BACKEND]){
+    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
+    g[N.ATTN_BACKEND].inputs.attention = "comfy kitchen attention";
+    currentModelNode = N.ATTN_BACKEND;
+  }
+
+  // 2. H3MemoryOptimization
+  if(h3opt.memOptEnabled && g[N.MEM_OPT]){
+    g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+    g[N.MEM_OPT].inputs.qkv_streaming_mode = "Auto";
+    g[N.MEM_OPT].inputs.precision_mode = "Auto";
+    currentModelNode = N.MEM_OPT;
+  } else if(!h3opt.memOptEnabled && g[N.MEM_OPT]){
+    delete g[N.MEM_OPT];
+  }
+
+  // 3. H3SparseAttention
+  if(h3opt.sparseEnabled && g[N.SPARSE_ATTN]){
+    g[N.SPARSE_ATTN].inputs.model = [currentModelNode, 0];
+    g[N.SPARSE_ATTN].inputs.video_budget = h3opt.videoBudget;
+    g[N.SPARSE_ATTN].inputs.denser_early_late_steps = false;
+    currentModelNode = N.SPARSE_ATTN;
+  } else if(!h3opt.sparseEnabled && g[N.SPARSE_ATTN]){
+    delete g[N.SPARSE_ATTN];
+  }
+
+  // 4. Spectrum
   if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
     const s = getSpectrumState();
+    g[N.SPECTRUM].inputs.model = [currentModelNode, 0];
     g[N.SPECTRUM].inputs.enabled = s.enabled;
     g[N.SPECTRUM].inputs.blend_weight = s.blend;
     g[N.SPECTRUM].inputs.flex_window = s.flex;
