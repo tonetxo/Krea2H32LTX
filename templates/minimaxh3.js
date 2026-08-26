@@ -2060,7 +2060,7 @@ async function runSingleGeneration(index) {
           body:JSON.stringify({
             prompt:graph,
             client_id:CLIENT_ID,
-            extra_data: { preview_method: getPreviewMethod() }
+            extra_data: { preview_method: (getPreviewMethod() === "none" ? "none" : "latent2rgb") }
           })
         });
         if(!r.ok){
