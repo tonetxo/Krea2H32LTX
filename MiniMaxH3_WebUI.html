@@ -3684,17 +3684,16 @@ function buildGraph(){
 
   // Modo i2v vs flf2v
   if(currentMode === "flf2v" && uploadedLastImage){
-    // Ambos frames: first_frame y last_frame apuntan a sus LoadImage respectivos.
+    // Ambos frames (FLF2V): ancla frame 0 a first_frame y frame N-1 a last_frame.
     g[N.IMAGE_LAST].inputs.image = uploadedLastImage.name;
     g[N.I2V].inputs.first_frame = [N.IMAGE_FIRST, 0];
     g[N.I2V].inputs.last_frame = [N.IMAGE_LAST, 0];
   } else {
-    // i2v: mantener el nodo 121 (igual que el grafo original) cargando la
-    // misma imagen que el primer frame. Así la topología de dependencias
-    // de ComfyUI no cambia y se evita un pico de VRAM que provocaba OOM.
-    g[N.IMAGE_LAST].inputs.image = uploadedFirstImage.name;
+    // Modo I2V puro: solo primer frame (ancla en frame 0).
+    // Se elimina last_frame para que el vídeo evolucione libremente y no se obligue a terminar en el frame inicial.
     g[N.I2V].inputs.first_frame = [N.IMAGE_FIRST, 0];
-    g[N.I2V].inputs.last_frame = [N.IMAGE_LAST, 0];
+    delete g[N.I2V].inputs.last_frame;
+    delete g[N.IMAGE_LAST];
   }
 
   return g;
