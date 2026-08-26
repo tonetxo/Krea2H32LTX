@@ -846,7 +846,7 @@ const BASE_GRAPH = {
 };
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v0.1_768p_sla_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
-const AVAILABLE_VAES = [];
+const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors"];
 const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO_ref2va_beta2_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_fl2va_beta2_pruned_int8_convrot_skip_edges.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b30-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const LTXV_UI_PORT = "8002";
@@ -1088,6 +1088,13 @@ function connectSocket() {
             return;
         }
         if(msg.type === 'progress') handleStepProgress(msg.data);
+        if(msg.type === 'kj_preview_override'){
+          if(msg.data && msg.data.image){
+            const mime = msg.data.mime || "image/jpeg";
+            const dataUrl = `data:${mime};base64,${msg.data.image}`;
+            if(CONFIG.onPreview) CONFIG.onPreview(dataUrl, msg.data);
+          }
+        }
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
         if(msg.type === 'executed' && CONFIG.onNodeExecuted){
           try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
@@ -3841,7 +3848,28 @@ function buildGraph(){
     delete g[N.SPARSE_ATTN];
   }
 
-  // 4. Spectrum
+  // 4. Model Preview Override con taeh3 (Tiny VAE live preview)
+  const prevMethod = getPreviewMethod();
+  const hasTaeH3 = (typeof AVAILABLE_VAES !== "undefined" && AVAILABLE_VAES.some(v => v.toLowerCase().includes("taeh3")));
+  if(prevMethod !== "none"){
+    const previewOverrideKey = "105:130";
+    g[previewOverrideKey] = {
+      class_type: "ModelPreviewOverrideKJ",
+      inputs: {
+        model: [currentModelNode, 0],
+        max_resolution: 1024,
+        jpeg_quality: 85,
+        suppress_default_preview: false,
+        preview_frames: 1,
+        preview_fps: 12,
+        tiny_vae: (hasTaeH3 && prevMethod !== "latent2rgb") ? "taeh3.safetensors" : "none"
+      },
+      _meta: { title: "Model Preview Override (taeh3)" }
+    };
+    currentModelNode = previewOverrideKey;
+  }
+
+  // 5. Spectrum
   if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
     const s = getSpectrumState();
     g[N.SPECTRUM].inputs.model = [currentModelNode, 0];
@@ -3850,11 +3878,11 @@ function buildGraph(){
     g[N.SPECTRUM].inputs.flex_window = s.flex;
     g[N.SPECTRUM].inputs.warmup_steps = s.warmup;
     g[N.SPECTRUM].inputs.history_storage = s.historyStorage;
+    currentModelNode = N.SPECTRUM;
   }
-  // Sampler
-  if(g[N.SAMPLER_SELECT] && g[N.SAMPLER_SELECT].inputs) g[N.SAMPLER_SELECT].inputs.sampler_name = $("samplerName").value;
-  // Scheduler + steps
+  // Scheduler conectado a currentModelNode
   if(g[N.SCHEDULER] && g[N.SCHEDULER].inputs){
+    g[N.SCHEDULER].inputs.model = [currentModelNode, 0];
     g[N.SCHEDULER].inputs.scheduler = $("schedulerName").value;
     g[N.SCHEDULER].inputs.steps = parseInt($("stepsSlider").value || "20", 10);
   }

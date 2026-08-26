@@ -236,6 +236,13 @@ function connectSocket() {
             return;
         }
         if(msg.type === 'progress') handleStepProgress(msg.data);
+        if(msg.type === 'kj_preview_override'){
+          if(msg.data && msg.data.image){
+            const mime = msg.data.mime || "image/jpeg";
+            const dataUrl = `data:${mime};base64,${msg.data.image}`;
+            if(CONFIG.onPreview) CONFIG.onPreview(dataUrl, msg.data);
+          }
+        }
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
         if(msg.type === 'executed' && CONFIG.onNodeExecuted){
           try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }

@@ -1390,7 +1390,28 @@ function buildGraph(){
     delete g[N.SPARSE_ATTN];
   }
 
-  // 4. Spectrum
+  // 4. Model Preview Override con taeh3 (Tiny VAE live preview)
+  const prevMethod = getPreviewMethod();
+  const hasTaeH3 = (typeof AVAILABLE_VAES !== "undefined" && AVAILABLE_VAES.some(v => v.toLowerCase().includes("taeh3")));
+  if(prevMethod !== "none"){
+    const previewOverrideKey = "105:130";
+    g[previewOverrideKey] = {
+      class_type: "ModelPreviewOverrideKJ",
+      inputs: {
+        model: [currentModelNode, 0],
+        max_resolution: 1024,
+        jpeg_quality: 85,
+        suppress_default_preview: false,
+        preview_frames: 1,
+        preview_fps: 12,
+        tiny_vae: (hasTaeH3 && prevMethod !== "latent2rgb") ? "taeh3.safetensors" : "none"
+      },
+      _meta: { title: "Model Preview Override (taeh3)" }
+    };
+    currentModelNode = previewOverrideKey;
+  }
+
+  // 5. Spectrum
   if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
     const s = getSpectrumState();
     g[N.SPECTRUM].inputs.model = [currentModelNode, 0];
@@ -1399,11 +1420,11 @@ function buildGraph(){
     g[N.SPECTRUM].inputs.flex_window = s.flex;
     g[N.SPECTRUM].inputs.warmup_steps = s.warmup;
     g[N.SPECTRUM].inputs.history_storage = s.historyStorage;
+    currentModelNode = N.SPECTRUM;
   }
-  // Sampler
-  if(g[N.SAMPLER_SELECT] && g[N.SAMPLER_SELECT].inputs) g[N.SAMPLER_SELECT].inputs.sampler_name = $("samplerName").value;
-  // Scheduler + steps
+  // Scheduler conectado a currentModelNode
   if(g[N.SCHEDULER] && g[N.SCHEDULER].inputs){
+    g[N.SCHEDULER].inputs.model = [currentModelNode, 0];
     g[N.SCHEDULER].inputs.scheduler = $("schedulerName").value;
     g[N.SCHEDULER].inputs.steps = parseInt($("stepsSlider").value || "20", 10);
   }

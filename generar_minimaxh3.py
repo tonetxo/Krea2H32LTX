@@ -34,9 +34,9 @@ def main():
         # LoRAs / Turbo LoRAs de MiniMaxH3
         'lora_dirs': [(LORAS_DIR, LORAS_PREFIX)],
         'lora_fallback': 'Ligazón para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors',
-        # Sin selector de VAE: el workflow lleva 2 VAEs fijos (vídeo + audio).
-        'vae_dir': None,
-        'vae_fallback': '',
+        # VAEs aproximados (taeh3 para live previews de alta calidad)
+        'vae_dir': '/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/vae_approx',
+        'vae_fallback': 'taeh3.safetensors',
         # UNet y CLIP sí se exponen como selectores.
         'unet_dirs': [(UNET_DIR, UNET_PREFIX)],
         'unet_fallback': 'Ligazón para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors',
