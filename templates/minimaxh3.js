@@ -399,20 +399,24 @@ CONFIG.onProgress = function(value, max, prompt_id, node){
 };
 
 CONFIG.onPreview = function(url, meta){
-  const p = $("previewImg1"), e = $("empty1"), v = $("video1"), w = $("previewWrap1");
-  if(p && e){
-    p.src = url;
-    if(w) w.style.display = "block";
-    p.style.display = "block";
-    e.style.display = "none";
-    if(v && (!displayedSlots[currentPromptId] || !displayedSlots[currentPromptId].has(1))){
-      v.style.display = "none";
-    }
+  const p = $("previewImg1"), pv = $("previewVideo1"), e = $("empty1"), v = $("video1"), w = $("previewWrap1");
+  if(!p && !pv) return;
+  const isVideoUrl = typeof url === "string" && (url.startsWith("data:video/mp4") || url.startsWith("data:video/webm"));
+  const target = isVideoUrl && pv ? pv : p;
+  const other  = isVideoUrl ? p : pv;
+  target.src = url;
+  if(w) w.style.display = "block";
+  target.style.display = "block";
+  if(other) other.style.display = "none";
+  e.style.display = "none";
+  if(v && (!displayedSlots[currentPromptId] || !displayedSlots[currentPromptId].has(1))){
+    v.style.display = "none";
   }
+  if(isVideoUrl && pv.autoplay !== true){ pv.autoplay = true; pv.muted = true; pv.loop = true; }
   if(currentPromptId && promptVariantMap[currentPromptId]){
     const varIdx = promptVariantMap[currentPromptId];
     const cardImg = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-live-thumb`);
-    if(cardImg){
+    if(cardImg && !isVideoUrl){
       cardImg.src = url;
       cardImg.style.opacity = "1";
     }
@@ -420,8 +424,9 @@ CONFIG.onPreview = function(url, meta){
 };
 
 CONFIG.onClearPreview = function(){
-  const p1 = $("previewImg1"), w = $("previewWrap1"), b = $("previewStep1");
+  const p1 = $("previewImg1"), pv1 = $("previewVideo1"), w = $("previewWrap1"), b = $("previewStep1");
   if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
+  if(pv1){ pv1.pause(); pv1.style.display = "none"; pv1.removeAttribute("src"); pv1.load(); }
   if(w) w.style.display = "none";
   if(b) b.style.display = "none";
 };
@@ -1493,11 +1498,35 @@ function buildGraph(){
     currentModelNode = N.ATTN_BACKEND;
   }
 
+  // 6. Model Preview Override (preview animado, sin taeh3).
+  // tiny_vae="none" fuerza el fallback `_decode_video_frames_l2rgb` de KJNodes:
+  // lee los latent_rgb_factors de MiniMaxH3Video, decodifica 16 frames del latente
+  // y los anima via WS. NO usar "taesd" como preview_method (crashea con taeh3:
+  // first_stage_model=None). Con suppress_default_preview=true evitamos doble preview.
+  const prevMethod = getPreviewMethod();
+  if(prevMethod !== "none"){
+    const previewOverrideKey = "170";
+    g[previewOverrideKey] = {
+      class_type: "ModelPreviewOverrideKJ",
+      inputs: {
+        model: [currentModelNode, 0],
+        max_resolution: 768,
+        jpeg_quality: 80,
+        suppress_default_preview: true,
+        preview_frames: 32,
+        preview_fps: 6,
+        tiny_vae: "none"
+      },
+      _meta: { title: "Model Preview Override (animado L2RGB)" }
+    };
+    currentModelNode = previewOverrideKey;
+  }
+
   // Limpiar nodos de switch estáticos no necesarios de la plantilla
   delete g["141"]; delete g["142"]; delete g["143"]; delete g["144"]; delete g["146"];
   delete g["156"]; delete g["157"]; delete g["160"];
 
-  // 6. Proceso de LoRAs dinámico
+  // 7. Proceso de LoRAs dinámico
   for(let i = 0; i < loras.length; i++){
     const loraObj = loras[i];
     const name = loraObj ? loraObj.lora : "";
@@ -2065,6 +2094,11 @@ async function runSingleGeneration(index) {
           body:JSON.stringify({
             prompt:graph,
             client_id:CLIENT_ID,
+            // "taesd" crashea con taeh3 (VAE genérico no lo instancia:
+            // 'NoneType' object has no attribute 'show_progress_bar').
+            // latent2rgb (al que "auto" resuelve) proyecta el 1er frame del
+            // latente y sí funciona; el envío por WS requiere el handshake de
+            // feature_flags (supports_preview_metadata) de common.js.
             extra_data: { preview_method: (getPreviewMethod() === "none" ? "none" : "latent2rgb") }
           })
         });

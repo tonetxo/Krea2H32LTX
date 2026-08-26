@@ -1789,7 +1789,15 @@ function connectSocket() {
     const url = server().replace(/^http/, 'ws') + '/ws?clientId=' + CLIENT_ID;
     socket = new WebSocket(url);
     socket.binaryType = "blob";
-    socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
+    socket.onopen = () => {
+        // Negociación de capacidades con ComfyUI (protocolo feature_flags).
+        // Sin declarar supports_preview_metadata el backend NO manda los previews
+        // binarios (PREVIEW_IMAGE_WITH_METADATA) durante la generación.
+        try {
+            socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
+        } catch(e){ console.warn("WS feature_flags no enviados:", e); }
+        console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)");
+    };
     socket.onmessage = (event) => {
         if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
           handleBinaryPreview(event.data);
