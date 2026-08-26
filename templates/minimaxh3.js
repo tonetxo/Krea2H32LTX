@@ -335,6 +335,24 @@ CONFIG.onNodeExecuted = function(data){
     }
   }
 };
+
+CONFIG.onPreview = function(url, meta){
+  const p = $("previewImg1"), e = $("empty1"), v = $("video1");
+  if(p && e){
+    p.src = url;
+    p.style.display = "block";
+    e.style.display = "none";
+    if(v && (!displayedSlots[currentPromptId] || !displayedSlots[currentPromptId].has(1))){
+      v.style.display = "none";
+    }
+  }
+};
+
+CONFIG.onClearPreview = function(){
+  const p1 = $("previewImg1");
+  if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
+};
+
 CONFIG.onPromptError = function(pid){
   delete pendingSeeds[pid];
   delete promptVariantMap[pid];
@@ -1417,6 +1435,8 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
+  const prev=$("previewImg"+slot);
+  if(prev) prev.style.display="none";
   v.crossOrigin = "anonymous";
   v.src = url;
   v.style.display = "block";
@@ -1886,7 +1906,11 @@ async function runSingleGeneration(index) {
         log(`🚀 Procesando Var ${varIndex} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
+          body:JSON.stringify({
+            prompt:graph,
+            client_id:CLIENT_ID,
+            extra_data: { preview_method: getPreviewMethod() }
+          })
         });
         if(!r.ok){
             const t = await r.text().catch(()=> "");

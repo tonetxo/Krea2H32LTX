@@ -55,6 +55,7 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .time-tag.live{color:var(--warn);}
 .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em;flex-shrink:0;white-space:nowrap;}
 .empty{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+.preview-img{width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);display:block;margin:0 auto;}
 .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
 .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
 .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
@@ -244,7 +245,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
   </div>
   <div class="grid">
     <div class="controls-col">
-            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="promptLibToggle">
@@ -415,6 +416,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
         <div class="empty" id="empty1">sin generar</div>
+        <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa vídeo">
         <span class="video-badge" id="badge1"></span>
         <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
         <div class="vid-footer">
@@ -987,16 +989,97 @@ function updateServerHint(){
   }
 }
 
+// --- PREVIEWS (TAE VAE / TAESD / Latent2RGB) ---
+function getPreviewMethod(){
+  const sel = $("previewMethod");
+  return sel ? sel.value : "taesd";
+}
+
+let currentPreviewUrl = null;
+
+async function handleBinaryPreview(data) {
+  try {
+    let buffer;
+    if (data instanceof Blob) {
+      buffer = await data.arrayBuffer();
+    } else if (data instanceof ArrayBuffer) {
+      buffer = data;
+    } else {
+      return;
+    }
+    if (!buffer || buffer.byteLength < 8) return;
+    const view = new DataView(buffer);
+    const eventType = view.getUint32(0, false);
+    let blob = null;
+    let meta = null;
+
+    if (eventType === 1) {
+      // BinaryEventTypes.PREVIEW_IMAGE: [event_type: uint32][image_type: uint32][image_bytes...]
+      const imageType = view.getUint32(4, false);
+      const mime = (imageType === 2) ? "image/png" : "image/jpeg";
+      blob = new Blob([buffer.slice(8)], { type: mime });
+    } else if (eventType === 4) {
+      // BinaryEventTypes.PREVIEW_IMAGE_WITH_METADATA: [event_type: uint32][meta_len: uint32][meta_json_utf8][image_bytes...]
+      const metaLen = view.getUint32(4, false);
+      if (buffer.byteLength >= 8 + metaLen) {
+        const metaBytes = new Uint8Array(buffer, 8, metaLen);
+        const metaStr = new TextDecoder().decode(metaBytes);
+        try { meta = JSON.parse(metaStr); } catch(_) {}
+        const mime = (meta && meta.image_type) || "image/jpeg";
+        blob = new Blob([buffer.slice(8 + metaLen)], { type: mime });
+      }
+    } else if (eventType === 2) {
+      // BinaryEventTypes.UNENCODED_PREVIEW_IMAGE
+      blob = new Blob([buffer.slice(4)], { type: "image/jpeg" });
+    }
+
+    if (blob) {
+      const oldUrl = currentPreviewUrl;
+      currentPreviewUrl = URL.createObjectURL(blob);
+      if (oldUrl) {
+        try { URL.revokeObjectURL(oldUrl); } catch(_) {}
+      }
+      if (CONFIG.onPreview) {
+        CONFIG.onPreview(currentPreviewUrl, meta);
+      }
+    }
+  } catch (err) {
+    console.warn("[WS Binary Preview] Error procesando frame:", err);
+  }
+}
+
+function clearPreview() {
+  if (currentPreviewUrl) {
+    try { URL.revokeObjectURL(currentPreviewUrl); } catch(_) {}
+    currentPreviewUrl = null;
+  }
+  if (CONFIG.onClearPreview) {
+    CONFIG.onClearPreview();
+  }
+}
+
+function handleStepProgress(data) {
+  if (!data) return;
+  const { value, max, prompt_id, node } = data;
+  if (value != null && max != null && max > 0) {
+    const pct = Math.round((value / max) * 100);
+    setRun("busy", `Muestreando (${value}/${max} · ${pct}%)`);
+    if (CONFIG.onProgress) {
+      CONFIG.onProgress(value, max, prompt_id, node);
+    }
+  }
+}
+
 // --- WEBSOCKET ---
 function connectSocket() {
     if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
     const url = server().replace(/^http/, 'ws') + '/ws?clientId=' + CLIENT_ID;
     socket = new WebSocket(url);
+    socket.binaryType = "blob";
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
-        // ComfyUI sends some frames as binary Blobs (e.g. progress previews).
-        // Ignore them instead of closing the socket.
-        if(event.data instanceof Blob){
+        if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
+          handleBinaryPreview(event.data);
           return;
         }
         let msg;
@@ -1004,6 +1087,7 @@ function connectSocket() {
             console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
             return;
         }
+        if(msg.type === 'progress') handleStepProgress(msg.data);
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
         if(msg.type === 'executed' && CONFIG.onNodeExecuted){
           try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
@@ -1017,6 +1101,7 @@ function connectSocket() {
               discardTimer(pid);
               if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
             }
+            clearPreview();
             currentBatchIndex++;
             processNextBatch();
         }
@@ -1476,6 +1561,7 @@ async function stopCurrentVideo(){
   discardTimer(pid);
   delete pendingSeeds[pid];
   handledPrompts.add(pid);
+  clearPreview();
   if(CONFIG.onStopCurrent) CONFIG.onStopCurrent(pid);
   log("⏹ Generación actual detenida.", "l-err");
   currentBatchIndex++;
@@ -1497,6 +1583,7 @@ async function stopAll(){
     handledPrompts.add(pid);
     delete pendingSeeds[pid];
   }
+  clearPreview();
   if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");
@@ -2037,6 +2124,22 @@ function initCommon(){
     updateServerHint();
   });
   $("serverUrl").addEventListener("input", updateServerHint);
+
+  // Preview method persistence
+  (function initPreviewMethod(){
+    const sel = $("previewMethod");
+    if(!sel) return;
+    const key = CONFIG.PREVIEW_METHOD_KEY || "ltx_preview_method";
+    try {
+      const stored = localStorage.getItem(key);
+      if(stored && ["taesd", "latent2rgb", "auto", "none"].includes(stored)){
+        sel.value = stored;
+      }
+    } catch(_){}
+    sel.addEventListener("change", (e) => {
+      try { localStorage.setItem(key, e.target.value); } catch(_){}
+    });
+  })();
 
   // Prompt library buttons
   $("btnSavePrompt").addEventListener("click", savePrompt);
@@ -2683,6 +2786,24 @@ CONFIG.onNodeExecuted = function(data){
     }
   }
 };
+
+CONFIG.onPreview = function(url, meta){
+  const p = $("previewImg1"), e = $("empty1"), v = $("video1");
+  if(p && e){
+    p.src = url;
+    p.style.display = "block";
+    e.style.display = "none";
+    if(v && (!displayedSlots[currentPromptId] || !displayedSlots[currentPromptId].has(1))){
+      v.style.display = "none";
+    }
+  }
+};
+
+CONFIG.onClearPreview = function(){
+  const p1 = $("previewImg1");
+  if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
+};
+
 CONFIG.onPromptError = function(pid){
   delete pendingSeeds[pid];
   delete promptVariantMap[pid];
@@ -3765,6 +3886,8 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
+  const prev=$("previewImg"+slot);
+  if(prev) prev.style.display="none";
   v.crossOrigin = "anonymous";
   v.src = url;
   v.style.display = "block";
@@ -4234,7 +4357,11 @@ async function runSingleGeneration(index) {
         log(`🚀 Procesando Var ${varIndex} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
+          body:JSON.stringify({
+            prompt:graph,
+            client_id:CLIENT_ID,
+            extra_data: { preview_method: getPreviewMethod() }
+          })
         });
         if(!r.ok){
             const t = await r.text().catch(()=> "");

@@ -55,6 +55,7 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .time-tag.live{color:var(--warn);}
 .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em;flex-shrink:0;white-space:nowrap;}
 .empty{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+.preview-img{width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);display:block;margin:0 auto;}
 .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
 .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
 .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
@@ -210,7 +211,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
   <div class="head"><h1>Krea2 <span>//</span> panel pro</h1><div class="sub">grafo: Krea2_OK</div></div>
   <div class="grid">
     <div class="controls-col">
-            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="promptLibToggle">
@@ -698,7 +699,7 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-int4_convrot.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b-nvfp4.safetensors", "flux-2-klein-9b.safetensors", "krea2_raw_int8_convrot.safetensors", "krea2_turbo_convrot_int4_fast.safetensors", "krea2_turbo_fp8_scaled.safetensors", "krea2_turbo_int4_tensorwise_mixed.safetensors"];
+const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b.safetensors", "jibMixKrea2_v40Habanero.safetensors", "krea2_turbo_fp8_scaled.safetensors"];
 const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "GalKrea.safetensors", "GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
 const AVAILABLE_VAES = [];
 const AVAILABLE_UNETS = [];
@@ -843,16 +844,97 @@ function updateServerHint(){
   }
 }
 
+// --- PREVIEWS (TAE VAE / TAESD / Latent2RGB) ---
+function getPreviewMethod(){
+  const sel = $("previewMethod");
+  return sel ? sel.value : "taesd";
+}
+
+let currentPreviewUrl = null;
+
+async function handleBinaryPreview(data) {
+  try {
+    let buffer;
+    if (data instanceof Blob) {
+      buffer = await data.arrayBuffer();
+    } else if (data instanceof ArrayBuffer) {
+      buffer = data;
+    } else {
+      return;
+    }
+    if (!buffer || buffer.byteLength < 8) return;
+    const view = new DataView(buffer);
+    const eventType = view.getUint32(0, false);
+    let blob = null;
+    let meta = null;
+
+    if (eventType === 1) {
+      // BinaryEventTypes.PREVIEW_IMAGE: [event_type: uint32][image_type: uint32][image_bytes...]
+      const imageType = view.getUint32(4, false);
+      const mime = (imageType === 2) ? "image/png" : "image/jpeg";
+      blob = new Blob([buffer.slice(8)], { type: mime });
+    } else if (eventType === 4) {
+      // BinaryEventTypes.PREVIEW_IMAGE_WITH_METADATA: [event_type: uint32][meta_len: uint32][meta_json_utf8][image_bytes...]
+      const metaLen = view.getUint32(4, false);
+      if (buffer.byteLength >= 8 + metaLen) {
+        const metaBytes = new Uint8Array(buffer, 8, metaLen);
+        const metaStr = new TextDecoder().decode(metaBytes);
+        try { meta = JSON.parse(metaStr); } catch(_) {}
+        const mime = (meta && meta.image_type) || "image/jpeg";
+        blob = new Blob([buffer.slice(8 + metaLen)], { type: mime });
+      }
+    } else if (eventType === 2) {
+      // BinaryEventTypes.UNENCODED_PREVIEW_IMAGE
+      blob = new Blob([buffer.slice(4)], { type: "image/jpeg" });
+    }
+
+    if (blob) {
+      const oldUrl = currentPreviewUrl;
+      currentPreviewUrl = URL.createObjectURL(blob);
+      if (oldUrl) {
+        try { URL.revokeObjectURL(oldUrl); } catch(_) {}
+      }
+      if (CONFIG.onPreview) {
+        CONFIG.onPreview(currentPreviewUrl, meta);
+      }
+    }
+  } catch (err) {
+    console.warn("[WS Binary Preview] Error procesando frame:", err);
+  }
+}
+
+function clearPreview() {
+  if (currentPreviewUrl) {
+    try { URL.revokeObjectURL(currentPreviewUrl); } catch(_) {}
+    currentPreviewUrl = null;
+  }
+  if (CONFIG.onClearPreview) {
+    CONFIG.onClearPreview();
+  }
+}
+
+function handleStepProgress(data) {
+  if (!data) return;
+  const { value, max, prompt_id, node } = data;
+  if (value != null && max != null && max > 0) {
+    const pct = Math.round((value / max) * 100);
+    setRun("busy", `Muestreando (${value}/${max} · ${pct}%)`);
+    if (CONFIG.onProgress) {
+      CONFIG.onProgress(value, max, prompt_id, node);
+    }
+  }
+}
+
 // --- WEBSOCKET ---
 function connectSocket() {
     if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
     const url = server().replace(/^http/, 'ws') + '/ws?clientId=' + CLIENT_ID;
     socket = new WebSocket(url);
+    socket.binaryType = "blob";
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
-        // ComfyUI sends some frames as binary Blobs (e.g. progress previews).
-        // Ignore them instead of closing the socket.
-        if(event.data instanceof Blob){
+        if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
+          handleBinaryPreview(event.data);
           return;
         }
         let msg;
@@ -860,6 +942,7 @@ function connectSocket() {
             console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
             return;
         }
+        if(msg.type === 'progress') handleStepProgress(msg.data);
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
         if(msg.type === 'executed' && CONFIG.onNodeExecuted){
           try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
@@ -873,6 +956,7 @@ function connectSocket() {
               discardTimer(pid);
               if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
             }
+            clearPreview();
             currentBatchIndex++;
             processNextBatch();
         }
@@ -1194,7 +1278,9 @@ function loadModels(){
   }
 }
 function renderLoras(){
-  const wrap=$("loraList"); wrap.innerHTML="";
+  const wrap=$("loraList");
+  if(!wrap) return;
+  wrap.innerHTML="";
   loras.forEach((l,i)=>{
     const box=document.createElement("div");
     box.className="lora"+(l.on?"":" off");
@@ -1330,6 +1416,7 @@ async function stopCurrentVideo(){
   discardTimer(pid);
   delete pendingSeeds[pid];
   handledPrompts.add(pid);
+  clearPreview();
   if(CONFIG.onStopCurrent) CONFIG.onStopCurrent(pid);
   log("⏹ Generación actual detenida.", "l-err");
   currentBatchIndex++;
@@ -1351,6 +1438,7 @@ async function stopAll(){
     handledPrompts.add(pid);
     delete pendingSeeds[pid];
   }
+  clearPreview();
   if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");
@@ -1892,6 +1980,22 @@ function initCommon(){
   });
   $("serverUrl").addEventListener("input", updateServerHint);
 
+  // Preview method persistence
+  (function initPreviewMethod(){
+    const sel = $("previewMethod");
+    if(!sel) return;
+    const key = CONFIG.PREVIEW_METHOD_KEY || "ltx_preview_method";
+    try {
+      const stored = localStorage.getItem(key);
+      if(stored && ["taesd", "latent2rgb", "auto", "none"].includes(stored)){
+        sel.value = stored;
+      }
+    } catch(_){}
+    sel.addEventListener("change", (e) => {
+      try { localStorage.setItem(key, e.target.value); } catch(_){}
+    });
+  })();
+
   // Prompt library buttons
   $("btnSavePrompt").addEventListener("click", savePrompt);
   $("btnMovePrompt").addEventListener("click", movePrompt);
@@ -2300,7 +2404,9 @@ CONFIG.onBatchComplete = function(){
   $("btnGenerate").disabled=false;
   enableStopButtons(false);
 };
-CONFIG.onStopCurrent = function(pid){};
+CONFIG.onStopCurrent = function(pid){
+  clearPreview();
+};
 CONFIG.onStopAll = function(){
   for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   pendingSeeds = {};
@@ -2310,8 +2416,32 @@ CONFIG.onStopAll = function(){
   currentBatchIndex = totalBatchSize;
   const t1 = $("time1");
   if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
+  clearPreview();
   enableStopButtons(false);
   $("btnGenerate").disabled=false;
+};
+
+CONFIG.onPreview = function(url, meta){
+  const img = $("outputImg"), empty = $("empty1"), dl = $("dl1");
+  if(img && empty){
+    img.src = url;
+    img.style.display = "block";
+    empty.style.display = "none";
+    if(dl) dl.style.display = "none";
+    const info = $("imgInfo");
+    if(info) info.textContent = "⚡ Vista previa (TAE VAE / Latent)";
+  }
+};
+
+CONFIG.onClearPreview = function(){
+  if(!currentOutputMedia){
+    const img = $("outputImg"), empty = $("empty1"), dl = $("dl1");
+    if(img){ img.style.display = "none"; img.removeAttribute("src"); }
+    if(empty) empty.style.display = "flex";
+    if(dl) dl.style.display = "none";
+    const info = $("imgInfo");
+    if(info) info.textContent = "";
+  }
 };
 
 // --- Krea2 displayResult callback ---
@@ -3141,7 +3271,11 @@ async function runSingleGeneration(index) {
         log(`🚀 Procesando variante ${varIndex} (batch ${index + 1}/${totalBatchSize}) (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
+          body:JSON.stringify({
+            prompt:graph,
+            client_id:CLIENT_ID,
+            extra_data: { preview_method: getPreviewMethod() }
+          })
         });
         if(!r.ok){
             const t = await r.text().catch(()=> "");

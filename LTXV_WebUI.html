@@ -55,6 +55,7 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .time-tag.live{color:var(--warn);}
 .variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em;flex-shrink:0;white-space:nowrap;}
 .empty{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+.preview-img{width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);display:block;margin:0 auto;}
 .log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
 .hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
 .gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
@@ -237,7 +238,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
   </div>
   <div class="grid">
     <div class="controls-col">
-            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="promptLibToggle">
@@ -374,6 +375,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
         <div class="empty" id="empty1">sin generar</div>
+        <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa 1er pase">
         <span class="video-badge" id="badge1"></span>
         <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
         <div class="vid-footer">
@@ -393,6 +395,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
         <div class="empty" id="empty2">sin generar</div>
+        <img class="preview-img" id="previewImg2" style="display:none;" alt="Vista previa 2º pase">
         <span class="video-badge" id="badge2"></span>
         <video id="video2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
         <div class="vid-footer">
@@ -1548,9 +1551,9 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["10Eros_v1.4_DMD_int8_convrot.safetensors", "10Eros_v1.4_bf16.safetensors", "ltx-2.3-22b-distilled-1.1.safetensors", "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors", "ltxv/sulphur_distil_bf16.safetensors"];
-const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "IvoriLTX_000000250.safetensors", "IvoriLTX_000000750.safetensors", "IvoriLTX_000001000.safetensors", "IvoriLTX_000001250.safetensors", "IvoriLTX_000001500.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "Post_Apocalyptic.safetensors", "anal-insertion-i2v.safetensors", "beauty_of_rain_ltx23.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-distilled-lora-1.1_rank96_energy.safetensors", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors", "ltx-2.3-22b-distilled-lora-fro90_ceil72.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi2ltxv.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001250.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_000001750.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
-const AVAILABLE_VAES = ["Ligaz\u00f3n para VAE/AceStep/ace_1.5_vae.safetensors", "Ligaz\u00f3n para VAE/Flux/ae.safetensors", "Ligaz\u00f3n para VAE/Flux/flux2-vae.safetensors", "Ligaz\u00f3n para VAE/Flux/ultra_flux1.safetensors", "Ligaz\u00f3n para VAE/LTX-2/LTX23_audio_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/LTX23_video_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX23_audio_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX23_video_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX2_audio_vae.safetensors", "Ligaz\u00f3n para VAE/MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors", "Ligaz\u00f3n para VAE/MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "Ligaz\u00f3n para VAE/QwenImage/REPA-E_qwen.safetensors", "Ligaz\u00f3n para VAE/QwenImage/qwen_image_vae.safetensors", "Ligaz\u00f3n para VAE/Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Ligaz\u00f3n para VAE/Wan/wan_2.1_vae.safetensors", "Ligaz\u00f3n para VAE/ace_1.5_vae.safetensors", "Ligaz\u00f3n para VAE/ema_vae_fp16.safetensors", "Ligaz\u00f3n para VAE/flux2-vae.safetensors", "Ligaz\u00f3n para VAE/lumina2_vae_fp32.safetensors", "Ligaz\u00f3n para VAE/qwen_image_vae.safetensors", "Ligaz\u00f3n para VAE/sd3_vae.safetensors", "Ligaz\u00f3n para VAE/sdxl_vae.safetensors", "Ligaz\u00f3n para VAE/taeltx2_3.safetensors", "Ligaz\u00f3n para VAE/wan/wan_2.1_vae.safetensors"];
+const AVAILABLE_MODELS = ["ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors", "ltxv/sulphur_distil_bf16.safetensors"];
+const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "IvoriLTX_000000250.safetensors", "IvoriLTX_000000750.safetensors", "IvoriLTX_000001000.safetensors", "IvoriLTX_000001250.safetensors", "IvoriLTX_000001500.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "Post_Apocalyptic.safetensors", "anal-insertion-i2v.safetensors", "beauty_of_rain_ltx23.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-distilled-lora-1.1_rank96_energy.safetensors", "ltx-2.3-22b-distilled-lora-384-1.1.safetensors", "ltx-2.3-22b-distilled-lora-fro90_ceil72.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001250.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_000001750.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
+const AVAILABLE_VAES = ["Ligaz\u00f3n para VAE/AceStep/ace_1.5_vae.safetensors", "Ligaz\u00f3n para VAE/Flux/ae.safetensors", "Ligaz\u00f3n para VAE/Flux/flux2-vae.safetensors", "Ligaz\u00f3n para VAE/Flux/ultra_flux1.safetensors", "Ligaz\u00f3n para VAE/LTX-2/LTX23_audio_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/LTX23_video_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/ltx-2.5-audio-vae-bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/ltx-2.5-video-vae-bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors", "Ligaz\u00f3n para VAE/LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX23_audio_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX23_video_vae_bf16.safetensors", "Ligaz\u00f3n para VAE/LTX2/LTX2_audio_vae.safetensors", "Ligaz\u00f3n para VAE/MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors", "Ligaz\u00f3n para VAE/MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "Ligaz\u00f3n para VAE/QwenImage/REPA-E_qwen.safetensors", "Ligaz\u00f3n para VAE/QwenImage/qwen_image_vae.safetensors", "Ligaz\u00f3n para VAE/SeedVR2/seedvr2_ema_vae_fp16.safetensors", "Ligaz\u00f3n para VAE/Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Ligaz\u00f3n para VAE/Wan/wan_2.1_vae.safetensors", "Ligaz\u00f3n para VAE/ace_1.5_vae.safetensors", "Ligaz\u00f3n para VAE/ema_vae_fp16.safetensors", "Ligaz\u00f3n para VAE/flux2-vae.safetensors", "Ligaz\u00f3n para VAE/lumina2_vae_fp32.safetensors", "Ligaz\u00f3n para VAE/qwenImageVAESharpKrea2_sharpFp32.safetensors", "Ligaz\u00f3n para VAE/qwen_image_vae.safetensors", "Ligaz\u00f3n para VAE/sd3_vae.safetensors", "Ligaz\u00f3n para VAE/sdxl_vae.safetensors", "Ligaz\u00f3n para VAE/taeltx2_3.safetensors", "Ligaz\u00f3n para VAE/wan/wan_2.1_vae.safetensors"];
 const AVAILABLE_UNETS = [];
 const AVAILABLE_CLIPS = [];
 const LTXV_UI_PORT = "8000";
@@ -1693,16 +1696,97 @@ function updateServerHint(){
   }
 }
 
+// --- PREVIEWS (TAE VAE / TAESD / Latent2RGB) ---
+function getPreviewMethod(){
+  const sel = $("previewMethod");
+  return sel ? sel.value : "taesd";
+}
+
+let currentPreviewUrl = null;
+
+async function handleBinaryPreview(data) {
+  try {
+    let buffer;
+    if (data instanceof Blob) {
+      buffer = await data.arrayBuffer();
+    } else if (data instanceof ArrayBuffer) {
+      buffer = data;
+    } else {
+      return;
+    }
+    if (!buffer || buffer.byteLength < 8) return;
+    const view = new DataView(buffer);
+    const eventType = view.getUint32(0, false);
+    let blob = null;
+    let meta = null;
+
+    if (eventType === 1) {
+      // BinaryEventTypes.PREVIEW_IMAGE: [event_type: uint32][image_type: uint32][image_bytes...]
+      const imageType = view.getUint32(4, false);
+      const mime = (imageType === 2) ? "image/png" : "image/jpeg";
+      blob = new Blob([buffer.slice(8)], { type: mime });
+    } else if (eventType === 4) {
+      // BinaryEventTypes.PREVIEW_IMAGE_WITH_METADATA: [event_type: uint32][meta_len: uint32][meta_json_utf8][image_bytes...]
+      const metaLen = view.getUint32(4, false);
+      if (buffer.byteLength >= 8 + metaLen) {
+        const metaBytes = new Uint8Array(buffer, 8, metaLen);
+        const metaStr = new TextDecoder().decode(metaBytes);
+        try { meta = JSON.parse(metaStr); } catch(_) {}
+        const mime = (meta && meta.image_type) || "image/jpeg";
+        blob = new Blob([buffer.slice(8 + metaLen)], { type: mime });
+      }
+    } else if (eventType === 2) {
+      // BinaryEventTypes.UNENCODED_PREVIEW_IMAGE
+      blob = new Blob([buffer.slice(4)], { type: "image/jpeg" });
+    }
+
+    if (blob) {
+      const oldUrl = currentPreviewUrl;
+      currentPreviewUrl = URL.createObjectURL(blob);
+      if (oldUrl) {
+        try { URL.revokeObjectURL(oldUrl); } catch(_) {}
+      }
+      if (CONFIG.onPreview) {
+        CONFIG.onPreview(currentPreviewUrl, meta);
+      }
+    }
+  } catch (err) {
+    console.warn("[WS Binary Preview] Error procesando frame:", err);
+  }
+}
+
+function clearPreview() {
+  if (currentPreviewUrl) {
+    try { URL.revokeObjectURL(currentPreviewUrl); } catch(_) {}
+    currentPreviewUrl = null;
+  }
+  if (CONFIG.onClearPreview) {
+    CONFIG.onClearPreview();
+  }
+}
+
+function handleStepProgress(data) {
+  if (!data) return;
+  const { value, max, prompt_id, node } = data;
+  if (value != null && max != null && max > 0) {
+    const pct = Math.round((value / max) * 100);
+    setRun("busy", `Muestreando (${value}/${max} · ${pct}%)`);
+    if (CONFIG.onProgress) {
+      CONFIG.onProgress(value, max, prompt_id, node);
+    }
+  }
+}
+
 // --- WEBSOCKET ---
 function connectSocket() {
     if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
     const url = server().replace(/^http/, 'ws') + '/ws?clientId=' + CLIENT_ID;
     socket = new WebSocket(url);
+    socket.binaryType = "blob";
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
-        // ComfyUI sends some frames as binary Blobs (e.g. progress previews).
-        // Ignore them instead of closing the socket.
-        if(event.data instanceof Blob){
+        if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
+          handleBinaryPreview(event.data);
           return;
         }
         let msg;
@@ -1710,6 +1794,7 @@ function connectSocket() {
             console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
             return;
         }
+        if(msg.type === 'progress') handleStepProgress(msg.data);
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
         if(msg.type === 'executed' && CONFIG.onNodeExecuted){
           try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
@@ -1723,6 +1808,7 @@ function connectSocket() {
               discardTimer(pid);
               if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
             }
+            clearPreview();
             currentBatchIndex++;
             processNextBatch();
         }
@@ -2044,7 +2130,9 @@ function loadModels(){
   }
 }
 function renderLoras(){
-  const wrap=$("loraList"); wrap.innerHTML="";
+  const wrap=$("loraList");
+  if(!wrap) return;
+  wrap.innerHTML="";
   loras.forEach((l,i)=>{
     const box=document.createElement("div");
     box.className="lora"+(l.on?"":" off");
@@ -2180,6 +2268,7 @@ async function stopCurrentVideo(){
   discardTimer(pid);
   delete pendingSeeds[pid];
   handledPrompts.add(pid);
+  clearPreview();
   if(CONFIG.onStopCurrent) CONFIG.onStopCurrent(pid);
   log("⏹ Generación actual detenida.", "l-err");
   currentBatchIndex++;
@@ -2201,6 +2290,7 @@ async function stopAll(){
     handledPrompts.add(pid);
     delete pendingSeeds[pid];
   }
+  clearPreview();
   if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");
@@ -2742,6 +2832,22 @@ function initCommon(){
   });
   $("serverUrl").addEventListener("input", updateServerHint);
 
+  // Preview method persistence
+  (function initPreviewMethod(){
+    const sel = $("previewMethod");
+    if(!sel) return;
+    const key = CONFIG.PREVIEW_METHOD_KEY || "ltx_preview_method";
+    try {
+      const stored = localStorage.getItem(key);
+      if(stored && ["taesd", "latent2rgb", "auto", "none"].includes(stored)){
+        sel.value = stored;
+      }
+    } catch(_){}
+    sel.addEventListener("change", (e) => {
+      try { localStorage.setItem(key, e.target.value); } catch(_){}
+    });
+  })();
+
   // Prompt library buttons
   $("btnSavePrompt").addEventListener("click", savePrompt);
   $("btnMovePrompt").addEventListener("click", movePrompt);
@@ -3260,6 +3366,30 @@ CONFIG.onNodeExecuted = function(data){
     }
   }
 };
+
+CONFIG.onPreview = function(url, meta){
+  const pid = currentPromptId;
+  const isFirst = activeJob?.firstPassOnly || (!displayedSlots[pid] || !displayedSlots[pid].has(1));
+  const slot = isFirst ? 1 : 2;
+  const p = $("previewImg" + slot);
+  const e = $("empty" + slot);
+  const v = $("video" + slot);
+  if(p && e){
+    p.src = url;
+    p.style.display = "block";
+    e.style.display = "none";
+    if(v && (!displayedSlots[pid] || !displayedSlots[pid].has(slot))){
+      v.style.display = "none";
+    }
+  }
+};
+
+CONFIG.onClearPreview = function(){
+  const p1 = $("previewImg1"), p2 = $("previewImg2");
+  if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
+  if(p2){ p2.style.display = "none"; p2.removeAttribute("src"); }
+};
+
 CONFIG.onPromptError = function(pid){
   delete promptSteps[pid];
   delete pendingSeeds[pid];
@@ -4420,6 +4550,8 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
+  const prev=$("previewImg"+slot);
+  if(prev) prev.style.display="none";
   v.crossOrigin = "anonymous";
   v.src = url;
   v.style.display = "block";
@@ -4903,7 +5035,11 @@ async function runSingleGeneration(index) {
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
+          body:JSON.stringify({
+            prompt:graph,
+            client_id:CLIENT_ID,
+            extra_data: { preview_method: getPreviewMethod() }
+          })
         });
         if(!r.ok){
             const t = await r.text().catch(()=> "");

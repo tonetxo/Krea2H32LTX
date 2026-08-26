@@ -137,16 +137,97 @@ function updateServerHint(){
   }
 }
 
+// --- PREVIEWS (TAE VAE / TAESD / Latent2RGB) ---
+function getPreviewMethod(){
+  const sel = $("previewMethod");
+  return sel ? sel.value : "taesd";
+}
+
+let currentPreviewUrl = null;
+
+async function handleBinaryPreview(data) {
+  try {
+    let buffer;
+    if (data instanceof Blob) {
+      buffer = await data.arrayBuffer();
+    } else if (data instanceof ArrayBuffer) {
+      buffer = data;
+    } else {
+      return;
+    }
+    if (!buffer || buffer.byteLength < 8) return;
+    const view = new DataView(buffer);
+    const eventType = view.getUint32(0, false);
+    let blob = null;
+    let meta = null;
+
+    if (eventType === 1) {
+      // BinaryEventTypes.PREVIEW_IMAGE: [event_type: uint32][image_type: uint32][image_bytes...]
+      const imageType = view.getUint32(4, false);
+      const mime = (imageType === 2) ? "image/png" : "image/jpeg";
+      blob = new Blob([buffer.slice(8)], { type: mime });
+    } else if (eventType === 4) {
+      // BinaryEventTypes.PREVIEW_IMAGE_WITH_METADATA: [event_type: uint32][meta_len: uint32][meta_json_utf8][image_bytes...]
+      const metaLen = view.getUint32(4, false);
+      if (buffer.byteLength >= 8 + metaLen) {
+        const metaBytes = new Uint8Array(buffer, 8, metaLen);
+        const metaStr = new TextDecoder().decode(metaBytes);
+        try { meta = JSON.parse(metaStr); } catch(_) {}
+        const mime = (meta && meta.image_type) || "image/jpeg";
+        blob = new Blob([buffer.slice(8 + metaLen)], { type: mime });
+      }
+    } else if (eventType === 2) {
+      // BinaryEventTypes.UNENCODED_PREVIEW_IMAGE
+      blob = new Blob([buffer.slice(4)], { type: "image/jpeg" });
+    }
+
+    if (blob) {
+      const oldUrl = currentPreviewUrl;
+      currentPreviewUrl = URL.createObjectURL(blob);
+      if (oldUrl) {
+        try { URL.revokeObjectURL(oldUrl); } catch(_) {}
+      }
+      if (CONFIG.onPreview) {
+        CONFIG.onPreview(currentPreviewUrl, meta);
+      }
+    }
+  } catch (err) {
+    console.warn("[WS Binary Preview] Error procesando frame:", err);
+  }
+}
+
+function clearPreview() {
+  if (currentPreviewUrl) {
+    try { URL.revokeObjectURL(currentPreviewUrl); } catch(_) {}
+    currentPreviewUrl = null;
+  }
+  if (CONFIG.onClearPreview) {
+    CONFIG.onClearPreview();
+  }
+}
+
+function handleStepProgress(data) {
+  if (!data) return;
+  const { value, max, prompt_id, node } = data;
+  if (value != null && max != null && max > 0) {
+    const pct = Math.round((value / max) * 100);
+    setRun("busy", `Muestreando (${value}/${max} · ${pct}%)`);
+    if (CONFIG.onProgress) {
+      CONFIG.onProgress(value, max, prompt_id, node);
+    }
+  }
+}
+
 // --- WEBSOCKET ---
 function connectSocket() {
     if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
     const url = server().replace(/^http/, 'ws') + '/ws?clientId=' + CLIENT_ID;
     socket = new WebSocket(url);
+    socket.binaryType = "blob";
     socket.onopen = () => { console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)"); };
     socket.onmessage = (event) => {
-        // ComfyUI sends some frames as binary Blobs (e.g. progress previews).
-        // Ignore them instead of closing the socket.
-        if(event.data instanceof Blob){
+        if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
+          handleBinaryPreview(event.data);
           return;
         }
         let msg;
@@ -154,6 +235,7 @@ function connectSocket() {
             console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
             return;
         }
+        if(msg.type === 'progress') handleStepProgress(msg.data);
         if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
         if(msg.type === 'executed' && CONFIG.onNodeExecuted){
           try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
@@ -167,6 +249,7 @@ function connectSocket() {
               discardTimer(pid);
               if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
             }
+            clearPreview();
             currentBatchIndex++;
             processNextBatch();
         }
@@ -626,6 +709,7 @@ async function stopCurrentVideo(){
   discardTimer(pid);
   delete pendingSeeds[pid];
   handledPrompts.add(pid);
+  clearPreview();
   if(CONFIG.onStopCurrent) CONFIG.onStopCurrent(pid);
   log("⏹ Generación actual detenida.", "l-err");
   currentBatchIndex++;
@@ -647,6 +731,7 @@ async function stopAll(){
     handledPrompts.add(pid);
     delete pendingSeeds[pid];
   }
+  clearPreview();
   if(CONFIG.onStopAll) CONFIG.onStopAll();
   setRun("bad", "Detenido por usuario");
   log("🛑 Generación detenida.", "l-err");
@@ -1187,6 +1272,22 @@ function initCommon(){
     updateServerHint();
   });
   $("serverUrl").addEventListener("input", updateServerHint);
+
+  // Preview method persistence
+  (function initPreviewMethod(){
+    const sel = $("previewMethod");
+    if(!sel) return;
+    const key = CONFIG.PREVIEW_METHOD_KEY || "ltx_preview_method";
+    try {
+      const stored = localStorage.getItem(key);
+      if(stored && ["taesd", "latent2rgb", "auto", "none"].includes(stored)){
+        sel.value = stored;
+      }
+    } catch(_){}
+    sel.addEventListener("change", (e) => {
+      try { localStorage.setItem(key, e.target.value); } catch(_){}
+    });
+  })();
 
   // Prompt library buttons
   $("btnSavePrompt").addEventListener("click", savePrompt);

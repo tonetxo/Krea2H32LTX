@@ -208,6 +208,30 @@ CONFIG.onNodeExecuted = function(data){
     }
   }
 };
+
+CONFIG.onPreview = function(url, meta){
+  const pid = currentPromptId;
+  const isFirst = activeJob?.firstPassOnly || (!displayedSlots[pid] || !displayedSlots[pid].has(1));
+  const slot = isFirst ? 1 : 2;
+  const p = $("previewImg" + slot);
+  const e = $("empty" + slot);
+  const v = $("video" + slot);
+  if(p && e){
+    p.src = url;
+    p.style.display = "block";
+    e.style.display = "none";
+    if(v && (!displayedSlots[pid] || !displayedSlots[pid].has(slot))){
+      v.style.display = "none";
+    }
+  }
+};
+
+CONFIG.onClearPreview = function(){
+  const p1 = $("previewImg1"), p2 = $("previewImg2");
+  if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
+  if(p2){ p2.style.display = "none"; p2.removeAttribute("src"); }
+};
+
 CONFIG.onPromptError = function(pid){
   delete promptSteps[pid];
   delete pendingSeeds[pid];
@@ -1368,6 +1392,8 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
+  const prev=$("previewImg"+slot);
+  if(prev) prev.style.display="none";
   v.crossOrigin = "anonymous";
   v.src = url;
   v.style.display = "block";
@@ -1851,7 +1877,11 @@ async function runSingleGeneration(index) {
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
+          body:JSON.stringify({
+            prompt:graph,
+            client_id:CLIENT_ID,
+            extra_data: { preview_method: getPreviewMethod() }
+          })
         });
         if(!r.ok){
             const t = await r.text().catch(()=> "");

@@ -98,7 +98,9 @@ CONFIG.onBatchComplete = function(){
   $("btnGenerate").disabled=false;
   enableStopButtons(false);
 };
-CONFIG.onStopCurrent = function(pid){};
+CONFIG.onStopCurrent = function(pid){
+  clearPreview();
+};
 CONFIG.onStopAll = function(){
   for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
   pendingSeeds = {};
@@ -108,8 +110,32 @@ CONFIG.onStopAll = function(){
   currentBatchIndex = totalBatchSize;
   const t1 = $("time1");
   if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
+  clearPreview();
   enableStopButtons(false);
   $("btnGenerate").disabled=false;
+};
+
+CONFIG.onPreview = function(url, meta){
+  const img = $("outputImg"), empty = $("empty1"), dl = $("dl1");
+  if(img && empty){
+    img.src = url;
+    img.style.display = "block";
+    empty.style.display = "none";
+    if(dl) dl.style.display = "none";
+    const info = $("imgInfo");
+    if(info) info.textContent = "⚡ Vista previa (TAE VAE / Latent)";
+  }
+};
+
+CONFIG.onClearPreview = function(){
+  if(!currentOutputMedia){
+    const img = $("outputImg"), empty = $("empty1"), dl = $("dl1");
+    if(img){ img.style.display = "none"; img.removeAttribute("src"); }
+    if(empty) empty.style.display = "flex";
+    if(dl) dl.style.display = "none";
+    const info = $("imgInfo");
+    if(info) info.textContent = "";
+  }
 };
 
 // --- Krea2 displayResult callback ---
@@ -939,7 +965,11 @@ async function runSingleGeneration(index) {
         log(`🚀 Procesando variante ${varIndex} (batch ${index + 1}/${totalBatchSize}) (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
-          body:JSON.stringify({prompt:graph, client_id:CLIENT_ID})
+          body:JSON.stringify({
+            prompt:graph,
+            client_id:CLIENT_ID,
+            extra_data: { preview_method: getPreviewMethod() }
+          })
         });
         if(!r.ok){
             const t = await r.text().catch(()=> "");
