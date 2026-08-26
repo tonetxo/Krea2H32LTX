@@ -84,7 +84,21 @@
       <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple">simple</option><option value="normal">normal</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="sgm_uniform">sgm_uniform</option><option value="beta">beta</option></select></div></div>
       <div class="panel"><h2>Steps</h2><div class="row slider-row"><input type="range" id="stepsSlider" min="4" max="50" step="1" value="20"><div class="slider-val" id="stepsVal">20</div></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
-      <div class="panel"><h2>Megapíxeles &amp; duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.7"><div class="slider-val" id="mpVal">0.70</div></div><div class="row"><label>Duración (s) <span class="hint" id="durHint">(10s)</span></label><input type="number" id="duration" value="10" step="1" min="1" max="60"></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="framesHint">(243 / 24fps = 10.12s)</span></label><input type="number" id="frames" value="243" step="17" min="17" class="ro" readonly></div><div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
+      <div class="panel"><h2>Megapíxeles &amp; resolución</h2>
+        <div class="row">
+          <label>Relación de aspecto</label>
+          <div class="seed-toggle">
+            <div class="seg on" id="segArAuto" data-value="auto">Auto (Imagen)</div>
+            <div class="seg" id="segAr169" data-value="16:9">Forzar 16:9 (2304×1280)</div>
+          </div>
+        </div>
+        <div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.7"><div class="slider-val" id="mpVal">0.70</div></div>
+        <div class="row two-col"><div><label>Ancho base</label><input type="number" id="width" value="1120" step="32" min="256" class="ro" readonly></div><div><label>Alto base</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div></div>
+        <div class="hint" id="resFinalHint" style="font-size:10px;margin-top:4px;">Vídeo final: 2240×1280 px tras RTX 2x</div>
+        <div class="row" style="margin-top:6px;"><label>Duración (s) <span class="hint" id="durHint">(10s)</span></label><input type="number" id="duration" value="10" step="1" min="1" max="60"></div>
+        <div class="row"><label>Frames <span class="hint" id="framesHint">(243 / 24fps = 10.12s)</span></label><input type="number" id="frames" value="243" step="17" min="17" class="ro" readonly></div>
+        <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div>
+      </div>
       <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnGenerate" class="primary">Generar vídeo</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar vídeo</button><button id="btnStopAll" class="danger" disabled>Parar todo</button><button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div style="display:flex;align-items:center;gap:8px;margin-top:6px;"><span id="queueCount" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);">Cola: 0</span><span id="queueHint" class="hint" style="font-size:10px;"></span></div><div class="log" id="log">listo.</div></div>
     </div>
     <div class="results-col">

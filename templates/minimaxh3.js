@@ -248,6 +248,32 @@ setModeUI(loadMode());
 $("segI2V")?.addEventListener("click", () => setModeUI("i2v"));
 $("segFLF2V")?.addEventListener("click", () => setModeUI("flf2v"));
 
+// --- ASPECT RATIO MODE (Auto vs Forzar 16:9) ---
+const AR_MODE_KEY = "minimaxh3_ar_mode";
+let arMode = "auto"; // "auto" | "16:9"
+let imageNativeAspectRatio = 16 / 9;
+
+function loadArMode(){
+  try { return localStorage.getItem(AR_MODE_KEY) || "auto"; } catch(_){ return "auto"; }
+}
+function saveArMode(m){
+  try { localStorage.setItem(AR_MODE_KEY, m); } catch(_){}
+}
+function setArModeUI(mode){
+  arMode = mode;
+  const auto = $("segArAuto"), f169 = $("segAr169");
+  if(mode === "16:9"){
+    f169?.classList.add("on"); auto?.classList.remove("on");
+  } else {
+    auto?.classList.add("on"); f169?.classList.remove("on");
+  }
+  recalcResolution();
+  saveArMode(mode);
+}
+setArModeUI(loadArMode());
+$("segArAuto")?.addEventListener("click", () => setArModeUI("auto"));
+$("segAr169")?.addEventListener("click", () => setArModeUI("16:9"));
+
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
   for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
@@ -261,6 +287,8 @@ CONFIG.renderVariantMedia = function(card, url, media){
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
   const h = getH3OptState();
+  const w = parseInt($("width")?.value || "1120", 10);
+  const he = parseInt($("height")?.value || "640", 10);
   const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
   const rows = [
     ["UNet", $("unetSelect")?.value || ""],
@@ -272,7 +300,9 @@ CONFIG.variantMeta = function(){
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
     ["Steps", $("stepsSlider")?.value || "20"],
-    ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
+    ["Resolución Base", `${w}×${he}`],
+    ["Resolución Vídeo", `${w*2}×${he*2} (RTX 2x)`],
+    ["Aspect Ratio", arMode === "16:9" ? "Forzar 16:9" : "Auto (Imagen)"],
     ["Duración", `${$("duration")?.value || ""}s`],
     ["Modo", currentMode],
   ];
@@ -412,13 +442,18 @@ function nearest32(v){ return Math.round(v / 32) * 32; }
 function recalcResolution(){
   const mp = parseFloat($("mpSlider").value) || 0.7;
   const totalPx = mp * 1024 * 1024;
-  let w = nearest32(Math.sqrt(totalPx * currentAspectRatio));
-  let h = nearest32(Math.sqrt(totalPx / currentAspectRatio));
+  const targetAspect = (arMode === "16:9") ? (16 / 9) : (imageNativeAspectRatio || (16 / 9));
+  currentAspectRatio = targetAspect;
+  let w = nearest32(Math.sqrt(totalPx * targetAspect));
+  let h = nearest32(Math.sqrt(totalPx / targetAspect));
   if(h < 256) h = 256;
   if(w < 256) w = 256;
   $("width").value = w;
   $("height").value = h;
   $("mpVal").textContent = mp.toFixed(2);
+  const finalW = w * 2;
+  const finalH = h * 2;
+  if($("resFinalHint")) $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px tras RTX 2x`;
 }
 
 function updateQueueUI(){
@@ -933,7 +968,7 @@ function updateDzInfo(w, h, infoEl){
   const d = gcd(w, h) || 1;
   info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
   if(w && h && infoEl === $("dzInfo")){
-    currentAspectRatio = w / h;
+    imageNativeAspectRatio = w / h;
     recalcResolution();
   }
 }
@@ -1259,8 +1294,14 @@ function buildGraph(){
   if($("prompt").value.trim()) g[N.I2V].inputs.prompt = $("prompt").value.trim();
   // Seed
   g[N.NOISE].inputs.noise_seed = (seedMode === "random") ? -1 : parseInt($("seedVal").value, 10);
-  // Megapixels
-  g[N.IMG_SCALE].inputs.megapixels = parseFloat($("mpSlider").value);
+  // Megapixels & Resolution
+  const w = parseInt($("width").value || "1120", 10);
+  const h = parseInt($("height").value || "640", 10);
+  if(g[N.IMG_SCALE] && g[N.IMG_SCALE].inputs) g[N.IMG_SCALE].inputs.megapixels = parseFloat($("mpSlider").value);
+  if(g[N.I2V] && g[N.I2V].inputs){
+    g[N.I2V].inputs.width = w;
+    g[N.I2V].inputs.height = h;
+  }
   // Duración (segundos) → nodo PrimitiveFloat
   g[N.DURATION].inputs.value = parseFloat($("duration").value || "10");
   // UNet

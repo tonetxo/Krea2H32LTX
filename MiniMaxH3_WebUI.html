@@ -386,7 +386,21 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple">simple</option><option value="normal">normal</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="sgm_uniform">sgm_uniform</option><option value="beta">beta</option></select></div></div>
       <div class="panel"><h2>Steps</h2><div class="row slider-row"><input type="range" id="stepsSlider" min="4" max="50" step="1" value="20"><div class="slider-val" id="stepsVal">20</div></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
-      <div class="panel"><h2>Megapíxeles &amp; duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.7"><div class="slider-val" id="mpVal">0.70</div></div><div class="row"><label>Duración (s) <span class="hint" id="durHint">(10s)</span></label><input type="number" id="duration" value="10" step="1" min="1" max="60"></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="framesHint">(243 / 24fps = 10.12s)</span></label><input type="number" id="frames" value="243" step="17" min="17" class="ro" readonly></div><div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
+      <div class="panel"><h2>Megapíxeles &amp; resolución</h2>
+        <div class="row">
+          <label>Relación de aspecto</label>
+          <div class="seed-toggle">
+            <div class="seg on" id="segArAuto" data-value="auto">Auto (Imagen)</div>
+            <div class="seg" id="segAr169" data-value="16:9">Forzar 16:9 (2304×1280)</div>
+          </div>
+        </div>
+        <div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.7"><div class="slider-val" id="mpVal">0.70</div></div>
+        <div class="row two-col"><div><label>Ancho base</label><input type="number" id="width" value="1120" step="32" min="256" class="ro" readonly></div><div><label>Alto base</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div></div>
+        <div class="hint" id="resFinalHint" style="font-size:10px;margin-top:4px;">Vídeo final: 2240×1280 px tras RTX 2x</div>
+        <div class="row" style="margin-top:6px;"><label>Duración (s) <span class="hint" id="durHint">(10s)</span></label><input type="number" id="duration" value="10" step="1" min="1" max="60"></div>
+        <div class="row"><label>Frames <span class="hint" id="framesHint">(243 / 24fps = 10.12s)</span></label><input type="number" id="frames" value="243" step="17" min="17" class="ro" readonly></div>
+        <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div>
+      </div>
       <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnGenerate" class="primary">Generar vídeo</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar vídeo</button><button id="btnStopAll" class="danger" disabled>Parar todo</button><button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div style="display:flex;align-items:center;gap:8px;margin-top:6px;"><span id="queueCount" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);">Cola: 0</span><span id="queueHint" class="hint" style="font-size:10px;"></span></div><div class="log" id="log">listo.</div></div>
     </div>
     <div class="results-col">
@@ -2582,6 +2596,32 @@ setModeUI(loadMode());
 $("segI2V")?.addEventListener("click", () => setModeUI("i2v"));
 $("segFLF2V")?.addEventListener("click", () => setModeUI("flf2v"));
 
+// --- ASPECT RATIO MODE (Auto vs Forzar 16:9) ---
+const AR_MODE_KEY = "minimaxh3_ar_mode";
+let arMode = "auto"; // "auto" | "16:9"
+let imageNativeAspectRatio = 16 / 9;
+
+function loadArMode(){
+  try { return localStorage.getItem(AR_MODE_KEY) || "auto"; } catch(_){ return "auto"; }
+}
+function saveArMode(m){
+  try { localStorage.setItem(AR_MODE_KEY, m); } catch(_){}
+}
+function setArModeUI(mode){
+  arMode = mode;
+  const auto = $("segArAuto"), f169 = $("segAr169");
+  if(mode === "16:9"){
+    f169?.classList.add("on"); auto?.classList.remove("on");
+  } else {
+    auto?.classList.add("on"); f169?.classList.remove("on");
+  }
+  recalcResolution();
+  saveArMode(mode);
+}
+setArModeUI(loadArMode());
+$("segArAuto")?.addEventListener("click", () => setArModeUI("auto"));
+$("segAr169")?.addEventListener("click", () => setArModeUI("16:9"));
+
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
   for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
@@ -2595,6 +2635,8 @@ CONFIG.renderVariantMedia = function(card, url, media){
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
   const h = getH3OptState();
+  const w = parseInt($("width")?.value || "1120", 10);
+  const he = parseInt($("height")?.value || "640", 10);
   const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
   const rows = [
     ["UNet", $("unetSelect")?.value || ""],
@@ -2606,7 +2648,9 @@ CONFIG.variantMeta = function(){
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
     ["Steps", $("stepsSlider")?.value || "20"],
-    ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
+    ["Resolución Base", `${w}×${he}`],
+    ["Resolución Vídeo", `${w*2}×${he*2} (RTX 2x)`],
+    ["Aspect Ratio", arMode === "16:9" ? "Forzar 16:9" : "Auto (Imagen)"],
     ["Duración", `${$("duration")?.value || ""}s`],
     ["Modo", currentMode],
   ];
@@ -2746,13 +2790,18 @@ function nearest32(v){ return Math.round(v / 32) * 32; }
 function recalcResolution(){
   const mp = parseFloat($("mpSlider").value) || 0.7;
   const totalPx = mp * 1024 * 1024;
-  let w = nearest32(Math.sqrt(totalPx * currentAspectRatio));
-  let h = nearest32(Math.sqrt(totalPx / currentAspectRatio));
+  const targetAspect = (arMode === "16:9") ? (16 / 9) : (imageNativeAspectRatio || (16 / 9));
+  currentAspectRatio = targetAspect;
+  let w = nearest32(Math.sqrt(totalPx * targetAspect));
+  let h = nearest32(Math.sqrt(totalPx / targetAspect));
   if(h < 256) h = 256;
   if(w < 256) w = 256;
   $("width").value = w;
   $("height").value = h;
   $("mpVal").textContent = mp.toFixed(2);
+  const finalW = w * 2;
+  const finalH = h * 2;
+  if($("resFinalHint")) $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px tras RTX 2x`;
 }
 
 function updateQueueUI(){
@@ -3267,7 +3316,7 @@ function updateDzInfo(w, h, infoEl){
   const d = gcd(w, h) || 1;
   info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
   if(w && h && infoEl === $("dzInfo")){
-    currentAspectRatio = w / h;
+    imageNativeAspectRatio = w / h;
     recalcResolution();
   }
 }
@@ -3593,8 +3642,14 @@ function buildGraph(){
   if($("prompt").value.trim()) g[N.I2V].inputs.prompt = $("prompt").value.trim();
   // Seed
   g[N.NOISE].inputs.noise_seed = (seedMode === "random") ? -1 : parseInt($("seedVal").value, 10);
-  // Megapixels
-  g[N.IMG_SCALE].inputs.megapixels = parseFloat($("mpSlider").value);
+  // Megapixels & Resolution
+  const w = parseInt($("width").value || "1120", 10);
+  const h = parseInt($("height").value || "640", 10);
+  if(g[N.IMG_SCALE] && g[N.IMG_SCALE].inputs) g[N.IMG_SCALE].inputs.megapixels = parseFloat($("mpSlider").value);
+  if(g[N.I2V] && g[N.I2V].inputs){
+    g[N.I2V].inputs.width = w;
+    g[N.I2V].inputs.height = h;
+  }
   // Duración (segundos) → nodo PrimitiveFloat
   g[N.DURATION].inputs.value = parseFloat($("duration").value || "10");
   // UNet
