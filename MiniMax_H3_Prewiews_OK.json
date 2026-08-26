@@ -1,0 +1,546 @@
+{
+  "92": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "130",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  },
+  "115": {
+    "inputs": {
+      "aspect_ratio": "16:9 (Widescreen)",
+      "megapixels": 0.7,
+      "multiple": 32
+    },
+    "class_type": "ResolutionSelector",
+    "_meta": {
+      "title": "Resolution Selector (Size)"
+    }
+  },
+  "119": {
+    "inputs": {
+      "vae_name": "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "120": {
+    "inputs": {
+      "vae_name": "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "121": {
+    "inputs": {
+      "samples": [
+        "125",
+        0
+      ],
+      "vae": [
+        "120",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "VAE Decode Audio"
+    }
+  },
+  "122": {
+    "inputs": {
+      "samples": [
+        "125",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "123": {
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "124": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "142",
+        0
+      ],
+      "denoise": 1,
+      "model": [
+        "147",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "125": {
+    "inputs": {
+      "noise": [
+        "129",
+        0
+      ],
+      "guider": [
+        "126",
+        0
+      ],
+      "sampler": [
+        "123",
+        0
+      ],
+      "sigmas": [
+        "124",
+        0
+      ],
+      "latent_image": [
+        "136",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "126": {
+    "inputs": {
+      "model": [
+        "141",
+        0
+      ],
+      "conditioning": [
+        "136",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Basic Guider"
+    }
+  },
+  "127": {
+    "inputs": {
+      "unet_name": "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "128": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "129": {
+    "inputs": {
+      "noise_seed": 533875991249741
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "130": {
+    "inputs": {
+      "fps": 24,
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "images": [
+        "148",
+        0
+      ],
+      "audio": [
+        "121",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "131": {
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "132",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Math Expression"
+    }
+  },
+  "132": {
+    "inputs": {
+      "value": 12
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "Float (Duration)"
+    }
+  },
+  "136": {
+    "inputs": {
+      "prompt": [
+        "157",
+        0
+      ],
+      "width": [
+        "115",
+        0
+      ],
+      "height": [
+        "115",
+        1
+      ],
+      "length": [
+        "131",
+        1
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "128",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ],
+      "audio_vae": [
+        "120",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "137",
+        0
+      ],
+      "ref_video_audios.ref_video_audio_0": [
+        "161",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "MiniMax H3 Reference to Video"
+    }
+  },
+  "137": {
+    "inputs": {
+      "image": "imaxe (79).png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "138": {
+    "inputs": {
+      "value": "{\n  \"primary_actions\": [\n    {\n      \"time_range\": \"0.0-2.0\",\n      \"description\": \"Urco initiates violent full-body shake: head snaps left-right, torso twists, hindquarters follow in wave motion. Chains slack then snap taut. Water droplets eject radially from fur at high velocity.\"\n    },\n    {\n      \"time_range\": \"2.0-3.5\",\n      \"description\": \"Octopus enters frame from upper left (dislodged by shake), travels in ballistic arc. Impacts Urco's snout/eye region with visible deformation. Suction cups engage sequentially with audible timing.\"\n    },\n    {\n      \"time_range\": \"3.5-7.0\",\n      \"description\": \"Urco blinded: spins clockwise on forepaws, hind legs scrabbling on wet granite. Chains whip horizontally at head height, carving arcs through spray. Paws impact rocks with audible thuds. Body weight shifts violently side-to-side.\"\n    },\n    {\n      \"time_range\": \"7.0-10.5\",\n      \"description\": \"Percebeiro reacts: initial backward stumble, then lateral sprint along rock ridge. Leaps over low-swinging chain link (0.5m clearance). Slips on algae-slick rock, recovers with hand plant. Dodges second chain whip by dropping prone.\"\n    },\n    {\n      \"time_range\": \"10.5-12.0\",\n      \"description\": \"Urco crashes sideways into boulder, chain anchor point groans. Percebeiro scrambles up incline away from surf line.\"\n    }\n  ],\n  \"subject_motion\": {\n    \"urco\": \"0-2s: Rotational shake axis along spine, frequency ~4Hz, amplitude decaying. 2-3.5s: Head snap-back on impact, eyes clamp shut. 3.5-7s: Continuous spin ~90deg/sec, center of mass orbits 1.5m radius. Chains describe figure-8 patterns. 7-12s: Momentum carries into boulder collision, rebound, partial collapse.\",\n    \"percebeiro\": \"0-3.5s: Static tension, weight on balls of feet. 3.5-7s: Micro-adjustments tracking Urco. 7-10.5s: Explosive lateral displacement 3m, vertical leap 0.8m, prone drop 1.2m, scramble 2m uphill. Limbs splay for friction on wet rock.\",\n    \"octopus\": \"2.0-3.5s: Rigid-body tumble 2 rev/sec. Impact: mantle compresses 40%, arms splay radially. 3.5-7s: Arms adhere sequentially (0.1s intervals), mantle pulses. Chromatophores flash maroon-to-pale.\"\n  },\n  \"environmental_motion\": {\n    \"waves\": \"Breaking on offshore reef: 3 major impacts at 1.2s, 4.8s, 9.1s. Whitewater plumes rise 8m, fall as sheet spray.\",\n    \"spray\": \"Wind-driven horizontal sheets at 15m/s. Droplet size 0.5-3mm. Accumulates on lens as partial occlusion 4-6s.\",\n    \"rocks\": \"Static. Surface water films flow downhill 0.2m/s. Algae patches undulate in surge.\",\n    \"sky\": \"Cloud bases lower 50m over 12s. Stratocumulus bands rotate cyclonically slow.\"\n  },\n  \"particle_motion\": {\n    \"shake_droplets\": \"0-2.5s: 5000+ droplets 1-4mm, initial velocity 12m/s radial. Ballistic arcs 2-3m. Catch backlight.\",\n    \"impact_spray\": \"2.5-3.5s: Octopus impact ejecta - mucus-water mix, high viscosity strands 10cm long.\",\n    \"chain_spray\": \"3.5-10s: Chain links fling bound water in tight spirals. Droplets 2mm, velocity 8m/s tangential.\",\n    \"surf_aerosol\": \"Continuous: Sub-100um salt nuclei in suspension. Visibility 30m at camera height.\"\n  },\n  \"lighting_motion\": {\n    \"ambient\": \"Global illuminance drops 15% over 12s (cloud thickening). Color temp shifts 5500K->5000K.\",\n    \"specular\": \"Wet fur highlights track body rotation. Chain links flash point-reflections at 3.5s, 5.2s, 7.8s. Octopus mantle catches highlight at 3.0s.\",\n    \"shadow\": \"Urco's shadow sweeps rocks during spin. Penumbra softens as cloud thickens.\"\n  },\n  \"camera_motion\": {\n    \"0-3.5s\": \"Static low tripod (0.4m height), 24mm equiv. Slight micro-jitter (0.5px) from wind.\",\n    \"3.5-7s\": \"Pan right 25deg at 7deg/sec tracking Percebeiro. Tilt up 5deg to include chain arcs.\",\n    \"7-10.5s\": \"Handheld follow: dolly left 1.5m at 0.4m/s, yaw left 15deg. Roll ±2deg from uneven footing.\",\n    \"10.5-12s\": \"Pedestal up 0.3m, zoom 24->35mm (digital crop). Frame Urco collapse and Percebeiro escape.\"\n  },\n  \"physics_reactions\": {\n    \"chains\": \"Mass 15kg/m. Slack-to-taut transitions at 3.2s, 5.0s, 6.8s. Link collision energy dissipates as heat/sound. Anchor ring deforms rock surface <1mm.\",\n    \"fur\": \"Wet clump separation at 4Hz shake. Surface tension bridges break at 0.3s intervals. Re-clumping during spin via centrifugal mat.\",\n    \"rock_contact\": \"Paw pressure 400kPa on impact. Granite fracture risk at existing fissures. Algae shear at 0.1m/s slip.\",\n    \"octopus_adhesion\": \"Suction cup pressure differential -60kPa. Detachment force >200N per arm. Viscoelastic mucus strand failure at 15cm extension.\"\n  },\n  \"timing_beats\": [\n    \"0.0: Shake onset\",\n    \"1.2: Wave boom 1\",\n    \"2.1: Octopus launch visible\",\n    \"2.8: SPLAT impact\",\n    \"3.0: First suction pop\",\n    \"3.5: Spin initiation\",\n    \"4.8: Wave boom 2\",\n    \"5.5: Chain shriek peak\",\n    \"7.0: Percebeiro flight\",\n    \"7.3: Chain leap clearance\",\n    \"8.1: Prone dodge\",\n    \"9.1: Wave boom 3\",\n    \"10.2: Boulder impact\",\n    \"11.5: Frame settle\"\n  ],\n  \"audio_events\": [\n    \"0.0-2.0: Wet fur thrash 'flap-flap-flap' 4Hz, broadband 200-2000Hz\",\n    \"1.2: Wave crash 'WHOOOOM' 50-200Hz fundamental\",\n    \"2.8: Impact 'SPLAT-SQUISH' 1k-5kHz transient\",\n    \"3.0-3.5: Suction 'pop-pop-pop-schlick' 800Hz clicks + 300Hz schlick\",\n    \"3.5-10: Chain 'CLANK-CLANK-WHOOSH-SHRIEK' 200Hz clanks, 2kHz shrieks, Doppler whoosh\",\n    \"4.8, 9.1: Wave booms\",\n    \"7.0-10.5: Footfalls 'scrape-slip-thud' on wet rock\",\n    \"0-12: Pandeireta 16th notes 180BPM, hand slaps 2&4, jingles continuous\"\n  ],\n  \"motion_constraints\": [\n    \"Urco mass ~300kg: angular acceleration limited by paw friction (mu=0.4 wet granite). Max spin 120deg/s sustained.\",\n    \"Chain length fixed at 4m visible. Anchor point immutable. No stretching.\",\n    \"Percebeiro max sprint 4m/s on dry, 1.5m/s on wet algae. Leap height limited by wetsuit restriction.\",\n    \"Octopus mass 1.5kg: ballistic trajectory calculable from launch point. No self-propulsion in air.\",\n    \"Camera rig mass 8kg: operator momentum limits pan acceleration to 30deg/s^2.\",\n    \"Water droplets obey gravity + wind (15m/s SW). No evaporation in 12s.\",\n    \"Lighting changes only via cloud motion. No artificial sources.\"\n  ]\n}"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Input Text (Prompt)"
+    }
+  },
+  "141": {
+    "inputs": {
+      "switch": [
+        "146",
+        0
+      ],
+      "on_false": [
+        "147",
+        0
+      ],
+      "on_true": [
+        "145",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "If/Else Switch (model)"
+    }
+  },
+  "142": {
+    "inputs": {
+      "switch": [
+        "146",
+        0
+      ],
+      "on_false": [
+        "143",
+        0
+      ],
+      "on_true": [
+        "144",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "If/Else Switch (Steps)"
+    }
+  },
+  "143": {
+    "inputs": {
+      "value": 20
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Int (Full)"
+    }
+  },
+  "144": {
+    "inputs": {
+      "value": 12
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Int (Lightning LoRA)"
+    }
+  },
+  "145": {
+    "inputs": {
+      "lora_name": "h3/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "147",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "146": {
+    "inputs": {
+      "value": true
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "Boolean (Enable Lightning LoRA)"
+    }
+  },
+  "147": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "162",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "ModelAttentionBackend"
+    }
+  },
+  "148": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.scale": 2,
+      "quality": "ULTRA",
+      "images": [
+        "122",
+        0
+      ]
+    },
+    "class_type": "RTXVideoSuperResolution",
+    "_meta": {
+      "title": "RTX Video Super Resolution"
+    }
+  },
+  "151": {
+    "inputs": {
+      "audio": "lofivision-wind-and-waves-307526.mp3"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "156": {
+    "inputs": {
+      "switch": false,
+      "on_false": [
+        "138",
+        0
+      ],
+      "on_true": [
+        "138",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "text/json"
+    }
+  },
+  "157": {
+    "inputs": {
+      "switch": false,
+      "on_false": [
+        "138",
+        0
+      ],
+      "on_true": [
+        "156",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "text/PromptStudio"
+    }
+  },
+  "158": {
+    "inputs": {
+      "video_budget": 0.3,
+      "denser_early_late_steps": false,
+      "layer_video_budgets": "",
+      "model": [
+        "127",
+        0
+      ]
+    },
+    "class_type": "H3SparseAttention",
+    "_meta": {
+      "title": "H3 Sparse Attention"
+    }
+  },
+  "159": {
+    "inputs": {
+      "shift_video": 8,
+      "shift_audio": 3,
+      "model": [
+        "158",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "ModelSamplingMiniMaxH3"
+    }
+  },
+  "160": {
+    "inputs": {
+      "text_0": "{\n  \"primary_actions\": [\n    {\n      \"time_range\": \"0.0-2.0\",\n      \"description\": \"Urco initiates violent full-body shake: head snaps left-right, torso twists, hindquarters follow in wave motion. Chains slack then snap taut. Water droplets eject radially from fur at high velocity.\"\n    },\n    {\n      \"time_range\": \"2.0-3.5\",\n      \"description\": \"Octopus enters frame from upper left (dislodged by shake), travels in ballistic arc. Impacts Urco's snout/eye region with visible deformation. Suction cups engage sequentially with audible timing.\"\n    },\n    {\n      \"time_range\": \"3.5-7.0\",\n      \"description\": \"Urco blinded: spins clockwise on forepaws, hind legs scrabbling on wet granite. Chains whip horizontally at head height, carving arcs through spray. Paws impact rocks with audible thuds. Body weight shifts violently side-to-side.\"\n    },\n    {\n      \"time_range\": \"7.0-10.5\",\n      \"description\": \"Percebeiro reacts: initial backward stumble, then lateral sprint along rock ridge. Leaps over low-swinging chain link (0.5m clearance). Slips on algae-slick rock, recovers with hand plant. Dodges second chain whip by dropping prone.\"\n    },\n    {\n      \"time_range\": \"10.5-12.0\",\n      \"description\": \"Urco crashes sideways into boulder, chain anchor point groans. Percebeiro scrambles up incline away from surf line.\"\n    }\n  ],\n  \"subject_motion\": {\n    \"urco\": \"0-2s: Rotational shake axis along spine, frequency ~4Hz, amplitude decaying. 2-3.5s: Head snap-back on impact, eyes clamp shut. 3.5-7s: Continuous spin ~90deg/sec, center of mass orbits 1.5m radius. Chains describe figure-8 patterns. 7-12s: Momentum carries into boulder collision, rebound, partial collapse.\",\n    \"percebeiro\": \"0-3.5s: Static tension, weight on balls of feet. 3.5-7s: Micro-adjustments tracking Urco. 7-10.5s: Explosive lateral displacement 3m, vertical leap 0.8m, prone drop 1.2m, scramble 2m uphill. Limbs splay for friction on wet rock.\",\n    \"octopus\": \"2.0-3.5s: Rigid-body tumble 2 rev/sec. Impact: mantle compresses 40%, arms splay radially. 3.5-7s: Arms adhere sequentially (0.1s intervals), mantle pulses. Chromatophores flash maroon-to-pale.\"\n  },\n  \"environmental_motion\": {\n    \"waves\": \"Breaking on offshore reef: 3 major impacts at 1.2s, 4.8s, 9.1s. Whitewater plumes rise 8m, fall as sheet spray.\",\n    \"spray\": \"Wind-driven horizontal sheets at 15m/s. Droplet size 0.5-3mm. Accumulates on lens as partial occlusion 4-6s.\",\n    \"rocks\": \"Static. Surface water films flow downhill 0.2m/s. Algae patches undulate in surge.\",\n    \"sky\": \"Cloud bases lower 50m over 12s. Stratocumulus bands rotate cyclonically slow.\"\n  },\n  \"particle_motion\": {\n    \"shake_droplets\": \"0-2.5s: 5000+ droplets 1-4mm, initial velocity 12m/s radial. Ballistic arcs 2-3m. Catch backlight.\",\n    \"impact_spray\": \"2.5-3.5s: Octopus impact ejecta - mucus-water mix, high viscosity strands 10cm long.\",\n    \"chain_spray\": \"3.5-10s: Chain links fling bound water in tight spirals. Droplets 2mm, velocity 8m/s tangential.\",\n    \"surf_aerosol\": \"Continuous: Sub-100um salt nuclei in suspension. Visibility 30m at camera height.\"\n  },\n  \"lighting_motion\": {\n    \"ambient\": \"Global illuminance drops 15% over 12s (cloud thickening). Color temp shifts 5500K->5000K.\",\n    \"specular\": \"Wet fur highlights track body rotation. Chain links flash point-reflections at 3.5s, 5.2s, 7.8s. Octopus mantle catches highlight at 3.0s.\",\n    \"shadow\": \"Urco's shadow sweeps rocks during spin. Penumbra softens as cloud thickens.\"\n  },\n  \"camera_motion\": {\n    \"0-3.5s\": \"Static low tripod (0.4m height), 24mm equiv. Slight micro-jitter (0.5px) from wind.\",\n    \"3.5-7s\": \"Pan right 25deg at 7deg/sec tracking Percebeiro. Tilt up 5deg to include chain arcs.\",\n    \"7-10.5s\": \"Handheld follow: dolly left 1.5m at 0.4m/s, yaw left 15deg. Roll ±2deg from uneven footing.\",\n    \"10.5-12s\": \"Pedestal up 0.3m, zoom 24->35mm (digital crop). Frame Urco collapse and Percebeiro escape.\"\n  },\n  \"physics_reactions\": {\n    \"chains\": \"Mass 15kg/m. Slack-to-taut transitions at 3.2s, 5.0s, 6.8s. Link collision energy dissipates as heat/sound. Anchor ring deforms rock surface <1mm.\",\n    \"fur\": \"Wet clump separation at 4Hz shake. Surface tension bridges break at 0.3s intervals. Re-clumping during spin via centrifugal mat.\",\n    \"rock_contact\": \"Paw pressure 400kPa on impact. Granite fracture risk at existing fissures. Algae shear at 0.1m/s slip.\",\n    \"octopus_adhesion\": \"Suction cup pressure differential -60kPa. Detachment force >200N per arm. Viscoelastic mucus strand failure at 15cm extension.\"\n  },\n  \"timing_beats\": [\n    \"0.0: Shake onset\",\n    \"1.2: Wave boom 1\",\n    \"2.1: Octopus launch visible\",\n    \"2.8: SPLAT impact\",\n    \"3.0: First suction pop\",\n    \"3.5: Spin initiation\",\n    \"4.8: Wave boom 2\",\n    \"5.5: Chain shriek peak\",\n    \"7.0: Percebeiro flight\",\n    \"7.3: Chain leap clearance\",\n    \"8.1: Prone dodge\",\n    \"9.1: Wave boom 3\",\n    \"10.2: Boulder impact\",\n    \"11.5: Frame settle\"\n  ],\n  \"audio_events\": [\n    \"0.0-2.0: Wet fur thrash 'flap-flap-flap' 4Hz, broadband 200-2000Hz\",\n    \"1.2: Wave crash 'WHOOOOM' 50-200Hz fundamental\",\n    \"2.8: Impact 'SPLAT-SQUISH' 1k-5kHz transient\",\n    \"3.0-3.5: Suction 'pop-pop-pop-schlick' 800Hz clicks + 300Hz schlick\",\n    \"3.5-10: Chain 'CLANK-CLANK-WHOOSH-SHRIEK' 200Hz clanks, 2kHz shrieks, Doppler whoosh\",\n    \"4.8, 9.1: Wave booms\",\n    \"7.0-10.5: Footfalls 'scrape-slip-thud' on wet rock\",\n    \"0-12: Pandeireta 16th notes 180BPM, hand slaps 2&4, jingles continuous\"\n  ],\n  \"motion_constraints\": [\n    \"Urco mass ~300kg: angular acceleration limited by paw friction (mu=0.4 wet granite). Max spin 120deg/s sustained.\",\n    \"Chain length fixed at 4m visible. Anchor point immutable. No stretching.\",\n    \"Percebeiro max sprint 4m/s on dry, 1.5m/s on wet algae. Leap height limited by wetsuit restriction.\",\n    \"Octopus mass 1.5kg: ballistic trajectory calculable from launch point. No self-propulsion in air.\",\n    \"Camera rig mass 8kg: operator momentum limits pan acceleration to 30deg/s^2.\",\n    \"Water droplets obey gravity + wind (15m/s SW). No evaporation in 12s.\",\n    \"Lighting changes only via cloud motion. No artificial sources.\"\n  ]\n}",
+      "text": [
+        "157",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  },
+  "161": {
+    "inputs": {
+      "volume": 3,
+      "audio": [
+        "151",
+        0
+      ]
+    },
+    "class_type": "AudioAdjustVolume",
+    "_meta": {
+      "title": "Adjust Audio Volume"
+    }
+  },
+  "162": {
+    "inputs": {
+      "enabled": false,
+      "blend_weight": 0.5,
+      "degree": 1,
+      "ridge_lambda": 0.1,
+      "window_size": 2,
+      "flex_window": 0.75,
+      "warmup_steps": 1,
+      "tail_actual_steps": 1,
+      "max_history": 8,
+      "debug": false,
+      "history_storage": "system_ram",
+      "bootstrap_first_forecast": true,
+      "anchor_residual_feedback": false,
+      "selective_rollback_correction": false,
+      "offline_smoothing_replay": true,
+      "audio_blend_weight": 0,
+      "offline_archive_storage": "system_ram",
+      "model_aware_mode": "off",
+      "model_aware_risk_threshold": 0.65,
+      "model_aware_trust_shrinkage": false,
+      "model_aware_replay_generic_correction": false,
+      "generic_correction_mode": "coordinate_rls",
+      "generic_correction_limiter": "hard_clip",
+      "generic_correction_limit": 0.4,
+      "generic_correction_attenuation": "no_attenuation",
+      "model": [
+        "164",
+        0
+      ]
+    },
+    "class_type": "SpectrumApplyMiniMaxH3",
+    "_meta": {
+      "title": "Spectrum Apply MiniMax H3"
+    }
+  },
+  "164": {
+    "inputs": {
+      "fused_qkv": "auto",
+      "mlp_memory": "auto",
+      "chunk_rows": 4096,
+      "preserve_precision": true,
+      "precision_mode": "Auto",
+      "qkv_streaming_mode": "Auto",
+      "model": [
+        "159",
+        0
+      ]
+    },
+    "class_type": "H3MemoryOptimization",
+    "_meta": {
+      "title": "H3 Memory Optimization"
+    }
+  }
+}
