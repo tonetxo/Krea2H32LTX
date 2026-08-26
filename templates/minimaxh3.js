@@ -121,6 +121,7 @@ const BITDEPTH_KEY = "minimaxh3_bit_depth";
 const MODE_KEY = "minimaxh3_mode";
 const SPECTRUM_KEY = "minimaxh3_spectrum";
 const H3OPT_KEY = "minimaxh3_h3opt";
+const SIGMASHIFT_KEY = "minimaxh3_sigma_shift";
 let currentMode = "i2v"; // "i2v" | "flf2v"
 window.currentBatchMode = false;
 let jobQueue = [];
@@ -189,7 +190,41 @@ function loadBitDepth(){
 }
 setBitDepthUI(loadBitDepth());
 $("segBitDepth8")?.addEventListener("click", () => { setBitDepthUI(8); saveBitDepth(8); });
-$("segBitDepth10")?.addEventListener("click", () => { setBitDepthUI(10); saveBitDepth(10); });
+// --- SIGMA SHIFT (MiniMax H3) ---
+const SIGMASHIFT_DEFAULTS = { shiftVideo: 8.0, shiftAudio: 3.0 };
+function loadSigmaShift(){
+  try { return Object.assign({}, SIGMASHIFT_DEFAULTS, JSON.parse(localStorage.getItem(SIGMASHIFT_KEY) || "{}")); }
+  catch(_) { return {...SIGMASHIFT_DEFAULTS}; }
+}
+function saveSigmaShift(s){ try { localStorage.setItem(SIGMASHIFT_KEY, JSON.stringify(s)); } catch(_){} }
+function setSigmaShiftUI(s){
+  if($("sigmaShiftVideo")){
+    $("sigmaShiftVideo").value = s.shiftVideo;
+    if($("sigmaShiftVideoVal")) $("sigmaShiftVideoVal").textContent = parseFloat(s.shiftVideo).toFixed(1);
+  }
+  if($("sigmaShiftAudio")){
+    $("sigmaShiftAudio").value = s.shiftAudio;
+    if($("sigmaShiftAudioVal")) $("sigmaShiftAudioVal").textContent = parseFloat(s.shiftAudio).toFixed(1);
+  }
+}
+function getSigmaShiftState(){
+  return {
+    shiftVideo: parseFloat($("sigmaShiftVideo")?.value ?? "8.0"),
+    shiftAudio: parseFloat($("sigmaShiftAudio")?.value ?? "3.0"),
+  };
+}
+const _sigmaShiftState = loadSigmaShift();
+setSigmaShiftUI(_sigmaShiftState);
+$("sigmaShiftVideo")?.addEventListener("input", (e) => {
+  const val = parseFloat(e.target.value);
+  if($("sigmaShiftVideoVal")) $("sigmaShiftVideoVal").textContent = val.toFixed(1);
+  const s = getSigmaShiftState(); s.shiftVideo = val; saveSigmaShift(s);
+});
+$("sigmaShiftAudio")?.addEventListener("input", (e) => {
+  const val = parseFloat(e.target.value);
+  if($("sigmaShiftAudioVal")) $("sigmaShiftAudioVal").textContent = val.toFixed(1);
+  const s = getSigmaShiftState(); s.shiftAudio = val; saveSigmaShift(s);
+});
 
 // --- SPECTRUM (MiniMax H3) ---
 const SPECTRUM_DEFAULTS = { enabled: true, blend: 0.5, flex: 0.75, warmup: 5, historyStorage: "system_ram" };
@@ -288,6 +323,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
   const h = getH3OptState();
+  const ss = getSigmaShiftState();
   const w = parseInt($("width")?.value || "1120", 10);
   const he = parseInt($("height")?.value || "640", 10);
   const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
@@ -297,6 +333,7 @@ CONFIG.variantMeta = function(){
     ["LoRAs", activeLoras.length ? activeLoras.join(", ") : "ninguna"],
     ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
+    ["Sigma Shift", `Vídeo ${ss.shiftVideo.toFixed(1)} / Audio ${ss.shiftAudio.toFixed(1)}`],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
@@ -882,6 +919,19 @@ function applyWorkflow(workflow, opts={}){
     saveH3Opt(h3State);
   }
 
+  // Sigma Shift
+  const sigmaNode = findByClass("MiniMaxH3SigmaShift");
+  if(sigmaNode && sigmaNode.inputs){
+    const sv = typeof sigmaNode.inputs.shift_video === "number" ? sigmaNode.inputs.shift_video : 8.0;
+    const sa = typeof sigmaNode.inputs.shift_audio === "number" ? sigmaNode.inputs.shift_audio : 3.0;
+    const ss = { shiftVideo: sv, shiftAudio: sa };
+    setSigmaShiftUI(ss);
+    saveSigmaShift(ss);
+    setApplied(`sigma shift (${sv}v / ${sa}a)`);
+  } else if(sigmaNode === null){
+    setMissing("sigma shift");
+  }
+
   // Spectrum
   const spectrumNode = findByClass("SpectrumApplyMiniMaxH3");
   if(spectrumNode && spectrumNode.inputs){
@@ -1372,9 +1422,10 @@ function buildGraph(){
 
   // 2. Sigma Shift (MiniMaxH3SigmaShift)
   if(g[N.SIGMA_SHIFT]){
+    const ss = getSigmaShiftState();
     g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
-    g[N.SIGMA_SHIFT].inputs.shift_video = 8;
-    g[N.SIGMA_SHIFT].inputs.shift_audio = 3;
+    g[N.SIGMA_SHIFT].inputs.shift_video = ss.shiftVideo;
+    g[N.SIGMA_SHIFT].inputs.shift_audio = ss.shiftAudio;
     currentModelNode = N.SIGMA_SHIFT;
   }
 

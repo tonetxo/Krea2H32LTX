@@ -382,6 +382,19 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="hint" style="margin-top:6px;font-size:10px;">Acelera la atención (Kitchen INT8 64x64) y reduce el consumo de VRAM (QKV &amp; MLP chunking). Menor budget = más rápido.</div>
       </div>
+      <div class="panel"><h2>Sigma Shift (Flow Match)</h2>
+        <div class="row slider-row">
+          <label>Shift Vídeo <span class="hint">(desplazamiento de flujo vídeo)</span></label>
+          <input type="range" id="sigmaShiftVideo" min="1.0" max="30.0" step="0.5" value="8.0">
+          <div class="slider-val" id="sigmaShiftVideoVal">8.0</div>
+        </div>
+        <div class="row slider-row">
+          <label>Shift Audio <span class="hint">(desplazamiento de flujo audio)</span></label>
+          <input type="range" id="sigmaShiftAudio" min="1.0" max="30.0" step="0.5" value="3.0">
+          <div class="slider-val" id="sigmaShiftAudioVal">3.0</div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Ajusta el schedule temporal (flow shifts) del DiT de MiniMax H3. Por defecto: 8.0 vídeo / 3.0 audio.</div>
+      </div>
       <div class="panel"><h2>Spectrum (MiniMax H3)</h2><div class="seed-toggle"><div class="seg on" id="segSpectrumOn" data-value="true">Activo</div><div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div></div><div class="row slider-row"><label>Blend weight <span class="hint">(peso espectral)</span></label><input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5"><div class="slider-val" id="spectrumBlendVal">0.50</div></div><div class="row slider-row"><label>Flex window <span class="hint">(ajuste intervalo)</span></label><input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75"><div class="slider-val" id="spectrumFlexVal">0.75</div></div><div class="row slider-row"><label>Warmup steps <span class="hint">(pasos nativos iniciales)</span></label><input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="5"><div class="slider-val" id="spectrumWarmupVal">5</div></div><div class="row"><label>Historial en <span class="hint">(VRAM más rápido, más memoria)</span></label><select id="spectrumHistoryStorage"><option value="system_ram" selected>RAM sistema</option><option value="vram">VRAM</option></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div></div>
       <div class="panel"><h2>Sampler</h2><div class="row"><select id="samplerName"><option value="res_multistep">res_multistep</option><option value="res_multistep_cfg_pp">res_multistep_cfg_pp</option><option value="euler">euler</option><option value="euler_ancestral">euler_ancestral</option><option value="dpmpp_2m">dpmpp_2m</option><option value="dpmpp_2m_sde">dpmpp_2m_sde</option><option value="dpmpp_3m_sde">dpmpp_3m_sde</option><option value="lcm">lcm</option></select></div></div>
       <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple">simple</option><option value="normal">normal</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="sgm_uniform">sgm_uniform</option><option value="beta">beta</option></select></div></div>
@@ -2726,6 +2739,7 @@ const BITDEPTH_KEY = "minimaxh3_bit_depth";
 const MODE_KEY = "minimaxh3_mode";
 const SPECTRUM_KEY = "minimaxh3_spectrum";
 const H3OPT_KEY = "minimaxh3_h3opt";
+const SIGMASHIFT_KEY = "minimaxh3_sigma_shift";
 let currentMode = "i2v"; // "i2v" | "flf2v"
 window.currentBatchMode = false;
 let jobQueue = [];
@@ -2794,7 +2808,41 @@ function loadBitDepth(){
 }
 setBitDepthUI(loadBitDepth());
 $("segBitDepth8")?.addEventListener("click", () => { setBitDepthUI(8); saveBitDepth(8); });
-$("segBitDepth10")?.addEventListener("click", () => { setBitDepthUI(10); saveBitDepth(10); });
+// --- SIGMA SHIFT (MiniMax H3) ---
+const SIGMASHIFT_DEFAULTS = { shiftVideo: 8.0, shiftAudio: 3.0 };
+function loadSigmaShift(){
+  try { return Object.assign({}, SIGMASHIFT_DEFAULTS, JSON.parse(localStorage.getItem(SIGMASHIFT_KEY) || "{}")); }
+  catch(_) { return {...SIGMASHIFT_DEFAULTS}; }
+}
+function saveSigmaShift(s){ try { localStorage.setItem(SIGMASHIFT_KEY, JSON.stringify(s)); } catch(_){} }
+function setSigmaShiftUI(s){
+  if($("sigmaShiftVideo")){
+    $("sigmaShiftVideo").value = s.shiftVideo;
+    if($("sigmaShiftVideoVal")) $("sigmaShiftVideoVal").textContent = parseFloat(s.shiftVideo).toFixed(1);
+  }
+  if($("sigmaShiftAudio")){
+    $("sigmaShiftAudio").value = s.shiftAudio;
+    if($("sigmaShiftAudioVal")) $("sigmaShiftAudioVal").textContent = parseFloat(s.shiftAudio).toFixed(1);
+  }
+}
+function getSigmaShiftState(){
+  return {
+    shiftVideo: parseFloat($("sigmaShiftVideo")?.value ?? "8.0"),
+    shiftAudio: parseFloat($("sigmaShiftAudio")?.value ?? "3.0"),
+  };
+}
+const _sigmaShiftState = loadSigmaShift();
+setSigmaShiftUI(_sigmaShiftState);
+$("sigmaShiftVideo")?.addEventListener("input", (e) => {
+  const val = parseFloat(e.target.value);
+  if($("sigmaShiftVideoVal")) $("sigmaShiftVideoVal").textContent = val.toFixed(1);
+  const s = getSigmaShiftState(); s.shiftVideo = val; saveSigmaShift(s);
+});
+$("sigmaShiftAudio")?.addEventListener("input", (e) => {
+  const val = parseFloat(e.target.value);
+  if($("sigmaShiftAudioVal")) $("sigmaShiftAudioVal").textContent = val.toFixed(1);
+  const s = getSigmaShiftState(); s.shiftAudio = val; saveSigmaShift(s);
+});
 
 // --- SPECTRUM (MiniMax H3) ---
 const SPECTRUM_DEFAULTS = { enabled: true, blend: 0.5, flex: 0.75, warmup: 5, historyStorage: "system_ram" };
@@ -2893,6 +2941,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
   const h = getH3OptState();
+  const ss = getSigmaShiftState();
   const w = parseInt($("width")?.value || "1120", 10);
   const he = parseInt($("height")?.value || "640", 10);
   const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
@@ -2902,6 +2951,7 @@ CONFIG.variantMeta = function(){
     ["LoRAs", activeLoras.length ? activeLoras.join(", ") : "ninguna"],
     ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
+    ["Sigma Shift", `Vídeo ${ss.shiftVideo.toFixed(1)} / Audio ${ss.shiftAudio.toFixed(1)}`],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
@@ -3487,6 +3537,19 @@ function applyWorkflow(workflow, opts={}){
     saveH3Opt(h3State);
   }
 
+  // Sigma Shift
+  const sigmaNode = findByClass("MiniMaxH3SigmaShift");
+  if(sigmaNode && sigmaNode.inputs){
+    const sv = typeof sigmaNode.inputs.shift_video === "number" ? sigmaNode.inputs.shift_video : 8.0;
+    const sa = typeof sigmaNode.inputs.shift_audio === "number" ? sigmaNode.inputs.shift_audio : 3.0;
+    const ss = { shiftVideo: sv, shiftAudio: sa };
+    setSigmaShiftUI(ss);
+    saveSigmaShift(ss);
+    setApplied(`sigma shift (${sv}v / ${sa}a)`);
+  } else if(sigmaNode === null){
+    setMissing("sigma shift");
+  }
+
   // Spectrum
   const spectrumNode = findByClass("SpectrumApplyMiniMaxH3");
   if(spectrumNode && spectrumNode.inputs){
@@ -3977,9 +4040,10 @@ function buildGraph(){
 
   // 2. Sigma Shift (MiniMaxH3SigmaShift)
   if(g[N.SIGMA_SHIFT]){
+    const ss = getSigmaShiftState();
     g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
-    g[N.SIGMA_SHIFT].inputs.shift_video = 8;
-    g[N.SIGMA_SHIFT].inputs.shift_audio = 3;
+    g[N.SIGMA_SHIFT].inputs.shift_video = ss.shiftVideo;
+    g[N.SIGMA_SHIFT].inputs.shift_audio = ss.shiftAudio;
     currentModelNode = N.SIGMA_SHIFT;
   }
 

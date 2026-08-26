@@ -79,6 +79,19 @@
         </div>
         <div class="hint" style="margin-top:6px;font-size:10px;">Acelera la atención (Kitchen INT8 64x64) y reduce el consumo de VRAM (QKV &amp; MLP chunking). Menor budget = más rápido.</div>
       </div>
+      <div class="panel"><h2>Sigma Shift (Flow Match)</h2>
+        <div class="row slider-row">
+          <label>Shift Vídeo <span class="hint">(desplazamiento de flujo vídeo)</span></label>
+          <input type="range" id="sigmaShiftVideo" min="1.0" max="30.0" step="0.5" value="8.0">
+          <div class="slider-val" id="sigmaShiftVideoVal">8.0</div>
+        </div>
+        <div class="row slider-row">
+          <label>Shift Audio <span class="hint">(desplazamiento de flujo audio)</span></label>
+          <input type="range" id="sigmaShiftAudio" min="1.0" max="30.0" step="0.5" value="3.0">
+          <div class="slider-val" id="sigmaShiftAudioVal">3.0</div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Ajusta el schedule temporal (flow shifts) del DiT de MiniMax H3. Por defecto: 8.0 vídeo / 3.0 audio.</div>
+      </div>
       <div class="panel"><h2>Spectrum (MiniMax H3)</h2><div class="seed-toggle"><div class="seg on" id="segSpectrumOn" data-value="true">Activo</div><div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div></div><div class="row slider-row"><label>Blend weight <span class="hint">(peso espectral)</span></label><input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5"><div class="slider-val" id="spectrumBlendVal">0.50</div></div><div class="row slider-row"><label>Flex window <span class="hint">(ajuste intervalo)</span></label><input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75"><div class="slider-val" id="spectrumFlexVal">0.75</div></div><div class="row slider-row"><label>Warmup steps <span class="hint">(pasos nativos iniciales)</span></label><input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="5"><div class="slider-val" id="spectrumWarmupVal">5</div></div><div class="row"><label>Historial en <span class="hint">(VRAM más rápido, más memoria)</span></label><select id="spectrumHistoryStorage"><option value="system_ram" selected>RAM sistema</option><option value="vram">VRAM</option></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div></div>
       <div class="panel"><h2>Sampler</h2><div class="row"><select id="samplerName"><option value="res_multistep">res_multistep</option><option value="res_multistep_cfg_pp">res_multistep_cfg_pp</option><option value="euler">euler</option><option value="euler_ancestral">euler_ancestral</option><option value="dpmpp_2m">dpmpp_2m</option><option value="dpmpp_2m_sde">dpmpp_2m_sde</option><option value="dpmpp_3m_sde">dpmpp_3m_sde</option><option value="lcm">lcm</option></select></div></div>
       <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple">simple</option><option value="normal">normal</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="sgm_uniform">sgm_uniform</option><option value="beta">beta</option></select></div></div>
