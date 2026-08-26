@@ -1488,11 +1488,32 @@ function buildGraph(){
     currentModelNode = N.ATTN_BACKEND;
   }
 
+  // 6. Model Preview Override con taeh3 (Live Animated Video Preview)
+  const prevMethod = getPreviewMethod();
+  const hasTaeH3 = (typeof AVAILABLE_VAES !== "undefined" && AVAILABLE_VAES.some(v => v.toLowerCase().includes("taeh3")));
+  if(prevMethod !== "none"){
+    const previewOverrideKey = "170";
+    g[previewOverrideKey] = {
+      class_type: "ModelPreviewOverrideKJ",
+      inputs: {
+        model: [currentModelNode, 0],
+        max_resolution: 768,
+        jpeg_quality: 80,
+        suppress_default_preview: true,
+        preview_frames: 16,
+        preview_fps: 12,
+        tiny_vae: hasTaeH3 ? "taeh3.safetensors" : "none"
+      },
+      _meta: { title: "Model Preview Override (taeh3 Animated)" }
+    };
+    currentModelNode = previewOverrideKey;
+  }
+
   // Limpiar nodos de switch estáticos no necesarios de la plantilla
   delete g["141"]; delete g["142"]; delete g["143"]; delete g["144"]; delete g["146"];
   delete g["156"]; delete g["157"]; delete g["160"];
 
-  // 6. Proceso de LoRAs dinámico
+  // 7. Proceso de LoRAs dinámico
   for(let i = 0; i < loras.length; i++){
     const loraObj = loras[i];
     const name = loraObj ? loraObj.lora : "";
