@@ -3859,7 +3859,7 @@ function buildGraph(){
         model: [currentModelNode, 0],
         max_resolution: 1024,
         jpeg_quality: 85,
-        suppress_default_preview: false,
+        suppress_default_preview: true,
         preview_frames: 1,
         preview_fps: 12,
         tiny_vae: (hasTaeH3 && prevMethod !== "latent2rgb") ? "taeh3.safetensors" : "none"
@@ -4388,7 +4388,7 @@ async function runSingleGeneration(index) {
           body:JSON.stringify({
             prompt:graph,
             client_id:CLIENT_ID,
-            extra_data: { preview_method: getPreviewMethod() }
+            extra_data: { preview_method: (getPreviewMethod() === "none" ? "none" : "latent2rgb") }
           })
         });
         if(!r.ok){
