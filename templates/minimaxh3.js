@@ -945,13 +945,21 @@ $("stepsSlider")?.addEventListener("input",(e)=>{$("stepsVal").textContent=e.tar
 $("mpSlider").addEventListener("input",()=>{recalcResolution();});
 $("duration").addEventListener("input",updateDurationHints);
 
+function alignFrameCount(n){
+  let f = Math.max(5, Math.round(n));
+  while(f % 17 !== 5){
+    f++;
+  }
+  return f;
+}
+
 function updateDurationHints(){
   const dur = parseFloat($("duration").value || "0");
-  const frames = Math.max(5, Math.round(dur * 24));
-  // El ComfyMathExpression del grafo: max(5, round(a*24)) + (5 - (max(5, round(a*24)) % 17)) % 17
-  const adjusted = frames + ((5 - (frames % 17)) % 17);
+  const rawFrames = Math.max(5, Math.round(dur * 24));
+  const adjusted = alignFrameCount(rawFrames);
+  const effectiveSec = (adjusted / 24).toFixed(2);
   $("durHint").textContent = `(${dur}s)`;
-  $("framesHint").textContent = `(${adjusted} / 24fps = ${(adjusted/24).toFixed(1)}s)`;
+  $("framesHint").textContent = `(${adjusted} / 24fps = ${effectiveSec}s)`;
   $("frames").value = adjusted;
 }
 
