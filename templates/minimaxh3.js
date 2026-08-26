@@ -11,14 +11,15 @@ const CONFIG = {
   DEFAULT_MODEL: "",
   DEFAULT_VAE: "Checkpoint",
   N: {
-    IMAGE_FIRST:"114", IMAGE_LAST:"121", IMG_SCALE:"119", GET_SIZE:"120",
-    UNET:"105:6", CLIP:"105:13", VAE_VIDEO:"105:11", VAE_AUDIO:"105:24",
-    LORA1:"105:127", LORA2:"105:128",
-    ATTN_BACKEND:"105:122", MEM_OPT:"105:125", SPARSE_ATTN:"105:126",
-    SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
-    SCHEDULER:"105:9", SAMPLER_SELECT:"105:17", I2V:"105:104", GUIDER:"105:16",
-    SAMPLER:"105:14", DECODE_VIDEO:"105:10", DECODE_AUDIO:"105:23",
-    RTX_SR:"105:121", CREATE_VIDEO:"105:91", SAVE:"92",
+    IMAGE_FIRST:"137", IMAGE_LAST:"137", AUDIO_FIRST:"151", AUDIO_VOL:"161",
+    PROMPT_TEXT:"138", RES_SELECTOR:"115",
+    UNET:"127", CLIP:"128", VAE_VIDEO:"119", VAE_AUDIO:"120",
+    LORA1:"145", LORA2:"145_2",
+    SPARSE_ATTN:"158", SIGMA_SHIFT:"159", MEM_OPT:"164", SPECTRUM:"162",
+    ATTN_BACKEND:"147", NOISE:"129", DURATION:"132", MATH:"131",
+    SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
+    SAMPLER:"125", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
+    RTX_SR:"148", CREATE_VIDEO:"130", SAVE:"92",
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -757,14 +758,22 @@ function applyWorkflow(workflow, opts={}){
     return out;
   }
 
-  // Prompt: nodo MiniMaxH3ImageToVideo tiene inputs.prompt (string directo)
+  // Prompt: MiniMaxH3ReferenceToVideo / MiniMaxH3ImageToVideo / PrimitiveStringMultiline
+  const ref2vNode = findByClass("MiniMaxH3ReferenceToVideo");
   const i2vNode = findByClass("MiniMaxH3ImageToVideo");
-  if(i2vNode && i2vNode.inputs && typeof i2vNode.inputs.prompt === "string"){
-    $("prompt").value = i2vNode.inputs.prompt;
-    setApplied("prompt");
-  } else {
-    setMissing("prompt");
+  const strNode = findByClass("PrimitiveStringMultiline");
+  let promptFound = false;
+  if(strNode && strNode.inputs && typeof strNode.inputs.value === "string" && strNode.inputs.value.trim()){
+    $("prompt").value = strNode.inputs.value.trim();
+    promptFound = true;
+  } else if(ref2vNode && ref2vNode.inputs && typeof ref2vNode.inputs.prompt === "string" && ref2vNode.inputs.prompt.trim()){
+    $("prompt").value = ref2vNode.inputs.prompt.trim();
+    promptFound = true;
+  } else if(i2vNode && i2vNode.inputs && typeof i2vNode.inputs.prompt === "string" && i2vNode.inputs.prompt.trim()){
+    $("prompt").value = i2vNode.inputs.prompt.trim();
+    promptFound = true;
   }
+  if(promptFound) setApplied("prompt"); else setMissing("prompt");
 
   // Modo i2v/flf2v: si el nodo tiene last_frame referencia a LoadImage y no es
   // igual a first_frame, es flf2v.
@@ -1308,79 +1317,50 @@ async function ensureImagesUploaded(){
 
 function buildGraph(){
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
+
   // Prompt
-  if($("prompt").value.trim()) g[N.I2V].inputs.prompt = $("prompt").value.trim();
-  // Seed
+  const pVal = $("prompt").value.trim();
+  if(pVal){
+    if(g[N.PROMPT_TEXT] && g[N.PROMPT_TEXT].inputs) g[N.PROMPT_TEXT].inputs.value = pVal;
+    if(g[N.REF2V] && g[N.REF2V].inputs) g[N.REF2V].inputs.prompt = pVal;
+  }
+
+  // Seed (RandomNoise node 129)
   g[N.NOISE].inputs.noise_seed = (seedMode === "random") ? -1 : parseInt($("seedVal").value, 10);
-  // Megapixels & Resolution
+
+  // Resolution & Megapixels
   const w = parseInt($("width").value || "1120", 10);
   const h = parseInt($("height").value || "640", 10);
-  if(g[N.IMG_SCALE] && g[N.IMG_SCALE].inputs) g[N.IMG_SCALE].inputs.megapixels = parseFloat($("mpSlider").value);
-  if(g[N.I2V] && g[N.I2V].inputs){
-    g[N.I2V].inputs.width = w;
-    g[N.I2V].inputs.height = h;
+  if(g[N.RES_SELECTOR] && g[N.RES_SELECTOR].inputs){
+    g[N.RES_SELECTOR].inputs.megapixels = parseFloat($("mpSlider").value || "0.7");
+    g[N.RES_SELECTOR].inputs.aspect_ratio = (arMode === "16:9") ? "16:9 (Widescreen)" : "16:9 (Widescreen)";
   }
-  // Duración (segundos) → nodo PrimitiveFloat
+  if(g[N.REF2V] && g[N.REF2V].inputs){
+    g[N.REF2V].inputs.width = w;
+    g[N.REF2V].inputs.height = h;
+  }
+
+  // Duración (segundos) → nodo PrimitiveFloat 132
   g[N.DURATION].inputs.value = parseFloat($("duration").value || "10");
-  // UNet
+
+  // UNet & CLIP
   if(g[N.UNET] && g[N.UNET].inputs) g[N.UNET].inputs.unet_name = $("unetSelect").value;
-  // CLIP
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
 
-  // Model Pipeline: UNet -> LoRAs -> ModelAttentionBackend -> H3 Memory -> H3 Sparse -> Spectrum -> Sampler
+  // Imagen de referencia (LoadImage node 137)
+  if(uploadedFirstImage && g[N.IMAGE_FIRST]){
+    g[N.IMAGE_FIRST].inputs.image = uploadedFirstImage.name;
+    if(g[N.REF2V] && g[N.REF2V].inputs){
+      g[N.REF2V].inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+    }
+  }
+
+  // Pipeline de Modelo:
+  // UNET (127) -> SparseAttn (158) -> SigmaShift (159) -> MemOpt (164) -> Spectrum (162) -> AttnBackend (147) -> LoRAs -> Scheduler (124) & Guider (126)
   let currentModelNode = N.UNET;
 
-  // Proceso de LoRAs con bypass dinámico y resolución de nombres
-  const loraNodes = [N.LORA1, N.LORA2];
-  for(let i = 0; i < loraNodes.length; i++){
-    const nodeKey = loraNodes[i];
-    if(!g[nodeKey]) continue;
-    const loraObj = loras[i];
-    const name = loraObj ? loraObj.lora : "";
-
-    let resolvedName = name;
-    let exists = false;
-    if(name && typeof AVAILABLE_LORAS !== "undefined"){
-      const targetBase = name.replace(/^.*\//, "").toLowerCase();
-      const matched = AVAILABLE_LORAS.find(al => al.replace(/^.*\//, "").toLowerCase() === targetBase || al === name);
-      if(matched){
-        resolvedName = matched;
-        exists = true;
-      }
-    }
-
-    const shouldBypass = !loraObj || !loraObj.on || !exists || !resolvedName;
-    if(shouldBypass){
-      delete g[nodeKey];
-    } else {
-      g[nodeKey].inputs.model = [currentModelNode, 0];
-      g[nodeKey].inputs.lora_name = resolvedName;
-      g[nodeKey].inputs.strength_model = (typeof loraObj.strength === "number") ? loraObj.strength : 1.0;
-      currentModelNode = nodeKey;
-    }
-  }
-
-  // Model Attention Backend & H3 Optimizations
+  // 1. Sparse Attention
   const h3opt = getH3OptState();
-
-  // 1. ModelAttentionBackend
-  if(g[N.ATTN_BACKEND]){
-    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
-    g[N.ATTN_BACKEND].inputs.attention = "comfy kitchen attention";
-    currentModelNode = N.ATTN_BACKEND;
-  }
-
-  // 2. H3MemoryOptimization
-  if(h3opt.memOptEnabled && g[N.MEM_OPT]){
-    g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
-    g[N.MEM_OPT].inputs.qkv_streaming_mode = "Auto";
-    g[N.MEM_OPT].inputs.precision_mode = "Auto";
-    currentModelNode = N.MEM_OPT;
-  } else if(!h3opt.memOptEnabled && g[N.MEM_OPT]){
-    delete g[N.MEM_OPT];
-  }
-
-  // 3. H3SparseAttention
   if(h3opt.sparseEnabled && g[N.SPARSE_ATTN]){
     g[N.SPARSE_ATTN].inputs.model = [currentModelNode, 0];
     g[N.SPARSE_ATTN].inputs.video_budget = h3opt.videoBudget;
@@ -1390,28 +1370,25 @@ function buildGraph(){
     delete g[N.SPARSE_ATTN];
   }
 
-  // 4. Model Preview Override con taeh3 (Tiny VAE live preview)
-  const prevMethod = getPreviewMethod();
-  const hasTaeH3 = (typeof AVAILABLE_VAES !== "undefined" && AVAILABLE_VAES.some(v => v.toLowerCase().includes("taeh3")));
-  if(prevMethod !== "none"){
-    const previewOverrideKey = "105:130";
-    g[previewOverrideKey] = {
-      class_type: "ModelPreviewOverrideKJ",
-      inputs: {
-        model: [currentModelNode, 0],
-        max_resolution: 1024,
-        jpeg_quality: 85,
-        suppress_default_preview: true,
-        preview_frames: 1,
-        preview_fps: 12,
-        tiny_vae: (hasTaeH3 && prevMethod !== "latent2rgb") ? "taeh3.safetensors" : "none"
-      },
-      _meta: { title: "Model Preview Override (taeh3)" }
-    };
-    currentModelNode = previewOverrideKey;
+  // 2. Sigma Shift (MiniMaxH3SigmaShift)
+  if(g[N.SIGMA_SHIFT]){
+    g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
+    g[N.SIGMA_SHIFT].inputs.shift_video = 8;
+    g[N.SIGMA_SHIFT].inputs.shift_audio = 3;
+    currentModelNode = N.SIGMA_SHIFT;
   }
 
-  // 5. Spectrum
+  // 3. Memory Optimization
+  if(h3opt.memOptEnabled && g[N.MEM_OPT]){
+    g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+    g[N.MEM_OPT].inputs.qkv_streaming_mode = "Auto";
+    g[N.MEM_OPT].inputs.precision_mode = "Auto";
+    currentModelNode = N.MEM_OPT;
+  } else if(!h3opt.memOptEnabled && g[N.MEM_OPT]){
+    delete g[N.MEM_OPT];
+  }
+
+  // 4. Spectrum
   if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
     const s = getSpectrumState();
     g[N.SPECTRUM].inputs.model = [currentModelNode, 0];
@@ -1422,31 +1399,67 @@ function buildGraph(){
     g[N.SPECTRUM].inputs.history_storage = s.historyStorage;
     currentModelNode = N.SPECTRUM;
   }
-  // Scheduler conectado a currentModelNode
+
+  // 5. Model Attention Backend
+  if(g[N.ATTN_BACKEND]){
+    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
+    g[N.ATTN_BACKEND].inputs.attention = "comfy kitchen attention";
+    currentModelNode = N.ATTN_BACKEND;
+  }
+
+  // Limpiar nodos de switch estáticos no necesarios de la plantilla
+  delete g["141"]; delete g["142"]; delete g["143"]; delete g["144"]; delete g["146"];
+  delete g["156"]; delete g["157"]; delete g["160"];
+
+  // 6. Proceso de LoRAs dinámico
+  for(let i = 0; i < loras.length; i++){
+    const loraObj = loras[i];
+    const name = loraObj ? loraObj.lora : "";
+    let resolvedName = name;
+    let exists = false;
+    if(name && typeof AVAILABLE_LORAS !== "undefined"){
+      const targetBase = name.replace(/^.*\//, "").toLowerCase();
+      const matched = AVAILABLE_LORAS.find(al => al.replace(/^.*\//, "").toLowerCase() === targetBase || al === name);
+      if(matched){ resolvedName = matched; exists = true; }
+    }
+    const shouldBypass = !loraObj || !loraObj.on || !exists || !resolvedName;
+    if(shouldBypass){
+      if(i === 0) delete g[N.LORA1];
+    } else {
+      const nodeKey = (i === 0) ? N.LORA1 : "145_2";
+      g[nodeKey] = {
+        class_type: "LoraLoaderModelOnly",
+        inputs: {
+          model: [currentModelNode, 0],
+          lora_name: resolvedName,
+          strength_model: (typeof loraObj.strength === "number") ? loraObj.strength : 1.0
+        },
+        _meta: { title: `Load LoRA ${i+1}` }
+      };
+      currentModelNode = nodeKey;
+    }
+  }
+
+  // 7. Scheduler y Guider conectados a currentModelNode
   if(g[N.SCHEDULER] && g[N.SCHEDULER].inputs){
     g[N.SCHEDULER].inputs.model = [currentModelNode, 0];
     g[N.SCHEDULER].inputs.scheduler = $("schedulerName").value;
     g[N.SCHEDULER].inputs.steps = parseInt($("stepsSlider").value || "20", 10);
   }
-  // Bit depth
+  if(g[N.GUIDER] && g[N.GUIDER].inputs){
+    g[N.GUIDER].inputs.model = [currentModelNode, 0];
+    if(g[N.REF2V]) g[N.GUIDER].inputs.conditioning = [N.REF2V, 0];
+  }
+
+  // 8. Sampler
+  if(g[N.SAMPLER_SELECT] && g[N.SAMPLER_SELECT].inputs){
+    g[N.SAMPLER_SELECT].inputs.sampler_name = $("samplerName").value;
+  }
+
+  // 9. Bit depth en CreateVideo
   const bitDepth = getBitDepth();
-  if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs) g[N.CREATE_VIDEO].inputs.bit_depth = bitDepth;
-
-  // Imagen de inicio (first_frame)
-  if(uploadedFirstImage) g[N.IMAGE_FIRST].inputs.image = uploadedFirstImage.name;
-
-  // Modo i2v vs flf2v
-  if(currentMode === "flf2v" && uploadedLastImage){
-    // Ambos frames (FLF2V): ancla frame 0 a first_frame y frame N-1 a last_frame.
-    g[N.IMAGE_LAST].inputs.image = uploadedLastImage.name;
-    g[N.I2V].inputs.first_frame = [N.IMAGE_FIRST, 0];
-    g[N.I2V].inputs.last_frame = [N.IMAGE_LAST, 0];
-  } else {
-    // Modo I2V puro: solo primer frame (ancla en frame 0).
-    // Se elimina last_frame para que el vídeo evolucione libremente y no se obligue a terminar en el frame inicial.
-    g[N.I2V].inputs.first_frame = [N.IMAGE_FIRST, 0];
-    delete g[N.I2V].inputs.last_frame;
-    delete g[N.IMAGE_LAST];
+  if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
+    g[N.CREATE_VIDEO].inputs.bit_depth = bitDepth;
   }
 
   return g;

@@ -6,7 +6,7 @@ from generar_common import generate_html
 # original del autor. Sobrescríbelas si tu instalación está en otro sitio:
 #   MINIMAXH3_JSON, MINIMAXH3_OUTPUT_HTML, MINIMAXH3_UNET_DIR,
 #   MINIMAXH3_UNET_PREFIX, MINIMAXH3_CLIP_DIR.
-JSON_FILE = os.environ.get("MINIMAXH3_JSON", "MiniMaxH3_I2V.json")
+JSON_FILE = os.environ.get("MINIMAXH3_JSON", "MiniMax_H3_Prewiews_OK.json")
 OUTPUT_HTML = os.environ.get("MINIMAXH3_OUTPUT_HTML", "MiniMaxH3_WebUI.html")
 UNET_DIR = os.environ.get("MINIMAXH3_UNET_DIR", "/home/tonetxo/SwarmUI/Models/diffusion_models")
 UNET_PREFIX = os.environ.get("MINIMAXH3_UNET_PREFIX", "Ligazón para diffusion_models")

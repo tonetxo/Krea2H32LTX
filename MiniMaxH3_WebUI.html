@@ -450,9 +450,10 @@ const BASE_GRAPH = {
     "inputs": {
       "filename_prefix": "video/MiniMax_H3",
       "format": "auto",
+      "format.codec": "auto",
       "codec": "auto",
       "video": [
-        "105:91",
+        "130",
         0
       ]
     },
@@ -461,70 +462,68 @@ const BASE_GRAPH = {
       "title": "Save Video"
     }
   },
-  "114": {
+  "115": {
     "inputs": {
-      "image": "2058007-A photorealistic, cinematic 35 mm film c-pornmasterPro_realismILV4.png"
+      "aspect_ratio": "16:9 (Widescreen)",
+      "megapixels": 0.7,
+      "multiple": 32
     },
-    "class_type": "LoadImage",
+    "class_type": "ResolutionSelector",
     "_meta": {
-      "title": "Load Image"
+      "title": "Resolution Selector (Size)"
     }
   },
   "119": {
     "inputs": {
-      "upscale_method": "nearest-exact",
-      "megapixels": 0.7,
-      "resolution_steps": 32,
-      "image": [
-        "114",
-        0
-      ]
+      "vae_name": "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors"
     },
-    "class_type": "ImageScaleToTotalPixels",
+    "class_type": "VAELoader",
     "_meta": {
-      "title": "Scale Image to Total Pixels"
+      "title": "Load VAE"
     }
   },
   "120": {
     "inputs": {
-      "image": [
-        "119",
-        0
-      ]
+      "vae_name": "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors"
     },
-    "class_type": "GetImageSize",
+    "class_type": "VAELoader",
     "_meta": {
-      "title": "Get Image Size"
+      "title": "Load VAE"
     }
   },
   "121": {
     "inputs": {
-      "image": "2058005-A photorealistic, cinematic 35 mm film c-pornmasterPro_realismILV4.png"
+      "samples": [
+        "125",
+        0
+      ],
+      "vae": [
+        "120",
+        0
+      ]
     },
-    "class_type": "LoadImage",
+    "class_type": "VAEDecodeAudio",
     "_meta": {
-      "title": "Load Image"
+      "title": "VAE Decode Audio"
     }
   },
-  "105:11": {
+  "122": {
     "inputs": {
-      "vae_name": "Ligazón para VAE/MiniMaxH3/minimax_h3_video_vae_fp16.safetensors"
+      "samples": [
+        "125",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ]
     },
-    "class_type": "VAELoader",
+    "class_type": "VAEDecode",
     "_meta": {
-      "title": "Load VAE"
+      "title": "VAE Decode"
     }
   },
-  "105:24": {
-    "inputs": {
-      "vae_name": "Ligazón para VAE/MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors"
-    },
-    "class_type": "VAELoader",
-    "_meta": {
-      "title": "Load VAE"
-    }
-  },
-  "105:17": {
+  "123": {
     "inputs": {
       "sampler_name": "res_multistep"
     },
@@ -533,9 +532,71 @@ const BASE_GRAPH = {
       "title": "KSamplerSelect"
     }
   },
-  "105:6": {
+  "124": {
     "inputs": {
-      "unet_name": "Ligazón para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "scheduler": "simple",
+      "steps": [
+        "142",
+        0
+      ],
+      "denoise": 1,
+      "model": [
+        "147",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "BasicScheduler"
+    }
+  },
+  "125": {
+    "inputs": {
+      "noise": [
+        "129",
+        0
+      ],
+      "guider": [
+        "126",
+        0
+      ],
+      "sampler": [
+        "123",
+        0
+      ],
+      "sigmas": [
+        "124",
+        0
+      ],
+      "latent_image": [
+        "136",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "126": {
+    "inputs": {
+      "model": [
+        "141",
+        0
+      ],
+      "conditioning": [
+        "136",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Basic Guider"
+    }
+  },
+  "127": {
+    "inputs": {
+      "unet_name": "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -543,7 +604,7 @@ const BASE_GRAPH = {
       "title": "Load Diffusion Model"
     }
   },
-  "105:13": {
+  "128": {
     "inputs": {
       "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
       "type": "minimax",
@@ -554,103 +615,39 @@ const BASE_GRAPH = {
       "title": "Load CLIP"
     }
   },
-  "105:15": {
+  "129": {
     "inputs": {
-      "noise_seed": 621120923979368
+      "noise_seed": 533875991249741
     },
     "class_type": "RandomNoise",
     "_meta": {
       "title": "RandomNoise"
     }
   },
-  "105:111": {
+  "130": {
     "inputs": {
-      "value": 10
-    },
-    "class_type": "PrimitiveFloat",
-    "_meta": {
-      "title": "Float (duration)"
-    }
-  },
-  "105:127": {
-    "inputs": {
-      "lora_name": "Ligazón para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors",
-      "strength_model": 1,
-      "model": [
-        "105:6",
+      "fps": 24,
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "images": [
+        "148",
+        0
+      ],
+      "audio": [
+        "121",
         0
       ]
     },
-    "class_type": "LoraLoaderModelOnly",
+    "class_type": "CreateVideo",
     "_meta": {
-      "title": "Load LoRA (Turbo)"
+      "title": "Create Video"
     }
   },
-  "105:128": {
-    "inputs": {
-      "lora_name": "",
-      "strength_model": 1,
-      "model": [
-        "105:127",
-        0
-      ]
-    },
-    "class_type": "LoraLoaderModelOnly",
-    "_meta": {
-      "title": "Load LoRA 2"
-    }
-  },
-  "105:122": {
-    "inputs": {
-      "attention": "comfy kitchen attention",
-      "model": [
-        "105:128",
-        0
-      ]
-    },
-    "class_type": "ModelAttentionBackend",
-    "_meta": {
-      "title": "ModelAttentionBackend"
-    }
-  },
-  "105:125": {
-    "inputs": {
-      "chunk_rows": 4096,
-      "fused_qkv": "auto",
-      "mlp_memory": "auto",
-      "precision_mode": "Auto",
-      "preserve_precision": true,
-      "qkv_streaming_mode": "Auto",
-      "model": [
-        "105:122",
-        0
-      ]
-    },
-    "class_type": "H3MemoryOptimization",
-    "_meta": {
-      "title": "H3 Memory Optimization"
-    }
-  },
-  "105:126": {
-    "inputs": {
-      "denser_early_late_steps": false,
-      "layer_video_budgets": "",
-      "video_budget": 0.3,
-      "model": [
-        "105:125",
-        0
-      ]
-    },
-    "class_type": "H3SparseAttention",
-    "_meta": {
-      "title": "H3 Sparse Attention"
-    }
-  },
-  "105:107": {
+  "131": {
     "inputs": {
       "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
       "values.a": [
-        "105:111",
+        "132",
         0
       ]
     },
@@ -659,164 +656,179 @@ const BASE_GRAPH = {
       "title": "Math Expression"
     }
   },
-  "105:124": {
+  "132": {
     "inputs": {
-      "enabled": true,
-      "blend_weight": 0.5,
-      "degree": 4,
-      "ridge_lambda": 0.1,
-      "window_size": 2.0,
-      "flex_window": 0.75,
-      "warmup_steps": 5,
-      "tail_actual_steps": 1,
-      "max_history": 8,
-      "debug": false,
-      "history_storage": "system_ram",
-      "model": [
-        "105:126",
-        0
-      ]
+      "value": 12
     },
-    "class_type": "SpectrumApplyMiniMaxH3",
+    "class_type": "PrimitiveFloat",
     "_meta": {
-      "title": "Spectrum Apply MiniMax H3"
+      "title": "Float (Duration)"
     }
   },
-  "105:9": {
+  "136": {
     "inputs": {
-      "scheduler": "simple",
-      "steps": 20,
-      "denoise": 1,
-      "model": [
-        "105:124",
+      "prompt": [
+        "157",
         0
-      ]
-    },
-    "class_type": "BasicScheduler",
-    "_meta": {
-      "title": "BasicScheduler"
-    }
-  },
-  "105:104": {
-    "inputs": {
-      "prompt": "The scene opens on a sun-drenched beach at golden hour, where a woman with tousled, chin-length brunette hair kneels on warm, damp sand at the water's edge. She wears a minimalist black bikini and several delicate gold necklaces that catch the low light, along with thin gold bracelets on her wrist. The ocean stretches behind her in a soft gradient of turquoise and deep blue, with gentle white-capped waves rolling in. Her skin glows with a warm tan, dusted lightly with grains of sand. The camera initially captures her in a three-quarter profile as she glances back over her right shoulder, her expression calm yet purposeful, lips slightly parted. She lowers her gaze forward and begins to crawl on all fours, her hands sinking into the wet sand as she shifts her weight onto her palms. Her right arm extends first, fingers splaying and pressing into the soft ground, followed by a deliberate drag of her right knee forward, leaving a shallow indentation in the sand. She repeats the motion with her left arm and left knee, her hips swaying in a slow, fluid rhythm with each deliberate movement. Her bare feet flex and push off behind her, toes curling into the sand with each step, sending tiny sprays of grains scattering backward. The thin straps of her bikini shift subtly with the motion of her shoulders and back muscles, the delicate chain of her necklaces swaying gently against her collarbone. The camera repositions smoothly behind her, now framing her from the rear as instructed, tracking her slow, deliberate crawl toward the shoreline. The perspective captures the gentle curve of her spine, the rhythmic rise and fall of her hips, and the way her hands press forward into the wet sand. The incoming waves lap closer, the foam creeping toward her knees. A small wave reaches her shins, swirling around her ankles with a soft hiss before retreating. She pauses briefly, her fingers curling into the sand, and then continues her advance, each movement steady and unhurried, her body language suggesting quiet determination or perhaps reverent approach toward the sea. The ambient soundscape is dominated by the rhythmic wash of waves rolling onto shore, a soft and continuous hush punctuated by the gentle bubbling of receding foam. Fine, wet sand emits a faint squelching sound beneath her palms and knees with each forward motion. The breeze carries a distant cry of seabirds and the low, almost subliminal hum of the ocean's undertow. A subtle, melancholic ambient pad gradually fades in, featuring a slow, descending piano melody in a minor key, underscored by a deep, sustained cello note that mirrors the slow, meditative pace of her crawling. The overall mood is contemplative, intimate, and quietly cinematic, bathed in the warm amber glow of late afternoon light reflecting off the wet sand.",
+      ],
       "width": [
-        "120",
+        "115",
         0
       ],
       "height": [
-        "120",
+        "115",
         1
       ],
       "length": [
-        "105:107",
+        "131",
         1
       ],
+      "ref_image_size": "match",
       "clip": [
-        "105:13",
+        "128",
         0
       ],
       "vae": [
-        "105:11",
+        "119",
         0
       ],
-      "first_frame": [
-        "114",
+      "audio_vae": [
+        "120",
         0
       ],
-      "last_frame": [
-        "121",
+      "ref_images.ref_image_0": [
+        "137",
+        0
+      ],
+      "ref_video_audios.ref_video_audio_0": [
+        "161",
         0
       ]
     },
-    "class_type": "MiniMaxH3ImageToVideo",
+    "class_type": "MiniMaxH3ReferenceToVideo",
     "_meta": {
-      "title": "MiniMax H3 Image to Video"
+      "title": "MiniMax H3 Reference to Video"
     }
   },
-  "105:16": {
+  "137": {
     "inputs": {
+      "image": "imaxe (79).png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "138": {
+    "inputs": {
+      "value": "{\n  \"primary_actions\": [\n    {\n      \"time_range\": \"0.0-2.0\",\n      \"description\": \"Urco initiates violent full-body shake: head snaps left-right, torso twists, hindquarters follow in wave motion. Chains slack then snap taut. Water droplets eject radially from fur at high velocity.\"\n    },\n    {\n      \"time_range\": \"2.0-3.5\",\n      \"description\": \"Octopus enters frame from upper left (dislodged by shake), travels in ballistic arc. Impacts Urco's snout/eye region with visible deformation. Suction cups engage sequentially with audible timing.\"\n    },\n    {\n      \"time_range\": \"3.5-7.0\",\n      \"description\": \"Urco blinded: spins clockwise on forepaws, hind legs scrabbling on wet granite. Chains whip horizontally at head height, carving arcs through spray. Paws impact rocks with audible thuds. Body weight shifts violently side-to-side.\"\n    },\n    {\n      \"time_range\": \"7.0-10.5\",\n      \"description\": \"Percebeiro reacts: initial backward stumble, then lateral sprint along rock ridge. Leaps over low-swinging chain link (0.5m clearance). Slips on algae-slick rock, recovers with hand plant. Dodges second chain whip by dropping prone.\"\n    },\n    {\n      \"time_range\": \"10.5-12.0\",\n      \"description\": \"Urco crashes sideways into boulder, chain anchor point groans. Percebeiro scrambles up incline away from surf line.\"\n    }\n  ],\n  \"subject_motion\": {\n    \"urco\": \"0-2s: Rotational shake axis along spine, frequency ~4Hz, amplitude decaying. 2-3.5s: Head snap-back on impact, eyes clamp shut. 3.5-7s: Continuous spin ~90deg/sec, center of mass orbits 1.5m radius. Chains describe figure-8 patterns. 7-12s: Momentum carries into boulder collision, rebound, partial collapse.\",\n    \"percebeiro\": \"0-3.5s: Static tension, weight on balls of feet. 3.5-7s: Micro-adjustments tracking Urco. 7-10.5s: Explosive lateral displacement 3m, vertical leap 0.8m, prone drop 1.2m, scramble 2m uphill. Limbs splay for friction on wet rock.\",\n    \"octopus\": \"2.0-3.5s: Rigid-body tumble 2 rev/sec. Impact: mantle compresses 40%, arms splay radially. 3.5-7s: Arms adhere sequentially (0.1s intervals), mantle pulses. Chromatophores flash maroon-to-pale.\"\n  },\n  \"environmental_motion\": {\n    \"waves\": \"Breaking on offshore reef: 3 major impacts at 1.2s, 4.8s, 9.1s. Whitewater plumes rise 8m, fall as sheet spray.\",\n    \"spray\": \"Wind-driven horizontal sheets at 15m/s. Droplet size 0.5-3mm. Accumulates on lens as partial occlusion 4-6s.\",\n    \"rocks\": \"Static. Surface water films flow downhill 0.2m/s. Algae patches undulate in surge.\",\n    \"sky\": \"Cloud bases lower 50m over 12s. Stratocumulus bands rotate cyclonically slow.\"\n  },\n  \"particle_motion\": {\n    \"shake_droplets\": \"0-2.5s: 5000+ droplets 1-4mm, initial velocity 12m/s radial. Ballistic arcs 2-3m. Catch backlight.\",\n    \"impact_spray\": \"2.5-3.5s: Octopus impact ejecta - mucus-water mix, high viscosity strands 10cm long.\",\n    \"chain_spray\": \"3.5-10s: Chain links fling bound water in tight spirals. Droplets 2mm, velocity 8m/s tangential.\",\n    \"surf_aerosol\": \"Continuous: Sub-100um salt nuclei in suspension. Visibility 30m at camera height.\"\n  },\n  \"lighting_motion\": {\n    \"ambient\": \"Global illuminance drops 15% over 12s (cloud thickening). Color temp shifts 5500K->5000K.\",\n    \"specular\": \"Wet fur highlights track body rotation. Chain links flash point-reflections at 3.5s, 5.2s, 7.8s. Octopus mantle catches highlight at 3.0s.\",\n    \"shadow\": \"Urco's shadow sweeps rocks during spin. Penumbra softens as cloud thickens.\"\n  },\n  \"camera_motion\": {\n    \"0-3.5s\": \"Static low tripod (0.4m height), 24mm equiv. Slight micro-jitter (0.5px) from wind.\",\n    \"3.5-7s\": \"Pan right 25deg at 7deg/sec tracking Percebeiro. Tilt up 5deg to include chain arcs.\",\n    \"7-10.5s\": \"Handheld follow: dolly left 1.5m at 0.4m/s, yaw left 15deg. Roll ±2deg from uneven footing.\",\n    \"10.5-12s\": \"Pedestal up 0.3m, zoom 24->35mm (digital crop). Frame Urco collapse and Percebeiro escape.\"\n  },\n  \"physics_reactions\": {\n    \"chains\": \"Mass 15kg/m. Slack-to-taut transitions at 3.2s, 5.0s, 6.8s. Link collision energy dissipates as heat/sound. Anchor ring deforms rock surface <1mm.\",\n    \"fur\": \"Wet clump separation at 4Hz shake. Surface tension bridges break at 0.3s intervals. Re-clumping during spin via centrifugal mat.\",\n    \"rock_contact\": \"Paw pressure 400kPa on impact. Granite fracture risk at existing fissures. Algae shear at 0.1m/s slip.\",\n    \"octopus_adhesion\": \"Suction cup pressure differential -60kPa. Detachment force >200N per arm. Viscoelastic mucus strand failure at 15cm extension.\"\n  },\n  \"timing_beats\": [\n    \"0.0: Shake onset\",\n    \"1.2: Wave boom 1\",\n    \"2.1: Octopus launch visible\",\n    \"2.8: SPLAT impact\",\n    \"3.0: First suction pop\",\n    \"3.5: Spin initiation\",\n    \"4.8: Wave boom 2\",\n    \"5.5: Chain shriek peak\",\n    \"7.0: Percebeiro flight\",\n    \"7.3: Chain leap clearance\",\n    \"8.1: Prone dodge\",\n    \"9.1: Wave boom 3\",\n    \"10.2: Boulder impact\",\n    \"11.5: Frame settle\"\n  ],\n  \"audio_events\": [\n    \"0.0-2.0: Wet fur thrash 'flap-flap-flap' 4Hz, broadband 200-2000Hz\",\n    \"1.2: Wave crash 'WHOOOOM' 50-200Hz fundamental\",\n    \"2.8: Impact 'SPLAT-SQUISH' 1k-5kHz transient\",\n    \"3.0-3.5: Suction 'pop-pop-pop-schlick' 800Hz clicks + 300Hz schlick\",\n    \"3.5-10: Chain 'CLANK-CLANK-WHOOSH-SHRIEK' 200Hz clanks, 2kHz shrieks, Doppler whoosh\",\n    \"4.8, 9.1: Wave booms\",\n    \"7.0-10.5: Footfalls 'scrape-slip-thud' on wet rock\",\n    \"0-12: Pandeireta 16th notes 180BPM, hand slaps 2&4, jingles continuous\"\n  ],\n  \"motion_constraints\": [\n    \"Urco mass ~300kg: angular acceleration limited by paw friction (mu=0.4 wet granite). Max spin 120deg/s sustained.\",\n    \"Chain length fixed at 4m visible. Anchor point immutable. No stretching.\",\n    \"Percebeiro max sprint 4m/s on dry, 1.5m/s on wet algae. Leap height limited by wetsuit restriction.\",\n    \"Octopus mass 1.5kg: ballistic trajectory calculable from launch point. No self-propulsion in air.\",\n    \"Camera rig mass 8kg: operator momentum limits pan acceleration to 30deg/s^2.\",\n    \"Water droplets obey gravity + wind (15m/s SW). No evaporation in 12s.\",\n    \"Lighting changes only via cloud motion. No artificial sources.\"\n  ]\n}"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Input Text (Prompt)"
+    }
+  },
+  "141": {
+    "inputs": {
+      "switch": [
+        "146",
+        0
+      ],
+      "on_false": [
+        "147",
+        0
+      ],
+      "on_true": [
+        "145",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "If/Else Switch (model)"
+    }
+  },
+  "142": {
+    "inputs": {
+      "switch": [
+        "146",
+        0
+      ],
+      "on_false": [
+        "143",
+        0
+      ],
+      "on_true": [
+        "144",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "If/Else Switch (Steps)"
+    }
+  },
+  "143": {
+    "inputs": {
+      "value": 20
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Int (Full)"
+    }
+  },
+  "144": {
+    "inputs": {
+      "value": 12
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Int (Lightning LoRA)"
+    }
+  },
+  "145": {
+    "inputs": {
+      "lora_name": "h3/minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+      "strength_model": 1,
       "model": [
-        "105:124",
-        0
-      ],
-      "conditioning": [
-        "105:104",
+        "147",
         0
       ]
     },
-    "class_type": "BasicGuider",
+    "class_type": "LoraLoaderModelOnly",
     "_meta": {
-      "title": "Basic Guider"
+      "title": "Load LoRA"
     }
   },
-  "105:14": {
+  "146": {
     "inputs": {
-      "noise": [
-        "105:15",
-        0
-      ],
-      "guider": [
-        "105:16",
-        0
-      ],
-      "sampler": [
-        "105:17",
-        0
-      ],
-      "sigmas": [
-        "105:9",
-        0
-      ],
-      "latent_image": [
-        "105:104",
-        1
-      ]
+      "value": true
     },
-    "class_type": "SamplerCustomAdvanced",
+    "class_type": "PrimitiveBoolean",
     "_meta": {
-      "title": "SamplerCustomAdvanced"
+      "title": "Boolean (Enable Lightning LoRA)"
     }
   },
-  "105:23": {
+  "147": {
     "inputs": {
-      "samples": [
-        "105:14",
-        0
-      ],
-      "vae": [
-        "105:24",
+      "attention": "comfy kitchen attention",
+      "model": [
+        "162",
         0
       ]
     },
-    "class_type": "VAEDecodeAudio",
+    "class_type": "ModelAttentionBackend",
     "_meta": {
-      "title": "VAE Decode Audio"
+      "title": "ModelAttentionBackend"
     }
   },
-  "105:10": {
-    "inputs": {
-      "samples": [
-        "105:14",
-        0
-      ],
-      "vae": [
-        "105:11",
-        0
-      ]
-    },
-    "class_type": "VAEDecode",
-    "_meta": {
-      "title": "VAE Decode"
-    }
-  },
-  "105:121": {
+  "148": {
     "inputs": {
       "resize_type": "scale by multiplier",
       "resize_type.scale": 2,
       "quality": "ULTRA",
       "images": [
-        "105:10",
+        "122",
         0
       ]
     },
@@ -825,22 +837,157 @@ const BASE_GRAPH = {
       "title": "RTX Video Super Resolution"
     }
   },
-  "105:91": {
+  "151": {
     "inputs": {
-      "fps": 24,
-      "bit_depth": 8,
-      "images": [
-        "105:121",
+      "audio": "lofivision-wind-and-waves-307526.mp3"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "Load Audio"
+    }
+  },
+  "156": {
+    "inputs": {
+      "switch": false,
+      "on_false": [
+        "138",
         0
       ],
-      "audio": [
-        "105:23",
+      "on_true": [
+        "138",
         0
       ]
     },
-    "class_type": "CreateVideo",
+    "class_type": "ComfySwitchNode",
     "_meta": {
-      "title": "Create Video"
+      "title": "text/json"
+    }
+  },
+  "157": {
+    "inputs": {
+      "switch": false,
+      "on_false": [
+        "138",
+        0
+      ],
+      "on_true": [
+        "156",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "text/PromptStudio"
+    }
+  },
+  "158": {
+    "inputs": {
+      "video_budget": 0.3,
+      "denser_early_late_steps": false,
+      "layer_video_budgets": "",
+      "model": [
+        "127",
+        0
+      ]
+    },
+    "class_type": "H3SparseAttention",
+    "_meta": {
+      "title": "H3 Sparse Attention"
+    }
+  },
+  "159": {
+    "inputs": {
+      "shift_video": 8,
+      "shift_audio": 3,
+      "model": [
+        "158",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "ModelSamplingMiniMaxH3"
+    }
+  },
+  "160": {
+    "inputs": {
+      "text_0": "{\n  \"primary_actions\": [\n    {\n      \"time_range\": \"0.0-2.0\",\n      \"description\": \"Urco initiates violent full-body shake: head snaps left-right, torso twists, hindquarters follow in wave motion. Chains slack then snap taut. Water droplets eject radially from fur at high velocity.\"\n    },\n    {\n      \"time_range\": \"2.0-3.5\",\n      \"description\": \"Octopus enters frame from upper left (dislodged by shake), travels in ballistic arc. Impacts Urco's snout/eye region with visible deformation. Suction cups engage sequentially with audible timing.\"\n    },\n    {\n      \"time_range\": \"3.5-7.0\",\n      \"description\": \"Urco blinded: spins clockwise on forepaws, hind legs scrabbling on wet granite. Chains whip horizontally at head height, carving arcs through spray. Paws impact rocks with audible thuds. Body weight shifts violently side-to-side.\"\n    },\n    {\n      \"time_range\": \"7.0-10.5\",\n      \"description\": \"Percebeiro reacts: initial backward stumble, then lateral sprint along rock ridge. Leaps over low-swinging chain link (0.5m clearance). Slips on algae-slick rock, recovers with hand plant. Dodges second chain whip by dropping prone.\"\n    },\n    {\n      \"time_range\": \"10.5-12.0\",\n      \"description\": \"Urco crashes sideways into boulder, chain anchor point groans. Percebeiro scrambles up incline away from surf line.\"\n    }\n  ],\n  \"subject_motion\": {\n    \"urco\": \"0-2s: Rotational shake axis along spine, frequency ~4Hz, amplitude decaying. 2-3.5s: Head snap-back on impact, eyes clamp shut. 3.5-7s: Continuous spin ~90deg/sec, center of mass orbits 1.5m radius. Chains describe figure-8 patterns. 7-12s: Momentum carries into boulder collision, rebound, partial collapse.\",\n    \"percebeiro\": \"0-3.5s: Static tension, weight on balls of feet. 3.5-7s: Micro-adjustments tracking Urco. 7-10.5s: Explosive lateral displacement 3m, vertical leap 0.8m, prone drop 1.2m, scramble 2m uphill. Limbs splay for friction on wet rock.\",\n    \"octopus\": \"2.0-3.5s: Rigid-body tumble 2 rev/sec. Impact: mantle compresses 40%, arms splay radially. 3.5-7s: Arms adhere sequentially (0.1s intervals), mantle pulses. Chromatophores flash maroon-to-pale.\"\n  },\n  \"environmental_motion\": {\n    \"waves\": \"Breaking on offshore reef: 3 major impacts at 1.2s, 4.8s, 9.1s. Whitewater plumes rise 8m, fall as sheet spray.\",\n    \"spray\": \"Wind-driven horizontal sheets at 15m/s. Droplet size 0.5-3mm. Accumulates on lens as partial occlusion 4-6s.\",\n    \"rocks\": \"Static. Surface water films flow downhill 0.2m/s. Algae patches undulate in surge.\",\n    \"sky\": \"Cloud bases lower 50m over 12s. Stratocumulus bands rotate cyclonically slow.\"\n  },\n  \"particle_motion\": {\n    \"shake_droplets\": \"0-2.5s: 5000+ droplets 1-4mm, initial velocity 12m/s radial. Ballistic arcs 2-3m. Catch backlight.\",\n    \"impact_spray\": \"2.5-3.5s: Octopus impact ejecta - mucus-water mix, high viscosity strands 10cm long.\",\n    \"chain_spray\": \"3.5-10s: Chain links fling bound water in tight spirals. Droplets 2mm, velocity 8m/s tangential.\",\n    \"surf_aerosol\": \"Continuous: Sub-100um salt nuclei in suspension. Visibility 30m at camera height.\"\n  },\n  \"lighting_motion\": {\n    \"ambient\": \"Global illuminance drops 15% over 12s (cloud thickening). Color temp shifts 5500K->5000K.\",\n    \"specular\": \"Wet fur highlights track body rotation. Chain links flash point-reflections at 3.5s, 5.2s, 7.8s. Octopus mantle catches highlight at 3.0s.\",\n    \"shadow\": \"Urco's shadow sweeps rocks during spin. Penumbra softens as cloud thickens.\"\n  },\n  \"camera_motion\": {\n    \"0-3.5s\": \"Static low tripod (0.4m height), 24mm equiv. Slight micro-jitter (0.5px) from wind.\",\n    \"3.5-7s\": \"Pan right 25deg at 7deg/sec tracking Percebeiro. Tilt up 5deg to include chain arcs.\",\n    \"7-10.5s\": \"Handheld follow: dolly left 1.5m at 0.4m/s, yaw left 15deg. Roll ±2deg from uneven footing.\",\n    \"10.5-12s\": \"Pedestal up 0.3m, zoom 24->35mm (digital crop). Frame Urco collapse and Percebeiro escape.\"\n  },\n  \"physics_reactions\": {\n    \"chains\": \"Mass 15kg/m. Slack-to-taut transitions at 3.2s, 5.0s, 6.8s. Link collision energy dissipates as heat/sound. Anchor ring deforms rock surface <1mm.\",\n    \"fur\": \"Wet clump separation at 4Hz shake. Surface tension bridges break at 0.3s intervals. Re-clumping during spin via centrifugal mat.\",\n    \"rock_contact\": \"Paw pressure 400kPa on impact. Granite fracture risk at existing fissures. Algae shear at 0.1m/s slip.\",\n    \"octopus_adhesion\": \"Suction cup pressure differential -60kPa. Detachment force >200N per arm. Viscoelastic mucus strand failure at 15cm extension.\"\n  },\n  \"timing_beats\": [\n    \"0.0: Shake onset\",\n    \"1.2: Wave boom 1\",\n    \"2.1: Octopus launch visible\",\n    \"2.8: SPLAT impact\",\n    \"3.0: First suction pop\",\n    \"3.5: Spin initiation\",\n    \"4.8: Wave boom 2\",\n    \"5.5: Chain shriek peak\",\n    \"7.0: Percebeiro flight\",\n    \"7.3: Chain leap clearance\",\n    \"8.1: Prone dodge\",\n    \"9.1: Wave boom 3\",\n    \"10.2: Boulder impact\",\n    \"11.5: Frame settle\"\n  ],\n  \"audio_events\": [\n    \"0.0-2.0: Wet fur thrash 'flap-flap-flap' 4Hz, broadband 200-2000Hz\",\n    \"1.2: Wave crash 'WHOOOOM' 50-200Hz fundamental\",\n    \"2.8: Impact 'SPLAT-SQUISH' 1k-5kHz transient\",\n    \"3.0-3.5: Suction 'pop-pop-pop-schlick' 800Hz clicks + 300Hz schlick\",\n    \"3.5-10: Chain 'CLANK-CLANK-WHOOSH-SHRIEK' 200Hz clanks, 2kHz shrieks, Doppler whoosh\",\n    \"4.8, 9.1: Wave booms\",\n    \"7.0-10.5: Footfalls 'scrape-slip-thud' on wet rock\",\n    \"0-12: Pandeireta 16th notes 180BPM, hand slaps 2&4, jingles continuous\"\n  ],\n  \"motion_constraints\": [\n    \"Urco mass ~300kg: angular acceleration limited by paw friction (mu=0.4 wet granite). Max spin 120deg/s sustained.\",\n    \"Chain length fixed at 4m visible. Anchor point immutable. No stretching.\",\n    \"Percebeiro max sprint 4m/s on dry, 1.5m/s on wet algae. Leap height limited by wetsuit restriction.\",\n    \"Octopus mass 1.5kg: ballistic trajectory calculable from launch point. No self-propulsion in air.\",\n    \"Camera rig mass 8kg: operator momentum limits pan acceleration to 30deg/s^2.\",\n    \"Water droplets obey gravity + wind (15m/s SW). No evaporation in 12s.\",\n    \"Lighting changes only via cloud motion. No artificial sources.\"\n  ]\n}",
+      "text": [
+        "157",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  },
+  "161": {
+    "inputs": {
+      "volume": 3,
+      "audio": [
+        "151",
+        0
+      ]
+    },
+    "class_type": "AudioAdjustVolume",
+    "_meta": {
+      "title": "Adjust Audio Volume"
+    }
+  },
+  "162": {
+    "inputs": {
+      "enabled": false,
+      "blend_weight": 0.5,
+      "degree": 1,
+      "ridge_lambda": 0.1,
+      "window_size": 2,
+      "flex_window": 0.75,
+      "warmup_steps": 1,
+      "tail_actual_steps": 1,
+      "max_history": 8,
+      "debug": false,
+      "history_storage": "system_ram",
+      "bootstrap_first_forecast": true,
+      "anchor_residual_feedback": false,
+      "selective_rollback_correction": false,
+      "offline_smoothing_replay": true,
+      "audio_blend_weight": 0,
+      "offline_archive_storage": "system_ram",
+      "model_aware_mode": "off",
+      "model_aware_risk_threshold": 0.65,
+      "model_aware_trust_shrinkage": false,
+      "model_aware_replay_generic_correction": false,
+      "generic_correction_mode": "coordinate_rls",
+      "generic_correction_limiter": "hard_clip",
+      "generic_correction_limit": 0.4,
+      "generic_correction_attenuation": "no_attenuation",
+      "model": [
+        "164",
+        0
+      ]
+    },
+    "class_type": "SpectrumApplyMiniMaxH3",
+    "_meta": {
+      "title": "Spectrum Apply MiniMax H3"
+    }
+  },
+  "164": {
+    "inputs": {
+      "fused_qkv": "auto",
+      "mlp_memory": "auto",
+      "chunk_rows": 4096,
+      "preserve_precision": true,
+      "precision_mode": "Auto",
+      "qkv_streaming_mode": "Auto",
+      "model": [
+        "159",
+        0
+      ]
+    },
+    "class_type": "H3MemoryOptimization",
+    "_meta": {
+      "title": "H3 Memory Optimization"
     }
   }
 };
@@ -2469,14 +2616,15 @@ const CONFIG = {
   DEFAULT_MODEL: "",
   DEFAULT_VAE: "Checkpoint",
   N: {
-    IMAGE_FIRST:"114", IMAGE_LAST:"121", IMG_SCALE:"119", GET_SIZE:"120",
-    UNET:"105:6", CLIP:"105:13", VAE_VIDEO:"105:11", VAE_AUDIO:"105:24",
-    LORA1:"105:127", LORA2:"105:128",
-    ATTN_BACKEND:"105:122", MEM_OPT:"105:125", SPARSE_ATTN:"105:126",
-    SPECTRUM:"105:124", NOISE:"105:15", DURATION:"105:111", MATH:"105:107",
-    SCHEDULER:"105:9", SAMPLER_SELECT:"105:17", I2V:"105:104", GUIDER:"105:16",
-    SAMPLER:"105:14", DECODE_VIDEO:"105:10", DECODE_AUDIO:"105:23",
-    RTX_SR:"105:121", CREATE_VIDEO:"105:91", SAVE:"92",
+    IMAGE_FIRST:"137", IMAGE_LAST:"137", AUDIO_FIRST:"151", AUDIO_VOL:"161",
+    PROMPT_TEXT:"138", RES_SELECTOR:"115",
+    UNET:"127", CLIP:"128", VAE_VIDEO:"119", VAE_AUDIO:"120",
+    LORA1:"145", LORA2:"145_2",
+    SPARSE_ATTN:"158", SIGMA_SHIFT:"159", MEM_OPT:"164", SPECTRUM:"162",
+    ATTN_BACKEND:"147", NOISE:"129", DURATION:"132", MATH:"131",
+    SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
+    SAMPLER:"125", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
+    RTX_SR:"148", CREATE_VIDEO:"130", SAVE:"92",
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -3215,14 +3363,22 @@ function applyWorkflow(workflow, opts={}){
     return out;
   }
 
-  // Prompt: nodo MiniMaxH3ImageToVideo tiene inputs.prompt (string directo)
+  // Prompt: MiniMaxH3ReferenceToVideo / MiniMaxH3ImageToVideo / PrimitiveStringMultiline
+  const ref2vNode = findByClass("MiniMaxH3ReferenceToVideo");
   const i2vNode = findByClass("MiniMaxH3ImageToVideo");
-  if(i2vNode && i2vNode.inputs && typeof i2vNode.inputs.prompt === "string"){
-    $("prompt").value = i2vNode.inputs.prompt;
-    setApplied("prompt");
-  } else {
-    setMissing("prompt");
+  const strNode = findByClass("PrimitiveStringMultiline");
+  let promptFound = false;
+  if(strNode && strNode.inputs && typeof strNode.inputs.value === "string" && strNode.inputs.value.trim()){
+    $("prompt").value = strNode.inputs.value.trim();
+    promptFound = true;
+  } else if(ref2vNode && ref2vNode.inputs && typeof ref2vNode.inputs.prompt === "string" && ref2vNode.inputs.prompt.trim()){
+    $("prompt").value = ref2vNode.inputs.prompt.trim();
+    promptFound = true;
+  } else if(i2vNode && i2vNode.inputs && typeof i2vNode.inputs.prompt === "string" && i2vNode.inputs.prompt.trim()){
+    $("prompt").value = i2vNode.inputs.prompt.trim();
+    promptFound = true;
   }
+  if(promptFound) setApplied("prompt"); else setMissing("prompt");
 
   // Modo i2v/flf2v: si el nodo tiene last_frame referencia a LoadImage y no es
   // igual a first_frame, es flf2v.
@@ -3766,79 +3922,50 @@ async function ensureImagesUploaded(){
 
 function buildGraph(){
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
+
   // Prompt
-  if($("prompt").value.trim()) g[N.I2V].inputs.prompt = $("prompt").value.trim();
-  // Seed
+  const pVal = $("prompt").value.trim();
+  if(pVal){
+    if(g[N.PROMPT_TEXT] && g[N.PROMPT_TEXT].inputs) g[N.PROMPT_TEXT].inputs.value = pVal;
+    if(g[N.REF2V] && g[N.REF2V].inputs) g[N.REF2V].inputs.prompt = pVal;
+  }
+
+  // Seed (RandomNoise node 129)
   g[N.NOISE].inputs.noise_seed = (seedMode === "random") ? -1 : parseInt($("seedVal").value, 10);
-  // Megapixels & Resolution
+
+  // Resolution & Megapixels
   const w = parseInt($("width").value || "1120", 10);
   const h = parseInt($("height").value || "640", 10);
-  if(g[N.IMG_SCALE] && g[N.IMG_SCALE].inputs) g[N.IMG_SCALE].inputs.megapixels = parseFloat($("mpSlider").value);
-  if(g[N.I2V] && g[N.I2V].inputs){
-    g[N.I2V].inputs.width = w;
-    g[N.I2V].inputs.height = h;
+  if(g[N.RES_SELECTOR] && g[N.RES_SELECTOR].inputs){
+    g[N.RES_SELECTOR].inputs.megapixels = parseFloat($("mpSlider").value || "0.7");
+    g[N.RES_SELECTOR].inputs.aspect_ratio = (arMode === "16:9") ? "16:9 (Widescreen)" : "16:9 (Widescreen)";
   }
-  // Duración (segundos) → nodo PrimitiveFloat
+  if(g[N.REF2V] && g[N.REF2V].inputs){
+    g[N.REF2V].inputs.width = w;
+    g[N.REF2V].inputs.height = h;
+  }
+
+  // Duración (segundos) → nodo PrimitiveFloat 132
   g[N.DURATION].inputs.value = parseFloat($("duration").value || "10");
-  // UNet
+
+  // UNet & CLIP
   if(g[N.UNET] && g[N.UNET].inputs) g[N.UNET].inputs.unet_name = $("unetSelect").value;
-  // CLIP
   if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
 
-  // Model Pipeline: UNet -> LoRAs -> ModelAttentionBackend -> H3 Memory -> H3 Sparse -> Spectrum -> Sampler
+  // Imagen de referencia (LoadImage node 137)
+  if(uploadedFirstImage && g[N.IMAGE_FIRST]){
+    g[N.IMAGE_FIRST].inputs.image = uploadedFirstImage.name;
+    if(g[N.REF2V] && g[N.REF2V].inputs){
+      g[N.REF2V].inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+    }
+  }
+
+  // Pipeline de Modelo:
+  // UNET (127) -> SparseAttn (158) -> SigmaShift (159) -> MemOpt (164) -> Spectrum (162) -> AttnBackend (147) -> LoRAs -> Scheduler (124) & Guider (126)
   let currentModelNode = N.UNET;
 
-  // Proceso de LoRAs con bypass dinámico y resolución de nombres
-  const loraNodes = [N.LORA1, N.LORA2];
-  for(let i = 0; i < loraNodes.length; i++){
-    const nodeKey = loraNodes[i];
-    if(!g[nodeKey]) continue;
-    const loraObj = loras[i];
-    const name = loraObj ? loraObj.lora : "";
-
-    let resolvedName = name;
-    let exists = false;
-    if(name && typeof AVAILABLE_LORAS !== "undefined"){
-      const targetBase = name.replace(/^.*\//, "").toLowerCase();
-      const matched = AVAILABLE_LORAS.find(al => al.replace(/^.*\//, "").toLowerCase() === targetBase || al === name);
-      if(matched){
-        resolvedName = matched;
-        exists = true;
-      }
-    }
-
-    const shouldBypass = !loraObj || !loraObj.on || !exists || !resolvedName;
-    if(shouldBypass){
-      delete g[nodeKey];
-    } else {
-      g[nodeKey].inputs.model = [currentModelNode, 0];
-      g[nodeKey].inputs.lora_name = resolvedName;
-      g[nodeKey].inputs.strength_model = (typeof loraObj.strength === "number") ? loraObj.strength : 1.0;
-      currentModelNode = nodeKey;
-    }
-  }
-
-  // Model Attention Backend & H3 Optimizations
+  // 1. Sparse Attention
   const h3opt = getH3OptState();
-
-  // 1. ModelAttentionBackend
-  if(g[N.ATTN_BACKEND]){
-    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
-    g[N.ATTN_BACKEND].inputs.attention = "comfy kitchen attention";
-    currentModelNode = N.ATTN_BACKEND;
-  }
-
-  // 2. H3MemoryOptimization
-  if(h3opt.memOptEnabled && g[N.MEM_OPT]){
-    g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
-    g[N.MEM_OPT].inputs.qkv_streaming_mode = "Auto";
-    g[N.MEM_OPT].inputs.precision_mode = "Auto";
-    currentModelNode = N.MEM_OPT;
-  } else if(!h3opt.memOptEnabled && g[N.MEM_OPT]){
-    delete g[N.MEM_OPT];
-  }
-
-  // 3. H3SparseAttention
   if(h3opt.sparseEnabled && g[N.SPARSE_ATTN]){
     g[N.SPARSE_ATTN].inputs.model = [currentModelNode, 0];
     g[N.SPARSE_ATTN].inputs.video_budget = h3opt.videoBudget;
@@ -3848,28 +3975,25 @@ function buildGraph(){
     delete g[N.SPARSE_ATTN];
   }
 
-  // 4. Model Preview Override con taeh3 (Tiny VAE live preview)
-  const prevMethod = getPreviewMethod();
-  const hasTaeH3 = (typeof AVAILABLE_VAES !== "undefined" && AVAILABLE_VAES.some(v => v.toLowerCase().includes("taeh3")));
-  if(prevMethod !== "none"){
-    const previewOverrideKey = "105:130";
-    g[previewOverrideKey] = {
-      class_type: "ModelPreviewOverrideKJ",
-      inputs: {
-        model: [currentModelNode, 0],
-        max_resolution: 1024,
-        jpeg_quality: 85,
-        suppress_default_preview: true,
-        preview_frames: 1,
-        preview_fps: 12,
-        tiny_vae: (hasTaeH3 && prevMethod !== "latent2rgb") ? "taeh3.safetensors" : "none"
-      },
-      _meta: { title: "Model Preview Override (taeh3)" }
-    };
-    currentModelNode = previewOverrideKey;
+  // 2. Sigma Shift (MiniMaxH3SigmaShift)
+  if(g[N.SIGMA_SHIFT]){
+    g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
+    g[N.SIGMA_SHIFT].inputs.shift_video = 8;
+    g[N.SIGMA_SHIFT].inputs.shift_audio = 3;
+    currentModelNode = N.SIGMA_SHIFT;
   }
 
-  // 5. Spectrum
+  // 3. Memory Optimization
+  if(h3opt.memOptEnabled && g[N.MEM_OPT]){
+    g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+    g[N.MEM_OPT].inputs.qkv_streaming_mode = "Auto";
+    g[N.MEM_OPT].inputs.precision_mode = "Auto";
+    currentModelNode = N.MEM_OPT;
+  } else if(!h3opt.memOptEnabled && g[N.MEM_OPT]){
+    delete g[N.MEM_OPT];
+  }
+
+  // 4. Spectrum
   if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
     const s = getSpectrumState();
     g[N.SPECTRUM].inputs.model = [currentModelNode, 0];
@@ -3880,31 +4004,67 @@ function buildGraph(){
     g[N.SPECTRUM].inputs.history_storage = s.historyStorage;
     currentModelNode = N.SPECTRUM;
   }
-  // Scheduler conectado a currentModelNode
+
+  // 5. Model Attention Backend
+  if(g[N.ATTN_BACKEND]){
+    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
+    g[N.ATTN_BACKEND].inputs.attention = "comfy kitchen attention";
+    currentModelNode = N.ATTN_BACKEND;
+  }
+
+  // Limpiar nodos de switch estáticos no necesarios de la plantilla
+  delete g["141"]; delete g["142"]; delete g["143"]; delete g["144"]; delete g["146"];
+  delete g["156"]; delete g["157"]; delete g["160"];
+
+  // 6. Proceso de LoRAs dinámico
+  for(let i = 0; i < loras.length; i++){
+    const loraObj = loras[i];
+    const name = loraObj ? loraObj.lora : "";
+    let resolvedName = name;
+    let exists = false;
+    if(name && typeof AVAILABLE_LORAS !== "undefined"){
+      const targetBase = name.replace(/^.*\//, "").toLowerCase();
+      const matched = AVAILABLE_LORAS.find(al => al.replace(/^.*\//, "").toLowerCase() === targetBase || al === name);
+      if(matched){ resolvedName = matched; exists = true; }
+    }
+    const shouldBypass = !loraObj || !loraObj.on || !exists || !resolvedName;
+    if(shouldBypass){
+      if(i === 0) delete g[N.LORA1];
+    } else {
+      const nodeKey = (i === 0) ? N.LORA1 : "145_2";
+      g[nodeKey] = {
+        class_type: "LoraLoaderModelOnly",
+        inputs: {
+          model: [currentModelNode, 0],
+          lora_name: resolvedName,
+          strength_model: (typeof loraObj.strength === "number") ? loraObj.strength : 1.0
+        },
+        _meta: { title: `Load LoRA ${i+1}` }
+      };
+      currentModelNode = nodeKey;
+    }
+  }
+
+  // 7. Scheduler y Guider conectados a currentModelNode
   if(g[N.SCHEDULER] && g[N.SCHEDULER].inputs){
     g[N.SCHEDULER].inputs.model = [currentModelNode, 0];
     g[N.SCHEDULER].inputs.scheduler = $("schedulerName").value;
     g[N.SCHEDULER].inputs.steps = parseInt($("stepsSlider").value || "20", 10);
   }
-  // Bit depth
+  if(g[N.GUIDER] && g[N.GUIDER].inputs){
+    g[N.GUIDER].inputs.model = [currentModelNode, 0];
+    if(g[N.REF2V]) g[N.GUIDER].inputs.conditioning = [N.REF2V, 0];
+  }
+
+  // 8. Sampler
+  if(g[N.SAMPLER_SELECT] && g[N.SAMPLER_SELECT].inputs){
+    g[N.SAMPLER_SELECT].inputs.sampler_name = $("samplerName").value;
+  }
+
+  // 9. Bit depth en CreateVideo
   const bitDepth = getBitDepth();
-  if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs) g[N.CREATE_VIDEO].inputs.bit_depth = bitDepth;
-
-  // Imagen de inicio (first_frame)
-  if(uploadedFirstImage) g[N.IMAGE_FIRST].inputs.image = uploadedFirstImage.name;
-
-  // Modo i2v vs flf2v
-  if(currentMode === "flf2v" && uploadedLastImage){
-    // Ambos frames (FLF2V): ancla frame 0 a first_frame y frame N-1 a last_frame.
-    g[N.IMAGE_LAST].inputs.image = uploadedLastImage.name;
-    g[N.I2V].inputs.first_frame = [N.IMAGE_FIRST, 0];
-    g[N.I2V].inputs.last_frame = [N.IMAGE_LAST, 0];
-  } else {
-    // Modo I2V puro: solo primer frame (ancla en frame 0).
-    // Se elimina last_frame para que el vídeo evolucione libremente y no se obligue a terminar en el frame inicial.
-    g[N.I2V].inputs.first_frame = [N.IMAGE_FIRST, 0];
-    delete g[N.I2V].inputs.last_frame;
-    delete g[N.IMAGE_LAST];
+  if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
+    g[N.CREATE_VIDEO].inputs.bit_depth = bitDepth;
   }
 
   return g;
