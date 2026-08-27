@@ -933,8 +933,10 @@ function updateQueueUI(){
   if(clearBtn) clearBtn.disabled = count === 0;
 }
 
+let jobCounter = 0;
 function snapshotJob(){
   return {
+    id: ++jobCounter,
     prompt: $("prompt").value,
     seedMode,
     seedValue: parseInt($("seedVal").value || "12345", 10),
@@ -948,8 +950,13 @@ function snapshotJob(){
     schedulerName: $("schedulerName")?.value,
     steps: $("stepsSlider")?.value,
     bitDepth: getBitDepth(),
+    filenamePrefix: $("filenamePrefix")?.value,
     mode: currentMode,
+    h3opt: getH3OptState(),
+    sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
+    attnBackend: $("attnBackend")?.value,
+    loras: JSON.parse(JSON.stringify(loras)),
     batchSize: parseInt($("batchSize")?.value || "1", 10),
     uploadedFirstImage: uploadedFirstImage ? {...uploadedFirstImage} : null,
     uploadedLastImage: uploadedLastImage ? {...uploadedLastImage} : null,
@@ -1866,30 +1873,32 @@ async function ensureImagesUploaded(){
     const d2 = await r2.json();
     uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
     log("Último frame subido: "+uploadedLastImage.name,"l-ok");
-  } else {
-    uploadedLastImage = null;
+    job.uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
   }
 }
 
-function buildGraph(){
+function buildGraph(job){
+  const j = job || activeJob || null;
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
 
   // Prompt
-  const pVal = $("prompt").value.trim();
+  const pVal = ((j ? j.prompt : $("prompt").value) || "").trim();
   if(pVal){
     if(g[N.PROMPT_TEXT] && g[N.PROMPT_TEXT].inputs) g[N.PROMPT_TEXT].inputs.value = pVal;
     if(g[N.REF2V] && g[N.REF2V].inputs) g[N.REF2V].inputs.prompt = pVal;
   }
 
   // Seed (RandomNoise node 129)
-  g[N.NOISE].inputs.noise_seed = (seedMode === "random") ? -1 : parseInt($("seedVal").value, 10);
+  const sMode = j ? j.seedMode : seedMode;
+  const sVal = j ? j.seedValue : parseInt($("seedVal").value, 10);
+  g[N.NOISE].inputs.noise_seed = (sMode === "random") ? -1 : sVal;
 
   // Resolution & Megapixels
-  const w = parseInt($("width").value || "1120", 10);
-  const h = parseInt($("height").value || "640", 10);
+  const w = parseInt((j ? j.width : $("width").value) || "1120", 10);
+  const h = parseInt((j ? j.height : $("height").value) || "640", 10);
   if(g[N.RES_SELECTOR] && g[N.RES_SELECTOR].inputs){
-    g[N.RES_SELECTOR].inputs.megapixels = parseFloat($("mpSlider").value || "0.7");
-    g[N.RES_SELECTOR].inputs.aspect_ratio = (arMode === "16:9") ? "16:9 (Widescreen)" : "16:9 (Widescreen)";
+    g[N.RES_SELECTOR].inputs.megapixels = parseFloat((j ? j.mp : $("mpSlider").value) || "0.7");
+    g[N.RES_SELECTOR].inputs.aspect_ratio = "16:9 (Widescreen)";
   }
   if(g[N.REF2V] && g[N.REF2V].inputs){
     g[N.REF2V].inputs.width = w;
@@ -1897,15 +1906,21 @@ function buildGraph(){
   }
 
   // Duración (segundos) → nodo PrimitiveFloat 132
-  g[N.DURATION].inputs.value = parseFloat($("duration").value || "10");
+  g[N.DURATION].inputs.value = parseFloat((j ? j.duration : $("duration").value) || "10");
 
   // UNet & CLIP
-  if(g[N.UNET] && g[N.UNET].inputs) g[N.UNET].inputs.unet_name = $("unetSelect").value;
-  if(g[N.CLIP] && g[N.CLIP].inputs) g[N.CLIP].inputs.clip_name = $("clipSelect").value;
+  const unetVal = (j ? j.unet : $("unetSelect")?.value) || "";
+  const clipVal = (j ? j.clip : $("clipSelect")?.value) || "";
+  if(g[N.UNET] && g[N.UNET].inputs && unetVal) g[N.UNET].inputs.unet_name = unetVal;
+  if(g[N.CLIP] && g[N.CLIP].inputs && clipVal) g[N.CLIP].inputs.clip_name = clipVal;
 
-  if(currentMode === "r2v"){
+  const modeVal = j ? j.mode : currentMode;
+  if(modeVal === "r2v"){
     // MODO R2V: construir referencias sobre el nodo MiniMaxH3ReferenceToVideo (136)
     const r2v = g[N.REF2V];
+    const rImages = j ? j.refImages : refImages;
+    const rVideos = j ? j.refVideos : refVideos;
+    const rAudios = j ? j.refAudios : refAudios;
     if(r2v && r2v.inputs){
       // Limpiar refs previas del grafo base
       for(let i = 0; i < 9; i++){
@@ -1919,7 +1934,7 @@ function buildGraph(){
       // Imágenes de referencia (nodo 137 reutilizado para la 1ª; 200-205 para el resto)
       const imgKeys = ["200","201","202","203","204","205"];
       const usedImgKeys = new Set();
-      refImages.forEach((ref, i) => {
+      rImages.forEach((ref, i) => {
         if(ref.uploaded){
           const key = (i === 0) ? "137" : imgKeys[i-1];
           g[key] = { class_type: "LoadImage", inputs: { image: (ref.uploaded.subfolder ? ref.uploaded.subfolder+"/" : "") + ref.uploaded.name }, _meta: { title: "Ref Image "+(i+1) } };
@@ -1930,8 +1945,8 @@ function buildGraph(){
       // Si no hay imagen de referencia, eliminar el LoadImage por defecto del grafo base
       if(!usedImgKeys.has("137") && g["137"]) delete g["137"];
       // Vídeos de referencia + sus audios
-      for(let i = 0; i < refVideos.length; i++){
-        const v = refVideos[i];
+      for(let i = 0; i < rVideos.length; i++){
+        const v = rVideos[i];
         if(v.uploaded){
           const vidKey = "21"+i;
           g[vidKey] = { class_type: "LoadVideo", inputs: { file: (v.uploaded.subfolder ? v.uploaded.subfolder+"/" : "") + v.uploaded.name }, _meta: { title: "Ref Video "+(i+1) } };
@@ -1944,8 +1959,8 @@ function buildGraph(){
         }
       }
       // Audios independientes
-      for(let i = 0; i < refAudios.length; i++){
-        const a = refAudios[i];
+      for(let i = 0; i < rAudios.length; i++){
+        const a = rAudios[i];
         if(a.uploaded){
           const audKey = "23" + i;
           g[audKey] = { class_type: "LoadAudio", inputs: { audio: (a.uploaded.subfolder ? a.uploaded.subfolder+"/" : "") + a.uploaded.name }, _meta: { title: "Ref Audio "+(i+1) } };
@@ -1953,24 +1968,19 @@ function buildGraph(){
         }
       }
     }
-  } else if(uploadedFirstImage && g[N.IMAGE_FIRST]){
-    // i2v / flf2v: imagen de inicio como referencia 0
-    g[N.IMAGE_FIRST].inputs.image = uploadedFirstImage.name;
-    if(g[N.REF2V] && g[N.REF2V].inputs){
-      g[N.REF2V].inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+  } else {
+    const firstImg = j ? j.uploadedFirstImage : uploadedFirstImage;
+    if(firstImg && g[N.IMAGE_FIRST]){
+      // i2v / flf2v: imagen de inicio como referencia 0
+      g[N.IMAGE_FIRST].inputs.image = firstImg.name;
+      if(g[N.REF2V] && g[N.REF2V].inputs){
+        g[N.REF2V].inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+      }
     }
   }
 
-  // Pipeline de Modelo (orden = dependencias):
-  // UNET (127) -> MemOpt (164) -> SparseAttn (158) -> SigmaShift (159) -> Spectrum (162) -> AttnBackend (147) -> LoRAs -> Scheduler (124) & Guider (126)
-  //
-  // IMPORTANTE: la nueva versión de H3-Optimizations crashea si H3SparseAttention
-  // va ANTES que H3MemoryOptimization en la cadena (el sparse llama a apply_plan
-  // con plan.memory=None y el custom node accede a memory.chunk_rows). Por eso
-  // MemOpt debe ir primero y, si el usuario desactiva memOpt, usar streaming "Off"
-  // (memory definida) en lugar de borrar el nodo.
   let currentModelNode = N.UNET;
-  const h3opt = getH3OptState();
+  const h3opt = j ? j.h3opt : getH3OptState();
 
   // 1. Memory Optimization (antes de Sparse)
   if(g[N.MEM_OPT]){
@@ -1992,7 +2002,7 @@ function buildGraph(){
 
   // 3. Sigma Shift (MiniMaxH3SigmaShift)
   if(g[N.SIGMA_SHIFT]){
-    const ss = getSigmaShiftState();
+    const ss = j ? j.sigmaShift : getSigmaShiftState();
     g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
     g[N.SIGMA_SHIFT].inputs.shift_video = ss.shiftVideo;
     g[N.SIGMA_SHIFT].inputs.shift_audio = ss.shiftAudio;
@@ -2001,7 +2011,7 @@ function buildGraph(){
 
   // 4. Spectrum
   if(g[N.SPECTRUM] && g[N.SPECTRUM].inputs){
-    const s = getSpectrumState();
+    const s = j ? j.spectrum : getSpectrumState();
     g[N.SPECTRUM].inputs.model = [currentModelNode, 0];
     g[N.SPECTRUM].inputs.enabled = s.enabled;
     g[N.SPECTRUM].inputs.blend_weight = s.blend;
@@ -2011,44 +2021,26 @@ function buildGraph(){
     currentModelNode = N.SPECTRUM;
   }
 
-  // 5. Model Attention Backend
+  // 5. Attention Backend selector
+  const attnBackend = (j ? j.attnBackend : $("attnBackend")?.value) || "sage";
   if(g[N.ATTN_BACKEND]){
-    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
-    g[N.ATTN_BACKEND].inputs.attention = "comfy kitchen attention";
-    currentModelNode = N.ATTN_BACKEND;
-  }
-
-  // 6. Model Preview Override (preview animado, sin taeh3).
-  // tiny_vae="none" fuerza el fallback `_decode_video_frames_l2rgb` de KJNodes:
-  // lee los latent_rgb_factors de MiniMaxH3Video, decodifica 16 frames del latente
-  // y los anima via WS. NO usar "taesd" como preview_method (crashea con taeh3:
-  // first_stage_model=None). Con suppress_default_preview=true evitamos doble preview.
-  const prevMethod = getPreviewMethod();
-  if(prevMethod !== "none"){
-    const previewOverrideKey = "170";
-    g[previewOverrideKey] = {
-      class_type: "ModelPreviewOverrideKJ",
-      inputs: {
-        model: [currentModelNode, 0],
-        max_resolution: 768,
-        jpeg_quality: 80,
-        suppress_default_preview: true,
-        preview_frames: 32,
-        preview_fps: 6,
-        tiny_vae: "none"
-      },
-      _meta: { title: "Model Preview Override (animado L2RGB)" }
-    };
-    currentModelNode = previewOverrideKey;
+    if(attnBackend === "default" || attnBackend === "off"){
+      delete g[N.ATTN_BACKEND];
+    } else {
+      g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
+      g[N.ATTN_BACKEND].inputs.backend = attnBackend;
+      currentModelNode = N.ATTN_BACKEND;
+    }
   }
 
   // Limpiar nodos de switch estáticos no necesarios de la plantilla
   delete g["141"]; delete g["142"]; delete g["143"]; delete g["144"]; delete g["146"];
   delete g["156"]; delete g["157"]; delete g["160"];
 
-  // 7. Proceso de LoRAs dinámico
-  for(let i = 0; i < loras.length; i++){
-    const loraObj = loras[i];
+  // 6. Proceso de LoRAs dinámico
+  const jobLoras = j ? j.loras : loras;
+  for(let i = 0; i < jobLoras.length; i++){
+    const loraObj = jobLoras[i];
     const name = loraObj ? loraObj.lora : "";
     let resolvedName = name;
     let exists = false;
@@ -2078,8 +2070,8 @@ function buildGraph(){
   // 7. Scheduler y Guider conectados a currentModelNode
   if(g[N.SCHEDULER] && g[N.SCHEDULER].inputs){
     g[N.SCHEDULER].inputs.model = [currentModelNode, 0];
-    g[N.SCHEDULER].inputs.scheduler = $("schedulerName").value;
-    g[N.SCHEDULER].inputs.steps = parseInt($("stepsSlider").value || "20", 10);
+    g[N.SCHEDULER].inputs.scheduler = (j ? j.schedulerName : $("schedulerName").value);
+    g[N.SCHEDULER].inputs.steps = parseInt((j ? j.steps : $("stepsSlider").value) || "20", 10);
   }
   if(g[N.GUIDER] && g[N.GUIDER].inputs){
     g[N.GUIDER].inputs.model = [currentModelNode, 0];
@@ -2088,16 +2080,16 @@ function buildGraph(){
 
   // 8. Sampler
   if(g[N.SAMPLER_SELECT] && g[N.SAMPLER_SELECT].inputs){
-    g[N.SAMPLER_SELECT].inputs.sampler_name = $("samplerName").value;
+    g[N.SAMPLER_SELECT].inputs.sampler_name = (j ? j.samplerName : $("samplerName").value);
   }
 
   // 9. Bit depth en CreateVideo
-  const bitDepth = getBitDepth();
+  const bitDepth = j ? j.bitDepth : getBitDepth();
   if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
     g[N.CREATE_VIDEO].inputs.bit_depth = bitDepth;
   }
 
-  const prefix = $("filenamePrefix")?.value.trim() || "video/MiniMax_H3";
+  const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "video/MiniMax_H3";
   if(g[N.SAVE] && g[N.SAVE].inputs){
     g[N.SAVE].inputs.filename_prefix = prefix;
   }
@@ -2601,7 +2593,7 @@ async function loadVideoHistory(){
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
     try {
-        const graph = buildGraph();
+        const graph = buildGraph(activeJob);
         const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
         const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
         const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
@@ -2619,11 +2611,6 @@ async function runSingleGeneration(index) {
           body:JSON.stringify({
             prompt:graph,
             client_id:CLIENT_ID,
-            // "taesd" crashea con taeh3 (VAE genérico no lo instancia:
-            // 'NoneType' object has no attribute 'show_progress_bar').
-            // latent2rgb (al que "auto" resuelve) proyecta el 1er frame del
-            // latente y sí funciona; el envío por WS requiere el handshake de
-            // feature_flags (supports_preview_metadata) de common.js.
             extra_data: { preview_method: (getPreviewMethod() === "none" ? "none" : "latent2rgb") }
           })
         });
@@ -2648,9 +2635,8 @@ async function runSingleGeneration(index) {
 
 async function startJob(job){
   activeJob = job;
-  restoreJob(job);
   connectSocket();
-  await ensureImagesUploaded();
+  await ensureJobImagesUploaded(job);
   totalBatchSize = job.batchSize || 1;
   currentBatchIndex = 0;
   batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
@@ -2658,9 +2644,9 @@ async function startJob(job){
   job.currentVariantIndex = null;
   $("time1").textContent = "";
   $("time1").classList.remove("live");
-  setRun("busy", `Job en cola · ${job.batchSize} flujo(s)...`);
-  $("btnGenerate").disabled=true;
+  setRun("busy", `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
   enableStopButtons(true);
+  updateQueueUI();
   runSingleGeneration(0);
 }
 
@@ -2669,13 +2655,13 @@ function finishCurrentJob(){
   if(jobQueue.length > 0){
     const next = jobQueue.shift();
     updateQueueUI();
-    log(`⏭️ Iniciando siguiente job de la cola...`, "l-info");
+    log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
     startJob(next);
   } else {
     setRun("ok", "en reposo");
     log("🏁 Cola vacía. Todos los jobs completados.", "l-ok");
-    $("btnGenerate").disabled=false;
     enableStopButtons(false);
+    updateQueueUI();
   }
 }
 
@@ -2684,7 +2670,7 @@ async function enqueueGeneration(){
   if(activeJob || (currentPromptId && !handledPrompts.has(currentPromptId))){
     jobQueue.push(job);
     updateQueueUI();
-    log(`📥 Job añadido a la cola (total ${jobQueue.length}). Cambia parámetros libremente.`, "l-info");
+    log(`📥 Job #${job.id} añadido a la cola (${jobQueue.length} en espera). Puedes seguir cambiando parámetros libremente.`, "l-info");
   } else {
     await startJob(job);
   }

@@ -3593,9 +3593,11 @@ function updateQueueUI(){
   if(clearBtn) clearBtn.disabled = count === 0;
 }
 
+let jobCounter = 0;
 function snapshotJob(firstPassOnly){
-  // Captura de todos los parámetros necesarios para reproducir el job más tarde.
+  // Captura inmutable de todos los parámetros necesarios para reproducir el job
   return {
+    id: ++jobCounter,
     firstPassOnly: !!firstPassOnly,
     prompt: $("prompt").value,
     seedMode,
@@ -3609,6 +3611,8 @@ function snapshotJob(firstPassOnly){
     firstPassSteps: $("firstPassSteps")?.value || "10",
     model: $("modelSelect")?.value,
     vae: $("vaeSelect")?.value,
+    audioVae: $("audioVaeSelect")?.value,
+    filenamePrefix: $("filenamePrefix")?.value,
     sageType: $("sageAttentionType")?.value,
     bitDepth: getBitDepth(),
     loras: JSON.parse(JSON.stringify(loras)),
@@ -4497,21 +4501,45 @@ async function ensureImageUploaded(){
   log("Imagen subida al servidor: "+uploadedImage.name,"l-ok");
 }
 
-function buildGraph(mode){
+async function ensureJobImageUploaded(job){
+  if(job.uploadedImage) return;
+  if(!job.localFile) throw new Error("selecciona imagen");
+  setRun("busy","subiendo imagen...");
+  const fd=new FormData();
+  fd.append("image", job.localFile, job.localFile.name.replace(/^temp_\d+_/, ''));
+  fd.append("overwrite","true");
+  const r=await fetch(server()+"/upload/image",{method:"POST",body:fd});
+  if(!r.ok) throw new Error("fallo subida");
+  const data=await r.json();
+  job.uploadedImage={name:data.name, subfolder:data.subfolder||"", type:data.type||"input"};
+  log("Imagen del job subida: "+job.uploadedImage.name,"l-ok");
+}
+
+function buildGraph(mode, job){
   // mode: "first" | "second" | "full"
+  const j = job || activeJob || null;
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
-  if(uploadedImage) g[N.IMAGE].inputs.image = uploadedImage.name;
-  if($("prompt").value.trim())g[N.PROMPT].inputs.text=$("prompt").value.trim();
-  g[N.SEED].inputs.seed=(seedMode==="random")?-1:parseInt($("seedVal").value,10);
-  const w=parseInt($("width").value,10),h=parseInt($("height").value,10);
+  const imgObj = j ? j.uploadedImage : uploadedImage;
+  if(imgObj) g[N.IMAGE].inputs.image = imgObj.name;
+  const promptText = (j ? j.prompt : $("prompt").value) || "";
+  if(promptText.trim()) g[N.PROMPT].inputs.text = promptText.trim();
+  const sMode = j ? j.seedMode : seedMode;
+  const sVal = j ? j.seedValue : parseInt($("seedVal").value, 10);
+  g[N.SEED].inputs.seed = (sMode === "random") ? -1 : sVal;
+  const w = j ? j.width : parseInt($("width").value, 10);
+  const h = j ? j.height : parseInt($("height").value, 10);
   g[N.WIDTH].inputs.Xi=w;g[N.WIDTH].inputs.Xf=w;g[N.HEIGHT].inputs.Xi=h;g[N.HEIGHT].inputs.Xf=h;
-  const frames=parseInt($("frames").value,10);g[N.FRAMES].inputs.Xi=frames;g[N.FRAMES].inputs.Xf=frames;
-  g[N.FIDELITY].inputs.Xi=parseFloat($("fidelitySlider").value);g[N.FIDELITY].inputs.Xf=g[N.FIDELITY].inputs.Xi;
-  g[N.MOTION].inputs.Xi=parseFloat($("motionSlider").value);g[N.MOTION].inputs.Xf=g[N.MOTION].inputs.Xi;
-  g[N.LORA].inputs.lora_1={on:loras[0].on,lora:loras[0].lora,strength:loras[0].strength};
-  g[N.LORA].inputs.lora_2={on:loras[1].on,lora:loras[1].lora,strength:loras[1].strength};
-  g[N.LORA].inputs.lora_3={on:loras[2].on,lora:loras[2].lora,strength:loras[2].strength};
-  const modelChoice = $("modelSelect")?.value || "";
+  const frames = j ? j.frames : parseInt($("frames").value, 10);
+  g[N.FRAMES].inputs.Xi=frames;g[N.FRAMES].inputs.Xf=frames;
+  const fid = j ? parseFloat(j.fidelity) : parseFloat($("fidelitySlider").value);
+  g[N.FIDELITY].inputs.Xi=fid;g[N.FIDELITY].inputs.Xf=fid;
+  const mot = j ? parseFloat(j.motion) : parseFloat($("motionSlider").value);
+  g[N.MOTION].inputs.Xi=mot;g[N.MOTION].inputs.Xf=mot;
+  const jobLoras = j ? j.loras : loras;
+  g[N.LORA].inputs.lora_1={on:jobLoras[0].on,lora:jobLoras[0].lora,strength:jobLoras[0].strength};
+  g[N.LORA].inputs.lora_2={on:jobLoras[1].on,lora:jobLoras[1].lora,strength:jobLoras[1].strength};
+  g[N.LORA].inputs.lora_3={on:jobLoras[2].on,lora:jobLoras[2].lora,strength:jobLoras[2].strength};
+  const modelChoice = (j ? j.model : $("modelSelect")?.value) || "";
   const isDiffusionModel = modelChoice.startsWith("diffusion_models/") || modelChoice.includes("diffusion_models") || modelChoice.includes("transformer") || modelChoice.includes("int8-convrot");
 
   if(isDiffusionModel){
@@ -4539,7 +4567,7 @@ function buildGraph(mode){
 
   // VAE Vídeo: "Checkpoint" mantiene el VAE del nodo CHECKPOINT; cualquier otro valor
   // activa el VAELoader personalizado y redirige todas las entradas vae.
-  let vaeChoice = $("vaeSelect")?.value || "";
+  let vaeChoice = (j ? j.vae : $("vaeSelect")?.value) || "";
   if(isDiffusionModel && (!vaeChoice || vaeChoice === "Checkpoint")){
     vaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-bf16")) ||
                 (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("pruna_ltx2.3_vae")) ||
@@ -4562,7 +4590,7 @@ function buildGraph(mode){
   }
 
   // VAE Audio
-  let audioVaeChoice = $("audioVaeSelect")?.value || "";
+  let audioVaeChoice = (j ? j.audioVae : $("audioVaeSelect")?.value) || "";
   if(isDiffusionModel && (!audioVaeChoice || audioVaeChoice === "Checkpoint")){
     audioVaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-audio-vae-bf16")) ||
                      (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("LTX23_audio_vae")) ||
@@ -4581,31 +4609,31 @@ function buildGraph(mode){
     g["617"].inputs.ckpt_name = isDiffusionModel ? "10Eros_v1.4_bf16.safetensors" : modelChoice;
   }
 
-  const bitDepth = getBitDepth();
+  const bitDepth = j ? j.bitDepth : getBitDepth();
   if(g[N.CREATE_VIDEO_1] && g[N.CREATE_VIDEO_1].inputs) g[N.CREATE_VIDEO_1].inputs.bit_depth = bitDepth;
   if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;
 
   // Patch Sage Attention: tipo configurable, siempre activo
-  const sageType = $("sageAttentionType")?.value || "sageattn";
+  const sageType = (j ? j.sageType : $("sageAttentionType")?.value) || "sageattn";
   if(g[N.SAGE_PATCH] && g[N.SAGE_PATCH].inputs) g[N.SAGE_PATCH].inputs.sage_attention = sageType;
 
   // Steps del primer pase: regenerar sigmas interpolando desde la curva base 10-step
-  const firstSteps = parseInt($("firstPassSteps")?.value || 10, 10);
+  const firstSteps = parseInt((j ? j.firstPassSteps : $("firstPassSteps")?.value) || 10, 10);
   if(g[N.FIRST_SIGMAS] && g[N.FIRST_SIGMAS].inputs){
     g[N.FIRST_SIGMAS].inputs.sigmas = buildFirstPassSigmas(firstSteps);
   }
 
   // Cadena de mejora: se rellena el raw prompt siempre
-  const rawPrompt = $("prompt").value.trim();
+  const rawPrompt = promptText.trim();
   if(g[N.RAW_PROMPT] && g[N.RAW_PROMPT].inputs) g[N.RAW_PROMPT].inputs.value = rawPrompt;
 
   // Configurar nodo TextGenerateLTX2Prompt (siempre presente en el grafo)
   if(g[N.LTX2_PROMPT] && g[N.LTX2_PROMPT].inputs){
-    g[N.LTX2_PROMPT].inputs["sampling_mode.temperature"] = parseFloat($("ltx2Temperature")?.value || 0.7);
-    g[N.LTX2_PROMPT].inputs["sampling_mode.seed"] = parseInt($("ltx2Seed")?.value || 2, 10);
+    g[N.LTX2_PROMPT].inputs["sampling_mode.temperature"] = parseFloat((j ? j.ltx2Temperature : $("ltx2Temperature")?.value) || 0.7);
+    g[N.LTX2_PROMPT].inputs["sampling_mode.seed"] = parseInt((j ? j.ltx2Seed : $("ltx2Seed")?.value) || 2, 10);
   }
 
-  const chainMode = $("enhancerChainMode")?.value || "off";
+  const chainMode = (j ? j.chainMode : $("enhancerChainMode")?.value) || "off";
   // Si la cadena es LTX2 o Ambos, CLIPTextEncode lee del nodo Generate LTX2 Prompt;
   // si es off u Ollama, lee directamente del raw prompt (Ollama ya ha actualizado el textbox).
   if(g[N.PROMPT] && g[N.PROMPT].inputs){
@@ -4629,12 +4657,13 @@ function buildGraph(mode){
   }
 
   // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
-  if(dmdBypass && g[N.LORA] && g[N.LORA].inputs.model){
+  const bypass = j ? j.dmdBypass : dmdBypass;
+  if(bypass && g[N.LORA] && g[N.LORA].inputs.model){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
   }
 
   // Prefijo de archivo configurable
-  const prefix = $("filenamePrefix")?.value.trim() || "templo/mensaje_botella";
+  const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "templo/mensaje_botella";
   if(g[N.FINAL_SAVE] && g[N.FINAL_SAVE].inputs){
     g[N.FINAL_SAVE].inputs.filename_prefix = prefix;
   }
@@ -5156,8 +5185,8 @@ async function loadVideoHistory(){
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
     try {
-        const mode = activeJob ? (activeJob.firstPassOnly ? "first" : "full") : "first";
-        const graph = buildGraph(mode);
+        const mode = activeJob ? (activeJob.firstPassOnly ? "first" : "full") : "full";
+        const graph = buildGraph(mode, activeJob);
         const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
         const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
         const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
@@ -5191,9 +5220,6 @@ async function runSingleGeneration(index) {
         promptVariantMap[data.prompt_id] = varIndex;
         currentPromptId = data.prompt_id;
         promptSteps[data.prompt_id] = "1";
-        // En modo "full" el timer va en el slot 1 (1er pase) y al final
-        // displayResult repartirá los tiempos: t1 en slot 1, t2 en slot 2.
-        // En modo "first" el timer también va en el slot 1.
         startTimer(data.prompt_id, 1);
         pollFallback(data.prompt_id);
     } catch(err) {
@@ -5205,13 +5231,11 @@ async function runSingleGeneration(index) {
 
 async function startJob(job){
   activeJob = job;
-  restoreJob(job);
   connectSocket();
-  await ensureImageUploaded();
+  await ensureJobImageUploaded(job);
   totalBatchSize = job.batchSize || 1;
   currentBatchIndex = 0;
   batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
-  // LTXV gestiona sus propios pasos; para common.js el flujo es siempre "completo".
   window.currentBatchMode = false;
   generationStep = 1;
   firstPromptId = null;
@@ -5221,10 +5245,9 @@ async function startJob(job){
   $("time1").classList.remove("live");
   $("time2").textContent = "";
   $("time2").classList.remove("live");
-  setRun("busy", `Job en cola · ${job.firstPassOnly ? "1er pase" : "completo"} · ${job.batchSize} flujo(s)...`);
-  $("btnFirstPass").disabled=true;
-  $("btnFull").disabled=true;
+  setRun("busy", `Job #${job.id} en proceso · ${job.firstPassOnly ? "1er pase" : "completo"} · ${job.batchSize} variante(s)...`);
   enableStopButtons(true);
+  updateQueueUI();
   runSingleGeneration(0);
 }
 
@@ -5233,14 +5256,13 @@ function finishCurrentJob(){
   if(jobQueue.length > 0){
     const next = jobQueue.shift();
     updateQueueUI();
-    log(`⏭️ Iniciando siguiente job de la cola...`, "l-info");
+    log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
     startJob(next);
   } else {
     setRun("ok", "en reposo");
     log("🏁 Cola vacía. Todos los jobs completados.", "l-ok");
-    $("btnFirstPass").disabled=false;
-    $("btnFull").disabled=false;
     enableStopButtons(false);
+    updateQueueUI();
   }
 }
 
@@ -5249,7 +5271,7 @@ async function enqueueGeneration(firstPassOnly){
   if(activeJob || (currentPromptId && !handledPrompts.has(currentPromptId))){
     jobQueue.push(job);
     updateQueueUI();
-    log(`📥 Job añadido a la cola (total ${jobQueue.length}). Cambia parámetros libremente.`, "l-info");
+    log(`📥 Job #${job.id} añadido a la cola (${jobQueue.length} en espera). Puedes seguir cambiando parámetros o encolar más.`, "l-info");
   } else {
     await startJob(job);
   }

@@ -342,7 +342,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
         <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segSamplerRandom">Aleatoria</div><div class="seg" id="segSamplerFixed">Fija</div></div><input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled></div>
         <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
 
-      <div class="panel"><h2>Ejecución</h2><div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo <span class="hint">(ej: krea2/imagen)</span></label><input type="text" id="filenamePrefix" value="krea2/imagen" placeholder="krea2/imagen"></div><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar imagen</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
+      <div class="panel"><h2>Ejecución</h2><div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo <span class="hint">(ej: krea2/imagen)</span></label><input type="text" id="filenamePrefix" value="krea2/imagen" placeholder="krea2/imagen"></div><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar imagen</button><button id="btnStopAll" class="danger" disabled>Parar todo</button><button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div style="display:flex;align-items:center;gap:8px;margin-top:6px;"><span id="queueCount" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);">Cola: 0</span><span id="queueHint" class="hint" style="font-size:10px;"></span></div><div class="log" id="log">listo.</div></div>
     </div>
     <div class="results-col">
       <!-- REPRODUCTOR IMAGEN FINAL -->
@@ -2422,8 +2422,7 @@ CONFIG.onSeedUpdate = function(realSeed){ /* Krea2 logs only; no seed UI toggle 
 CONFIG.onPromptError = function(pid){};
 CONFIG.startNextVariant = function(index){ runSingleGeneration(index); };
 CONFIG.onBatchComplete = function(){
-  $("btnGenerate").disabled=false;
-  enableStopButtons(false);
+  if(typeof finishCurrentJob === "function") finishCurrentJob();
 };
 CONFIG.onStopCurrent = function(pid){
   clearPreview();
@@ -2438,8 +2437,10 @@ CONFIG.onStopAll = function(){
   const t1 = $("time1");
   if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
   clearPreview();
+  jobQueue = [];
+  activeJob = null;
+  if(typeof updateQueueUI === "function") updateQueueUI();
   enableStopButtons(false);
-  $("btnGenerate").disabled=false;
 };
 
 CONFIG.onPreview = function(url, meta){
@@ -3218,37 +3219,83 @@ $("filenamePrefix")?.addEventListener("input", (e) => {
   localStorage.setItem("krea2_filename_prefix", e.target.value.trim());
 });
 
+let jobQueue = [];
+let activeJob = null;
+let jobCounter = 0;
+
+function updateQueueUI(){
+  const count = jobQueue.length;
+  const el = $("queueCount");
+  const hint = $("queueHint");
+  const clearBtn = $("btnClearQueue");
+  if(el) el.textContent = `Cola: ${count}`;
+  if(hint) hint.textContent = count > 0 ? `${count} job(s) esperando` : "";
+  if(clearBtn) clearBtn.disabled = count === 0;
+}
+
+function snapshotJob(){
+  return {
+    id: ++jobCounter,
+    prompt: $("prompt").value,
+    model: $("modelSelect")?.value,
+    megapixels: parseFloat($("mpSlider")?.value || "1.0"),
+    aspectRatio: $("aspectRatio")?.value,
+    projectorPreset: $("projectorPreset")?.value,
+    projectorStrength: parseFloat($("projectorStrength")?.value || "1.0"),
+    enhancerEnabled: $("enhancerEnabled")?.classList.contains("on"),
+    enhancerStrength: parseFloat($("enhancerStrength")?.value || "0.5"),
+    enhancerTextScale: parseFloat($("enhancerTextScale")?.value || "0.5"),
+    variancePreset: $("variancePreset")?.value,
+    protectMode: $("protectMode")?.value,
+    varianceSeedMode: $("segVarianceRandom")?.classList.contains("on") ? "random" : "fixed",
+    varianceSeedValue: parseInt($("varianceSeed")?.value || "315489554057974", 10),
+    eta: parseFloat($("etaSlider")?.value || "0.5"),
+    steps: parseInt($("steps")?.value || "8", 10),
+    samplerSeedMode: $("segSamplerRandom")?.classList.contains("on") ? "random" : "fixed",
+    samplerSeedValue: parseInt($("samplerSeed")?.value || "1062442950133633", 10),
+    batchSize: parseInt($("batchSize")?.value || "1", 10),
+    filenamePrefix: $("filenamePrefix")?.value,
+    loras: JSON.parse(JSON.stringify(loras)),
+    createdAt: Date.now(),
+  };
+}
+
 // --- BUILD GRAPH ---
-function buildGraph(){
+function buildGraph(job){
+  const j = job || activeJob || null;
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
-  g[N.UNET].inputs.unet_name = "flux2/" + $("modelSelect").value;
-  g[N.PROMPT].inputs.string = $("prompt").value.trim();
-  g[N.RES_SELECTOR].inputs.megapixels = parseFloat($("mpSlider").value);
-  g[N.RES_SELECTOR].inputs.aspect_ratio = $("aspectRatio").value;
-  g[N.PROJECTOR].inputs.preset = $("projectorPreset").value;
-  g[N.PROJECTOR].inputs.strength = parseFloat($("projectorStrength").value);
-  const enhancerEnabled = $("enhancerEnabled").classList.contains("on");
+  const modelChoice = (j ? j.model : $("modelSelect")?.value) || "";
+  g[N.UNET].inputs.unet_name = "flux2/" + modelChoice;
+  g[N.PROMPT].inputs.string = ((j ? j.prompt : $("prompt").value) || "").trim();
+  g[N.RES_SELECTOR].inputs.megapixels = j ? j.megapixels : parseFloat($("mpSlider").value);
+  g[N.RES_SELECTOR].inputs.aspect_ratio = j ? j.aspectRatio : $("aspectRatio").value;
+  g[N.PROJECTOR].inputs.preset = j ? j.projectorPreset : $("projectorPreset").value;
+  g[N.PROJECTOR].inputs.strength = j ? j.projectorStrength : parseFloat($("projectorStrength").value);
+  
+  const enhancerEnabled = j ? j.enhancerEnabled : $("enhancerEnabled").classList.contains("on");
   if(enhancerEnabled){
     g[N.ENHANCER].inputs.enabled = true;
-    g[N.ENHANCER].inputs.strength = parseFloat($("enhancerStrength").value);
-    g[N.ENHANCER].inputs.text_scale = parseFloat($("enhancerTextScale").value);
+    g[N.ENHANCER].inputs.strength = j ? j.enhancerStrength : parseFloat($("enhancerStrength").value);
+    g[N.ENHANCER].inputs.text_scale = j ? j.enhancerTextScale : parseFloat($("enhancerTextScale").value);
   } else {
-    // Si el enhancer está desactivado, lo eliminamos del grafo y conectamos
-    // el projector directamente al primer LoRA, evitando errores del backend.
     delete g[N.ENHANCER];
     if(g[N.LORA1] && g[N.LORA1].inputs.model && g[N.LORA1].inputs.model[0] === N.ENHANCER){
       g[N.LORA1].inputs.model = [N.PROJECTOR, 0];
     }
   }
-  g[N.SEED_VARIANCE].inputs.variance_preset = $("variancePreset").value;
-  g[N.SEED_VARIANCE].inputs.protect_mode = $("protectMode").value;
-  g[N.SEED_VARIANCE].inputs.seed = $("segVarianceRandom").classList.contains("on") ? -1 : parseInt($("varianceSeed").value, 10);
-  // Proceso de LoRAs con bypass dinámico y resolución de rutas si están desactivados, vacíos o no existen en disco
+  
+  g[N.SEED_VARIANCE].inputs.variance_preset = j ? j.variancePreset : $("variancePreset").value;
+  g[N.SEED_VARIANCE].inputs.protect_mode = j ? j.protectMode : $("protectMode").value;
+  const varSeedMode = j ? j.varianceSeedMode : ($("segVarianceRandom").classList.contains("on") ? "random" : "fixed");
+  const varSeedVal = j ? j.varianceSeedValue : parseInt($("varianceSeed").value, 10);
+  g[N.SEED_VARIANCE].inputs.seed = (varSeedMode === "random") ? -1 : varSeedVal;
+  
+  const jobLoras = j ? j.loras : loras;
   const loraNodes = [N.LORA1, N.LORA2, N.LORA3];
   for(let i = 0; i < 3; i++){
     const nodeKey = loraNodes[i];
     if(!g[nodeKey]) continue;
-    const loraObj = loras[i];
+    const loraObj = jobLoras[i];
     const name = loraObj ? loraObj.lora : "";
     
     let resolvedName = name;
@@ -3281,11 +3328,14 @@ function buildGraph(){
       g[nodeKey].inputs.strength_model = loraObj.strength;
     }
   }
-  g[N.SAMPLER].inputs.eta = parseFloat($("etaSlider").value);
-  g[N.SAMPLER].inputs.steps = parseInt($("steps").value, 10);
-  g[N.SAMPLER].inputs.seed = $("segSamplerRandom").classList.contains("on") ? -1 : parseInt($("samplerSeed").value, 10);
 
-  const prefix = $("filenamePrefix")?.value.trim() || "krea2/imagen";
+  g[N.SAMPLER].inputs.eta = j ? j.eta : parseFloat($("etaSlider").value);
+  g[N.SAMPLER].inputs.steps = j ? j.steps : parseInt($("steps").value, 10);
+  const sampSeedMode = j ? j.samplerSeedMode : ($("segSamplerRandom").classList.contains("on") ? "random" : "fixed");
+  const sampSeedVal = j ? j.samplerSeedValue : parseInt($("samplerSeed").value, 10);
+  g[N.SAMPLER].inputs.seed = (sampSeedMode === "random") ? -1 : sampSeedVal;
+
+  const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "krea2/imagen";
   if(g[N.SAVE_IMAGE] && g[N.SAVE_IMAGE].inputs){
     g[N.SAVE_IMAGE].inputs.filename_prefix = prefix;
   }
@@ -3296,8 +3346,10 @@ function buildGraph(){
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
     try {
-        const graph = buildGraph();
-        const seedUsed = (batchSeedMode === "random") ? randomSeed() : parseInt($("samplerSeed").value, 10);
+        const graph = buildGraph(activeJob);
+        const jobSeedMode = activeJob ? activeJob.samplerSeedMode : (batchSeedMode || "random");
+        const jobSeedValue = activeJob ? activeJob.samplerSeedValue : parseInt($("samplerSeed").value, 10);
+        const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
         graph[N.SAMPLER].inputs.seed = seedUsed;
 
         const varIndex = variantCounter + 1;
@@ -3328,24 +3380,52 @@ async function runSingleGeneration(index) {
     }
 }
 
-async function queueAndWait(){
+async function startJob(job){
+  activeJob = job;
   connectSocket();
-  totalBatchSize = parseInt($("batchSize")?.value || "1", 10);
+  totalBatchSize = job.batchSize || 1;
   currentBatchIndex = 0;
-  variantCounter = 0;
-  batchSeedMode = $("segSamplerRandom").classList.contains("on") ? "random" : "fixed";
-  setRun("busy", `Iniciando batch de ${totalBatchSize} variantes...`);
-  $("btnGenerate").disabled=true;
+  batchSeedMode = job.samplerSeedMode || "random";
+  setRun("busy", `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
   enableStopButtons(true);
+  updateQueueUI();
   runSingleGeneration(0);
 }
 
-async function runGeneration(){
-  try{ await queueAndWait(); }
-  catch(err){ setRun("bad","error");log("Error: "+err.message,"l-err"); $("btnGenerate").disabled=false; }
+function finishCurrentJob(){
+  activeJob = null;
+  if(jobQueue.length > 0){
+    const next = jobQueue.shift();
+    updateQueueUI();
+    log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
+    startJob(next);
+  } else {
+    setRun("ok", "en reposo");
+    log("🏁 Cola vacía. Todos los jobs completados.", "l-ok");
+    enableStopButtons(false);
+    updateQueueUI();
+  }
 }
 
-$("btnGenerate").addEventListener("click", runGeneration);
+async function enqueueGeneration(){
+  const job = snapshotJob();
+  if(activeJob || (currentPromptId && !handledPrompts.has(currentPromptId))){
+    jobQueue.push(job);
+    updateQueueUI();
+    log(`📥 Job #${job.id} añadido a la cola (${jobQueue.length} en espera). Puedes seguir cambiando parámetros o encolar más imágenes.`, "l-info");
+  } else {
+    await startJob(job);
+  }
+}
+
+$("btnClearQueue")?.addEventListener("click", () => {
+  const count = jobQueue.length;
+  jobQueue = [];
+  updateQueueUI();
+  if(count) log(`🧹 Cola vacía (${count} job(s) eliminados).`, "l-ok");
+});
+
+$("btnGenerate").addEventListener("click", () => enqueueGeneration());
 
 // --- ENHANCER HELPERS (Krea2-specific) ---
 async function fetchWithRetry(url, options, attempts=3){
