@@ -160,6 +160,165 @@ video[draggable="true"]:active{cursor:grabbing;}
    y dejamos que el navegador muestre el ghost de arrastre. */
 .variant-card[draggable="true"],.gallery-item[draggable="true"]{cursor:grab;}
 .variant-card[draggable="true"]:active,.gallery-item[draggable="true"]:active{cursor:grabbing;}
+
+/* --- QUEUE STATUS COMPONENT --- */
+.queue-status-box {
+  background: var(--bg-1, #101116);
+  border: 1px solid var(--border, #2a2b36);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.queue-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.queue-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--fg);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue-total-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--surface, #20222b);
+  border: 1px solid var(--border, #2a2b36);
+  color: var(--muted-2, #8e90a6);
+  white-space: nowrap;
+}
+.queue-total-badge.active {
+  background: rgba(87, 232, 201, 0.12);
+  border-color: var(--accent, #57e8c9);
+  color: var(--accent, #57e8c9);
+}
+.queue-total-num {
+  font-weight: 700;
+}
+.queue-splits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.queue-split-card {
+  background: var(--panel, #181920);
+  border: 1px solid var(--border, #2a2b36);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.queue-split-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted-2, #8e90a6);
+  font-family: var(--mono);
+}
+.queue-split-main {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--fg, #e2e4f0);
+}
+.queue-split-sub {
+  font-size: 9.5px;
+  color: var(--muted-2, #8e90a6);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue-items-accordion {
+  border-top: 1px solid var(--border, #2a2b36);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+.queue-items-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-2, #8e90a6);
+  cursor: pointer;
+  user-select: none;
+}
+.queue-items-header:hover {
+  color: var(--accent, #57e8c9);
+}
+.queue-items-body {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.queue-items-accordion.open .queue-items-body {
+  display: flex;
+}
+.queue-items-accordion.open .queue-items-header .arrow {
+  transform: rotate(90deg);
+}
+.queue-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-2, #14151a);
+  border: 1px solid var(--border, #2a2b36);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg);
+}
+.queue-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.queue-item-id {
+  color: var(--accent, #57e8c9);
+  font-weight: 700;
+}
+.queue-item-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-1, #b2b5cc);
+}
+.queue-item-del {
+  cursor: pointer;
+  color: var(--muted-2, #8e90a6);
+  padding: 0 4px;
+  font-size: 12px;
+}
+.queue-item-del:hover {
+  color: #ff5555;
+}
 /* ============================================================
    krea2.css — CSS específico de Krea2 (generar_krea2.py)
    ============================================================ */
@@ -342,7 +501,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
         <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segSamplerRandom">Aleatoria</div><div class="seg" id="segSamplerFixed">Fija</div></div><input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled></div>
         <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
 
-      <div class="panel"><h2>Ejecución</h2><div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo <span class="hint">(ej: krea2/imagen)</span></label><input type="text" id="filenamePrefix" value="krea2/imagen" placeholder="krea2/imagen"></div><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar imagen</button><button id="btnStopAll" class="danger" disabled>Parar todo</button><button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div style="display:flex;align-items:center;gap:8px;margin-top:6px;"><span id="queueCount" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);">Cola: 0</span><span id="queueHint" class="hint" style="font-size:10px;"></span></div><div class="log" id="log">listo.</div></div>
+      <div class="panel"><h2>Ejecución</h2><div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo <span class="hint">(ej: krea2/imagen)</span></label><input type="text" id="filenamePrefix" value="krea2/imagen" placeholder="krea2/imagen"></div><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar imagen</button><button id="btnStopAll" class="danger" disabled>Parar todo</button><button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button></div><div class="queue-status-box"><div class="queue-status-row"><div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div></div><div class="queue-splits"><div class="queue-split-card"><div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div><div class="queue-split-main" id="queueWebuiSummary">0 en espera</div><div class="queue-split-sub" id="queueWebuiDetail">En reposo</div></div><div class="queue-split-card"><div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div><div class="queue-split-main" id="queueServerSummary">0 en espera</div><div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div></div></div><div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;"><div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div><div class="queue-items-body" id="queueItemsList"></div></div></div><div class="log" id="log">listo.</div></div>
     </div>
     <div class="results-col">
       <!-- REPRODUCTOR IMAGEN FINAL -->
@@ -981,9 +1140,25 @@ function connectSocket() {
             currentBatchIndex++;
             processNextBatch();
         }
-    };
     socket.onerror = (err) => console.error("WS Error", err);
 }
+
+// --- COMFYUI SERVER QUEUE MONITOR ---
+let serverQueueState = { running: 0, pending: 0 };
+async function fetchServerQueueStatus(){
+  try {
+    const r = await fetch(server() + "/queue");
+    if(r.ok){
+      const data = await r.json();
+      serverQueueState.running = Array.isArray(data.queue_running) ? data.queue_running.length : 0;
+      serverQueueState.pending = Array.isArray(data.queue_pending) ? data.queue_pending.length : 0;
+    }
+  } catch(_){}
+  if(typeof updateQueueUI === "function") updateQueueUI();
+}
+
+// Polling suave cada 3s para reflejar trabajos lanzados desde otros dispositivos
+setInterval(fetchServerQueueStatus, 3000);
 
 // --- HANDLE PROMPT DONE ---
 // Procesa un prompt_id terminado, venga del WS o del polling de respaldo.
@@ -3272,13 +3447,90 @@ let jobCounter = 0;
 
 function updateQueueUI(){
   const count = jobQueue.length;
-  const el = $("queueCount");
-  const hint = $("queueHint");
   const clearBtn = $("btnClearQueue");
-  if(el) el.textContent = `Cola: ${count}`;
-  if(hint) hint.textContent = count > 0 ? `${count} job(s) esperando` : "";
   if(clearBtn) clearBtn.disabled = count === 0;
+
+  // Cálculo de variantes/imágenes pendientes
+  const activeRemainingVars = activeJob ? Math.max(1, (totalBatchSize - currentBatchIndex)) : 0;
+  const queueVariants = jobQueue.reduce((acc, j) => acc + (j.batchSize || 1), 0);
+  const totalLocalImages = (activeJob ? activeRemainingVars : 0) + queueVariants;
+  const serverPending = (typeof serverQueueState !== "undefined" && serverQueueState.pending) ? serverQueueState.pending : 0;
+  const serverRunning = (typeof serverQueueState !== "undefined" && serverQueueState.running) ? serverQueueState.running : 0;
+  const totalPendingGlobal = totalLocalImages + serverPending;
+
+  // Badge total
+  const totalNumEl = $("queueTotalNum");
+  const totalBadgeEl = $("queueTotalBadge");
+  if(totalNumEl) totalNumEl.textContent = totalPendingGlobal;
+  if(totalBadgeEl){
+    if(totalPendingGlobal > 0) totalBadgeEl.classList.add("active");
+    else totalBadgeEl.classList.remove("active");
+  }
+
+  // Tarjeta Esta WebUI
+  const webuiSummary = $("queueWebuiSummary");
+  const webuiDetail = $("queueWebuiDetail");
+  if(webuiSummary){
+    if(count === 0 && !activeJob){
+      webuiSummary.textContent = "0 en espera";
+    } else {
+      webuiSummary.textContent = `${count} en cola (${queueVariants} imgs)`;
+    }
+  }
+  if(webuiDetail){
+    if(activeJob){
+      webuiDetail.textContent = `▶ Job #${activeJob.id} · Var ${currentBatchIndex + 1}/${totalBatchSize}`;
+    } else {
+      webuiDetail.textContent = "En reposo";
+    }
+  }
+
+  // Tarjeta Servidor ComfyUI
+  const srvSummary = $("queueServerSummary");
+  const srvDetail = $("queueServerDetail");
+  if(srvSummary){
+    srvSummary.textContent = `${serverPending} en espera`;
+  }
+  if(srvDetail){
+    srvDetail.textContent = `${serverRunning} en GPU · ${serverPending} en cola ComfyUI`;
+  }
+
+  // Desplegable de trabajos en cola
+  const accordion = $("queueItemsAccordion");
+  const itemsTitle = $("queueItemsTitle");
+  const itemsList = $("queueItemsList");
+  if(itemsTitle) itemsTitle.textContent = `Ver trabajos en cola (${count})`;
+  if(accordion){
+    accordion.style.display = count > 0 ? "block" : "none";
+  }
+  if(itemsList && count > 0){
+    itemsList.innerHTML = "";
+    jobQueue.forEach((job, idx) => {
+      const row = document.createElement("div");
+      row.className = "queue-item-row";
+      const pText = (job.prompt || "sin prompt").trim();
+      const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
+      row.innerHTML = `
+        <div class="queue-item-left" title="${pText}">
+          <span class="queue-item-id">#${job.id}</span>
+          <span class="queue-item-desc">${pShort} · ${job.batchSize || 1} var(s)</span>
+        </div>
+        <span class="queue-item-del" title="Eliminar este trabajo de la cola">×</span>
+      `;
+      row.querySelector(".queue-item-del").addEventListener("click", (e) => {
+        e.stopPropagation();
+        jobQueue.splice(idx, 1);
+        updateQueueUI();
+        log(`🗑️ Job #${job.id} eliminado de la cola.`, "l-ok");
+      });
+      itemsList.appendChild(row);
+    });
+  }
 }
+
+$("queueItemsToggle")?.addEventListener("click", () => {
+  $("queueItemsAccordion")?.classList.toggle("open");
+});
 
 function snapshotJob(){
   return {

@@ -268,9 +268,25 @@ function connectSocket() {
             currentBatchIndex++;
             processNextBatch();
         }
-    };
     socket.onerror = (err) => console.error("WS Error", err);
 }
+
+// --- COMFYUI SERVER QUEUE MONITOR ---
+let serverQueueState = { running: 0, pending: 0 };
+async function fetchServerQueueStatus(){
+  try {
+    const r = await fetch(server() + "/queue");
+    if(r.ok){
+      const data = await r.json();
+      serverQueueState.running = Array.isArray(data.queue_running) ? data.queue_running.length : 0;
+      serverQueueState.pending = Array.isArray(data.queue_pending) ? data.queue_pending.length : 0;
+    }
+  } catch(_){}
+  if(typeof updateQueueUI === "function") updateQueueUI();
+}
+
+// Polling suave cada 3s para reflejar trabajos lanzados desde otros dispositivos
+setInterval(fetchServerQueueStatus, 3000);
 
 // --- HANDLE PROMPT DONE ---
 // Procesa un prompt_id terminado, venga del WS o del polling de respaldo.

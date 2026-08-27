@@ -921,13 +921,91 @@ function recalcResolution(){
 
 function updateQueueUI(){
   const count = jobQueue.length;
-  const el = $("queueCount");
-  const hint = $("queueHint");
   const clearBtn = $("btnClearQueue");
-  if(el) el.textContent = `Cola: ${count}`;
-  if(hint) hint.textContent = count > 0 ? `${count} job(s) esperando` : "";
   if(clearBtn) clearBtn.disabled = count === 0;
+
+  // Cálculo de variantes/vídeos pendientes
+  const activeRemainingVars = activeJob ? Math.max(1, (totalBatchSize - currentBatchIndex)) : 0;
+  const queueVariants = jobQueue.reduce((acc, j) => acc + (j.batchSize || 1), 0);
+  const totalLocalVideos = (activeJob ? activeRemainingVars : 0) + queueVariants;
+  const serverPending = (typeof serverQueueState !== "undefined" && serverQueueState.pending) ? serverQueueState.pending : 0;
+  const serverRunning = (typeof serverQueueState !== "undefined" && serverQueueState.running) ? serverQueueState.running : 0;
+  const totalPendingGlobal = totalLocalVideos + serverPending;
+
+  // Badge total
+  const totalNumEl = $("queueTotalNum");
+  const totalBadgeEl = $("queueTotalBadge");
+  if(totalNumEl) totalNumEl.textContent = totalPendingGlobal;
+  if(totalBadgeEl){
+    if(totalPendingGlobal > 0) totalBadgeEl.classList.add("active");
+    else totalBadgeEl.classList.remove("active");
+  }
+
+  // Tarjeta Esta WebUI
+  const webuiSummary = $("queueWebuiSummary");
+  const webuiDetail = $("queueWebuiDetail");
+  if(webuiSummary){
+    if(count === 0 && !activeJob){
+      webuiSummary.textContent = "0 en espera";
+    } else {
+      webuiSummary.textContent = `${count} en cola (${queueVariants} vids)`;
+    }
+  }
+  if(webuiDetail){
+    if(activeJob){
+      webuiDetail.textContent = `▶ Job #${activeJob.id} · Var ${currentBatchIndex + 1}/${totalBatchSize} (${activeJob.mode || "i2v"})`;
+    } else {
+      webuiDetail.textContent = "En reposo";
+    }
+  }
+
+  // Tarjeta Servidor ComfyUI
+  const srvSummary = $("queueServerSummary");
+  const srvDetail = $("queueServerDetail");
+  if(srvSummary){
+    srvSummary.textContent = `${serverPending} en espera`;
+  }
+  if(srvDetail){
+    srvDetail.textContent = `${serverRunning} en GPU · ${serverPending} en cola ComfyUI`;
+  }
+
+  // Desplegable de trabajos en cola
+  const accordion = $("queueItemsAccordion");
+  const itemsTitle = $("queueItemsTitle");
+  const itemsList = $("queueItemsList");
+  if(itemsTitle) itemsTitle.textContent = `Ver trabajos en cola (${count})`;
+  if(accordion){
+    accordion.style.display = count > 0 ? "block" : "none";
+  }
+  if(itemsList && count > 0){
+    itemsList.innerHTML = "";
+    jobQueue.forEach((job, idx) => {
+      const row = document.createElement("div");
+      row.className = "queue-item-row";
+      const pText = (job.prompt || "sin prompt").trim();
+      const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
+      const modeLabel = job.mode || "i2v";
+      row.innerHTML = `
+        <div class="queue-item-left" title="${pText}">
+          <span class="queue-item-id">#${job.id}</span>
+          <span class="queue-item-desc">${pShort} · ${job.batchSize || 1} var(s) · ${modeLabel}</span>
+        </div>
+        <span class="queue-item-del" title="Eliminar este trabajo de la cola">×</span>
+      `;
+      row.querySelector(".queue-item-del").addEventListener("click", (e) => {
+        e.stopPropagation();
+        jobQueue.splice(idx, 1);
+        updateQueueUI();
+        log(`🗑️ Job #${job.id} eliminado de la cola.`, "l-ok");
+      });
+      itemsList.appendChild(row);
+    });
+  }
 }
+
+$("queueItemsToggle")?.addEventListener("click", () => {
+  $("queueItemsAccordion")?.classList.toggle("open");
+});
 
 let jobCounter = 0;
 function snapshotJob(){
