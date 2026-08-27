@@ -412,6 +412,11 @@ function renderRefImages(){
     });
     grid.appendChild(slot);
   });
+  const countEl = $("r2vImagesCount");
+  if(countEl){
+    const active = refImages.filter(r => r.local).length;
+    countEl.textContent = active ? `(${active}/6)` : "";
+  }
 }
 
 // --- input único para imágenes r2v ---
@@ -545,6 +550,11 @@ function renderRefVideos(){
       });
     }
   });
+  const countEl = $("r2vVideosCount");
+  if(countEl){
+    const active = refVideos.filter(r => r.local).length;
+    countEl.textContent = active ? `(${active}/3)` : "";
+  }
 }
 
 // --- RENDER de audios de referencia ---
@@ -600,6 +610,11 @@ function renderRefAudios(){
       });
     }
   });
+  const countEl = $("r2vAudiosCount");
+  if(countEl){
+    const active = refAudios.filter(r => r.local).length;
+    countEl.textContent = active ? `(${active}/3)` : "";
+  }
 }
 
 function renderR2V(){
@@ -2895,6 +2910,9 @@ function generateEvolved(prompt, mode, strength, count){
 }
 
 makeCollapsible("evolveToggle", "evolveBody");
+makeCollapsible("r2vImagesToggle", "r2vImagesBody");
+makeCollapsible("r2vVideosToggle", "r2vVideosBody");
+makeCollapsible("r2vAudiosToggle", "r2vAudiosBody");
 $("evolveStrength")?.addEventListener("input", (e) => {
   $("evolveStrengthVal").textContent = e.target.value + "%";
 });

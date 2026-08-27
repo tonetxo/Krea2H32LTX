@@ -14,15 +14,30 @@
       <div class="panel" id="lastFramePanel" style="display:none;"><h2>Último frame</h2><div class="dropzone" id="lastFrameDropzone"><input type="file" id="lastFrameFileInput" accept="image/*"><div class="ph" id="lastFrameDzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="lastFrameDzInfo"></div><div class="img-input-actions" id="lastFrameActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomLast" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenLast" class="ghost btn-mini" title="Pantalla completa">⛶</button></div><div class="img-wrap" id="lastFrameWrap" style="visibility:hidden;"><img id="lastFrameImg" style="display:none;width:100%;height:auto;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div></div>
 
       <div class="panel" id="r2vPanel" style="display:none;"><h2>Referencias</h2>
-        <div class="hint" style="font-size:10px;margin-bottom:6px;">Modo referencia completa. Hasta 6 imágenes, 3 vídeos (c/u con su audio) y 3 audios. El prompt se reescribe con la guía full-reference.</div>
-        <div class="r2v-section"><h3 style="font-size:11px;margin:6px 0 4px;">Imágenes</h3>
-          <div class="ref-grid" id="refImgGrid"></div>
+        <div class="hint" style="font-size:10px;margin-bottom:8px;">Modo referencia completa. Hasta 6 imágenes, 3 vídeos (c/u con su audio) y 3 audios. El prompt se reescribe con la guía full-reference.</div>
+        <div class="r2v-section">
+          <div class="collapsible-header open" id="r2vImagesToggle">
+            <span class="arrow">▼</span> Imágenes de referencia <span id="r2vImagesCount" class="hint" style="margin-left:auto;"></span>
+          </div>
+          <div class="collapsible-body open" id="r2vImagesBody">
+            <div class="ref-grid" id="refImgGrid" style="margin-top:6px;"></div>
+          </div>
         </div>
-        <div class="r2v-section"><h3 style="font-size:11px;margin:10px 0 4px;">Vídeos</h3>
-          <div id="refVideoList"></div>
+        <div class="r2v-section" style="margin-top:8px;">
+          <div class="collapsible-header" id="r2vVideosToggle">
+            <span class="arrow">▶</span> Vídeos de referencia <span id="r2vVideosCount" class="hint" style="margin-left:auto;"></span>
+          </div>
+          <div class="collapsible-body" id="r2vVideosBody">
+            <div id="refVideoList" style="margin-top:6px;"></div>
+          </div>
         </div>
-        <div class="r2v-section"><h3 style="font-size:11px;margin:10px 0 4px;">Audios</h3>
-          <div class="ref-grid" id="refAudioGrid"></div>
+        <div class="r2v-section" style="margin-top:8px;">
+          <div class="collapsible-header" id="r2vAudiosToggle">
+            <span class="arrow">▶</span> Audios de referencia <span id="r2vAudiosCount" class="hint" style="margin-left:auto;"></span>
+          </div>
+          <div class="collapsible-body" id="r2vAudiosBody">
+            <div class="ref-grid" id="refAudioGrid" style="margin-top:6px;"></div>
+          </div>
         </div>
       </div>
 
