@@ -3501,16 +3501,12 @@ CONFIG.startNextVariant = function(index){
   runSingleGeneration(index);
 };
 CONFIG.onBatchComplete = function(){
-  if(jobQueue.length === 0 && !activeJob){
-    $("btnGenerate").disabled=false;
-    enableStopButtons(false);
-  }
+  finishCurrentJob();
 };
 CONFIG.onStopCurrent = function(pid){
   delete pendingSeeds[pid];
   delete promptVariantMap[pid];
   delete displayedSlots[pid];
-  finishCurrentJob();
 };
 CONFIG.onStopAll = function(){
   for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);

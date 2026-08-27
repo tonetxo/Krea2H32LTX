@@ -250,12 +250,7 @@ CONFIG.startNextVariant = function(index){
   runSingleGeneration(index);
 };
 CONFIG.onBatchComplete = function(){
-  // LTXV gestiona el fin del job vía displayResult/finishCurrentJob.
-  if(jobQueue.length === 0 && !activeJob){
-    $("btnFirstPass").disabled=false;
-    $("btnFull").disabled=false;
-    enableStopButtons(false);
-  }
+  finishCurrentJob();
 };
 CONFIG.onStopCurrent = function(pid){
   delete promptSteps[pid];
@@ -263,7 +258,8 @@ CONFIG.onStopCurrent = function(pid){
   delete promptVariantMap[pid];
   delete displayedSlots[pid];
   generationStep = 0;
-  finishCurrentJob();
+  firstPromptId = null;
+  finalVariantIndex = null;
 };
 CONFIG.onStopAll = function(){
   for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);
