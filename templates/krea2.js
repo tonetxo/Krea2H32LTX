@@ -1055,14 +1055,20 @@ async function runSingleGeneration(index) {
 
 async function startJob(job){
   activeJob = job;
-  connectSocket();
-  totalBatchSize = job.batchSize || 1;
-  currentBatchIndex = 0;
-  batchSeedMode = job.samplerSeedMode || "random";
-  setRun("busy", `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
-  enableStopButtons(true);
   updateQueueUI();
-  runSingleGeneration(0);
+  try {
+    connectSocket();
+    totalBatchSize = job.batchSize || 1;
+    currentBatchIndex = 0;
+    batchSeedMode = job.samplerSeedMode || "random";
+    setRun("busy", `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
+    enableStopButtons(true);
+    await runSingleGeneration(0);
+  } catch(err) {
+    log(`❌ Error al iniciar Job #${job.id}: ${err.message || err}`, "l-err");
+    setRun("bad", "Error");
+    finishCurrentJob();
+  }
 }
 
 function finishCurrentJob(){
@@ -1082,7 +1088,7 @@ function finishCurrentJob(){
 
 async function enqueueGeneration(){
   const job = snapshotJob();
-  if(activeJob || (currentPromptId && !handledPrompts.has(currentPromptId))){
+  if(activeJob){
     jobQueue.push(job);
     updateQueueUI();
     log(`📥 Job #${job.id} añadido a la cola (${jobQueue.length} en espera). Puedes seguir cambiando parámetros o encolar más imágenes.`, "l-info");

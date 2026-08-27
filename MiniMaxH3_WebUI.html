@@ -4562,6 +4562,102 @@ async function ensureImagesUploaded(){
   }
 }
 
+async function ensureJobImagesUploaded(job){
+  if(job.mode === "r2v"){
+    const rImages = job.refImages || refImages;
+    for(let i=0; i<rImages.length; i++){
+      const ref = rImages[i];
+      if(ref.local && !ref.uploaded){
+        try{
+          ref.uploaded = await _uploadOneHot("image", ref.local, "ref_img_"+(i+1)+".png");
+        } catch(e){ throw new Error("Fallo subida ref "+(i+1)+": "+e.message); }
+      }
+    }
+    const rVideos = job.refVideos || refVideos;
+    for(let i=0; i<rVideos.length; i++){
+      const ref = rVideos[i];
+      if(ref.file && !ref.uploaded){
+        try{
+          const s = ref.settings || {};
+          const fd = new FormData();
+          fd.append("video", ref.file, ref.file.name);
+          fd.append("trim_start", String(s.trimStart || 0));
+          fd.append("trim_end", String(s.trimEnd || 0));
+          fd.append("fps", String(s.fps || 24));
+          fd.append("scale_res", String(s.scaleRes || 720));
+          fd.append("use_audio", String(ref.useAudio !== false));
+          fd.append("volume", String(ref.volume != null ? ref.volume : 1.0));
+          const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
+          if(!r.ok) throw new Error("Fallo ffmpeg preprocess");
+          const d = await r.json();
+          ref.uploaded = d.video || null;
+          ref.audioUploaded = d.audio || null;
+        } catch(e){ throw new Error("Fallo prep vídeo ref "+(i+1)+": "+e.message); }
+      }
+    }
+    const rAudios = job.refAudios || refAudios;
+    for(let i=0; i<rAudios.length; i++){
+      const ref = rAudios[i];
+      if(ref.local && !ref.uploaded){
+        try{
+          if(ref.volume !== 1.0){
+            const fd = new FormData();
+            fd.append("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
+            fd.append("volume", String(ref.volume));
+            fd.append("use_audio","true");
+            const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
+            if(!r.ok) throw new Error("Fallo ffmpeg audio");
+            const d = await r.json();
+            ref.uploaded = d.audio || null;
+          } else {
+            ref.uploaded = await _uploadOneHot("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
+          }
+        } catch(e){ throw new Error("Fallo subida audio ref "+(i+1)+": "+e.message); }
+      }
+    }
+    log("Referencias del job listas.","l-ok");
+    return;
+  }
+
+  // Imagen de inicio (i2v / flf2v)
+  if(!job.uploadedFirstImage){
+    const f1 = job.localFirstFile || localFirstFile;
+    if(f1){
+      const fd1 = new FormData();
+      fd1.append("image", f1, f1.name.replace(/^temp_\d+_/, ''));
+      fd1.append("overwrite","true");
+      const r1 = await fetch(server()+"/upload/image",{method:"POST",body:fd1});
+      if(!r1.ok) throw new Error("Fallo al subir imagen de inicio");
+      const d1 = await r1.json();
+      job.uploadedFirstImage = {name:d1.name, subfolder:d1.subfolder||"", type:d1.type||"input"};
+      uploadedFirstImage = {...job.uploadedFirstImage};
+      log("Imagen de inicio subida: "+job.uploadedFirstImage.name,"l-ok");
+    } else if(uploadedFirstImage){
+      job.uploadedFirstImage = {...uploadedFirstImage};
+    } else {
+      throw new Error("No hay imagen de inicio seleccionada. Arrastra una imagen a la zona de inicio.");
+    }
+  }
+
+  // Último frame (solo flf2v)
+  if(job.mode === "flf2v" && !job.uploadedLastImage){
+    const f2 = job.localLastFile || localLastFile;
+    if(f2){
+      const fd2 = new FormData();
+      fd2.append("image", f2, f2.name.replace(/^temp_last_\d+_/, ''));
+      fd2.append("overwrite","true");
+      const r2 = await fetch(server()+"/upload/image",{method:"POST",body:fd2});
+      if(!r2.ok) throw new Error("Fallo al subir último frame");
+      const d2 = await r2.json();
+      job.uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
+      uploadedLastImage = {...job.uploadedLastImage};
+      log("Último frame subido: "+job.uploadedLastImage.name,"l-ok");
+    } else if(uploadedLastImage){
+      job.uploadedLastImage = {...uploadedLastImage};
+    }
+  }
+}
+
 function buildGraph(job){
   const j = job || activeJob || null;
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
@@ -5320,19 +5416,25 @@ async function runSingleGeneration(index) {
 
 async function startJob(job){
   activeJob = job;
-  connectSocket();
-  await ensureJobImagesUploaded(job);
-  totalBatchSize = job.batchSize || 1;
-  currentBatchIndex = 0;
-  batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
-  window.currentBatchMode = false;
-  job.currentVariantIndex = null;
-  $("time1").textContent = "";
-  $("time1").classList.remove("live");
-  setRun("busy", `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
-  enableStopButtons(true);
   updateQueueUI();
-  runSingleGeneration(0);
+  try {
+    connectSocket();
+    await ensureJobImagesUploaded(job);
+    totalBatchSize = job.batchSize || 1;
+    currentBatchIndex = 0;
+    batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
+    window.currentBatchMode = false;
+    job.currentVariantIndex = null;
+    $("time1").textContent = "";
+    $("time1").classList.remove("live");
+    setRun("busy", `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
+    enableStopButtons(true);
+    await runSingleGeneration(0);
+  } catch(err) {
+    log(`❌ Error al iniciar Job #${job.id}: ${err.message || err}`, "l-err");
+    setRun("bad", "Error");
+    finishCurrentJob();
+  }
 }
 
 function finishCurrentJob(){
@@ -5352,7 +5454,7 @@ function finishCurrentJob(){
 
 async function enqueueGeneration(){
   const job = snapshotJob();
-  if(activeJob || (currentPromptId && !handledPrompts.has(currentPromptId))){
+  if(activeJob){
     jobQueue.push(job);
     updateQueueUI();
     log(`📥 Job #${job.id} añadido a la cola (${jobQueue.length} en espera). Puedes seguir cambiando parámetros libremente.`, "l-info");

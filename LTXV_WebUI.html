@@ -4499,16 +4499,24 @@ async function ensureImageUploaded(){
 
 async function ensureJobImageUploaded(job){
   if(job.uploadedImage) return;
-  if(!job.localFile) throw new Error("selecciona imagen");
+  const f = job.localFile || localFile;
+  if(!f){
+    if(uploadedImage){
+      job.uploadedImage = {...uploadedImage};
+      return;
+    }
+    throw new Error("No hay imagen seleccionada. Arrastra una imagen a la zona de entrada.");
+  }
   setRun("busy","subiendo imagen...");
   const fd=new FormData();
-  fd.append("image", job.localFile, job.localFile.name.replace(/^temp_\d+_/, ''));
+  fd.append("image", f, f.name.replace(/^temp_\d+_/, ''));
   fd.append("overwrite","true");
   const r=await fetch(server()+"/upload/image",{method:"POST",body:fd});
-  if(!r.ok) throw new Error("fallo subida");
+  if(!r.ok) throw new Error("Fallo al subir la imagen al servidor");
   const data=await r.json();
   job.uploadedImage={name:data.name, subfolder:data.subfolder||"", type:data.type||"input"};
-  log("Imagen del job subida: "+job.uploadedImage.name,"l-ok");
+  uploadedImage = {...job.uploadedImage};
+  log("Imagen subida al servidor: "+job.uploadedImage.name,"l-ok");
 }
 
 function buildGraph(mode, job){
@@ -5227,24 +5235,30 @@ async function runSingleGeneration(index) {
 
 async function startJob(job){
   activeJob = job;
-  connectSocket();
-  await ensureJobImageUploaded(job);
-  totalBatchSize = job.batchSize || 1;
-  currentBatchIndex = 0;
-  batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
-  window.currentBatchMode = false;
-  generationStep = 1;
-  firstPromptId = null;
-  job.currentVariantIndex = null;
-  // Limpiamos tiempos de jobs anteriores para evitar confusión visual.
-  $("time1").textContent = "";
-  $("time1").classList.remove("live");
-  $("time2").textContent = "";
-  $("time2").classList.remove("live");
-  setRun("busy", `Job #${job.id} en proceso · ${job.firstPassOnly ? "1er pase" : "completo"} · ${job.batchSize} variante(s)...`);
-  enableStopButtons(true);
   updateQueueUI();
-  runSingleGeneration(0);
+  try {
+    connectSocket();
+    await ensureJobImageUploaded(job);
+    totalBatchSize = job.batchSize || 1;
+    currentBatchIndex = 0;
+    batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
+    window.currentBatchMode = false;
+    generationStep = 1;
+    firstPromptId = null;
+    job.currentVariantIndex = null;
+    // Limpiamos tiempos de jobs anteriores para evitar confusión visual.
+    $("time1").textContent = "";
+    $("time1").classList.remove("live");
+    $("time2").textContent = "";
+    $("time2").classList.remove("live");
+    setRun("busy", `Job #${job.id} en proceso · ${job.firstPassOnly ? "1er pase" : "completo"} · ${job.batchSize} variante(s)...`);
+    enableStopButtons(true);
+    await runSingleGeneration(0);
+  } catch(err) {
+    log(`❌ Error al iniciar Job #${job.id}: ${err.message || err}`, "l-err");
+    setRun("bad", "Error");
+    finishCurrentJob();
+  }
 }
 
 function finishCurrentJob(){
@@ -5264,7 +5278,7 @@ function finishCurrentJob(){
 
 async function enqueueGeneration(firstPassOnly){
   const job = snapshotJob(firstPassOnly);
-  if(activeJob || (currentPromptId && !handledPrompts.has(currentPromptId))){
+  if(activeJob){
     jobQueue.push(job);
     updateQueueUI();
     log(`📥 Job #${job.id} añadido a la cola (${jobQueue.length} en espera). Puedes seguir cambiando parámetros o encolar más.`, "l-info");
