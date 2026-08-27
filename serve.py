@@ -30,6 +30,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 HOST = sys.argv[4] if len(sys.argv) > 4 else os.environ.get("HOST", "127.0.0.1")
@@ -37,7 +38,7 @@ BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess")
+CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess", "/api/prompts")
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
@@ -623,6 +624,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_ltxv_list()
         elif self._is_minimaxh3_list():
             self._do_minimaxh3_list()
+        elif self._is_prompts_route():
+            self._do_prompts_get()
         elif self._is_ollama_route():
             self._proxy("GET", OLLAMA)
         elif self._is_proxy_route():
@@ -639,6 +642,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_minimaxh3_list():
             self._send_json(405, {"error": "method not allowed"})
+        elif self._is_prompts_route():
+            self._do_prompts_post()
         elif self._is_file_delete():
             self._do_file_delete()
         elif self._is_krea2_upload():
@@ -870,7 +875,48 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             _LIST_CACHE.pop("ltxv", None)
             _LIST_CACHE.pop("minimaxh3", None)
             self._send_json(200, {"ok": True, "deleted": target})
-        except OSError as e:
+    def _is_prompts_route(self):
+        return self.path.split("?")[0] == "/api/prompts"
+
+    def _do_prompts_get(self):
+        query = urllib.parse.urlparse(self.path).query
+        params = urllib.parse.parse_qs(query)
+        key = params.get("key", ["default"])[0]
+        safe_key = re.sub(r"[^a-zA-Z0-9_]", "", key) or "default"
+        filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"prompts_{safe_key}.json")
+        if os.path.isfile(filepath):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self._send_json(200, data)
+                return
+            except Exception as e:
+                sys.stderr.write(f"[serve] Error leyendo {filepath}: {e}\n")
+        self._send_json(200, {})
+
+    def _do_prompts_post(self):
+        length = int(self.headers.get("Content-Length", 0))
+        if length <= 0 or length > 10 * 1024 * 1024:
+            self._send_json(400, {"error": "payload inválido"})
+            return
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+            key = body.get("key", "default")
+            safe_key = re.sub(r"[^a-zA-Z0-9_]", "", key) or "default"
+            prompts = body.get("prompts", {})
+            if not isinstance(prompts, dict):
+                self._send_json(400, {"error": "prompts debe ser un objeto"})
+                return
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            filepath = os.path.join(base_dir, f"prompts_{safe_key}.json")
+            tmp_path = filepath + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(prompts, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, filepath)
+            sys.stderr.write(f"[serve] Guardados {len(prompts)} prompts en {filepath}\n")
+            self._send_json(200, {"ok": True, "count": len(prompts)})
+        except Exception as e:
+            sys.stderr.write(f"[serve] Error guardando prompts: {e}\n")
             self._send_json(500, {"error": str(e)})
 
     def _send_json(self, status, obj):

@@ -1958,11 +1958,12 @@ function _readPromptStore(){
   try {
     const parsed = JSON.parse(raw);
     if(parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
-    } catch(e){ console.warn("Prompt store corrupto, reseteado:", e); }
+  } catch(e){ console.warn("Prompt store corrupto, reseteado:", e); }
   try { localStorage.removeItem(CONFIG.PROMPTS_KEY); } catch(_){}
   log("⚠️ Prompts guardados corruptos, reseteados.", "l-warn");
   return {};
 }
+
 function _readOpenState(){
   try {
     const parsed = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY + '_open') || '{}');
@@ -1970,7 +1971,45 @@ function _readOpenState(){
   } catch(e){ return {}; }
 }
 
-function loadPrompts(){
+async function _syncPromptsWithServer(){
+  try {
+    const res = await fetch("/api/prompts?key=" + encodeURIComponent(CONFIG.PROMPTS_KEY));
+    if(res.ok){
+      const serverData = await res.json();
+      if(serverData && typeof serverData === "object" && !Array.isArray(serverData)){
+        const local = _readPromptStore();
+        if(Object.keys(serverData).length > 0){
+          localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(serverData));
+          return serverData;
+        } else if(Object.keys(local).length > 0){
+          // El servidor no tenía prompts pero este cliente sí: subimos al servidor
+          _savePromptsToServer(local);
+          return local;
+        }
+      }
+    }
+  } catch(e){
+    console.warn("[Prompts Sync] No se pudo conectar con el servidor de prompts:", e);
+  }
+  return _readPromptStore();
+}
+
+async function _savePromptsToServer(data){
+  try {
+    await fetch("/api/prompts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: CONFIG.PROMPTS_KEY, prompts: data })
+    });
+  } catch(e){
+    console.warn("[Prompts Sync] Error al guardar prompts en servidor:", e);
+  }
+}
+
+async function loadPrompts(skipSync = false){
+  if(!skipSync){
+    await _syncPromptsWithServer();
+  }
   let saved = _readPromptStore();
   let dirty = false;
   for(const key of Object.keys(saved)){
@@ -1978,9 +2017,13 @@ function loadPrompts(){
       delete saved[key]; dirty = true;
     }
   }
-  if(dirty) localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  if(dirty){
+    localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+    _savePromptsToServer(saved);
+  }
 
   const tree = $("promptTree");
+  if(!tree) return;
   tree.innerHTML = '';
 
   if(Object.keys(saved).length === 0){
@@ -2036,7 +2079,8 @@ function loadPrompts(){
           }
         }
         localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
-        loadPrompts();
+        _savePromptsToServer(saved);
+        loadPrompts(true);
         log(`Carpeta "${folderPath}" eliminada (${count} prompt(s)).`, "l-ok");
       });
 
@@ -2090,10 +2134,11 @@ function savePrompt(){
   }
   saved[name] = text;
   localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  _savePromptsToServer(saved);
   selectedPromptKey = name;
   const parts = name.split('/');
   if(parts.length > 1) lastPromptDir = parts.slice(0, -1).join('/');
-  loadPrompts();
+  loadPrompts(true);
   log(`Prompt "${name}" guardado.`, "l-ok");
 }
 
@@ -2109,8 +2154,9 @@ function movePrompt(){
   saved[newName] = saved[oldName];
   delete saved[oldName];
   localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  _savePromptsToServer(saved);
   selectedPromptKey = newName;
-  loadPrompts();
+  loadPrompts(true);
   log(`Prompt movido: "${oldName}" → "${newName}"`, "l-ok");
 }
 
@@ -2120,8 +2166,9 @@ function deletePrompt(){
   const saved = _readPromptStore();
   delete saved[selectedPromptKey];
   localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  _savePromptsToServer(saved);
   selectedPromptKey = null;
-  loadPrompts();
+  loadPrompts(true);
   log(`Prompt eliminado.`, "l-ok");
 }
 
