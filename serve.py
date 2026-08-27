@@ -875,6 +875,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             _LIST_CACHE.pop("ltxv", None)
             _LIST_CACHE.pop("minimaxh3", None)
             self._send_json(200, {"ok": True, "deleted": target})
+        except OSError as e:
+            self._send_json(500, {"error": str(e)})
+
     def _is_prompts_route(self):
         return self.path.split("?")[0] == "/api/prompts"
 
