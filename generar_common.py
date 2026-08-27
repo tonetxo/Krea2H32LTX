@@ -110,7 +110,11 @@ def generate_html(config):
     # --- Build model, LoRA and VAE lists ---
     raw_models = get_file_list(config['model_dirs'], fallback=config['model_fallback'])
     exclude = config.get('model_exclude', ())
-    model_files = [m for m in raw_models if not any(m.startswith(x) for x in exclude)]
+    include = config.get('model_include', None)
+    if include:
+        model_files = [m for m in raw_models if any(x.lower() in m.lower() for x in include) and not any(m.startswith(x) for x in exclude)]
+    else:
+        model_files = [m for m in raw_models if not any(m.startswith(x) for x in exclude)]
     model_js_array = json.dumps(model_files)
 
     if config.get('lora_dirs'):

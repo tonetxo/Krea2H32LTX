@@ -92,7 +92,8 @@ CONFIG.renderVariantMedia = function(card, url, media){
   CONFIG.variantMeta = function(){
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
-    ["VAE", $("vaeSelect")?.value || "Checkpoint"],
+    ["VAE Vídeo", $("vaeSelect")?.value || "Checkpoint"],
+    ["VAE Audio", $("audioVaeSelect")?.value || "Checkpoint"],
     ["Sage", $("sageAttentionType")?.value || "sageattn"],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
@@ -803,12 +804,14 @@ function applyWorkflow(workflow, opts={}){
 
   let modelSet = false;
   const checkpoint = findByClass("CheckpointLoaderSimple");
-  if(checkpoint && checkpoint.inputs && checkpoint.inputs.ckpt_name){
-    const name = checkpoint.inputs.ckpt_name;
+  const unetLoader = findByClass("UNETLoader");
+  const modelName = (checkpoint && checkpoint.inputs && checkpoint.inputs.ckpt_name) ||
+                    (unetLoader && unetLoader.inputs && unetLoader.inputs.unet_name);
+  if(modelName){
     const sel = $("modelSelect");
     if(sel){
       for(const opt of sel.options){
-        if(opt.value === name || name.endsWith("/"+opt.value) || opt.value === name.replace("ltxv/","") || opt.value === name.replace("Stable-Diffusion/","")){
+        if(opt.value === modelName || modelName.endsWith("/"+opt.value) || opt.value === modelName.replace("ltxv/","") || opt.value === modelName.replace("Stable-Diffusion/","") || opt.value === modelName.replace("Ligazón para ","")){
           opt.selected = true; modelSet = true; break;
         }
       }
@@ -816,19 +819,32 @@ function applyWorkflow(workflow, opts={}){
   }
   if(modelSet) setApplied("modelo"); else setMissing("modelo");
 
-  // Restaurar VAE: si existe VAELoader en el workflow, intentar seleccionarlo.
+  // Restaurar VAE (Vídeo y Audio)
   let vaeSet = false;
-  const vaeLoader = findByClass("VAELoader");
+  const vaeLoaders = (function(){
+    const list = [];
+    for(const k of Object.keys(workflow)){
+      const n = workflow[k];
+      if(n && (n.class_type === "VAELoader" || n.type === "VAELoader")) list.push(n);
+    }
+    return list;
+  })();
   const vaeSel = $("vaeSelect");
-  if(vaeLoader && vaeLoader.inputs && vaeLoader.inputs.vae_name && vaeSel){
-    const vaeName = vaeLoader.inputs.vae_name;
-    for(const opt of vaeSel.options){
-      if(opt.value === vaeName || vaeName.endsWith("/"+opt.value)){
-        opt.selected = true; vaeSet = true; break;
+  const audioVaeSel = $("audioVaeSelect");
+  if(vaeLoaders.length && (vaeSel || audioVaeSel)){
+    for(const vl of vaeLoaders){
+      const name = vl.inputs && vl.inputs.vae_name;
+      if(!name) continue;
+      const isAudio = name.toLowerCase().includes("audio");
+      const targetSel = isAudio ? audioVaeSel : vaeSel;
+      if(targetSel){
+        for(const opt of targetSel.options){
+          if(opt.value === name || name.endsWith("/"+opt.value)){
+            opt.selected = true; vaeSet = true; break;
+          }
+        }
       }
     }
-    // Si no está en la lista pero hay un VAELoader, preferimos mostrar "Checkpoint"
-    // (porque el workflow embebido puede no incluir el nodo si usaba el del checkpoint).
   }
   if(vaeSet) setApplied("VAE"); else setMissing("VAE");
 
@@ -1011,25 +1027,62 @@ $("mpSlider").addEventListener("input",()=>{recalcResolution();});
 $("frames").addEventListener("input",updateDuration);
 
 function loadVaes(){
-  const sel = $("vaeSelect");
-  if(!sel) return;
-  sel.innerHTML = "";
-  const checkpointOpt = document.createElement("option");
-  checkpointOpt.value = "Checkpoint";
-  checkpointOpt.textContent = "Checkpoint (VAE del modelo)";
-  sel.appendChild(checkpointOpt);
-  for(const v of AVAILABLE_VAES){
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v;
-    sel.appendChild(opt);
+  const selVideo = $("vaeSelect");
+  const selAudio = $("audioVaeSelect");
+  
+  if(selVideo){
+    selVideo.innerHTML = "";
+    const checkpointOpt = document.createElement("option");
+    checkpointOpt.value = "Checkpoint";
+    checkpointOpt.textContent = "Checkpoint (VAE integrado)";
+    selVideo.appendChild(checkpointOpt);
+    const videoVaes = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).filter(v => !v.toLowerCase().includes("audio"));
+    const otherVaes = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).filter(v => v.toLowerCase().includes("audio"));
+    for(const v of [...videoVaes, ...otherVaes]){
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      selVideo.appendChild(opt);
+    }
+    const defaultVae = CONFIG.DEFAULT_VAE || "Checkpoint";
+    if(defaultVae && Array.from(selVideo.options).some(o => o.value === defaultVae)){
+      selVideo.value = defaultVae;
+    }
   }
-  const defaultVae = CONFIG.DEFAULT_VAE || "Checkpoint";
-  if(defaultVae && Array.from(sel.options).some(o => o.value === defaultVae)){
-    sel.value = defaultVae;
+
+  if(selAudio){
+    selAudio.innerHTML = "";
+    const chkAudio = document.createElement("option");
+    chkAudio.value = "Checkpoint";
+    chkAudio.textContent = "Checkpoint (Audio VAE integrado)";
+    selAudio.appendChild(chkAudio);
+    const audioVaes = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).filter(v => v.toLowerCase().includes("audio"));
+    const otherVaes = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).filter(v => !v.toLowerCase().includes("audio"));
+    for(const v of [...audioVaes, ...otherVaes]){
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      selAudio.appendChild(opt);
+    }
+    const defAudio = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-audio-vae-bf16")) || "Checkpoint";
+    if(defAudio && Array.from(selAudio.options).some(o => o.value === defAudio)){
+      selAudio.value = defAudio;
+    }
   }
 }
 loadVaes();
+
+$("modelSelect")?.addEventListener("change", () => {
+  const m = $("modelSelect").value || "";
+  const is25 = m.includes("ltx-2.5") || m.includes("transformer");
+  if(is25 && typeof AVAILABLE_VAES !== "undefined"){
+    const v25 = AVAILABLE_VAES.find(v => v.includes("ltx-2.5-video-vae-bf16"));
+    const a25 = AVAILABLE_VAES.find(v => v.includes("ltx-2.5-audio-vae-bf16"));
+    if(v25 && $("vaeSelect")) $("vaeSelect").value = v25;
+    if(a25 && $("audioVaeSelect")) $("audioVaeSelect").value = a25;
+    log("ℹ️ Modelo LTX-2.5 seleccionado: VAEs 2.5 de vídeo y audio asignados automáticamente", "l-info");
+  }
+});
 function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint").textContent=`(${f}/24fps=${(f/24).toFixed(1)}s)`;}
 
 // DMD bypass switch
@@ -1272,11 +1325,40 @@ function buildGraph(mode){
   g[N.LORA].inputs.lora_1={on:loras[0].on,lora:loras[0].lora,strength:loras[0].strength};
   g[N.LORA].inputs.lora_2={on:loras[1].on,lora:loras[1].lora,strength:loras[1].strength};
   g[N.LORA].inputs.lora_3={on:loras[2].on,lora:loras[2].lora,strength:loras[2].strength};
-  if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs) g[N.CHECKPOINT].inputs.ckpt_name = $("modelSelect").value;
+  const modelChoice = $("modelSelect")?.value || "";
+  const isDiffusionModel = modelChoice.startsWith("diffusion_models/") || modelChoice.includes("diffusion_models") || modelChoice.includes("transformer") || modelChoice.includes("int8-convrot");
 
-  // VAE: "Checkpoint" mantiene el VAE del nodo CHECKPOINT; cualquier otro valor
+  if(isDiffusionModel){
+    const unetName = modelChoice.startsWith("Ligazón para ") ? modelChoice : ("Ligazón para " + modelChoice);
+    g[N.CHECKPOINT] = {
+      class_type: "UNETLoader",
+      inputs: {
+        unet_name: unetName,
+        weight_dtype: "default"
+      },
+      _meta: { title: "Load Diffusion Model (LTX-2.5)" }
+    };
+    if(g[N.LTXAV_TEXT_ENCODER] && g[N.LTXAV_TEXT_ENCODER].inputs){
+      g[N.LTXAV_TEXT_ENCODER].inputs.ckpt_name = "10Eros_v1.4_bf16.safetensors";
+    }
+  } else {
+    if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs){
+      g[N.CHECKPOINT].class_type = "CheckpointLoaderSimple";
+      g[N.CHECKPOINT].inputs.ckpt_name = modelChoice;
+    }
+    if(g[N.LTXAV_TEXT_ENCODER] && g[N.LTXAV_TEXT_ENCODER].inputs){
+      g[N.LTXAV_TEXT_ENCODER].inputs.ckpt_name = modelChoice;
+    }
+  }
+
+  // VAE Vídeo: "Checkpoint" mantiene el VAE del nodo CHECKPOINT; cualquier otro valor
   // activa el VAELoader personalizado y redirige todas las entradas vae.
-  const vaeChoice = $("vaeSelect")?.value || "";
+  let vaeChoice = $("vaeSelect")?.value || "";
+  if(isDiffusionModel && (!vaeChoice || vaeChoice === "Checkpoint")){
+    vaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-bf16")) ||
+                (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("pruna_ltx2.3_vae")) ||
+                "Ligazón para VAE/LTX-2/ltx-2.5-video-vae-bf16.safetensors";
+  }
   const useCustomVae = vaeChoice && vaeChoice !== "Checkpoint";
   if(useCustomVae && g[N.CUSTOM_VAE] && g[N.CUSTOM_VAE].inputs){
     g[N.CUSTOM_VAE].inputs.vae_name = vaeChoice;
@@ -1291,6 +1373,26 @@ function buildGraph(mode){
         }
       }
     }
+  }
+
+  // VAE Audio
+  let audioVaeChoice = $("audioVaeSelect")?.value || "";
+  if(isDiffusionModel && (!audioVaeChoice || audioVaeChoice === "Checkpoint")){
+    audioVaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-audio-vae-bf16")) ||
+                     (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("LTX23_audio_vae")) ||
+                     "Ligazón para VAE/LTX-2/ltx-2.5-audio-vae-bf16.safetensors";
+  }
+  if(audioVaeChoice && audioVaeChoice !== "Checkpoint" && g["617"]){
+    g["617"] = {
+      class_type: "VAELoader",
+      inputs: {
+        vae_name: audioVaeChoice
+      },
+      _meta: { title: "Load LTXV Audio VAE" }
+    };
+  } else if(g["617"] && g["617"].inputs){
+    g["617"].class_type = "LTXVAudioVAELoader";
+    g["617"].inputs.ckpt_name = isDiffusionModel ? "10Eros_v1.4_bf16.safetensors" : modelChoice;
   }
 
   const bitDepth = getBitDepth();
