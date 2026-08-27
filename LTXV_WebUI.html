@@ -365,7 +365,8 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
       </div>
       <div class="panel"><h2>Resolución & duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
-      <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
+      <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div>
+      <div class="row" style="margin-top:6px;"><label>Prefijo de archivo <span class="hint">(ej: templo/mensaje_botella)</span></label><input type="text" id="filenamePrefix" value="templo/mensaje_botella" placeholder="templo/mensaje_botella"></div></div>
       <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
       <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="10"><div class="slider-val" id="firstPassStepsVal">10</div></div></div>
       <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
@@ -4263,6 +4264,11 @@ $("modelSelect")?.addEventListener("change", () => {
     log("ℹ️ Modelo LTX-2.5 seleccionado: VAEs 2.5 de vídeo y audio asignados automáticamente", "l-info");
   }
 });
+const savedLtxvPrefix = localStorage.getItem("ltxv_filename_prefix");
+if(savedLtxvPrefix && $("filenamePrefix")) $("filenamePrefix").value = savedLtxvPrefix;
+$("filenamePrefix")?.addEventListener("input", (e) => {
+  localStorage.setItem("ltxv_filename_prefix", e.target.value.trim());
+});
 function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint").textContent=`(${f}/24fps=${(f/24).toFixed(1)}s)`;}
 
 // DMD bypass switch
@@ -4625,6 +4631,15 @@ function buildGraph(mode){
   // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
   if(dmdBypass && g[N.LORA] && g[N.LORA].inputs.model){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
+  }
+
+  // Prefijo de archivo configurable
+  const prefix = $("filenamePrefix")?.value.trim() || "templo/mensaje_botella";
+  if(g[N.FINAL_SAVE] && g[N.FINAL_SAVE].inputs){
+    g[N.FINAL_SAVE].inputs.filename_prefix = prefix;
+  }
+  if(g[N.FIRST_SAVE] && g[N.FIRST_SAVE].inputs){
+    g[N.FIRST_SAVE].inputs.filename_prefix = prefix + "_prev";
   }
 
   if(mode === "first"){

@@ -342,7 +342,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
         <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segSamplerRandom">Aleatoria</div><div class="seg" id="segSamplerFixed">Fija</div></div><input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled></div>
         <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div></div>
 
-      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar imagen</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
+      <div class="panel"><h2>Ejecución</h2><div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo <span class="hint">(ej: krea2/imagen)</span></label><input type="text" id="filenamePrefix" value="krea2/imagen" placeholder="krea2/imagen"></div><div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar imagen</button><button id="btnStopAll" class="danger" disabled>Parar todo</button></div><div class="statusbar"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="log" id="log">listo.</div></div>
     </div>
     <div class="results-col">
       <!-- REPRODUCTOR IMAGEN FINAL -->
@@ -3212,6 +3212,12 @@ $("segSamplerFixed").addEventListener("click",()=>{$("segSamplerFixed").classLis
 // --- ETA ---
 $("etaSlider").addEventListener("input",()=>{$("etaVal").textContent=parseFloat($("etaSlider").value).toFixed(2);});
 
+const savedKrea2Prefix = localStorage.getItem("krea2_filename_prefix");
+if(savedKrea2Prefix && $("filenamePrefix")) $("filenamePrefix").value = savedKrea2Prefix;
+$("filenamePrefix")?.addEventListener("input", (e) => {
+  localStorage.setItem("krea2_filename_prefix", e.target.value.trim());
+});
+
 // --- BUILD GRAPH ---
 function buildGraph(){
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
@@ -3278,6 +3284,12 @@ function buildGraph(){
   g[N.SAMPLER].inputs.eta = parseFloat($("etaSlider").value);
   g[N.SAMPLER].inputs.steps = parseInt($("steps").value, 10);
   g[N.SAMPLER].inputs.seed = $("segSamplerRandom").classList.contains("on") ? -1 : parseInt($("samplerSeed").value, 10);
+
+  const prefix = $("filenamePrefix")?.value.trim() || "krea2/imagen";
+  if(g[N.SAVE_IMAGE] && g[N.SAVE_IMAGE].inputs){
+    g[N.SAVE_IMAGE].inputs.filename_prefix = prefix;
+  }
+
   return g;
 }
 

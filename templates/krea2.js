@@ -885,6 +885,12 @@ $("segSamplerFixed").addEventListener("click",()=>{$("segSamplerFixed").classLis
 // --- ETA ---
 $("etaSlider").addEventListener("input",()=>{$("etaVal").textContent=parseFloat($("etaSlider").value).toFixed(2);});
 
+const savedKrea2Prefix = localStorage.getItem("krea2_filename_prefix");
+if(savedKrea2Prefix && $("filenamePrefix")) $("filenamePrefix").value = savedKrea2Prefix;
+$("filenamePrefix")?.addEventListener("input", (e) => {
+  localStorage.setItem("krea2_filename_prefix", e.target.value.trim());
+});
+
 // --- BUILD GRAPH ---
 function buildGraph(){
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
@@ -951,6 +957,12 @@ function buildGraph(){
   g[N.SAMPLER].inputs.eta = parseFloat($("etaSlider").value);
   g[N.SAMPLER].inputs.steps = parseInt($("steps").value, 10);
   g[N.SAMPLER].inputs.seed = $("segSamplerRandom").classList.contains("on") ? -1 : parseInt($("samplerSeed").value, 10);
+
+  const prefix = $("filenamePrefix")?.value.trim() || "krea2/imagen";
+  if(g[N.SAVE_IMAGE] && g[N.SAVE_IMAGE].inputs){
+    g[N.SAVE_IMAGE].inputs.filename_prefix = prefix;
+  }
+
   return g;
 }
 

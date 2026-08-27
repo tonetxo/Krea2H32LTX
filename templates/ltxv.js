@@ -1083,6 +1083,11 @@ $("modelSelect")?.addEventListener("change", () => {
     log("ℹ️ Modelo LTX-2.5 seleccionado: VAEs 2.5 de vídeo y audio asignados automáticamente", "l-info");
   }
 });
+const savedLtxvPrefix = localStorage.getItem("ltxv_filename_prefix");
+if(savedLtxvPrefix && $("filenamePrefix")) $("filenamePrefix").value = savedLtxvPrefix;
+$("filenamePrefix")?.addEventListener("input", (e) => {
+  localStorage.setItem("ltxv_filename_prefix", e.target.value.trim());
+});
 function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint").textContent=`(${f}/24fps=${(f/24).toFixed(1)}s)`;}
 
 // DMD bypass switch
@@ -1445,6 +1450,15 @@ function buildGraph(mode){
   // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
   if(dmdBypass && g[N.LORA] && g[N.LORA].inputs.model){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
+  }
+
+  // Prefijo de archivo configurable
+  const prefix = $("filenamePrefix")?.value.trim() || "templo/mensaje_botella";
+  if(g[N.FINAL_SAVE] && g[N.FINAL_SAVE].inputs){
+    g[N.FINAL_SAVE].inputs.filename_prefix = prefix;
+  }
+  if(g[N.FIRST_SAVE] && g[N.FIRST_SAVE].inputs){
+    g[N.FIRST_SAVE].inputs.filename_prefix = prefix + "_prev";
   }
 
   if(mode === "first"){

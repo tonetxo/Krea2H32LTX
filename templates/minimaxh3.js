@@ -1490,6 +1490,12 @@ $("stepsSlider")?.addEventListener("input",(e)=>{$("stepsVal").textContent=e.tar
 $("mpSlider").addEventListener("input",()=>{recalcResolution();});
 $("duration").addEventListener("input",updateDurationHints);
 
+const savedMinimaxPrefix = localStorage.getItem("minimaxh3_filename_prefix");
+if(savedMinimaxPrefix && $("filenamePrefix")) $("filenamePrefix").value = savedMinimaxPrefix;
+$("filenamePrefix")?.addEventListener("input", (e) => {
+  localStorage.setItem("minimaxh3_filename_prefix", e.target.value.trim());
+});
+
 function alignFrameCount(n){
   let f = Math.max(5, Math.round(n));
   while(f % 17 !== 5){
@@ -2089,6 +2095,11 @@ function buildGraph(){
   const bitDepth = getBitDepth();
   if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
     g[N.CREATE_VIDEO].inputs.bit_depth = bitDepth;
+  }
+
+  const prefix = $("filenamePrefix")?.value.trim() || "video/MiniMax_H3";
+  if(g[N.SAVE] && g[N.SAVE].inputs){
+    g[N.SAVE].inputs.filename_prefix = prefix;
   }
 
   return g;

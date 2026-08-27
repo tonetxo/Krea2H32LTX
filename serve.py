@@ -680,10 +680,11 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def _build_krea2_list(self):
         items = []
+        output_dir = os.path.join(COMFYUI_ROOT, "output")
         try:
             paths = []
-            for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
-                paths.extend(glob.glob(os.path.join(KREA2_OUTPUT_DIR, pattern)))
+            for pattern in ("**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"):
+                paths.extend(glob.glob(os.path.join(output_dir, pattern), recursive=True))
             # eliminar duplicados si hay alias .jpg/.jpeg
             seen = set()
             unique_paths = []
@@ -699,14 +700,18 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 except OSError:
                     continue
             paths_with_time.sort(key=lambda x: x[0], reverse=True)
-            paths = [p for _, p in paths_with_time][:50]
+            paths = [p for _, p in paths_with_time][:60]
 
             for p in paths:
                 try:
                     st = os.stat(p)
+                    rel = os.path.relpath(p, output_dir)
+                    parts = rel.split(os.sep)
+                    filename = parts[-1]
+                    subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
                     items.append({
-                        "filename": os.path.basename(p),
-                        "subfolder": "krea2",
+                        "filename": filename,
+                        "subfolder": subfolder,
                         "type": "output",
                         "mtime": int(st.st_mtime),
                         "size": st.st_size,
@@ -716,7 +721,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         except OSError as e:
             sys.stderr.write(f"[serve] krea2_list error: {e}\n")
         return {
-            "dir": KREA2_OUTPUT_DIR,
+            "dir": output_dir,
             "count": len(items),
             "items": items,
         }
@@ -770,7 +775,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         }
 
     def _do_minimaxh3_list(self):
-        """List MP4s in ComfyUI output/video/MiniMax_H3, newest first, max 100."""
+        """List MP4s in ComfyUI output dir (recursive), newest first, max 100."""
         cached = _LIST_CACHE.get("minimaxh3")
         if cached and cached[0] > time.time():
             self._send_json(200, cached[1])
@@ -781,14 +786,11 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def _build_minimaxh3_list(self):
         items = []
-        # SaveVideo con filename_prefix="video/MiniMax_H3" guarda como
-        # "MiniMax_H3_NNNN_.mp4" dentro de output/video/ (el prefijo "video/"
-        # se interpreta como subfolder, "MiniMax_H3" como base del nombre).
-        video_dir = os.path.join(COMFYUI_ROOT, "output", "video")
+        output_dir = os.path.join(COMFYUI_ROOT, "output")
         try:
-            all_mp4 = glob.glob(os.path.join(video_dir, "MiniMax_H3_*.mp4"))
+            paths = glob.glob(os.path.join(output_dir, "**", "*.mp4"), recursive=True)
             paths_with_time = []
-            for p in all_mp4:
+            for p in paths:
                 try:
                     paths_with_time.append((os.path.getmtime(p), p))
                 except OSError:
@@ -799,9 +801,13 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             for p in paths:
                 try:
                     st = os.stat(p)
+                    rel = os.path.relpath(p, output_dir)
+                    parts = rel.split(os.sep)
+                    filename = parts[-1]
+                    subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
                     items.append({
-                        "filename": os.path.basename(p),
-                        "subfolder": "video",
+                        "filename": filename,
+                        "subfolder": subfolder,
                         "type": "output",
                         "mtime": int(st.st_mtime),
                         "size": st.st_size,
@@ -811,7 +817,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         except OSError as e:
             sys.stderr.write(f"[serve] minimaxh3_list error: {e}\n")
         return {
-            "dir": video_dir,
+            "dir": output_dir,
             "count": len(items),
             "items": items,
         }
