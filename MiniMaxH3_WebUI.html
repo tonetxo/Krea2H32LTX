@@ -4814,11 +4814,35 @@ function buildGraph(job){
     }
   }
 
+  // 6. Model Preview Override (preview animado, sin taeh3).
+  // tiny_vae="none" fuerza el fallback `_decode_video_frames_l2rgb` de KJNodes:
+  // lee los latent_rgb_factors de MiniMaxH3Video, decodifica 16 frames del latente
+  // y los anima via WS. NO usar "taesd" como preview_method (crashea con taeh3:
+  // first_stage_model=None). Con suppress_default_preview=true evitamos doble preview.
+  const prevMethod = getPreviewMethod();
+  if(prevMethod !== "none"){
+    const previewOverrideKey = "170";
+    g[previewOverrideKey] = {
+      class_type: "ModelPreviewOverrideKJ",
+      inputs: {
+        model: [currentModelNode, 0],
+        max_resolution: 768,
+        jpeg_quality: 80,
+        suppress_default_preview: true,
+        preview_frames: 32,
+        preview_fps: 6,
+        tiny_vae: "none"
+      },
+      _meta: { title: "Model Preview Override (animado L2RGB)" }
+    };
+    currentModelNode = previewOverrideKey;
+  }
+
   // Limpiar nodos de switch estáticos no necesarios de la plantilla
   delete g["141"]; delete g["142"]; delete g["143"]; delete g["144"]; delete g["146"];
   delete g["156"]; delete g["157"]; delete g["160"];
 
-  // 6. Proceso de LoRAs dinámico
+  // 7. Proceso de LoRAs dinámico
   const jobLoras = j ? j.loras : loras;
   for(let i = 0; i < jobLoras.length; i++){
     const loraObj = jobLoras[i];
