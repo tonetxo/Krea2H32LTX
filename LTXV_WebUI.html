@@ -2335,12 +2335,12 @@ async function loadPrompts(skipSync = false){
 }
 
 function savePrompt(){
-  const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
+  const defaultName = selectedPromptKey || (lastPromptDir ? lastPromptDir + "/" : "");
   const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):", defaultName);
   if(!name) return;
   const text = $("prompt").value;
   const saved = _readPromptStore();
-  if(saved[name]){
+  if(saved[name] && name !== selectedPromptKey){
     const preview = saved[name].slice(0, 80);
     if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
   }
