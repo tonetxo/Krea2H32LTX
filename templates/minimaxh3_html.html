@@ -140,7 +140,7 @@
         <div class="row"><label>Frames <span class="hint" id="framesHint">(243 / 24fps = 10.12s)</span></label><input type="number" id="frames" value="243" step="17" min="17" class="ro" readonly></div>
         <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div>
         <div class="row" style="margin-top:6px;"><label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3)</span></label><input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3"></div>
-      <div class="panel"><h2>Ejecución</h2><div class="btn-row"><button id="btnGenerate" class="primary">Generar vídeo</button></div><div class="btn-row" style="margin-top:6px"><button id="btnStopVideo" disabled>Parar vídeo</button><button id="btnStopAll" class="danger" disabled>Parar todo</button><button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button></div><div class="queue-status-box"><div class="queue-status-row"><div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div><div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div></div><div class="queue-splits"><div class="queue-split-card"><div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div><div class="queue-split-main" id="queueWebuiSummary">0 en espera</div><div class="queue-split-sub" id="queueWebuiDetail">En reposo</div></div><div class="queue-split-card"><div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div><div class="queue-split-main" id="queueServerSummary">0 en espera</div><div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div></div></div><div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;"><div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div><div class="queue-items-body" id="queueItemsList"></div></div></div><div class="log" id="log">listo.</div></div>
+      </div>
     </div>
     <div class="results-col">
       <!-- REPRODUCTOR ÚNICO -->
@@ -171,6 +171,40 @@
       <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
         <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
         <div class="variant-grid" id="variantGrid"></div>
+      </div>
+
+      <!-- PANEL DE EJECUCIÓN Y COLAS -->
+      <div class="panel" style="margin-bottom:0;">
+        <h2>Ejecución</h2>
+        <div class="btn-row"><button id="btnGenerate" class="primary">Generar vídeo</button></div>
+        <div class="btn-row" style="margin-top:6px">
+          <button id="btnStopVideo" disabled>Parar vídeo</button>
+          <button id="btnStopAll" class="danger" disabled>Parar todo</button>
+          <button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
+        </div>
+        <div class="queue-status-box">
+          <div class="queue-status-row">
+            <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
+            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
+          </div>
+          <div class="queue-splits">
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div>
+              <div class="queue-split-main" id="queueWebuiSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueWebuiDetail">En reposo</div>
+            </div>
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div>
+              <div class="queue-split-main" id="queueServerSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div>
+            </div>
+          </div>
+          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
+            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
+            <div class="queue-items-body" id="queueItemsList"></div>
+          </div>
+        </div>
+        <div class="log" id="log">listo.</div>
       </div>
 
       <!-- HISTORIAL DE VÍDEOS -->
