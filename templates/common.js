@@ -268,6 +268,7 @@ function connectSocket() {
             currentBatchIndex++;
             processNextBatch();
         }
+    };
     socket.onerror = (err) => console.error("WS Error", err);
 }
 
