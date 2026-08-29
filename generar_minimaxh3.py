@@ -13,6 +13,7 @@ UNET_PREFIX = os.environ.get("MINIMAXH3_UNET_PREFIX", "Ligazón para diffusion_m
 CLIP_DIR = os.environ.get("MINIMAXH3_CLIP_DIR", "/home/tonetxo/SwarmUI/Models/text_encoders")
 LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/h3")
 LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "Ligazón para Lora/h3")
+INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/frame_interpolation")
 # Puerto donde se sirve esta UI (para el botón "enviar a ..." desde otras UIs).
 MINIMAXH3_UI_PORT = os.environ.get("MINIMAXH3_UI_PORT", "8002")
 # ---------------------
@@ -37,6 +38,9 @@ def main():
         # VAEs aproximados (taeh3 para live previews de alta calidad)
         'vae_dir': '/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/vae_approx',
         'vae_fallback': 'taeh3.safetensors',
+        # Frame Interpolation (RIFE / FILM)
+        'interp_dir': INTERP_DIR,
+        'interp_fallback': 'rife_v4.26.safetensors',
         # UNet y CLIP sí se exponen como selectores.
         'unet_dirs': [(UNET_DIR, UNET_PREFIX)],
         'unet_fallback': 'Ligazón para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors',

@@ -19,6 +19,7 @@ const CONFIG = {
     ATTN_BACKEND:"147", NOISE:"129", DURATION:"132", MATH:"131",
     SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
     SAMPLER:"125", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
+    RIFE_LOADER:"180", RIFE_INTERP:"181",
     RTX_SR:"148", CREATE_VIDEO:"130", SAVE:"92",
   },
   loras: [
@@ -272,6 +273,44 @@ $("spectrumBlend")?.addEventListener("input", (e) => { $("spectrumBlendVal").tex
 $("spectrumFlex")?.addEventListener("input", (e) => { $("spectrumFlexVal").textContent = parseFloat(e.target.value).toFixed(2); const s = getSpectrumState(); s.flex = parseFloat(e.target.value); saveSpectrum(s); });
 $("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").textContent = e.target.value; const s = getSpectrumState(); s.warmup = parseInt(e.target.value, 10); saveSpectrum(s); });
 $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); });
+
+// --- FRAME INTERPOLATION (RIFE) ---
+const RIFE_KEY = "minimaxh3_rife_state";
+const RIFE_DEFAULTS = { enabled: true, multiplier: 2, model: "rife_v4.26.safetensors" };
+function loadRife(){
+  try { return Object.assign({}, RIFE_DEFAULTS, JSON.parse(localStorage.getItem(RIFE_KEY) || "{}")); }
+  catch(_) { return {...RIFE_DEFAULTS}; }
+}
+function saveRife(r){ try { localStorage.setItem(RIFE_KEY, JSON.stringify(r)); } catch(_){} }
+function setRifeUI(r){
+  const on = $("segRifeOn"), off = $("segRifeOff");
+  if(r.enabled){ on?.classList.add("on"); off?.classList.remove("on"); }
+  else { off?.classList.add("on"); on?.classList.remove("on"); }
+  if($("rifeMultiplier")){
+    $("rifeMultiplier").value = r.multiplier;
+    const fps = 24 * parseInt(r.multiplier, 10);
+    if($("rifeFpsHint")) $("rifeFpsHint").textContent = `(24fps → ${fps}fps)`;
+  }
+  if($("rifeModel") && r.model) $("rifeModel").value = r.model;
+}
+function getRifeState(){
+  const mult = parseInt($("rifeMultiplier")?.value || "2", 10);
+  return {
+    enabled: $("segRifeOn")?.classList.contains("on") ?? true,
+    multiplier: mult,
+    model: $("rifeModel")?.value || "rife_v4.26.safetensors"
+  };
+}
+const _rifeState = loadRife();
+setRifeUI(_rifeState);
+$("segRifeOn")?.addEventListener("click", () => { const r = getRifeState(); r.enabled = true; setRifeUI(r); saveRife(r); });
+$("segRifeOff")?.addEventListener("click", () => { const r = getRifeState(); r.enabled = false; setRifeUI(r); saveRife(r); });
+$("rifeMultiplier")?.addEventListener("change", (e) => {
+  const mult = parseInt(e.target.value, 10);
+  if($("rifeFpsHint")) $("rifeFpsHint").textContent = `(24fps → ${24 * mult}fps)`;
+  const r = getRifeState(); r.multiplier = mult; saveRife(r);
+});
+$("rifeModel")?.addEventListener("change", (e) => { const r = getRifeState(); r.model = e.target.value; saveRife(r); });
 
 // --- MODO i2v / flf2v / r2v ---
 function setModeUI(mode){
@@ -695,6 +734,7 @@ CONFIG.variantMeta = function(){
   const s = getSpectrumState();
   const h = getH3OptState();
   const ss = getSigmaShiftState();
+  const r = getRifeState();
   const w = parseInt($("width")?.value || "1120", 10);
   const he = parseInt($("height")?.value || "640", 10);
   const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
@@ -706,6 +746,7 @@ CONFIG.variantMeta = function(){
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
     ["Sigma Shift", `Vídeo ${ss.shiftVideo.toFixed(1)} / Audio ${ss.shiftAudio.toFixed(1)}`],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
+    ["Interpolación RIFE", r.enabled ? `on · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
     ["Steps", $("stepsSlider")?.value || "20"],
@@ -1029,6 +1070,7 @@ function snapshotJob(){
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
+    rife: getRifeState(),
     attnBackend: $("attnBackend")?.value,
     loras: JSON.parse(JSON.stringify(loras)),
     batchSize: parseInt($("batchSize")?.value || "1", 10),
@@ -1070,6 +1112,7 @@ function restoreJob(job){
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
   if(job.spectrum){ setSpectrumUI(job.spectrum); saveSpectrum(job.spectrum); }
+  if(job.rife){ setRifeUI(job.rife); saveRife(job.rife); }
   setModeUI(job.mode || "i2v");
   $("batchSize").value = job.batchSize;
   uploadedFirstImage = job.uploadedFirstImage;
@@ -1625,6 +1668,31 @@ function loadClips(){
   if(Array.from(sel.options).some(o => o.value === fb)) sel.value = fb;
 }
 loadClips();
+
+function loadInterpModels(){
+  const sel = $("rifeModel");
+  if(!sel) return;
+  const models = (typeof AVAILABLE_INTERP_MODELS !== "undefined" && AVAILABLE_INTERP_MODELS.length)
+    ? AVAILABLE_INTERP_MODELS
+    : [
+      "rife_v4.26.safetensors",
+      "rife_v4.26_heavy.safetensors",
+      "rife_v4.25.safetensors",
+      "rife_v4.25_lite.safetensors",
+      "rife_v4.25_heavy.safetensors",
+      "film_net_fp16.safetensors"
+    ];
+  sel.innerHTML = "";
+  for(const m of models){
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    sel.appendChild(opt);
+  }
+  const fb = "rife_v4.26.safetensors";
+  if(Array.from(sel.options).some(o => o.value === fb)) sel.value = fb;
+}
+loadInterpModels();
 
 // Zoom/pan/fullscreen para imagen de entrada
 const inputZoom = setupZoomPan("inputWrap", "inputImg", "btnResetZoomInput", "btnFullscreenInput");
@@ -2286,6 +2354,50 @@ function buildGraph(job){
   const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "video/MiniMax_H3";
   if(g[N.SAVE] && g[N.SAVE].inputs){
     g[N.SAVE].inputs.filename_prefix = prefix;
+  }
+
+  // 10. Frame Interpolation (RIFE) — se conecta ANTES de RTXVideoSuperResolution
+  const rifeState = j ? j.rife : getRifeState();
+  const rifeEnabled = rifeState ? rifeState.enabled : true;
+  const rifeMultiplier = rifeState ? parseInt(rifeState.multiplier || "2", 10) : 2;
+  const rifeModel = rifeState ? (rifeState.model || "rife_v4.26.safetensors") : "rife_v4.26.safetensors";
+
+  if(rifeEnabled){
+    g[N.RIFE_LOADER] = {
+      inputs: {
+        model_name: rifeModel
+      },
+      class_type: "FrameInterpolationModelLoader",
+      _meta: {
+        title: "Frame Interpolation Model Loader"
+      }
+    };
+    g[N.RIFE_INTERP] = {
+      inputs: {
+        multiplier: rifeMultiplier,
+        images: [N.DECODE_VIDEO, 0],
+        interp_model: [N.RIFE_LOADER, 0]
+      },
+      class_type: "FrameInterpolate",
+      _meta: {
+        title: "Frame Interpolate"
+      }
+    };
+    if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
+      g[N.RTX_SR].inputs.images = [N.RIFE_INTERP, 0];
+    }
+    if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
+      g[N.CREATE_VIDEO].inputs.fps = 24 * rifeMultiplier;
+    }
+  } else {
+    delete g[N.RIFE_LOADER];
+    delete g[N.RIFE_INTERP];
+    if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
+      g[N.RTX_SR].inputs.images = [N.DECODE_VIDEO, 0];
+    }
+    if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
+      g[N.CREATE_VIDEO].inputs.fps = 24;
+    }
   }
 
   return g;

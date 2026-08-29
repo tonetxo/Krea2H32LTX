@@ -145,6 +145,13 @@ def generate_html(config):
         clip_files = []
     clip_js_array = json.dumps(clip_files)
 
+    if config.get('interp_dir'):
+        raw_interps = get_file_list(config['interp_dir'], fallback=config.get('interp_fallback', 'rife_v4.26.safetensors'))
+        interp_files = raw_interps
+    else:
+        interp_files = []
+    interp_js_array = json.dumps(interp_files)
+
     ltxv_ui_port = config.get('ltxv_ui_port', '8000')
 
     # --- Assemble CSS ---
@@ -168,6 +175,7 @@ def generate_html(config):
         "const AVAILABLE_VAES = __VAE_LIST__;\n"
         "const AVAILABLE_UNETS = __UNET_LIST__;\n"
         "const AVAILABLE_CLIPS = __CLIP_LIST__;\n"
+        "const AVAILABLE_INTERP_MODELS = __INTERP_LIST__;\n"
         "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
         + common_js + "\n"
         + ui_js
@@ -206,6 +214,7 @@ def generate_html(config):
     html = html.replace('__VAE_LIST__', vae_js_array)
     html = html.replace('__UNET_LIST__', unet_js_array)
     html = html.replace('__CLIP_LIST__', clip_js_array)
+    html = html.replace('__INTERP_LIST__', interp_js_array)
     html = html.replace('__LTXV_UI_PORT__', json.dumps(ltxv_ui_port))
 
     # --- Write output ---
