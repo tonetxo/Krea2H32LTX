@@ -9,7 +9,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "krea2",
   DEFAULT_MODEL: "krea2_turbo_convrot_int4_fast.safetensors",
-  N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
+  N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100",SAVE_IMAGE:"100"},
   loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -223,6 +223,22 @@ $("btnSendLtxv").addEventListener("click", () => {
   const win = window.open(url, "_blank");
   if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
   else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
+});
+
+$("btnSendH3")?.addEventListener("click", () => {
+  if(!currentOutputMedia || !currentOutputMedia.filename){
+    log("⚠️ Primero genera una imagen para poder enviarla a MiniMax H3.", "l-err");
+    return;
+  }
+  const filename = currentOutputMedia.filename;
+  const ref = encodeURIComponent(filename);
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
+  const url = `${here.protocol}//${targetHost}:${targetPort}/MiniMaxH3_WebUI.html?ref=${ref}`;
+  const win = window.open(url, "_blank");
+  if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
+  else log("↗️ Abriendo MiniMax H3 con la imagen: "+filename, "l-ok");
 });
 
 let _fsResetTimer = null;
@@ -1086,8 +1102,9 @@ function buildGraph(job){
   g[N.SAMPLER].inputs.seed = (sampSeedMode === "random") ? -1 : sampSeedVal;
 
   const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "krea2/imagen";
-  if(g[N.SAVE_IMAGE] && g[N.SAVE_IMAGE].inputs){
-    g[N.SAVE_IMAGE].inputs.filename_prefix = prefix;
+  const saveNode = g[N.SAVE_IMAGE] || g[N.SAVE];
+  if(saveNode && saveNode.inputs){
+    saveNode.inputs.filename_prefix = prefix;
   }
 
   return g;
@@ -1279,11 +1296,7 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
       const result = await r.json();
       const text = (result.response || "").trim();
       $("enhancerOutput").value = text;
-      if(text){
-        $("prompt").value = text;
-        log("✏️ Prompt actualizado desde Ollama.", "l-ok");
-      }
-      log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
+      log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
     } catch(e) {
       log("❌ Error al mejorar: "+e.message, "l-err");
       $("enhancerOutput").value = "Error: "+e.message;
@@ -1393,6 +1406,54 @@ $("btnSendRefLtxv").addEventListener("click", async () => {
     openLtxv(finalName);
   } catch(e){
     log("❌ No se pudo enviar la imagen a LTXV: "+e.message, "l-err");
+  }
+});
+
+$("btnSendRefH3")?.addEventListener("click", async () => {
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia.", "l-err");
+    return;
+  }
+  const src = refImgEl.src;
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
+  const openH3 = (filename) => {
+    const ref = encodeURIComponent(filename);
+    const url = `${here.protocol}//${targetHost}:${targetPort}/MiniMaxH3_WebUI.html?ref=${ref}`;
+    const win = window.open(url, "_blank");
+    if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
+    else log("↗️ Abriendo MiniMax H3 con la imagen: "+filename, "l-ok");
+  };
+
+  const m = src.match(/[?&]filename=([^&]+)/);
+  if(m){
+    openH3(decodeURIComponent(m[1]));
+    return;
+  }
+
+  if(!src.startsWith("data:")){
+    log("⚠️ Origen de imagen no soportado: "+src.slice(0,40), "l-err");
+    return;
+  }
+  log("⏳ Subiendo imagen de referencia para enviarla a MiniMax H3...", "l-info");
+  try {
+    const blob = await (await fetch(src)).blob();
+    const ts = Date.now();
+    const ext = (blob.type && blob.type.split("/")[1]) || "png";
+    const filename = `ref_${ts}.${ext.replace(/[^a-z0-9]/i,"")}`;
+    const fd = new FormData();
+    fd.append("image", new File([blob], filename, { type: blob.type || "image/png" }));
+    const r = await fetch("/api/krea2_upload", { method: "POST", body: fd });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const finalName = (data.name || filename).replace(/^.*\//, "");
+    log("✅ Imagen subida a output/krea2/"+finalName, "l-ok");
+    openH3(finalName);
+  } catch(e){
+    log("❌ No se pudo enviar la imagen a MiniMax H3: "+e.message, "l-err");
   }
 });
 

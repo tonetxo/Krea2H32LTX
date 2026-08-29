@@ -10,6 +10,8 @@ MODELS_DIR = os.environ.get("KREA2_MODELS_DIR", "/home/tonetxo/SwarmUI/Models/di
 LORAS_DIR = os.environ.get("KREA2_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/K2")
 # Puerto donde se sirve la UI LTXV (para el botón "enviar a LTXV").
 LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
+# Puerto donde se sirve la UI MiniMaxH3 (para el botón "enviar a H3").
+MINIMAXH3_UI_PORT = os.environ.get("MINIMAXH3_UI_PORT", "8002")
 # ---------------------
 
 def main():
@@ -30,6 +32,7 @@ def main():
         'header_sub': 'grafo: Krea2_OK',
         'model_count_label': 'modelos',
         'ltxv_ui_port': LTXV_UI_PORT,
+        'minimaxh3_ui_port': MINIMAXH3_UI_PORT,
     })
 
 if __name__ == '__main__':

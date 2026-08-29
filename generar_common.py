@@ -153,6 +153,7 @@ def generate_html(config):
     interp_js_array = json.dumps(interp_files)
 
     ltxv_ui_port = config.get('ltxv_ui_port', '8000')
+    minimaxh3_ui_port = config.get('minimaxh3_ui_port', '8002')
 
     # --- Assemble CSS ---
     css = _read_template('base.css') + '\n' + _read_template(config['ui_css'])
@@ -177,6 +178,7 @@ def generate_html(config):
         "const AVAILABLE_CLIPS = __CLIP_LIST__;\n"
         "const AVAILABLE_INTERP_MODELS = __INTERP_LIST__;\n"
         "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
+        "const MINIMAXH3_UI_PORT = __MINIMAXH3_UI_PORT__;\n"
         + common_js + "\n"
         + ui_js
     )
@@ -216,6 +218,7 @@ def generate_html(config):
     html = html.replace('__CLIP_LIST__', clip_js_array)
     html = html.replace('__INTERP_LIST__', interp_js_array)
     html = html.replace('__LTXV_UI_PORT__', json.dumps(ltxv_ui_port))
+    html = html.replace('__MINIMAXH3_UI_PORT__', json.dumps(minimaxh3_ui_port))
 
     # --- Write output ---
     with open(config['output_html'], 'w', encoding='utf-8') as f:

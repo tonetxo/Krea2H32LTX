@@ -2251,31 +2251,25 @@ $("btnEnhance").addEventListener("click", async () => {
     const result = await r.json();
     const text = (result.response || "").trim();
     $("enhancerOutput").value = text;
-    // Si el modo es Ollama o Ambos, actualizamos tambin el textbox principal
-    if(chainMode === LTX2_CHAIN_OLLAMA || chainMode === LTX2_CHAIN_BOTH){
-      $("prompt").value = text;
-      log("✏️ Prompt actualizado desde Ollama.", "l-ok");
-      // Previsualizacin del prompt final con LTX2 (sin ejecutar ComfyUI)
-      if(chainMode === LTX2_CHAIN_BOTH){
-        log("⏳ Ejecutando previsualización LTX2 en ComfyUI...", "l-info");
-        const ltx2Text = await runLTX2Preview(text);
-        if(!ltx2Text){
-          $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n(no se pudo previsualizar)`;
-        } else if(ltx2Text.trim() === text.trim()){
-          $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n(texto idéntico al de Ollama)`;
-        } else {
-          const score = ltx2ChangeScore(text, ltx2Text);
-          const onlyAppended = (score.prefix >= text.trim().length - 1) && score.suffix === 0;
-          const note = onlyAppended
-            ? ` (sólo añadió al final; se mantiene Ollama)`
-            : "";
-          $("ltx2PreviewText").value =
-            `[Ollama · ${text.length} chars]\n${text}\n\n` +
-            `[LTX2 · ${ltx2Text.length} chars · Δ ${score.chars} (${(score.pct*100).toFixed(1)}%)]${note}\n${ltx2Text}`;
-        }
+    if(chainMode === LTX2_CHAIN_BOTH){
+      log("Ejecutando previsualizacion LTX2 en ComfyUI...", "l-info");
+      const ltx2Text = await runLTX2Preview(text);
+      if(!ltx2Text){
+        $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n(no se pudo previsualizar)`;
+      } else if(ltx2Text.trim() === text.trim()){
+        $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n(texto identico al de Ollama)`;
+      } else {
+        const score = ltx2ChangeScore(text, ltx2Text);
+        const onlyAppended = (score.prefix >= text.trim().length - 1) && score.suffix === 0;
+        const note = onlyAppended
+          ? ` (solo anadio al final; se mantiene Ollama)`
+          : "";
+        $("ltx2PreviewText").value =
+          `[Ollama · ${text.length} chars]\n${text}\n\n` +
+          `[LTX2 · ${ltx2Text.length} chars · Δ ${score.chars} (${(score.pct*100).toFixed(1)}%)]${note}\n${ltx2Text}`;
       }
     }
-    log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
+    log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
   } catch(e) {
     log("❌ Error al mejorar: "+e.message, "l-err");
     $("enhancerOutput").value = "Error: "+e.message;
@@ -2362,19 +2356,16 @@ async function runLTX2Preview(ollamaText){
       // LTX2 está entrenado para hacer esto cuando el input ya es muy detallado.
       const onlyAppended = (score.prefix >= ollamaText.trim().length - 1) && score.suffix === 0;
       if(onlyAppended){
-        log(`ℹ️ LTX2 sólo añadió texto al final (+${text.length - ollamaText.length} chars de audio/continuación); se mantiene Ollama.`, "l-info");
-        $("prompt").value = ollamaText;
+        log(`LTX2 solo anadio texto al final (+${text.length - ollamaText.length} chars de audio/continuacion); se mantiene Ollama.`, "l-info");
         return ollamaText;
       }
       if(score.chars < minChars){
-        log(`ℹ️ LTX2 modificó el prompt mínimamente (Δ ${score.chars} chars, ${(score.pct*100).toFixed(1)}%); se mantiene Ollama.`, "l-info");
-        $("prompt").value = ollamaText;
+        log(`LTX2 modifico el prompt minimamente (Δ ${score.chars} chars, ${(score.pct*100).toFixed(1)}%); se mantiene Ollama.`, "l-info");
         return ollamaText;
       }
     }
-    $("prompt").value = text;
     const score = ltx2ChangeScore(ollamaText || "", text);
-    log(`✏️ Prompt actualizado desde LTX2 (Δ ${score.chars} chars, ${(score.pct*100).toFixed(1)}%).`, "l-ok");
+    log(`Previsualizacion LTX2 completada (Δ ${score.chars} chars, ${(score.pct*100).toFixed(1)}%).`, "l-ok");
     return text;
   } catch(e) {
     log("❌ Error previsualizando LTX2: "+e.message, "l-err");

@@ -1293,6 +1293,7 @@ const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distill
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
 const LTXV_UI_PORT = "8002";
+const MINIMAXH3_UI_PORT = "8002";
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
 //
 // This file is injected BEFORE the UI-specific JS (ltxv.js / krea2.js).
@@ -6076,11 +6077,7 @@ $("btnEnhance").addEventListener("click", async () => {
     const result = await r.json();
     const text = (result.response || "").trim();
     $("enhancerOutput").value = text;
-    if(chainMode === "ollama"){
-      $("prompt").value = text;
-      log("✏️ Prompt actualizado desde Ollama.", "l-ok");
-    }
-    log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
+    log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
   } catch(e) {
     log("❌ Error al mejorar: "+e.message, "l-err");
     $("enhancerOutput").value = "Error: "+e.message;

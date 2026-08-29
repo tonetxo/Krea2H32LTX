@@ -3103,11 +3103,7 @@ $("btnEnhance").addEventListener("click", async () => {
     const result = await r.json();
     const text = (result.response || "").trim();
     $("enhancerOutput").value = text;
-    if(chainMode === "ollama"){
-      $("prompt").value = text;
-      log("✏️ Prompt actualizado desde Ollama.", "l-ok");
-    }
-    log("✨ Prompt mejorado ("+model+", "+mode+", "+styleKey+")", "l-ok");
+    log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
   } catch(e) {
     log("❌ Error al mejorar: "+e.message, "l-err");
     $("enhancerOutput").value = "Error: "+e.message;
