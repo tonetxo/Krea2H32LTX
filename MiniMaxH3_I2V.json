@@ -1,284 +1,75 @@
 {
-  "92": {
+  "1": {
     "inputs": {
-      "filename_prefix": "video/MiniMax_H3",
-      "format": "auto",
-      "codec": "auto",
-      "video": [
-        "105:91",
-        0
-      ]
-    },
-    "class_type": "SaveVideo",
-    "_meta": {
-      "title": "Save Video"
-    }
-  },
-  "114": {
-    "inputs": {
-      "image": "2058007-A photorealistic, cinematic 35 mm film c-pornmasterPro_realismILV4.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "Load Image"
-    }
-  },
-  "119": {
-    "inputs": {
-      "upscale_method": "nearest-exact",
-      "megapixels": 0.7,
-      "resolution_steps": 32,
-      "image": [
-        "114",
-        0
-      ]
-    },
-    "class_type": "ImageScaleToTotalPixels",
-    "_meta": {
-      "title": "Scale Image to Total Pixels"
-    }
-  },
-  "120": {
-    "inputs": {
-      "image": [
-        "119",
-        0
-      ]
-    },
-    "class_type": "GetImageSize",
-    "_meta": {
-      "title": "Get Image Size"
-    }
-  },
-  "121": {
-    "inputs": {
-      "image": "2058005-A photorealistic, cinematic 35 mm film c-pornmasterPro_realismILV4.png"
-    },
-    "class_type": "LoadImage",
-    "_meta": {
-      "title": "Load Image"
-    }
-  },
-  "105:11": {
-    "inputs": {
-      "vae_name": "Ligazón para VAE/MiniMaxH3/minimax_h3_video_vae_fp16.safetensors"
-    },
-    "class_type": "VAELoader",
-    "_meta": {
-      "title": "Load VAE"
-    }
-  },
-  "105:24": {
-    "inputs": {
-      "vae_name": "Ligazón para VAE/MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors"
-    },
-    "class_type": "VAELoader",
-    "_meta": {
-      "title": "Load VAE"
-    }
-  },
-  "105:17": {
-    "inputs": {
-      "sampler_name": "res_multistep"
-    },
-    "class_type": "KSamplerSelect",
-    "_meta": {
-      "title": "KSamplerSelect"
-    }
-  },
-  "105:6": {
-    "inputs": {
-      "unet_name": "Ligazón para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
-      "weight_dtype": "default"
+      "unet_name": "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors"
     },
     "class_type": "UNETLoader",
     "_meta": {
-      "title": "Load Diffusion Model"
+      "title": "Load Diffusion Model (UNet)"
     }
   },
-  "105:13": {
+  "2": {
     "inputs": {
       "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
-      "type": "minimax",
+      "type": "minimax_h3",
       "device": "default"
     },
     "class_type": "CLIPLoader",
     "_meta": {
-      "title": "Load CLIP"
+      "title": "Load CLIP / Text Encoder"
     }
   },
-  "105:15": {
+  "3": {
     "inputs": {
-      "noise_seed": 621120923979368
+      "vae_name": "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors"
     },
-    "class_type": "RandomNoise",
+    "class_type": "VAELoader",
     "_meta": {
-      "title": "RandomNoise"
+      "title": "Load Video VAE"
     }
   },
-  "105:111": {
+  "4": {
     "inputs": {
-      "value": 10
+      "vae_name": "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors"
     },
-    "class_type": "PrimitiveFloat",
+    "class_type": "VAELoader",
     "_meta": {
-      "title": "Float (duration)"
+      "title": "Load Audio VAE"
     }
   },
-  "105:127": {
+  "5": {
     "inputs": {
-      "lora_name": "Ligazón para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors",
-      "strength_model": 1,
-      "model": [
-        "105:6",
-        0
-      ]
+      "image": "percebeiro_octo_galicia.png"
     },
-    "class_type": "LoraLoaderModelOnly",
+    "class_type": "LoadImage",
     "_meta": {
-      "title": "Load LoRA (Turbo)"
+      "title": "Load First Frame (Image)"
     }
   },
-  "105:128": {
-    "inputs": {
-      "lora_name": "",
-      "strength_model": 1,
-      "model": [
-        "105:127",
-        0
-      ]
-    },
-    "class_type": "LoraLoaderModelOnly",
-    "_meta": {
-      "title": "Load LoRA 2"
-    }
-  },
-  "105:122": {
-    "inputs": {
-      "attention": "comfy kitchen attention",
-      "model": [
-        "105:128",
-        0
-      ]
-    },
-    "class_type": "ModelAttentionBackend",
-    "_meta": {
-      "title": "ModelAttentionBackend"
-    }
-  },
-  "105:125": {
-    "inputs": {
-      "chunk_rows": 4096,
-      "fused_qkv": "auto",
-      "mlp_memory": "auto",
-      "precision_mode": "Auto",
-      "preserve_precision": true,
-      "qkv_streaming_mode": "Auto",
-      "model": [
-        "105:122",
-        0
-      ]
-    },
-    "class_type": "H3MemoryOptimization",
-    "_meta": {
-      "title": "H3 Memory Optimization"
-    }
-  },
-  "105:126": {
-    "inputs": {
-      "denser_early_late_steps": false,
-      "layer_video_budgets": "",
-      "video_budget": 0.3,
-      "model": [
-        "105:125",
-        0
-      ]
-    },
-    "class_type": "H3SparseAttention",
-    "_meta": {
-      "title": "H3 Sparse Attention"
-    }
-  },
-  "105:107": {
-    "inputs": {
-      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
-      "values.a": [
-        "105:111",
-        0
-      ]
-    },
-    "class_type": "ComfyMathExpression",
-    "_meta": {
-      "title": "Math Expression"
-    }
-  },
-  "105:124": {
-    "inputs": {
-      "enabled": true,
-      "blend_weight": 0.5,
-      "degree": 4,
-      "ridge_lambda": 0.1,
-      "window_size": 2.0,
-      "flex_window": 0.75,
-      "warmup_steps": 5,
-      "tail_actual_steps": 1,
-      "max_history": 8,
-      "debug": false,
-      "history_storage": "system_ram",
-      "model": [
-        "105:126",
-        0
-      ]
-    },
-    "class_type": "SpectrumApplyMiniMaxH3",
-    "_meta": {
-      "title": "Spectrum Apply MiniMax H3"
-    }
-  },
-  "105:9": {
-    "inputs": {
-      "scheduler": "simple",
-      "steps": 20,
-      "denoise": 1,
-      "model": [
-        "105:124",
-        0
-      ]
-    },
-    "class_type": "BasicScheduler",
-    "_meta": {
-      "title": "BasicScheduler"
-    }
-  },
-  "105:104": {
+  "6": {
     "inputs": {
       "prompt": "[Style]: Based on the supplied image reference, a cinematic realistic film style, raw coastal photography, 35mm camera, detailed textures of wet neoprene, rusted iron, and slimy octopus skin.\n\n[Timeline & Action]:\n[00-04s] The scene begins from the supplied first frame. The barnacle fisherman in his wet black diving suit tenses his muscles, pulling hard with his rusted iron scraper. The traditional fishing boat in the background pitches dramatically on the wild waves.\n[04-08s] The realistic common octopus, camouflage skin pulsing with shifting brown and maroon colors, emerges slightly from the dark crevice, wrapping more muscular tentacles around the goose barnacles, securing its grip with glistening suction cups. A tense, physical tug-of-war begins as both pull with heavy, grounded effort.\n[08-12s] The goose barnacles strain under the pressure, stretching slightly but remaining firm. Small rock fragments and white sea foam fly as the metal scraper slides along the wet, mossy granite. Droplets of saltwater fly off the fisherman's neoprene hood and the octopus's slimy tentacles under the dramatic overcast sky, ending with a tense visual freeze.\n\n[Environment]: Churning Atlantic waves crashing hard in the background, heavy white ocean spray, and dark granite rocks shimmering with wetness under moody, diffused lighting.\n\n[Audio & Sound Design Layers for Ref2VA]:\n- [00-12s] BACKGROUND AMBIENCE: Uninterrupted, deep roaring Atlantic surf crashing against granite, heavy coastal wind howling, and the continuous hiss of white sea foam (constant white noise spectrum to prevent muting).\n- [00-05s] MUSICAL TEXTURE: Low, rhythmic, slow pounding of a traditional Galician bass drum (\"bombo\"), acting like a tense heartbeat.\n- [01-04s] FOLEY (Fisherman): Sharp, high-frequency sound of the rusted iron scraper rasping against granite ('screeech-clink'), mixed with the tight, rubbery stretching sound of wet neoprene fabric.\n- [04-08s] FOLEY (Octopus): Wet, squishy, and rhythmic suction sounds ('plop-squeal-plop') as the octopus arms grip the stone and barnacles.\n- [05-12s] MUSICAL TENSION: The scraping sound of traditional scallop shells (\"cunchas de vieira\") starting slow and accelerating, simulating a bone-rattling tension as the tug-of-war intensifies to a climax at the 12th second.",
-      "width": [
-        "120",
+      "width": 1120,
+      "height": 640,
+      "length": 288,
+      "model": [
+        "1",
         0
       ],
-      "height": [
-        "120",
-        1
-      ],
-      "length": [
-        "105:107",
-        1
-      ],
       "clip": [
-        "105:13",
+        "2",
         0
       ],
       "vae": [
-        "105:11",
+        "3",
         0
       ],
       "first_frame": [
-        "114",
+        "5",
         0
       ],
       "last_frame": [
-        "121",
+        "5",
         0
       ]
     },
@@ -287,14 +78,23 @@
       "title": "MiniMax H3 Image to Video"
     }
   },
-  "105:16": {
+  "7": {
+    "inputs": {
+      "noise_seed": 72489218491204
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "Random Noise"
+    }
+  },
+  "8": {
     "inputs": {
       "model": [
-        "105:124",
+        "1",
         0
       ],
       "conditioning": [
-        "105:104",
+        "6",
         0
       ]
     },
@@ -303,42 +103,82 @@
       "title": "Basic Guider"
     }
   },
-  "105:14": {
+  "9": {
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "10": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": 20,
+      "denoise": 1.0,
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "Basic Scheduler"
+    }
+  },
+  "11": {
     "inputs": {
       "noise": [
-        "105:15",
+        "7",
         0
       ],
       "guider": [
-        "105:16",
+        "8",
         0
       ],
       "sampler": [
-        "105:17",
+        "9",
         0
       ],
       "sigmas": [
-        "105:9",
+        "10",
         0
       ],
       "latent_image": [
-        "105:104",
+        "6",
         1
       ]
     },
     "class_type": "SamplerCustomAdvanced",
     "_meta": {
-      "title": "SamplerCustomAdvanced"
+      "title": "Sampler Custom Advanced"
     }
   },
-  "105:23": {
+  "12": {
     "inputs": {
       "samples": [
-        "105:14",
+        "11",
         0
       ],
       "vae": [
-        "105:24",
+        "3",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode Video"
+    }
+  },
+  "13": {
+    "inputs": {
+      "samples": [
+        "11",
+        0
+      ],
+      "vae": [
+        "4",
         0
       ]
     },
@@ -347,53 +187,38 @@
       "title": "VAE Decode Audio"
     }
   },
-  "105:10": {
-    "inputs": {
-      "samples": [
-        "105:14",
-        0
-      ],
-      "vae": [
-        "105:11",
-        0
-      ]
-    },
-    "class_type": "VAEDecode",
-    "_meta": {
-      "title": "VAE Decode"
-    }
-  },
-  "105:121": {
-    "inputs": {
-      "resize_type": "scale by multiplier",
-      "resize_type.scale": 2,
-      "quality": "ULTRA",
-      "images": [
-        "105:10",
-        0
-      ]
-    },
-    "class_type": "RTXVideoSuperResolution",
-    "_meta": {
-      "title": "RTX Video Super Resolution"
-    }
-  },
-  "105:91": {
+  "14": {
     "inputs": {
       "fps": 24,
       "bit_depth": 8,
       "images": [
-        "105:121",
+        "12",
         0
       ],
       "audio": [
-        "105:23",
+        "13",
         0
       ]
     },
     "class_type": "CreateVideo",
     "_meta": {
       "title": "Create Video"
+    }
+  },
+  "15": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video (MP4 + Audio)"
     }
   }
 }

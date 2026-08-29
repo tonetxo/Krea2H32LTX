@@ -121,6 +121,20 @@ python3 generar_krea2.py
 
 ---
 
+## ComfyUI Workflows
+
+For users wishing to run workflows directly within the standard ComfyUI interface:
+
+- **`MiniMaxH3_I2V.json`** — **Universal / Vanilla Official Workflow**:
+  - Implemented using 100% native ComfyUI core nodes (`MiniMaxH3ImageToVideo`, `UNETLoader`, `CLIPLoader`, `VAELoader`, `CreateVideo`).
+  - Guaranteed out-of-the-box compatibility without any custom node requirements.
+- **`MiniMaxH3_Pro_Accelerated.json`** — **High-Performance Pro Pipeline**:
+  - Accelerated with `H3-Optimizations` (Sparse Attention), `SpectrumApplyMiniMaxH3`, `RTXVideoSuperResolution` (2x 1080p), and `FrameInterpolate` (RIFE 48fps).
+- **`Krea2_OK.json`** — **Frame Zero Image Generation**:
+  - High-detail text-to-image pipeline for Flux2 / Krea2 with RGB variance control.
+
+---
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
