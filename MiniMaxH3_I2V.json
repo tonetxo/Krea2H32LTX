@@ -67,10 +67,6 @@
       "first_frame": [
         "5",
         0
-      ],
-      "last_frame": [
-        "5",
-        0
       ]
     },
     "class_type": "MiniMaxH3ImageToVideo",
