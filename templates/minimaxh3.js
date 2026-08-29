@@ -1739,7 +1739,7 @@ inputZoom.onSwipe((dir) => { if(inputZoom.isFullscreen()) navigateKrea2Recent(di
 // Click en el wrap de la imagen de entrada -> abrir file dialog
 $("inputWrap").addEventListener("click", (e) => {
   if(inputZoom.isFullscreen()) return;
-  if(e.target.closest("#btnResetZoomInput") || e.target.closest("#btnFullscreenInput")) return;
+  if(e.target.closest("#btnResetZoomInput") || e.target.closest("#btnFullscreenInput") || e.target.closest("#btnClearInput")) return;
   if(inputZoom.wasPan && inputZoom.wasPan()) return;
   $("fileInput").click();
 });
@@ -1763,13 +1763,53 @@ lfDz?.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleLastFrameFile
 lfFileInput?.addEventListener("change",e=>{if(e.target.files[0])handleLastFrameFile(e.target.files[0]);});
 $("lastFrameWrap")?.addEventListener("click", (e) => {
   if(lastFrameZoom.isFullscreen()) return;
-  if(e.target.closest("#btnResetZoomLast") || e.target.closest("#btnFullscreenLast")) return;
+  if(e.target.closest("#btnResetZoomLast") || e.target.closest("#btnFullscreenLast") || e.target.closest("#btnClearLast")) return;
   if(lastFrameZoom.wasPan && lastFrameZoom.wasPan()) return;
   lfFileInput.click();
 });
 ["dragenter","dragover"].forEach(ev=>$("lastFrameWrap")?.addEventListener(ev,e=>{e.preventDefault();lfDz?.classList.add("drag");}));
 ["dragleave","drop"].forEach(ev=>$("lastFrameWrap")?.addEventListener(ev,e=>{e.preventDefault();lfDz?.classList.remove("drag");}));
 $("lastFrameWrap")?.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleLastFrameFile(e.dataTransfer.files[0]);});
+
+function clearFirstFrame(){
+  uploadedFirstImage = null;
+  localFirstFile = null;
+  currentVideoFile = null;
+  const wrap = $("inputWrap"), img = $("inputImg"), actions = $("imgInputActions");
+  if(img){ img.src = ""; img.style.display = "none"; }
+  if(wrap) wrap.style.visibility = "hidden";
+  if(actions) actions.style.display = "none";
+  const dz = $("dropzone");
+  if(dz) dz.style.display = "";
+  const dzInfo = $("dzInfo");
+  if(dzInfo) dzInfo.textContent = "";
+  const fileInp = $("fileInput");
+  if(fileInp) fileInp.value = "";
+  const frameSel = $("frameSelector");
+  if(frameSel) frameSel.style.display = "none";
+  if(inputZoom) inputZoom.resetZoom();
+  log("Imagen de inicio eliminada.", "l-info");
+}
+
+function clearLastFrame(){
+  uploadedLastImage = null;
+  localLastFile = null;
+  const wrap = $("lastFrameWrap"), img = $("lastFrameImg"), actions = $("lastFrameActions");
+  if(img){ img.src = ""; img.style.display = "none"; }
+  if(wrap) wrap.style.visibility = "hidden";
+  if(actions) actions.style.display = "none";
+  const dz = $("lastFrameDropzone");
+  if(dz) dz.style.display = "";
+  const dzInfo = $("lastFrameDzInfo");
+  if(dzInfo) dzInfo.textContent = "";
+  const fileInp = $("lastFrameFileInput");
+  if(fileInp) fileInp.value = "";
+  if(lastFrameZoom) lastFrameZoom.resetZoom();
+  log("Ultimo frame eliminado.", "l-info");
+}
+
+$("btnClearInput")?.addEventListener("click", clearFirstFrame);
+$("btnClearLast")?.addEventListener("click", clearLastFrame);
 
 function handleFile(f, shouldSaveToGallery = true){
   uploadedFirstImage = null;
@@ -1794,7 +1834,7 @@ function handleFile(f, shouldSaveToGallery = true){
   const reader = new FileReader();
   reader.onload = (e) => {
     showInputImage(e.target.result);
-    log(`🖼️ Imagen cargada: ${f.name}`, "l-ok");
+    log(`Imagen cargada: ${f.name}`, "l-ok");
   };
   reader.readAsDataURL(f);
 }
@@ -1807,7 +1847,7 @@ function handleLastFrameFile(f){
   const reader = new FileReader();
   reader.onload = (e) => {
     showLastFrameImage(e.target.result);
-    log(`🖼️ Último frame cargado: ${f.name}`, "l-ok");
+    log(`Ultimo frame cargado: ${f.name}`, "l-ok");
   };
   reader.readAsDataURL(f);
 }

@@ -1225,7 +1225,7 @@ inputZoom.onSwipe((dir) => { if(inputZoom.isFullscreen()) navigateKrea2Recent(di
 // Click en el wrap de la imagen de entrada -> abrir file dialog para reemplazar
 $("inputWrap").addEventListener("click", (e) => {
   if(inputZoom.isFullscreen()) return;
-  if(e.target.closest("#btnResetZoomInput") || e.target.closest("#btnFullscreenInput")) return;
+  if(e.target.closest("#btnResetZoomInput") || e.target.closest("#btnFullscreenInput") || e.target.closest("#btnClearInput")) return;
   if(inputZoom.wasPan && inputZoom.wasPan()) return;
   $("fileInput").click();
 });
@@ -1233,6 +1233,28 @@ $("inputWrap").addEventListener("click", (e) => {
 ["dragenter","dragover"].forEach(ev=>$("inputWrap").addEventListener(ev,e=>{e.preventDefault();$("dropzone").classList.add("drag");}));
 ["dragleave","drop"].forEach(ev=>$("inputWrap").addEventListener(ev,e=>{e.preventDefault();$("dropzone").classList.remove("drag");}));
 $("inputWrap").addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+
+function clearInputImage(){
+  uploadedImage = null;
+  localFile = null;
+  currentVideoFile = null;
+  const wrap = $("inputWrap"), img = $("inputImg"), actions = $("imgInputActions");
+  if(img){ img.src = ""; img.style.display = "none"; }
+  if(wrap) wrap.style.visibility = "hidden";
+  if(actions) actions.style.display = "none";
+  const dz = $("dropzone");
+  if(dz) dz.style.display = "";
+  const dzInfo = $("dzInfo");
+  if(dzInfo) dzInfo.textContent = "";
+  const fileInp = $("fileInput");
+  if(fileInp) fileInp.value = "";
+  const frameSel = $("frameSelector");
+  if(frameSel) frameSel.style.display = "none";
+  if(inputZoom) inputZoom.resetZoom();
+  log("Imagen de entrada eliminada.", "l-info");
+}
+
+$("btnClearInput")?.addEventListener("click", clearInputImage);
 
 const dz=$("dropzone"),fileInput=$("fileInput");
 dz.addEventListener("click",()=>fileInput.click());

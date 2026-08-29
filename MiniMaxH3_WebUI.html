@@ -501,9 +501,9 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
 
       <div class="panel"><h2>Modo</h2><div class="seed-toggle"><div class="seg on" id="segI2V" data-value="i2v">i2v (una imagen)</div><div class="seg" id="segFLF2V" data-value="flf2v">flf2v (1er + último frame)</div><div class="seg" id="segR2V" data-value="r2v">r2v (referencias)</div></div><div class="hint" id="modeHint" style="margin-top:4px;font-size:10px;">Imagen de inicio → vídeo.</div></div>
 
-      <div class="panel" id="startImagePanel"><h2>Imagen de inicio</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa">⛶</button></div><div class="img-wrap" id="inputWrap" style="visibility:hidden;"><img id="inputImg" style="display:none;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
+      <div class="panel" id="startImagePanel"><h2>Imagen de inicio</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="inputWrap" style="visibility:hidden;"><img id="inputImg" style="display:none;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
 
-      <div class="panel" id="lastFramePanel" style="display:none;"><h2>Último frame</h2><div class="dropzone" id="lastFrameDropzone"><input type="file" id="lastFrameFileInput" accept="image/*"><div class="ph" id="lastFrameDzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="lastFrameDzInfo"></div><div class="img-input-actions" id="lastFrameActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomLast" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenLast" class="ghost btn-mini" title="Pantalla completa">⛶</button></div><div class="img-wrap" id="lastFrameWrap" style="visibility:hidden;"><img id="lastFrameImg" style="display:none;width:100%;height:auto;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div></div>
+      <div class="panel" id="lastFramePanel" style="display:none;"><h2>Último frame</h2><div class="dropzone" id="lastFrameDropzone"><input type="file" id="lastFrameFileInput" accept="image/*"><div class="ph" id="lastFrameDzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="lastFrameDzInfo"></div><div class="img-input-actions" id="lastFrameActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomLast" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenLast" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearLast" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="lastFrameWrap" style="visibility:hidden;"><img id="lastFrameImg" style="display:none;width:100%;height:auto;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div></div>
 
       <div class="panel" id="r2vPanel" style="display:none;"><h2>Referencias</h2>
         <div class="hint" style="font-size:10px;margin-bottom:8px;">Modo referencia completa. Hasta 6 imágenes, 3 vídeos (c/u con su audio) y 3 audios. El prompt se reescribe con la guía full-reference.</div>
@@ -4713,7 +4713,7 @@ inputZoom.onSwipe((dir) => { if(inputZoom.isFullscreen()) navigateKrea2Recent(di
 // Click en el wrap de la imagen de entrada -> abrir file dialog
 $("inputWrap").addEventListener("click", (e) => {
   if(inputZoom.isFullscreen()) return;
-  if(e.target.closest("#btnResetZoomInput") || e.target.closest("#btnFullscreenInput")) return;
+  if(e.target.closest("#btnResetZoomInput") || e.target.closest("#btnFullscreenInput") || e.target.closest("#btnClearInput")) return;
   if(inputZoom.wasPan && inputZoom.wasPan()) return;
   $("fileInput").click();
 });
@@ -4737,13 +4737,53 @@ lfDz?.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleLastFrameFile
 lfFileInput?.addEventListener("change",e=>{if(e.target.files[0])handleLastFrameFile(e.target.files[0]);});
 $("lastFrameWrap")?.addEventListener("click", (e) => {
   if(lastFrameZoom.isFullscreen()) return;
-  if(e.target.closest("#btnResetZoomLast") || e.target.closest("#btnFullscreenLast")) return;
+  if(e.target.closest("#btnResetZoomLast") || e.target.closest("#btnFullscreenLast") || e.target.closest("#btnClearLast")) return;
   if(lastFrameZoom.wasPan && lastFrameZoom.wasPan()) return;
   lfFileInput.click();
 });
 ["dragenter","dragover"].forEach(ev=>$("lastFrameWrap")?.addEventListener(ev,e=>{e.preventDefault();lfDz?.classList.add("drag");}));
 ["dragleave","drop"].forEach(ev=>$("lastFrameWrap")?.addEventListener(ev,e=>{e.preventDefault();lfDz?.classList.remove("drag");}));
 $("lastFrameWrap")?.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleLastFrameFile(e.dataTransfer.files[0]);});
+
+function clearFirstFrame(){
+  uploadedFirstImage = null;
+  localFirstFile = null;
+  currentVideoFile = null;
+  const wrap = $("inputWrap"), img = $("inputImg"), actions = $("imgInputActions");
+  if(img){ img.src = ""; img.style.display = "none"; }
+  if(wrap) wrap.style.visibility = "hidden";
+  if(actions) actions.style.display = "none";
+  const dz = $("dropzone");
+  if(dz) dz.style.display = "";
+  const dzInfo = $("dzInfo");
+  if(dzInfo) dzInfo.textContent = "";
+  const fileInp = $("fileInput");
+  if(fileInp) fileInp.value = "";
+  const frameSel = $("frameSelector");
+  if(frameSel) frameSel.style.display = "none";
+  if(inputZoom) inputZoom.resetZoom();
+  log("Imagen de inicio eliminada.", "l-info");
+}
+
+function clearLastFrame(){
+  uploadedLastImage = null;
+  localLastFile = null;
+  const wrap = $("lastFrameWrap"), img = $("lastFrameImg"), actions = $("lastFrameActions");
+  if(img){ img.src = ""; img.style.display = "none"; }
+  if(wrap) wrap.style.visibility = "hidden";
+  if(actions) actions.style.display = "none";
+  const dz = $("lastFrameDropzone");
+  if(dz) dz.style.display = "";
+  const dzInfo = $("lastFrameDzInfo");
+  if(dzInfo) dzInfo.textContent = "";
+  const fileInp = $("lastFrameFileInput");
+  if(fileInp) fileInp.value = "";
+  if(lastFrameZoom) lastFrameZoom.resetZoom();
+  log("Ultimo frame eliminado.", "l-info");
+}
+
+$("btnClearInput")?.addEventListener("click", clearFirstFrame);
+$("btnClearLast")?.addEventListener("click", clearLastFrame);
 
 function handleFile(f, shouldSaveToGallery = true){
   uploadedFirstImage = null;
@@ -4768,7 +4808,7 @@ function handleFile(f, shouldSaveToGallery = true){
   const reader = new FileReader();
   reader.onload = (e) => {
     showInputImage(e.target.result);
-    log(`🖼️ Imagen cargada: ${f.name}`, "l-ok");
+    log(`Imagen cargada: ${f.name}`, "l-ok");
   };
   reader.readAsDataURL(f);
 }
@@ -4781,7 +4821,7 @@ function handleLastFrameFile(f){
   const reader = new FileReader();
   reader.onload = (e) => {
     showLastFrameImage(e.target.result);
-    log(`🖼️ Último frame cargado: ${f.name}`, "l-ok");
+    log(`Ultimo frame cargado: ${f.name}`, "l-ok");
   };
   reader.readAsDataURL(f);
 }
