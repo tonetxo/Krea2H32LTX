@@ -8,7 +8,7 @@ const CONFIG = {
   SERVERURL_KEY: 'ltxv_serverUrl',
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
-  DEFAULT_MODEL: "10Eros_v1.4_bf16.safetensors",
+  DEFAULT_MODEL: "diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
   DEFAULT_VAE: "Checkpoint",
   N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
@@ -1481,8 +1481,12 @@ function buildGraph(mode, job){
       },
       _meta: { title: "Load Diffusion Model (LTX-2.5)" }
     };
+    // Helper para obtener un checkpoint base LTXV disponible para el Text Encoder y Audio VAE
+    const availableLtxvModels = (typeof AVAILABLE_MODELS !== "undefined" && Array.isArray(AVAILABLE_MODELS)) ? AVAILABLE_MODELS : [];
+    const baseCkpt = availableLtxvModels.find(m => !m.includes("diffusion_models") && (m.includes("ltxv/") || m.includes("ltx-2") || m.includes("sulphur"))) || "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors";
+
     if(g[N.LTXAV_TEXT_ENCODER] && g[N.LTXAV_TEXT_ENCODER].inputs){
-      g[N.LTXAV_TEXT_ENCODER].inputs.ckpt_name = "10Eros_v1.4_bf16.safetensors";
+      g[N.LTXAV_TEXT_ENCODER].inputs.ckpt_name = baseCkpt;
     }
   } else {
     if(g[N.CHECKPOINT] && g[N.CHECKPOINT].inputs){
@@ -1534,8 +1538,10 @@ function buildGraph(mode, job){
       _meta: { title: "Load LTXV Audio VAE" }
     };
   } else if(g["617"] && g["617"].inputs){
+    const availableLtxvModels = (typeof AVAILABLE_MODELS !== "undefined" && Array.isArray(AVAILABLE_MODELS)) ? AVAILABLE_MODELS : [];
+    const baseCkpt = availableLtxvModels.find(m => !m.includes("diffusion_models") && (m.includes("ltxv/") || m.includes("ltx-2") || m.includes("sulphur"))) || "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors";
     g["617"].class_type = "LTXVAudioVAELoader";
-    g["617"].inputs.ckpt_name = isDiffusionModel ? "10Eros_v1.4_bf16.safetensors" : modelChoice;
+    g["617"].inputs.ckpt_name = isDiffusionModel ? baseCkpt : modelChoice;
   }
 
   const bitDepth = j ? j.bitDepth : getBitDepth();

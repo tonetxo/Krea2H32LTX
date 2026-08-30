@@ -33,7 +33,7 @@ def main():
             (SD_MODELS_DIR, ''),
             (DIFFUSION_MODELS_DIR, 'diffusion_models'),
         ],
-        'model_fallback': '10Eros_v1.4_bf16.safetensors',
+        'model_fallback': 'diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors',
         'model_include': ('ltx', 'sulphur'),
         'model_exclude': ('StableAudio/', 'HiDream/', 'sam3.1_multiplex_fp16', 'lens_turbo_bf16', 'sd3.5/', 'sdxl/', 'diffusion_models/minimaxh3/'),
         'vae_dir': [(VAE_DIR, VAE_PREFIX)],
