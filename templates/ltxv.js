@@ -149,6 +149,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
   const r = getRifeState();
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
+    ["Text Encoder", $("textEncoderSelect")?.value ? $("textEncoderSelect").value.split('/').pop() : ""],
     ["VAE Vídeo", $("vaeSelect")?.value || "Checkpoint"],
     ["VAE Audio", $("audioVaeSelect")?.value || "Checkpoint"],
     ["Atención", $("sageAttentionType")?.value || "sageattn3"],
@@ -564,6 +565,7 @@ function snapshotJob(firstPassOnly){
     motion: $("motionSlider").value,
     firstPassSteps: $("firstPassSteps")?.value || "10",
     model: $("modelSelect")?.value,
+    textEncoder: $("textEncoderSelect")?.value,
     vae: $("vaeSelect")?.value,
     audioVae: $("audioVaeSelect")?.value,
     filenamePrefix: $("filenamePrefix")?.value,
@@ -608,6 +610,7 @@ function restoreJob(job){
   $("firstPassSteps").value = job.firstPassSteps;
   $("firstPassStepsVal").textContent = job.firstPassSteps;
   if($("modelSelect") && job.model) $("modelSelect").value = job.model;
+  if($("textEncoderSelect") && job.textEncoder) $("textEncoderSelect").value = job.textEncoder;
   if($("vaeSelect") && job.vae) $("vaeSelect").value = job.vae;
   if($("sageAttentionType") && job.sageType) $("sageAttentionType").value = job.sageType;
   if(job.rife){
@@ -1162,6 +1165,17 @@ function applyWorkflow(workflow, opts={}){
     setMissing("interpolación RIFE");
   }
 
+  // Text Encoder (Gemma / LTX-2.5)
+  const ltxavTeNode = findByClass("LTXAVTextEncoderLoader");
+  if(ltxavTeNode && ltxavTeNode.inputs && ltxavTeNode.inputs.text_encoder){
+    const teName = ltxavTeNode.inputs.text_encoder;
+    if($("textEncoderSelect")){
+      $("textEncoderSelect").value = teName;
+      localStorage.setItem("ltxv_text_encoder", teName);
+      setApplied("text encoder (" + teName.split("/").pop() + ")");
+    }
+  }
+
   if(opts.silent) return { applied, missing };
   if(appliedMsg) log(appliedMsg, "l-ok");
   if(missingMsg) log(missingMsg, "l-warn");
@@ -1236,6 +1250,35 @@ function loadVaes(){
   }
 }
 loadVaes();
+
+function loadTextEncoders(){
+  const sel = $("textEncoderSelect");
+  if(!sel) return;
+  const clips = (typeof AVAILABLE_CLIPS !== "undefined" && AVAILABLE_CLIPS.length)
+    ? AVAILABLE_CLIPS
+    : ["gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors", "gemma-3-12b-it-ablit-norms-biproj-fp8mixed.safetensors"];
+  sel.innerHTML = "";
+  for(const c of clips){
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c.split("/").pop();
+    opt.title = c;
+    sel.appendChild(opt);
+  }
+  const saved = localStorage.getItem("ltxv_text_encoder");
+  const fallback = "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors";
+  if(saved && clips.includes(saved)){
+    sel.value = saved;
+  } else if(clips.some(c => c.includes("gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2"))){
+    sel.value = clips.find(c => c.includes("gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2"));
+  } else if(clips.includes(fallback)){
+    sel.value = fallback;
+  }
+}
+loadTextEncoders();
+$("textEncoderSelect")?.addEventListener("change", (e) => {
+  localStorage.setItem("ltxv_text_encoder", e.target.value);
+});
 
 $("modelSelect")?.addEventListener("change", () => {
   const m = $("modelSelect").value || "";
@@ -1566,7 +1609,9 @@ function buildGraph(mode, job){
     const availableLtxvModels = (typeof AVAILABLE_MODELS !== "undefined" && Array.isArray(AVAILABLE_MODELS)) ? AVAILABLE_MODELS : [];
     const baseCkpt = availableLtxvModels.find(m => !m.includes("diffusion_models") && (m.includes("ltxv/") || m.includes("ltx-2") || m.includes("sulphur"))) || "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors";
 
+    const textEncoderChoice = (j ? j.textEncoder : $("textEncoderSelect")?.value) || "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors";
     if(g[N.LTXAV_TEXT_ENCODER] && g[N.LTXAV_TEXT_ENCODER].inputs){
+      g[N.LTXAV_TEXT_ENCODER].inputs.text_encoder = textEncoderChoice;
       g[N.LTXAV_TEXT_ENCODER].inputs.ckpt_name = baseCkpt;
     }
   } else {

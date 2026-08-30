@@ -16,6 +16,7 @@ VAE_DIR = os.environ.get("LTXV_VAE_DIR", "/home/tonetxo/SwarmUI/Models/VAE")
 VAE_PREFIX = os.environ.get("LTXV_VAE_PREFIX", "Ligazón para VAE")
 VAE_FALLBACK = os.environ.get("LTXV_VAE_FALLBACK", "Ligazón para VAE/LTX-2/ltx-2.5-video-vae-bf16.safetensors")
 INTERP_DIR = os.environ.get("LTXV_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/frame_interpolation")
+CLIP_DIR = os.environ.get("LTXV_CLIP_DIR", "/home/tonetxo/SwarmUI/Models/text_encoders")
 # Puerto donde se sirve la UI LTXV (para el botón "enviar a LTXV" de Krea2).
 LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
 # ---------------------
@@ -37,6 +38,12 @@ def main():
         'model_fallback': 'diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors',
         'model_include': ('ltx', 'sulphur'),
         'model_exclude': ('StableAudio/', 'HiDream/', 'sam3.1_multiplex_fp16', 'lens_turbo_bf16', 'sd3.5/', 'sdxl/', 'diffusion_models/minimaxh3/'),
+        'clip_dirs': [(CLIP_DIR, '')],
+        'clip_fallback': 'gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors',
+        'clip_include': ('gemma', 'ltx'),
+        'clip_exclude': ('AceStep', 'ViT-L-14', 'byt5', 'clip_g', 'clip_l',
+                         'ministral', 'mistral', 'qwen', 'sulphur',
+                         't5xxl', 'gpt_oss'),
         'vae_dir': [(VAE_DIR, VAE_PREFIX)],
         'vae_fallback': VAE_FALLBACK,
         # Frame Interpolation (RIFE / FILM)

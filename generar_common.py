@@ -140,7 +140,12 @@ def generate_html(config):
     if config.get('clip_dirs'):
         raw_clips = get_file_list(config['clip_dirs'], fallback=config.get('clip_fallback'))
         clip_exclude = config.get('clip_exclude', ())
-        clip_files = [m for m in raw_clips if not any(x in m for x in clip_exclude)]
+        clip_include = config.get('clip_include')
+        clip_files = [
+            m for m in raw_clips
+            if (not clip_include or any(inc.lower() in m.lower() for inc in clip_include))
+            and not any(x in m for x in clip_exclude)
+        ]
     else:
         clip_files = []
     clip_js_array = json.dumps(clip_files)
