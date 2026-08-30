@@ -994,10 +994,14 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_header("Vary", "Origin")
                 self.end_headers()
                 # Stream the body
-                chunk = resp.read(65536)
+                chunk = resp.read(1024)
                 while chunk:
                     self.wfile.write(chunk)
-                    chunk = resp.read(65536)
+                    try:
+                        self.wfile.flush()
+                    except Exception:
+                        pass
+                    chunk = resp.read(1024)
         except (ConnectionError, BrokenPipeError) as e:
             # Client disconnected early (e.g. browser cancelled request, closed tab, or seeked)
             # We log a simple line and return cleanly.

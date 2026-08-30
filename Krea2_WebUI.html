@@ -1628,22 +1628,26 @@ function getCurrentSysPrompt(data, mode, styleKey){
 function cleanOllamaResponse(raw){
   if(!raw) return "";
   let text = String(raw).trim();
-  text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-  text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
+  const original = text;
+
   if(/<\/think>/i.test(text)){
     const parts = text.split(/<\/think>/i);
-    text = parts[parts.length - 1].trim();
-  }
-  if(/<\/thought>/i.test(text)){
+    const after = parts[parts.length - 1].trim();
+    if(after) text = after;
+  } else if(/<\/thought>/i.test(text)){
     const parts = text.split(/<\/thought>/i);
-    text = parts[parts.length - 1].trim();
+    const after = parts[parts.length - 1].trim();
+    if(after) text = after;
+  } else {
+    text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
   }
-  text = text.replace(/<think>[\s\S]*$/gi, "").trim();
-  text = text.replace(/<thought>[\s\S]*$/gi, "").trim();
+
   if(text.startsWith("```") && text.endsWith("```")){
     text = text.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
   }
-  return text.trim();
+
+  return text.trim() || original;
 }
 
 async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
@@ -1666,8 +1670,6 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   const reader = r.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let accumulated = "";
-  let inThink = false;
-  let thinkCount = 0;
   let buffer = "";
 
   while(true){
@@ -1675,7 +1677,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
     if(done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
-    buffer = lines.pop();
+    buffer = lines.pop() || "";
 
     for(const line of lines){
       if(!line.trim()) continue;
@@ -1683,26 +1685,27 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
         const json = JSON.parse(line);
         if(json.response){
           accumulated += json.response;
-          if(accumulated.includes("<think>") || accumulated.includes("<thought>")){
-            if(!accumulated.includes("</think>") && !accumulated.includes("</thought>")){
-              inThink = true;
-              thinkCount++;
-              if(outputEl && thinkCount % 6 === 0){
-                outputEl.value = `[Pensando... (${thinkCount} tokens)]`;
-              }
+          if(outputEl){
+            if(accumulated.includes("</think>")){
+              const after = accumulated.split(/<\/think>/i).pop().trim();
+              outputEl.value = after || "[Generando prompt final...]";
+            } else if(accumulated.includes("</thought>")){
+              const after = accumulated.split(/<\/thought>/i).pop().trim();
+              outputEl.value = after || "[Generando prompt final...]";
             } else {
-              inThink = false;
-            }
-          }
-          if(!inThink){
-            const clean = cleanOllamaResponse(accumulated);
-            if(outputEl && clean){
-              outputEl.value = clean;
+              outputEl.value = `[Pensando y analizando (${accumulated.length} caracteres)...]`;
             }
           }
         }
       } catch(e){}
     }
+  }
+
+  if(buffer && buffer.trim()){
+    try {
+      const json = JSON.parse(buffer.trim());
+      if(json.response) accumulated += json.response;
+    } catch(e){}
   }
 
   const finalClean = cleanOllamaResponse(accumulated);
