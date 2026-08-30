@@ -1992,57 +1992,71 @@ function handleStepProgress(data) {
 }
 
 // --- WEBSOCKET ---
+function getWebSocketUrl() {
+  const s = server();
+  if(s){
+    return s.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://') + '/ws?clientId=' + CLIENT_ID;
+  }
+  const proto = (window.location.protocol === "https:") ? "wss:" : "ws:";
+  const host = window.location.host;
+  return `${proto}//${host}/ws?clientId=${CLIENT_ID}`;
+}
+
 function connectSocket() {
     if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
-    const url = server().replace(/^http/, 'ws') + '/ws?clientId=' + CLIENT_ID;
-    socket = new WebSocket(url);
-    socket.binaryType = "blob";
-    socket.onopen = () => {
-        // Negociación de capacidades con ComfyUI (protocolo feature_flags).
-        // Sin declarar supports_preview_metadata el backend NO manda los previews
-        // binarios (PREVIEW_IMAGE_WITH_METADATA) durante la generación.
-        try {
-            socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
-        } catch(e){ console.warn("WS feature_flags no enviados:", e); }
-        console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)");
-    };
-    socket.onmessage = (event) => {
-        if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
-          handleBinaryPreview(event.data);
-          return;
-        }
-        let msg;
-        try { msg = JSON.parse(event.data); } catch(e) {
-            console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
+    const url = getWebSocketUrl();
+    try {
+      socket = new WebSocket(url);
+      socket.binaryType = "blob";
+      socket.onopen = () => {
+          try {
+              socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
+          } catch(e){ console.warn("WS feature_flags no enviados:", e); }
+          console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)");
+      };
+      socket.onmessage = (event) => {
+          if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
+            handleBinaryPreview(event.data);
             return;
-        }
-        if(msg.type === 'progress') handleStepProgress(msg.data);
-        if(msg.type === 'kj_preview_override'){
-          if(msg.data && msg.data.image){
-            const mime = msg.data.mime || "image/jpeg";
-            const dataUrl = `data:${mime};base64,${msg.data.image}`;
-            if(CONFIG.onPreview) CONFIG.onPreview(dataUrl, msg.data);
           }
-        }
-        if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
-        if(msg.type === 'executed' && CONFIG.onNodeExecuted){
-          try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
-        }
-        if(msg.type === 'execution_error') {
-            const pid = msg.data && msg.data.prompt_id;
-            log(`❌ Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
-            if(pid){
-              handledPrompts.add(pid);
-              delete pendingSeeds[pid];
-              discardTimer(pid);
-              if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
+          let msg;
+          try { msg = JSON.parse(event.data); } catch(e) {
+              console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
+              return;
+          }
+          if(msg.type === 'progress') handleStepProgress(msg.data);
+          if(msg.type === 'kj_preview_override'){
+            if(msg.data && msg.data.image){
+              const mime = msg.data.mime || "image/jpeg";
+              const dataUrl = `data:${mime};base64,${msg.data.image}`;
+              if(CONFIG.onPreview) CONFIG.onPreview(dataUrl, msg.data);
             }
-            clearPreview();
-            currentBatchIndex++;
-            processNextBatch();
-        }
-    };
-    socket.onerror = (err) => console.error("WS Error", err);
+          }
+          if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
+          if(msg.type === 'executed' && CONFIG.onNodeExecuted){
+            try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
+          }
+          if(msg.type === 'execution_error') {
+              const pid = msg.data && msg.data.prompt_id;
+              log(`Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
+              if(pid){
+                handledPrompts.add(pid);
+                delete pendingSeeds[pid];
+                discardTimer(pid);
+                if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
+              }
+              clearPreview();
+              currentBatchIndex++;
+              processNextBatch();
+          }
+      };
+      socket.onerror = (err) => console.error("WS Error", err);
+      socket.onclose = () => {
+        // Fallback activo sin error bloqueante
+      };
+    } catch(err){
+      console.warn("No se pudo abrir WebSocket:", err);
+    }
 }
 
 // --- COMFYUI SERVER QUEUE MONITOR ---
@@ -3448,13 +3462,25 @@ function initCommon(){
   $("btnTest").addEventListener("click", async ()=>{
       setConn("busy","comprobando...");
       try{
-          const r=await fetch(server()+"/system_stats");
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 6000);
+          const target = (server() ? server() : "") + "/system_stats";
+          const r = await fetch(target, { signal: ctrl.signal });
+          clearTimeout(timer);
           if(!r.ok) throw new Error("HTTP "+r.status);
-          await r.json();
+          const data = await r.json();
           setConn("ok","conectado");
           connectSocket();
-          log("Conexión OK","l-ok");
-      }catch(err){setConn("bad","sin conexión");log("Error: "+err.message,"l-err");}
+          const vram = data?.devices?.[0]?.vram_free ? ` (VRAM libre: ${(data.devices[0].vram_free / 1024 / 1024 / 1024).toFixed(1)} GB)` : "";
+          log("Conexión OK con ComfyUI" + vram, "l-ok");
+      }catch(err){
+          setConn("bad","sin conexión");
+          const msg = (err.name === "AbortError") ? "Timeout (sin respuesta en 6s)" : err.message;
+          log("Error de conexión: " + msg, "l-err");
+          if(server()){
+            log("Sugerencia: si estás en LAN, deja el campo de servidor vacío para usar el proxy automático.", "l-info");
+          }
+      }
   });
 }
 
