@@ -35,7 +35,7 @@ let dmdBypass = false;
 const DMD_LORA_NODE = "906";
 const DMD_MODEL_SOURCE = "868";
 let firstPromptId = null;
-const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk"];
+const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk","comfy kitchen attention"];
 const LTX2_CHAIN_OFF = "off";
 const LTX2_CHAIN_OLLAMA = "ollama";
 const LTX2_CHAIN_LTX2 = "ltx2";
@@ -94,7 +94,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
     ["Modelo", $("modelSelect")?.value || ""],
     ["VAE Vídeo", $("vaeSelect")?.value || "Checkpoint"],
     ["VAE Audio", $("audioVaeSelect")?.value || "Checkpoint"],
-    ["Sage", $("sageAttentionType")?.value || "sageattn"],
+    ["Atención", $("sageAttentionType")?.value || "sageattn3"],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
     ["Frames", $("frames")?.value || ""],
@@ -981,12 +981,16 @@ function applyWorkflow(workflow, opts={}){
   if(w && h) applyAspectRatio(w, h);
   updateDuration();
 
-  // Restaurar Patch Sage Attention
+  // Restaurar tipo de atención (Sage o Kitchen)
   const sageNode = findByClass("PathchSageAttentionKJ");
-  if(sageNode && sageNode.inputs && sageNode.inputs.sage_attention && SAGE_TYPES.includes(sageNode.inputs.sage_attention)){
+  const kitchenNode = findByClass("ModelAttentionBackend");
+  if(kitchenNode && kitchenNode.inputs && kitchenNode.inputs.attention === "comfy kitchen attention"){
+    $("sageAttentionType").value = "comfy kitchen attention";
+    setApplied("atención (kitchen)");
+  } else if(sageNode && sageNode.inputs && sageNode.inputs.sage_attention && SAGE_TYPES.includes(sageNode.inputs.sage_attention)){
     $("sageAttentionType").value = sageNode.inputs.sage_attention;
-    setApplied("sage attention");
-  } else { setMissing("sage attention"); }
+    setApplied("atención (" + sageNode.inputs.sage_attention + ")");
+  } else { setMissing("tipo de atención"); }
 
   // Restaurar TextGenerateLTX2Prompt settings
   const ltx2Node = findByClass("TextGenerateLTX2Prompt");
@@ -1538,9 +1542,27 @@ function buildGraph(mode, job){
   if(g[N.CREATE_VIDEO_1] && g[N.CREATE_VIDEO_1].inputs) g[N.CREATE_VIDEO_1].inputs.bit_depth = bitDepth;
   if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;
 
-  // Patch Sage Attention: tipo configurable, siempre activo
+  // Tipo de atención: Sage Attention o Comfy Kitchen Attention
   const sageType = (j ? j.sageType : $("sageAttentionType")?.value) || "sageattn";
-  if(g[N.SAGE_PATCH] && g[N.SAGE_PATCH].inputs) g[N.SAGE_PATCH].inputs.sage_attention = sageType;
+  if(g[N.SAGE_PATCH] && g[N.SAGE_PATCH].inputs){
+    const modelInput = g[N.SAGE_PATCH].inputs.model;
+    if(sageType === "comfy kitchen attention"){
+      g[N.SAGE_PATCH].class_type = "ModelAttentionBackend";
+      g[N.SAGE_PATCH].inputs = {
+        attention: "comfy kitchen attention",
+        model: modelInput
+      };
+      g[N.SAGE_PATCH]._meta = { title: "Model Attention Backend (Kitchen)" };
+    } else {
+      g[N.SAGE_PATCH].class_type = "PathchSageAttentionKJ";
+      g[N.SAGE_PATCH].inputs = {
+        sage_attention: sageType,
+        allow_compile: false,
+        model: modelInput
+      };
+      g[N.SAGE_PATCH]._meta = { title: "Patch Sage Attention KJ" };
+    }
+  }
 
   // Steps del primer pase: regenerar sigmas interpolando desde la curva base 10-step
   const firstSteps = parseInt((j ? j.firstPassSteps : $("firstPassSteps")?.value) || 10, 10);
