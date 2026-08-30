@@ -674,11 +674,23 @@ function renderLoras(){
 
 // --- ENHANCER ---
 function loadSysPrompts(){
+  const defaults = JSON.parse(JSON.stringify(CONFIG.ENHANCER_DEFAULT_PROMPTS));
   const saved = localStorage.getItem(CONFIG.ENHANCER_SYSKEY);
   if(saved){
-    try { return JSON.parse(saved); } catch(e) {}
+    try {
+      const parsed = JSON.parse(saved);
+      for(const mode of Object.keys(defaults)){
+        if(!parsed[mode]) parsed[mode] = defaults[mode];
+        else {
+          for(const k of Object.keys(defaults[mode])){
+            if(!parsed[mode][k]) parsed[mode][k] = defaults[mode][k];
+          }
+        }
+      }
+      return parsed;
+    } catch(e) {}
   }
-  return JSON.parse(JSON.stringify(CONFIG.ENHANCER_DEFAULT_PROMPTS));
+  return defaults;
 }
 
 function saveSysPrompts(data){

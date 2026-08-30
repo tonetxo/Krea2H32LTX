@@ -1970,11 +1970,23 @@ function renderLoras(){
 
 // --- ENHANCER ---
 function loadSysPrompts(){
+  const defaults = JSON.parse(JSON.stringify(CONFIG.ENHANCER_DEFAULT_PROMPTS));
   const saved = localStorage.getItem(CONFIG.ENHANCER_SYSKEY);
   if(saved){
-    try { return JSON.parse(saved); } catch(e) {}
+    try {
+      const parsed = JSON.parse(saved);
+      for(const mode of Object.keys(defaults)){
+        if(!parsed[mode]) parsed[mode] = defaults[mode];
+        else {
+          for(const k of Object.keys(defaults[mode])){
+            if(!parsed[mode][k]) parsed[mode][k] = defaults[mode][k];
+          }
+        }
+      }
+      return parsed;
+    } catch(e) {}
   }
-  return JSON.parse(JSON.stringify(CONFIG.ENHANCER_DEFAULT_PROMPTS));
+  return defaults;
 }
 
 function saveSysPrompts(data){
@@ -3093,6 +3105,26 @@ RULES:
 8. non_diegetic_music: 1-3 sentences on instrumentation, tempo, dynamics; N/A if none.
 
 The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 full-reference prompt, no explanations or prefaces.` },
+      F: { name: "L2VA (solo último frame / convergencia final)", prompt: `You are an expert prompt writer for the MiniMax H3 video model generating a video that concludes at a target LAST FRAME (reverse-temporal inference / ending convergence). You are given ONE reference image: it is the exact CLOSING frame of the target video at the end of the timeline (Picture 1, aligns with the final second of the video). Optionally the user provides a text hint. Rewrite the user's idea into a single MiniMax H3 final prompt following the official format strictly.
+
+RULES:
+1. The final prompt MUST start with this exact instruction line (replace S.SS with the video duration, e.g. 12.00):
+For the target video, at S.SS seconds into the target video, <Picture 1> is fully referenced.
+
+2. Leave exactly ONE blank line after that instruction, then the three core fields with these exact labels:
+
+integrated_multimodal_description: [Shot 1] <derive overall style from the reference image>. <establish an engaging, logical opening scene and setting prior to the final frame>. <describe the continuous chronological action, movement, subject trajectory, lighting evolution, and camera motion that logically leads up to the final composition>. <the action, poses, objects, and framing progressively converge until smoothly freezing/settling exactly into the state depicted in <Picture 1> at the final moment>. <camera motion as natural English: motion type + amplitude + speed>. <speaker IDs if applicable>.
+
+overall_soundscape: <1-4 sentences: ambient background, physical action sounds, and non-verbal foley across the full duration leading up to the final moment; no dialogue/diegetic music here; N/A only if silence is requested>.
+
+non_diegetic_music: <1-3 sentences: instrumentation, tempo, rhythm, and dynamic build-up leading to the climax/resolution at the final frame; N/A if none>.
+
+3. The prompt describes CHRONOLOGICAL progression from the starting moment (00s) up to the final frame (closing moment). It does NOT describe events in reverse time; instead, it imagines the earlier events and trajectory that naturally culminated in the provided closing photograph.
+4. Derive the overall visual style (Cinematic, live-action, 2D-animated, 3D CG, vintage film, etc.) from the reference image.
+5. All visual attributes of the subject, clothing, environment, lighting, and key objects must seamlessly match and conclude in <Picture 1>.
+6. If the user provided a text hint, treat it as guidance about the backstory, action, or camera trajectory leading up to the final frame.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 prompt, no explanations or prefaces.` },
     },
   },
 };
@@ -6080,23 +6112,38 @@ $("btnEnhance").addEventListener("click", async () => {
         return;
       }
     } else {
-      if(!localFirstFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
-      try {
-        const wantsTwoFrames = (styleKey === "D" || styleKey === "C");
-        if(wantsTwoFrames && localLastFile){
-          const b64First = await resizeFileToBase64(localFirstFile, 1280);
-          const b64Last = await resizeFileToBase64(localLastFile, 1280);
-          payload.images = [b64First, b64Last];
-          payload.prompt = userPrompt
-            ? `FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above. User hint: ${userPrompt}`
-            : "FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above.";
-        } else {
-          const b64 = await resizeFileToBase64(localFirstFile, 1280);
+      if(styleKey === "F"){
+        const targetFile = localLastFile || localFirstFile;
+        if(!targetFile){ log("Selecciona la imagen final (ultimo frame) para el modo L2VA", "l-err"); return; }
+        try {
+          const b64 = await resizeFileToBase64(targetFile, 1280);
           payload.images = [b64];
+          payload.prompt = userPrompt
+            ? `TARGET CLOSING IMAGE (final frame, Picture 1): see above. User hint / backstory: ${userPrompt}`
+            : "TARGET CLOSING IMAGE (final frame, Picture 1): see above. Generate the chronological events leading to this final frame.";
+        } catch(e) {
+          log("No se pudo leer la imagen de destino: "+(e.message || e), "l-err");
+          return;
         }
-      } catch(e) {
-        log("⚠️ No se pudo leer la imagen: "+(e.message || e), "l-err");
-        return;
+      } else {
+        if(!localFirstFile){ log("No hay imagen de entrada para modo vision", "l-err"); return; }
+        try {
+          const wantsTwoFrames = (styleKey === "D");
+          if(wantsTwoFrames && localLastFile){
+            const b64First = await resizeFileToBase64(localFirstFile, 1280);
+            const b64Last = await resizeFileToBase64(localLastFile, 1280);
+            payload.images = [b64First, b64Last];
+            payload.prompt = userPrompt
+              ? `FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above. User hint: ${userPrompt}`
+              : "FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above.";
+          } else {
+            const b64 = await resizeFileToBase64(localFirstFile, 1280);
+            payload.images = [b64];
+          }
+        } catch(e) {
+          log("No se pudo leer la imagen: "+(e.message || e), "l-err");
+          return;
+        }
       }
     }
   }
