@@ -1,7 +1,8 @@
 {
   "1": {
     "inputs": {
-      "unet_name": "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+      "unet_name": "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
     "_meta": {
@@ -39,7 +40,7 @@
   },
   "5": {
     "inputs": {
-      "image": "percebeiro_octo_galicia.png"
+      "image": "0139001-erase the octopus-flux2flux-2-klein-9b.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -49,13 +50,15 @@
   "6": {
     "inputs": {
       "prompt": "[Style]: Based on the supplied image reference, a cinematic realistic film style, raw coastal photography, 35mm camera, detailed textures of wet neoprene, rusted iron, and slimy octopus skin.\n\n[Timeline & Action]:\n[00-04s] The scene begins from the supplied first frame. The barnacle fisherman in his wet black diving suit tenses his muscles, pulling hard with his rusted iron scraper. The traditional fishing boat in the background pitches dramatically on the wild waves.\n[04-08s] The realistic common octopus, camouflage skin pulsing with shifting brown and maroon colors, emerges slightly from the dark crevice, wrapping more muscular tentacles around the goose barnacles, securing its grip with glistening suction cups. A tense, physical tug-of-war begins as both pull with heavy, grounded effort.\n[08-12s] The goose barnacles strain under the pressure, stretching slightly but remaining firm. Small rock fragments and white sea foam fly as the metal scraper slides along the wet, mossy granite. Droplets of saltwater fly off the fisherman's neoprene hood and the octopus's slimy tentacles under the dramatic overcast sky, ending with a tense visual freeze.\n\n[Environment]: Churning Atlantic waves crashing hard in the background, heavy white ocean spray, and dark granite rocks shimmering with wetness under moody, diffused lighting.\n\n[Audio & Sound Design Layers for Ref2VA]:\n- [00-12s] BACKGROUND AMBIENCE: Uninterrupted, deep roaring Atlantic surf crashing against granite, heavy coastal wind howling, and the continuous hiss of white sea foam (constant white noise spectrum to prevent muting).\n- [00-05s] MUSICAL TEXTURE: Low, rhythmic, slow pounding of a traditional Galician bass drum (\"bombo\"), acting like a tense heartbeat.\n- [01-04s] FOLEY (Fisherman): Sharp, high-frequency sound of the rusted iron scraper rasping against granite ('screeech-clink'), mixed with the tight, rubbery stretching sound of wet neoprene fabric.\n- [04-08s] FOLEY (Octopus): Wet, squishy, and rhythmic suction sounds ('plop-squeal-plop') as the octopus arms grip the stone and barnacles.\n- [05-12s] MUSICAL TENSION: The scraping sound of traditional scallop shells (\"cunchas de vieira\") starting slow and accelerating, simulating a bone-rattling tension as the tug-of-war intensifies to a climax at the 12th second.",
-      "width": 1120,
-      "height": 640,
-      "length": 288,
-      "model": [
-        "1",
+      "width": [
+        "21",
         0
       ],
+      "height": [
+        "21",
+        1
+      ],
+      "length": 294,
       "clip": [
         "2",
         0
@@ -76,7 +79,7 @@
   },
   "7": {
     "inputs": {
-      "noise_seed": 72489218491204
+      "noise_seed": 48561919923826
     },
     "class_type": "RandomNoise",
     "_meta": {
@@ -86,7 +89,7 @@
   "8": {
     "inputs": {
       "model": [
-        "1",
+        "16",
         0
       ],
       "conditioning": [
@@ -111,10 +114,10 @@
   "10": {
     "inputs": {
       "scheduler": "simple",
-      "steps": 20,
-      "denoise": 1.0,
+      "steps": 8,
+      "denoise": 1,
       "model": [
-        "1",
+        "16",
         0
       ]
     },
@@ -185,14 +188,15 @@
   },
   "14": {
     "inputs": {
-      "fps": 24,
+      "fps": 48,
       "bit_depth": 8,
+      "color_space": "sRGB",
       "images": [
-        "12",
+        "18",
         0
       ],
       "audio": [
-        "13",
+        "23",
         0
       ]
     },
@@ -215,6 +219,119 @@
     "class_type": "SaveVideo",
     "_meta": {
       "title": "Save Video (MP4 + Audio)"
+    }
+  },
+  "16": {
+    "inputs": {
+      "shift_video": 12,
+      "shift_audio": 3,
+      "model": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "ModelSamplingMiniMaxH3"
+    }
+  },
+  "17": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "ModelAttentionBackend"
+    }
+  },
+  "18": {
+    "inputs": {
+      "multiplier": 2,
+      "interp_model": [
+        "19",
+        0
+      ],
+      "images": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "FrameInterpolate",
+    "_meta": {
+      "title": "Run Frame Interpolation Model"
+    }
+  },
+  "19": {
+    "inputs": {
+      "model_name": "film_net_fp16.safetensors"
+    },
+    "class_type": "FrameInterpolationModelLoader",
+    "_meta": {
+      "title": "Load Frame Interpolation Model"
+    }
+  },
+  "20": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "megapixels": 0.7,
+      "resolution_steps": 32,
+      "image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "Scale Image to Total Pixels"
+    }
+  },
+  "21": {
+    "inputs": {
+      "image": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "22": {
+    "inputs": {
+      "lora_name": "h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors",
+      "strength_model": 1,
+      "model": [
+        "17",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "23": {
+    "inputs": {
+      "low_gain_dB": -14,
+      "low_freq": 120,
+      "mid_gain_dB": 0,
+      "mid_freq": 1000,
+      "mid_q": 0.707,
+      "high_gain_dB": 0,
+      "high_freq": 5000,
+      "audio": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "AudioEqualizer3Band",
+    "_meta": {
+      "title": "Audio Equalizer (3-Band)"
     }
   }
 }
