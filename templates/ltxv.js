@@ -10,7 +10,7 @@ const CONFIG = {
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
   DEFAULT_VAE: "Checkpoint",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -77,6 +77,62 @@ setBitDepthUI(loadBitDepth());
 $("segBitDepth8")?.addEventListener("click", () => { setBitDepthUI(8); saveBitDepth(8); });
 $("segBitDepth10")?.addEventListener("click", () => { setBitDepthUI(10); saveBitDepth(10); });
 
+// --- FRAME INTERPOLATION (RIFE) ---
+const RIFE_KEY = "ltxv_rife_state";
+const RIFE_DEFAULTS = { enabled: true, multiplier: 2, model: "rife_v4.26.safetensors" };
+function loadRife(){
+  try { return Object.assign({}, RIFE_DEFAULTS, JSON.parse(localStorage.getItem(RIFE_KEY) || "{}")); }
+  catch(_) { return {...RIFE_DEFAULTS}; }
+}
+function saveRife(r){ try { localStorage.setItem(RIFE_KEY, JSON.stringify(r)); } catch(_){} }
+function setRifeUI(r){
+  const on = $("segRifeOn"), off = $("segRifeOff");
+  if(r.enabled){ on?.classList.add("on"); off?.classList.remove("on"); }
+  else { off?.classList.add("on"); on?.classList.remove("on"); }
+  if($("rifeMultiplier")){
+    $("rifeMultiplier").value = r.multiplier;
+    const fps = 24 * parseInt(r.multiplier, 10);
+    if($("rifeFpsHint")) $("rifeFpsHint").textContent = `(24fps → ${fps}fps)`;
+  }
+  if($("rifeModel") && r.model) $("rifeModel").value = r.model;
+}
+function getRifeState(){
+  const mult = parseInt($("rifeMultiplier")?.value || "2", 10);
+  return {
+    enabled: $("segRifeOn")?.classList.contains("on") ?? true,
+    multiplier: mult,
+    model: $("rifeModel")?.value || "rife_v4.26.safetensors"
+  };
+}
+function loadInterpModels(){
+  const sel = $("rifeModel");
+  if(!sel) return;
+  const models = (typeof AVAILABLE_INTERP_MODELS !== "undefined" && AVAILABLE_INTERP_MODELS.length)
+    ? AVAILABLE_INTERP_MODELS
+    : ["rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors", "rife_v4.25.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.25_heavy.safetensors", "film_net_fp16.safetensors"];
+  const current = sel.value;
+  sel.innerHTML = "";
+  for(const m of models){
+    const opt = document.createElement("option");
+    opt.value = m;
+    const clean = m.split("/").pop();
+    opt.textContent = (clean === "rife_v4.26.safetensors") ? `${clean} (Recomendado)` : clean;
+    sel.appendChild(opt);
+  }
+  if(current && models.includes(current)) sel.value = current;
+}
+const _rifeState = loadRife();
+loadInterpModels();
+setRifeUI(_rifeState);
+$("segRifeOn")?.addEventListener("click", () => { const r = getRifeState(); r.enabled = true; setRifeUI(r); saveRife(r); });
+$("segRifeOff")?.addEventListener("click", () => { const r = getRifeState(); r.enabled = false; setRifeUI(r); saveRife(r); });
+$("rifeMultiplier")?.addEventListener("change", (e) => {
+  const mult = parseInt(e.target.value, 10);
+  if($("rifeFpsHint")) $("rifeFpsHint").textContent = `(24fps → ${24 * mult}fps)`;
+  const r = getRifeState(); r.multiplier = mult; saveRife(r);
+});
+$("rifeModel")?.addEventListener("change", (e) => { const r = getRifeState(); r.model = e.target.value; saveRife(r); });
+
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
   for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
@@ -90,11 +146,13 @@ CONFIG.renderVariantMedia = function(card, url, media){
 // Metadata para el tooltip de la variant-card: captura los sliders/LoRAs en el
 // momento de crear la tarjeta (no al hacer hover, que podría haber cambiado).
   CONFIG.variantMeta = function(){
+  const r = getRifeState();
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
     ["VAE Vídeo", $("vaeSelect")?.value || "Checkpoint"],
     ["VAE Audio", $("audioVaeSelect")?.value || "Checkpoint"],
     ["Atención", $("sageAttentionType")?.value || "sageattn3"],
+    ["Interpolación RIFE", r.enabled ? `on · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}` : "off"],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
     ["Frames", $("frames")?.value || ""],
@@ -510,6 +568,7 @@ function snapshotJob(firstPassOnly){
     audioVae: $("audioVaeSelect")?.value,
     filenamePrefix: $("filenamePrefix")?.value,
     sageType: $("sageAttentionType")?.value,
+    rife: getRifeState(),
     bitDepth: getBitDepth(),
     loras: JSON.parse(JSON.stringify(loras)),
     dmdBypass: !!dmdBypass,
@@ -551,6 +610,10 @@ function restoreJob(job){
   if($("modelSelect") && job.model) $("modelSelect").value = job.model;
   if($("vaeSelect") && job.vae) $("vaeSelect").value = job.vae;
   if($("sageAttentionType") && job.sageType) $("sageAttentionType").value = job.sageType;
+  if(job.rife){
+    setRifeUI(job.rife);
+    saveRife(job.rife);
+  }
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
   loras = job.loras || loras;
@@ -1080,6 +1143,24 @@ function applyWorkflow(workflow, opts={}){
     }
   }
   if(!bitDepthSet) setMissing("profundidad de color");
+
+  // Restaurar Frame Interpolation (RIFE)
+  const interpNode = findByClass("FrameInterpolate");
+  const interpLoader = findByClass("FrameInterpolationModelLoader");
+  if(interpNode && interpNode.inputs){
+    const mult = interpNode.inputs.multiplier || 2;
+    const model = (interpLoader && interpLoader.inputs) ? interpLoader.inputs.model_name : "rife_v4.26.safetensors";
+    const r = { enabled: true, multiplier: mult, model: model };
+    setRifeUI(r);
+    saveRife(r);
+    setApplied("interpolación RIFE (" + mult + "x)");
+  } else {
+    const r = getRifeState();
+    r.enabled = false;
+    setRifeUI(r);
+    saveRife(r);
+    setMissing("interpolación RIFE");
+  }
 
   if(opts.silent) return { applied, missing };
   if(appliedMsg) log(appliedMsg, "l-ok");
@@ -1624,6 +1705,50 @@ function buildGraph(mode, job){
     g[N.FIRST_SAVE].inputs.filename_prefix = prefix + "_prev";
   }
 
+  // Frame Interpolation (RIFE) — se conecta entre VAEDecode (740) y RTX_SR (921) o CreateVideo (919)
+  const rifeState = j ? j.rife : getRifeState();
+  const rifeEnabled = rifeState ? rifeState.enabled : true;
+  const rifeMultiplier = rifeState ? parseInt(rifeState.multiplier || "2", 10) : 2;
+  const rifeModel = rifeState ? (rifeState.model || "rife_v4.26.safetensors") : "rife_v4.26.safetensors";
+
+  if(rifeEnabled){
+    g[N.RIFE_LOADER] = {
+      inputs: {
+        model_name: rifeModel
+      },
+      class_type: "FrameInterpolationModelLoader",
+      _meta: {
+        title: "Frame Interpolation Model Loader"
+      }
+    };
+    g[N.RIFE_INTERP] = {
+      inputs: {
+        multiplier: rifeMultiplier,
+        images: [N.DECODE_VIDEO_2, 0],
+        interp_model: [N.RIFE_LOADER, 0]
+      },
+      class_type: "FrameInterpolate",
+      _meta: {
+        title: "Frame Interpolate"
+      }
+    };
+    if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
+      g[N.RTX_SR].inputs.images = [N.RIFE_INTERP, 0];
+    }
+    if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
+      g[N.CREATE_VIDEO_2].inputs.fps = 24 * rifeMultiplier;
+    }
+  } else {
+    delete g[N.RIFE_LOADER];
+    delete g[N.RIFE_INTERP];
+    if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
+      g[N.RTX_SR].inputs.images = [N.DECODE_VIDEO_2, 0];
+    }
+    if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
+      g[N.CREATE_VIDEO_2].inputs.fps = 24;
+    }
+  }
+
   if(mode === "first"){
     // Solo 1er pase: el sampler 888 genera el preview y lo guarda en 923.
     delete g[N.FINAL_SAVE];
@@ -1635,6 +1760,8 @@ function buildGraph(mode, job){
     if(g[N.RTX_SR]) delete g[N.RTX_SR]; // 921
     if(g[N.CREATE_VIDEO_2]) delete g[N.CREATE_VIDEO_2]; // 919
     if(g[N.REFERENCE_2]) delete g[N.REFERENCE_2]; // 870
+    if(g[N.RIFE_LOADER]) delete g[N.RIFE_LOADER];
+    if(g[N.RIFE_INTERP]) delete g[N.RIFE_INTERP];
   }
   else if(mode === "ltx2preview"){
     // Grafo mnimo solo para generar el prompt con TextGenerateLTX2Prompt.

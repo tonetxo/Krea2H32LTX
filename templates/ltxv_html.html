@@ -51,6 +51,33 @@
       <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="sageattn3">sageattn3</option><option value="sageattn2">sageattn2</option><option value="sageattn" selected>sageattn</option><option value="sageattn_qk">sageattn_qk</option><option value="auto">auto</option><option value="comfy kitchen attention">comfy kitchen attention</option></select></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
       <div class="panel">
+        <h2>Interpolación de Frames (RIFE)</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRifeOn" data-value="true">Activo</div>
+          <div class="seg" id="segRifeOff" data-value="false">Desactivado</div>
+        </div>
+        <div class="row">
+          <label>Multiplicador FPS <span class="hint" id="rifeFpsHint">(24fps → 48fps)</span></label>
+          <select id="rifeMultiplier">
+            <option value="2" selected>2x (48 fps — Ultra fluido)</option>
+            <option value="3">3x (72 fps — Cine HFR)</option>
+            <option value="4">4x (96 fps — Hyper Smooth)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Modelo RIFE</label>
+          <select id="rifeModel">
+            <option value="rife_v4.26.safetensors" selected>rife_v4.26.safetensors (Recomendado)</option>
+            <option value="rife_v4.26_heavy.safetensors">rife_v4.26_heavy.safetensors (Alta precisión)</option>
+            <option value="rife_v4.25.safetensors">rife_v4.25.safetensors</option>
+            <option value="rife_v4.25_lite.safetensors">rife_v4.25_lite.safetensors (Rápido)</option>
+            <option value="rife_v4.25_heavy.safetensors">rife_v4.25_heavy.safetensors</option>
+            <option value="film_net_fp16.safetensors">film_net_fp16.safetensors (FILM)</option>
+          </select>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes de RTX Super Resolution para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
+      </div>
+      <div class="panel">
         <div class="collapsible-header" id="loraToggle">
           <span class="arrow">▶</span> LoRAs
         </div>

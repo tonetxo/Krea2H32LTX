@@ -15,6 +15,7 @@ DIFFUSION_MODELS_DIR = os.environ.get("LTXV_DIFFUSION_MODELS_DIR", "/home/tonetx
 VAE_DIR = os.environ.get("LTXV_VAE_DIR", "/home/tonetxo/SwarmUI/Models/VAE")
 VAE_PREFIX = os.environ.get("LTXV_VAE_PREFIX", "Ligazón para VAE")
 VAE_FALLBACK = os.environ.get("LTXV_VAE_FALLBACK", "Ligazón para VAE/LTX-2/ltx-2.5-video-vae-bf16.safetensors")
+INTERP_DIR = os.environ.get("LTXV_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/frame_interpolation")
 # Puerto donde se sirve la UI LTXV (para el botón "enviar a LTXV" de Krea2).
 LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
 # ---------------------
@@ -38,6 +39,9 @@ def main():
         'model_exclude': ('StableAudio/', 'HiDream/', 'sam3.1_multiplex_fp16', 'lens_turbo_bf16', 'sd3.5/', 'sdxl/', 'diffusion_models/minimaxh3/'),
         'vae_dir': [(VAE_DIR, VAE_PREFIX)],
         'vae_fallback': VAE_FALLBACK,
+        # Frame Interpolation (RIFE / FILM)
+        'interp_dir': INTERP_DIR,
+        'interp_fallback': 'rife_v4.26.safetensors',
         'lora_dir': LORAS_DIR,
         'lora_fallback': 'ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors',
         'header_title': 'LTXV',
