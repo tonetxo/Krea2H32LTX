@@ -1294,11 +1294,11 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
       });
       if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,200)); }
       const result = await r.json();
-      const text = (result.response || "").trim();
+      const text = cleanOllamaResponse(result.response);
       $("enhancerOutput").value = text;
       log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
     } catch(e) {
-      log("❌ Error al mejorar: "+e.message, "l-err");
+      log("Error al mejorar: "+e.message, "l-err");
       $("enhancerOutput").value = "Error: "+e.message;
     } finally {
       $("btnEnhance").disabled = false;
@@ -1309,10 +1309,10 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
 // --- CAPTION (Krea2-specific) ---
 $("btnCaption").addEventListener("click", async () => {
   const model = $("enhancerModel").value;
-  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+  if(!model){ log("Selecciona un modelo de Ollama", "l-err"); return; }
   const refImgEl = $("refImg");
   if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
-    log("⚠️ Primero carga una imagen de referencia", "l-err"); return;
+    log("Primero carga una imagen de referencia", "l-err"); return;
   }
   const mode = $("enhancerMode").value;
   const styleKey = $("enhancerStyle").value;
@@ -1337,17 +1337,15 @@ $("btnCaption").addEventListener("click", async () => {
     });
     if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,300)); }
     const result = await r.json();
-    let text = (result.response || "").trim();
+    let text = cleanOllamaResponse(result.response);
     if(!text){
       const err = result.error || "(sin error declarado)";
-      log("⚠️ Respuesta vacía. Keys: "+Object.keys(result).join(",")+" err="+err, "l-err");
-      $("enhancerOutput").value = "El modelo no devolvió texto. Error: "+err+"\n\nRespuesta cruda: "+JSON.stringify(result).slice(0,500);
+      log("Respuesta vacia. Keys: "+Object.keys(result).join(",")+" err="+err, "l-err");
+      $("enhancerOutput").value = "El modelo no devolvio texto. Error: "+err+"\n\nRespuesta cruda: "+JSON.stringify(result).slice(0,500);
     } else {
-      const think = text.match(/<think>[\s\S]*?<\/think>/i);
-      if(think) text = text.replace(/<think>[\s\S]*?<\/think>/i, "").trim();
       $("enhancerOutput").value = text;
-      log("🖼️ Caption Ollama generado ("+model+", "+mode+"/"+styleKey+", "+text.length+" chars).", "l-ok");
-      log("💡 Pulsa 'Usar como prompt' para aplicarlo, o pulsa 'Generar' si ya está activo.", "l-info");
+      log("Caption Ollama generado ("+model+", "+mode+"/"+styleKey+", "+text.length+" chars).", "l-ok");
+      log("Pulsa 'Usar como prompt' para aplicarlo, o pulsa 'Generar' si ya esta activo.", "l-info");
     }
   } catch(e) {
     log("❌ Error en caption: "+e.message, "l-err");

@@ -2271,7 +2271,7 @@ $("btnEnhance").addEventListener("click", async () => {
       throw new Error("HTTP "+r.status+" "+t.slice(0,200));
     }
     const result = await r.json();
-    const text = (result.response || "").trim();
+    const text = cleanOllamaResponse(result.response);
     $("enhancerOutput").value = text;
     if(chainMode === LTX2_CHAIN_BOTH){
       log("Ejecutando previsualizacion LTX2 en ComfyUI...", "l-info");
@@ -2293,7 +2293,7 @@ $("btnEnhance").addEventListener("click", async () => {
     }
     log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
   } catch(e) {
-    log("❌ Error al mejorar: "+e.message, "l-err");
+    log("Error al mejorar: "+e.message, "l-err");
     $("enhancerOutput").value = "Error: "+e.message;
   } finally {
     $("btnEnhance").disabled = false;

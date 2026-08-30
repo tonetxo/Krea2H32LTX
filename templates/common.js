@@ -715,6 +715,27 @@ function getCurrentSysPrompt(data, mode, styleKey){
   return entry ? entry.prompt : "";
 }
 
+function cleanOllamaResponse(raw){
+  if(!raw) return "";
+  let text = String(raw).trim();
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
+  if(/<\/think>/i.test(text)){
+    const parts = text.split(/<\/think>/i);
+    text = parts[parts.length - 1].trim();
+  }
+  if(/<\/thought>/i.test(text)){
+    const parts = text.split(/<\/thought>/i);
+    text = parts[parts.length - 1].trim();
+  }
+  text = text.replace(/<think>[\s\S]*$/gi, "").trim();
+  text = text.replace(/<thought>[\s\S]*$/gi, "").trim();
+  if(text.startsWith("```") && text.endsWith("```")){
+    text = text.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
+  }
+  return text.trim();
+}
+
 function makeCollapsible(toggleId, bodyId, onOpen){
   const h = $(toggleId), b = $(bodyId);
   if(!h || !b) return;
