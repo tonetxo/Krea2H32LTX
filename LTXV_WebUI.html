@@ -523,7 +523,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
       </div>
-      <div class="panel"><h2>Resolución & duración</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
+      <div class="panel"><h2>Resolución &amp; duración</h2><div class="row slider-row"><label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
       <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div>
       <div class="row" style="margin-top:6px;"><label>Prefijo de archivo <span class="hint">(ej: templo/mensaje_botella)</span></label><input type="text" id="filenamePrefix" value="templo/mensaje_botella" placeholder="templo/mensaje_botella"></div></div>
       <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
@@ -1899,6 +1899,44 @@ async function fetchWithRetry(url, options = {}, attempts = 3, delay = 350){
       throw err;
     }
   }
+}
+
+function getFriendlyRatio(w, h){
+  if(!w || !h) return "16:9";
+  const r = w / h;
+  const known = [
+    { name: "16:9", val: 16/9 },
+    { name: "9:16", val: 9/16 },
+    { name: "1:1", val: 1/1 },
+    { name: "4:3", val: 4/3 },
+    { name: "3:4", val: 3/4 },
+    { name: "3:2", val: 3/2 },
+    { name: "2:3", val: 2/3 },
+    { name: "21:9", val: 21/9 },
+    { name: "9:21", val: 9/21 },
+    { name: "4:5", val: 4/5 },
+    { name: "5:4", val: 5/4 }
+  ];
+  let best = known[0];
+  let minDiff = Math.abs(r - best.val);
+  for(const k of known){
+    const diff = Math.abs(r - k.val);
+    if(diff < minDiff){
+      minDiff = diff;
+      best = k;
+    }
+  }
+  if(minDiff / best.val < 0.05){
+    return best.name;
+  }
+  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+  const g = gcd(Math.round(w), Math.round(h)) || 1;
+  const rw = Math.round(w / g);
+  const rh = Math.round(h / g);
+  if(rw < 50 && rh < 50){
+    return `${rw}:${rh}`;
+  }
+  return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
 }
 
 function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
@@ -4012,6 +4050,8 @@ function nearest32(v){ return Math.round(v / 32) * 32; }
   $("width").value = w;
   $("height").value = h;
   $("mpVal").textContent = mp.toFixed(2);
+  const ratioStr = getFriendlyRatio(w, h);
+  if($("arDetectHint")) $("arDetectHint").textContent = `(${ratioStr})`;
 }
 
 function updateQueueUI(){
@@ -4704,9 +4744,8 @@ function applyWorkflow(workflow, opts={}){
 function updateDzInfo(w, h){
   const info = $("dzInfo");
   if(!info) return;
-  function gcd(a,b){ return b ? gcd(b, a % b) : a; }
-  const d = gcd(w, h) || 1;
-  info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
+  const ratioStr = getFriendlyRatio(w, h);
+  info.textContent = `${w}×${h} · ${ratioStr}`;
   if(w && h){
     currentAspectRatio = w / h;
     recalcResolution();

@@ -718,6 +718,20 @@ async function prepareRefVideo(i){
 const AR_MODE_KEY = "minimaxh3_ar_mode";
 let arMode = "auto"; // "auto" | "16:9"
 let imageNativeAspectRatio = 16 / 9;
+let rawInputImageWidth = 0;
+let rawInputImageHeight = 0;
+
+function updateArLabel(w, h){
+  const auto = $("segArAuto");
+  const hint = $("arDetectHint");
+  const currentRatio = (w && h) ? getFriendlyRatio(w, h) : getFriendlyRatio(16, 9);
+  if(auto){
+    auto.textContent = (w && h) ? `Auto (${currentRatio})` : "Auto (Imagen)";
+  }
+  if(hint){
+    hint.textContent = (arMode === "16:9") ? `(Forzado 16:9 · Original: ${currentRatio})` : `(${currentRatio}${w && h ? ` · ${w}×${h}` : ''})`;
+  }
+}
 
 function loadArMode(){
   try { return localStorage.getItem(AR_MODE_KEY) || "auto"; } catch(_){ return "auto"; }
@@ -977,7 +991,9 @@ function recalcResolution(){
   $("mpVal").textContent = mp.toFixed(2);
   const finalW = w * 2;
   const finalH = h * 2;
-  if($("resFinalHint")) $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px tras RTX 2x`;
+  const currentRatioName = getFriendlyRatio(w, h);
+  if($("resFinalHint")) $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras RTX 2x`;
+  updateArLabel(rawInputImageWidth, rawInputImageHeight);
 }
 
 function updateQueueUI(){
@@ -1618,13 +1634,19 @@ function applyWorkflow(workflow, opts={}){
 // --- DROPZONE / FILE HANDLING (imagen de inicio) ---
 function updateDzInfo(w, h, infoEl){
   const info = infoEl || $("dzInfo");
-  if(!info) return;
-  function gcd(a,b){ return b ? gcd(b, a % b) : a; }
-  const d = gcd(w, h) || 1;
-  info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
-  if(w && h && infoEl === $("dzInfo")){
+  if(info && w && h){
+    const ratioStr = getFriendlyRatio(w, h);
+    info.textContent = `${w}×${h} · ${ratioStr}`;
+  }
+  if(w && h){
+    rawInputImageWidth = w;
+    rawInputImageHeight = h;
     imageNativeAspectRatio = w / h;
-    recalcResolution();
+    if(arMode !== "16:9"){
+      setArModeUI("auto");
+    } else {
+      recalcResolution();
+    }
   }
 }
 
@@ -1808,6 +1830,17 @@ function clearFirstFrame(){
   const frameSel = $("frameSelector");
   if(frameSel) frameSel.style.display = "none";
   if(inputZoom) inputZoom.resetZoom();
+
+  const lastImg = $("lastFrameImg");
+  if(lastImg && lastImg.naturalWidth && lastImg.naturalHeight && lastImg.style.display !== "none"){
+    updateDzInfo(lastImg.naturalWidth, lastImg.naturalHeight, $("lastFrameDzInfo"));
+  } else {
+    rawInputImageWidth = 0;
+    rawInputImageHeight = 0;
+    imageNativeAspectRatio = 16 / 9;
+    updateArLabel(0, 0);
+    recalcResolution();
+  }
   log("Imagen de inicio eliminada.", "l-info");
 }
 
@@ -1825,6 +1858,17 @@ function clearLastFrame(){
   const fileInp = $("lastFrameFileInput");
   if(fileInp) fileInp.value = "";
   if(lastFrameZoom) lastFrameZoom.resetZoom();
+
+  const firstImg = $("inputImg");
+  if(firstImg && firstImg.naturalWidth && firstImg.naturalHeight && firstImg.style.display !== "none"){
+    updateDzInfo(firstImg.naturalWidth, firstImg.naturalHeight, $("dzInfo"));
+  } else {
+    rawInputImageWidth = 0;
+    rawInputImageHeight = 0;
+    imageNativeAspectRatio = 16 / 9;
+    updateArLabel(0, 0);
+    recalcResolution();
+  }
   log("Ultimo frame eliminado.", "l-info");
 }
 

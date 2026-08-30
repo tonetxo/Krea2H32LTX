@@ -646,10 +646,10 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
       <div class="panel"><h2>Megapíxeles &amp; resolución</h2>
         <div class="row">
-          <label>Relación de aspecto</label>
+          <label>Relación de aspecto <span class="hint" id="arDetectHint">(Auto · 16:9)</span></label>
           <div class="seed-toggle">
             <div class="seg on" id="segArAuto" data-value="auto">Auto (Imagen)</div>
-            <div class="seg" id="segAr169" data-value="16:9">Forzar 16:9 (2304×1280)</div>
+            <div class="seg" id="segAr169" data-value="16:9">Forzar 16:9</div>
           </div>
         </div>
         <div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.7"><div class="slider-val" id="mpVal">0.70</div></div>
@@ -1431,6 +1431,44 @@ async function fetchWithRetry(url, options = {}, attempts = 3, delay = 350){
       throw err;
     }
   }
+}
+
+function getFriendlyRatio(w, h){
+  if(!w || !h) return "16:9";
+  const r = w / h;
+  const known = [
+    { name: "16:9", val: 16/9 },
+    { name: "9:16", val: 9/16 },
+    { name: "1:1", val: 1/1 },
+    { name: "4:3", val: 4/3 },
+    { name: "3:4", val: 3/4 },
+    { name: "3:2", val: 3/2 },
+    { name: "2:3", val: 2/3 },
+    { name: "21:9", val: 21/9 },
+    { name: "9:21", val: 9/21 },
+    { name: "4:5", val: 4/5 },
+    { name: "5:4", val: 5/4 }
+  ];
+  let best = known[0];
+  let minDiff = Math.abs(r - best.val);
+  for(const k of known){
+    const diff = Math.abs(r - k.val);
+    if(diff < minDiff){
+      minDiff = diff;
+      best = k;
+    }
+  }
+  if(minDiff / best.val < 0.05){
+    return best.name;
+  }
+  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+  const g = gcd(Math.round(w), Math.round(h)) || 1;
+  const rw = Math.round(w / g);
+  const rh = Math.round(h / g);
+  if(rw < 50 && rh < 50){
+    return `${rw}:${rh}`;
+  }
+  return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
 }
 
 function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
@@ -3866,6 +3904,20 @@ async function prepareRefVideo(i){
 const AR_MODE_KEY = "minimaxh3_ar_mode";
 let arMode = "auto"; // "auto" | "16:9"
 let imageNativeAspectRatio = 16 / 9;
+let rawInputImageWidth = 0;
+let rawInputImageHeight = 0;
+
+function updateArLabel(w, h){
+  const auto = $("segArAuto");
+  const hint = $("arDetectHint");
+  const currentRatio = (w && h) ? getFriendlyRatio(w, h) : getFriendlyRatio(16, 9);
+  if(auto){
+    auto.textContent = (w && h) ? `Auto (${currentRatio})` : "Auto (Imagen)";
+  }
+  if(hint){
+    hint.textContent = (arMode === "16:9") ? `(Forzado 16:9 · Original: ${currentRatio})` : `(${currentRatio}${w && h ? ` · ${w}×${h}` : ''})`;
+  }
+}
 
 function loadArMode(){
   try { return localStorage.getItem(AR_MODE_KEY) || "auto"; } catch(_){ return "auto"; }
@@ -4125,7 +4177,9 @@ function recalcResolution(){
   $("mpVal").textContent = mp.toFixed(2);
   const finalW = w * 2;
   const finalH = h * 2;
-  if($("resFinalHint")) $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px tras RTX 2x`;
+  const currentRatioName = getFriendlyRatio(w, h);
+  if($("resFinalHint")) $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras RTX 2x`;
+  updateArLabel(rawInputImageWidth, rawInputImageHeight);
 }
 
 function updateQueueUI(){
@@ -4766,13 +4820,19 @@ function applyWorkflow(workflow, opts={}){
 // --- DROPZONE / FILE HANDLING (imagen de inicio) ---
 function updateDzInfo(w, h, infoEl){
   const info = infoEl || $("dzInfo");
-  if(!info) return;
-  function gcd(a,b){ return b ? gcd(b, a % b) : a; }
-  const d = gcd(w, h) || 1;
-  info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
-  if(w && h && infoEl === $("dzInfo")){
+  if(info && w && h){
+    const ratioStr = getFriendlyRatio(w, h);
+    info.textContent = `${w}×${h} · ${ratioStr}`;
+  }
+  if(w && h){
+    rawInputImageWidth = w;
+    rawInputImageHeight = h;
     imageNativeAspectRatio = w / h;
-    recalcResolution();
+    if(arMode !== "16:9"){
+      setArModeUI("auto");
+    } else {
+      recalcResolution();
+    }
   }
 }
 
@@ -4956,6 +5016,17 @@ function clearFirstFrame(){
   const frameSel = $("frameSelector");
   if(frameSel) frameSel.style.display = "none";
   if(inputZoom) inputZoom.resetZoom();
+
+  const lastImg = $("lastFrameImg");
+  if(lastImg && lastImg.naturalWidth && lastImg.naturalHeight && lastImg.style.display !== "none"){
+    updateDzInfo(lastImg.naturalWidth, lastImg.naturalHeight, $("lastFrameDzInfo"));
+  } else {
+    rawInputImageWidth = 0;
+    rawInputImageHeight = 0;
+    imageNativeAspectRatio = 16 / 9;
+    updateArLabel(0, 0);
+    recalcResolution();
+  }
   log("Imagen de inicio eliminada.", "l-info");
 }
 
@@ -4973,6 +5044,17 @@ function clearLastFrame(){
   const fileInp = $("lastFrameFileInput");
   if(fileInp) fileInp.value = "";
   if(lastFrameZoom) lastFrameZoom.resetZoom();
+
+  const firstImg = $("inputImg");
+  if(firstImg && firstImg.naturalWidth && firstImg.naturalHeight && firstImg.style.display !== "none"){
+    updateDzInfo(firstImg.naturalWidth, firstImg.naturalHeight, $("dzInfo"));
+  } else {
+    rawInputImageWidth = 0;
+    rawInputImageHeight = 0;
+    imageNativeAspectRatio = 16 / 9;
+    updateArLabel(0, 0);
+    recalcResolution();
+  }
   log("Ultimo frame eliminado.", "l-info");
 }
 

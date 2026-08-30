@@ -1047,6 +1047,44 @@ async function fetchWithRetry(url, options = {}, attempts = 3, delay = 350){
   }
 }
 
+function getFriendlyRatio(w, h){
+  if(!w || !h) return "16:9";
+  const r = w / h;
+  const known = [
+    { name: "16:9", val: 16/9 },
+    { name: "9:16", val: 9/16 },
+    { name: "1:1", val: 1/1 },
+    { name: "4:3", val: 4/3 },
+    { name: "3:4", val: 3/4 },
+    { name: "3:2", val: 3/2 },
+    { name: "2:3", val: 2/3 },
+    { name: "21:9", val: 21/9 },
+    { name: "9:21", val: 9/21 },
+    { name: "4:5", val: 4/5 },
+    { name: "5:4", val: 5/4 }
+  ];
+  let best = known[0];
+  let minDiff = Math.abs(r - best.val);
+  for(const k of known){
+    const diff = Math.abs(r - k.val);
+    if(diff < minDiff){
+      minDiff = diff;
+      best = k;
+    }
+  }
+  if(minDiff / best.val < 0.05){
+    return best.name;
+  }
+  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+  const g = gcd(Math.round(w), Math.round(h)) || 1;
+  const rw = Math.round(w / g);
+  const rh = Math.round(h / g);
+  if(rw < 50 && rh < 50){
+    return `${rw}:${rh}`;
+  }
+  return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
+}
+
 function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
 function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
 function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}

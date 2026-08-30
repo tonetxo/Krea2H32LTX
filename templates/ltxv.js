@@ -396,6 +396,8 @@ function nearest32(v){ return Math.round(v / 32) * 32; }
   $("width").value = w;
   $("height").value = h;
   $("mpVal").textContent = mp.toFixed(2);
+  const ratioStr = getFriendlyRatio(w, h);
+  if($("arDetectHint")) $("arDetectHint").textContent = `(${ratioStr})`;
 }
 
 function updateQueueUI(){
@@ -1088,9 +1090,8 @@ function applyWorkflow(workflow, opts={}){
 function updateDzInfo(w, h){
   const info = $("dzInfo");
   if(!info) return;
-  function gcd(a,b){ return b ? gcd(b, a % b) : a; }
-  const d = gcd(w, h) || 1;
-  info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
+  const ratioStr = getFriendlyRatio(w, h);
+  info.textContent = `${w}×${h} · ${ratioStr}`;
   if(w && h){
     currentAspectRatio = w / h;
     recalcResolution();
