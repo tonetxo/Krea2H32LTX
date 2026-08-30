@@ -1282,20 +1282,13 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
     const userPrompt = $("prompt").value.trim();
     if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
-    const payload = { model, system, prompt: userPrompt, stream: false, options: { num_ctx: 8192 } };
+    const payload = { model, system, prompt: userPrompt, options: { num_ctx: 4096 } };
 
     $("btnEnhance").disabled = true;
     $("btnEnhance").textContent = "Mejorando...";
     $("enhancerOutput").value = "";
     try {
-      const r = await fetchWithRetry("/api/generate", {
-        method: "POST", headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload),
-      });
-      if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,200)); }
-      const result = await r.json();
-      const text = cleanOllamaResponse(result.response);
-      $("enhancerOutput").value = text;
+      const text = await streamOllamaGenerate(payload, $("enhancerOutput"));
       log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
     } catch(e) {
       log("Error al mejorar: "+e.message, "l-err");
@@ -1323,32 +1316,25 @@ $("btnCaption").addEventListener("click", async () => {
   $("btnCaption").textContent = "Analizando imagen...";
   $("enhancerOutput").value = "";
   try {
-    const b64 = await getVisibleRegionBase64(refImgEl.src, "refWrap", 1280);
+    const b64 = await getVisibleRegionBase64(refImgEl.src, "refWrap", 768);
     const userPrompt = $("prompt").value.trim();
     const captionPrompt = userPrompt
       ? `Describe this image. User guidance: ${userPrompt}`
       : "Describe this image.";
-    const r = await fetchWithRetry("/api/generate", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        model, system, prompt: captionPrompt, images: [b64], stream: false,
-        options: { num_ctx: 8192, temperature: 0.4 }
-      }),
-    });
-    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,300)); }
-    const result = await r.json();
-    let text = cleanOllamaResponse(result.response);
+    const payload = {
+      model, system, prompt: captionPrompt, images: [b64],
+      options: { num_ctx: 4096, temperature: 0.4 }
+    };
+    const text = await streamOllamaGenerate(payload, $("enhancerOutput"));
     if(!text){
-      const err = result.error || "(sin error declarado)";
-      log("Respuesta vacia. Keys: "+Object.keys(result).join(",")+" err="+err, "l-err");
-      $("enhancerOutput").value = "El modelo no devolvio texto. Error: "+err+"\n\nRespuesta cruda: "+JSON.stringify(result).slice(0,500);
+      log("Respuesta vacia.", "l-err");
+      $("enhancerOutput").value = "El modelo no devolvio texto.";
     } else {
-      $("enhancerOutput").value = text;
       log("Caption Ollama generado ("+model+", "+mode+"/"+styleKey+", "+text.length+" chars).", "l-ok");
       log("Pulsa 'Usar como prompt' para aplicarlo, o pulsa 'Generar' si ya esta activo.", "l-info");
     }
   } catch(e) {
-    log("❌ Error en caption: "+e.message, "l-err");
+    log("Error en caption: "+e.message, "l-err");
     $("enhancerOutput").value = "Error: "+e.message;
   } finally {
     $("btnCaption").disabled = false;

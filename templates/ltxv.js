@@ -2241,17 +2241,14 @@ $("btnEnhance").addEventListener("click", async () => {
   const userPrompt = $("prompt").value.trim();
   if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
-  const payload = { model, system, prompt: userPrompt || "Describe this image.", stream: false, options: { num_ctx: 8192 } };
+  const payload = { model, system, prompt: userPrompt || "Describe this image.", options: { num_ctx: 4096 } };
   if(mode === "vision"){
-    if(!localFile){ log("⚠️ No hay imagen de entrada para modo visión", "l-err"); return; }
+    if(!localFile){ log("No hay imagen de entrada para modo vision", "l-err"); return; }
     try {
-      // Redimensionamos antes de enviar: Ollama rechaza bodies > ~4 MB
-      // ("http: request body too large"). 1280 px de lado máximo es ample para
-      // visión y mantiene el JPEG por debajo del tope.
-      const b64 = await resizeFileToBase64(localFile, 1280);
+      const b64 = await resizeFileToBase64(localFile, 768);
       payload.images = [b64];
     } catch(e) {
-      log("⚠️ No se pudo leer la imagen: "+(e.message || e), "l-err");
+      log("No se pudo leer la imagen: "+(e.message || e), "l-err");
       return;
     }
   }
@@ -2261,18 +2258,7 @@ $("btnEnhance").addEventListener("click", async () => {
   $("enhancerOutput").value = "";
   $("ltx2PreviewText").value = "";
   try {
-    const r = await fetch("/api/generate", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload),
-    });
-    if(!r.ok){
-      const t = await r.text().catch(()=>"");
-      throw new Error("HTTP "+r.status+" "+t.slice(0,200));
-    }
-    const result = await r.json();
-    const text = cleanOllamaResponse(result.response);
-    $("enhancerOutput").value = text;
+    const text = await streamOllamaGenerate(payload, $("enhancerOutput"));
     if(chainMode === LTX2_CHAIN_BOTH){
       log("Ejecutando previsualizacion LTX2 en ComfyUI...", "l-info");
       const ltx2Text = await runLTX2Preview(text);

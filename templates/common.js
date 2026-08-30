@@ -736,6 +736,70 @@ function cleanOllamaResponse(raw){
   return text.trim();
 }
 
+async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
+  const bodyPayload = Object.assign({ stream: true }, payload);
+  if(!bodyPayload.options) bodyPayload.options = {};
+  if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
+
+  const r = await fetch("/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyPayload),
+    signal
+  });
+
+  if(!r.ok){
+    const t = await r.text().catch(()=>"");
+    throw new Error("HTTP " + r.status + " " + t.slice(0, 200));
+  }
+
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let accumulated = "";
+  let inThink = false;
+  let thinkCount = 0;
+  let buffer = "";
+
+  while(true){
+    const { done, value } = await reader.read();
+    if(done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop();
+
+    for(const line of lines){
+      if(!line.trim()) continue;
+      try {
+        const json = JSON.parse(line);
+        if(json.response){
+          accumulated += json.response;
+          if(accumulated.includes("<think>") || accumulated.includes("<thought>")){
+            if(!accumulated.includes("</think>") && !accumulated.includes("</thought>")){
+              inThink = true;
+              thinkCount++;
+              if(outputEl && thinkCount % 6 === 0){
+                outputEl.value = `[Pensando... (${thinkCount} tokens)]`;
+              }
+            } else {
+              inThink = false;
+            }
+          }
+          if(!inThink){
+            const clean = cleanOllamaResponse(accumulated);
+            if(outputEl && clean){
+              outputEl.value = clean;
+            }
+          }
+        }
+      } catch(e){}
+    }
+  }
+
+  const finalClean = cleanOllamaResponse(accumulated);
+  if(outputEl) outputEl.value = finalClean;
+  return finalClean;
+}
+
 function makeCollapsible(toggleId, bodyId, onOpen){
   const h = $(toggleId), b = $(bodyId);
   if(!h || !b) return;

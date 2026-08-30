@@ -3170,7 +3170,7 @@ $("btnEnhance").addEventListener("click", async () => {
         const targetFile = localLastFile || localFirstFile;
         if(!targetFile){ log("Selecciona la imagen final (ultimo frame) para el modo L2VA", "l-err"); return; }
         try {
-          const b64 = await resizeFileToBase64(targetFile, 1280);
+          const b64 = await resizeFileToBase64(targetFile, 768);
           payload.images = [b64];
           payload.prompt = userPrompt
             ? `TARGET CLOSING IMAGE (final frame, Picture 1): see above. User hint / backstory: ${userPrompt}`
@@ -3184,14 +3184,14 @@ $("btnEnhance").addEventListener("click", async () => {
         try {
           const wantsTwoFrames = (styleKey === "D");
           if(wantsTwoFrames && localLastFile){
-            const b64First = await resizeFileToBase64(localFirstFile, 1280);
-            const b64Last = await resizeFileToBase64(localLastFile, 1280);
+            const b64First = await resizeFileToBase64(localFirstFile, 768);
+            const b64Last = await resizeFileToBase64(localLastFile, 768);
             payload.images = [b64First, b64Last];
             payload.prompt = userPrompt
               ? `FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above. User hint: ${userPrompt}`
               : "FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above.";
           } else {
-            const b64 = await resizeFileToBase64(localFirstFile, 1280);
+            const b64 = await resizeFileToBase64(localFirstFile, 768);
             payload.images = [b64];
           }
         } catch(e) {
@@ -3206,18 +3206,7 @@ $("btnEnhance").addEventListener("click", async () => {
   $("btnEnhance").textContent = "Mejorando...";
   $("enhancerOutput").value = "";
   try {
-    const r = await fetch("/api/generate", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload),
-    });
-    if(!r.ok){
-      const t = await r.text().catch(()=>"");
-      throw new Error("HTTP "+r.status+" "+t.slice(0,200));
-    }
-    const result = await r.json();
-    const text = cleanOllamaResponse(result.response);
-    $("enhancerOutput").value = text;
+    const text = await streamOllamaGenerate(payload, $("enhancerOutput"));
     log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
   } catch(e) {
     log("Error al mejorar: "+e.message, "l-err");
