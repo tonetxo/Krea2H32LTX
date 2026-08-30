@@ -2052,30 +2052,34 @@ async function ensureImagesUploaded(){
     }
     log("Referencias subidas.","l-ok");
     return;
-  }
+  if(currentMode !== "r2v"){
+    if(!localFirstFile && (!localLastFile || currentMode !== "flf2v") && !uploadedFirstImage && !uploadedLastImage){
+      throw new Error("Selecciona una imagen de inicio o un último frame.");
+    }
+    // Imagen de inicio
+    if(localFirstFile){
+      const fd1 = new FormData();
+      fd1.append("image", localFirstFile, localFirstFile.name.replace(/^temp_\d+_/, ''));
+      fd1.append("overwrite","true");
+      const r1 = await fetch(server()+"/upload/image",{method:"POST",body:fd1});
+      if(!r1.ok) throw new Error("Fallo al subir imagen de inicio");
+      const d1 = await r1.json();
+      uploadedFirstImage = {name:d1.name, subfolder:d1.subfolder||"", type:d1.type||"input"};
+      log("Imagen de inicio subida: "+uploadedFirstImage.name,"l-ok");
+    }
 
-  if(!localFirstFile) throw new Error("selecciona imagen de inicio");
-  // Imagen de inicio
-  const fd1 = new FormData();
-  fd1.append("image", localFirstFile, localFirstFile.name.replace(/^temp_\d+_/, ''));
-  fd1.append("overwrite","true");
-  const r1 = await fetch(server()+"/upload/image",{method:"POST",body:fd1});
-  if(!r1.ok) throw new Error("fallo subida imagen inicio");
-  const d1 = await r1.json();
-  uploadedFirstImage = {name:d1.name, subfolder:d1.subfolder||"", type:d1.type||"input"};
-  log("Imagen de inicio subida: "+uploadedFirstImage.name,"l-ok");
-
-  // Último frame (solo flf2v)
-  if(currentMode === "flf2v" && localLastFile){
-    const fd2 = new FormData();
-    fd2.append("image", localLastFile, localLastFile.name.replace(/^temp_last_\d+_/, ''));
-    fd2.append("overwrite","true");
-    const r2 = await fetch(server()+"/upload/image",{method:"POST",body:fd2});
-    if(!r2.ok) throw new Error("fallo subida último frame");
-    const d2 = await r2.json();
-    uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
-    log("Último frame subido: "+uploadedLastImage.name,"l-ok");
-    job.uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
+    // Último frame (solo flf2v)
+    if(currentMode === "flf2v" && localLastFile){
+      const fd2 = new FormData();
+      fd2.append("image", localLastFile, localLastFile.name.replace(/^temp_last_\d+_/, ''));
+      fd2.append("overwrite","true");
+      const r2 = await fetch(server()+"/upload/image",{method:"POST",body:fd2});
+      if(!r2.ok) throw new Error("Fallo al subir último frame");
+      const d2 = await r2.json();
+      uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
+      log("Último frame subido: "+uploadedLastImage.name,"l-ok");
+    }
+    return;
   }
 }
 
@@ -2149,9 +2153,9 @@ async function ensureJobImagesUploaded(job){
       job.uploadedFirstImage = {name:d1.name, subfolder:d1.subfolder||"", type:d1.type||"input"};
       uploadedFirstImage = {...job.uploadedFirstImage};
       log("Imagen de inicio subida: "+job.uploadedFirstImage.name,"l-ok");
-    } else if(uploadedFirstImage){
+    } else if(uploadedFirstImage && !job.localFirstFile){
       job.uploadedFirstImage = {...uploadedFirstImage};
-    } else {
+    } else if(job.mode !== "flf2v" || (!job.localLastFile && !localLastFile && !job.uploadedLastImage && !uploadedLastImage)){
       throw new Error("No hay imagen de inicio seleccionada. Arrastra una imagen a la zona de inicio.");
     }
   }
@@ -2169,9 +2173,13 @@ async function ensureJobImagesUploaded(job){
       job.uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
       uploadedLastImage = {...job.uploadedLastImage};
       log("Último frame subido: "+job.uploadedLastImage.name,"l-ok");
-    } else if(uploadedLastImage){
+    } else if(uploadedLastImage && !job.localLastFile){
       job.uploadedLastImage = {...uploadedLastImage};
     }
+  }
+
+  if(job.mode !== "r2v" && !job.uploadedFirstImage && !job.uploadedLastImage){
+    throw new Error("Selecciona una imagen de inicio o un último frame.");
   }
 }
 
@@ -2267,12 +2275,42 @@ function buildGraph(job){
       }
     }
   } else {
+    // MODO i2v / flf2v
     const firstImg = j ? j.uploadedFirstImage : uploadedFirstImage;
-    if(firstImg && g[N.IMAGE_FIRST]){
-      // i2v / flf2v: imagen de inicio como referencia 0
-      g[N.IMAGE_FIRST].inputs.image = firstImg.name;
-      if(g[N.REF2V] && g[N.REF2V].inputs){
-        g[N.REF2V].inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+    const lastImg = (modeVal === "flf2v") ? (j ? j.uploadedLastImage : uploadedLastImage) : null;
+    const r2v = g[N.REF2V];
+
+    if(r2v && r2v.inputs){
+      // Limpiar referencias previas
+      for(let i = 0; i < 9; i++) delete r2v.inputs["ref_images.ref_image_"+i];
+      delete r2v.inputs["ref_video_audios.ref_video_audio_0"];
+      delete r2v.inputs["ref_videos.ref_video_0"];
+      delete r2v.inputs["ref_audios.ref_audio_0"];
+
+      if(firstImg && lastImg){
+        // Caso 1: Ambos frames (FLF2V: first_frame -> Picture 1 / ref_0, last_frame -> Picture 2 / ref_1)
+        if(g[N.IMAGE_FIRST]){
+          g[N.IMAGE_FIRST].inputs.image = (firstImg.subfolder ? firstImg.subfolder+"/" : "") + firstImg.name;
+          r2v.inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+        }
+        g["200"] = {
+          class_type: "LoadImage",
+          inputs: { image: (lastImg.subfolder ? lastImg.subfolder+"/" : "") + lastImg.name },
+          _meta: { title: "Last Frame (Picture 2)" }
+        };
+        r2v.inputs["ref_images.ref_image_1"] = ["200", 0];
+      } else if(firstImg){
+        // Caso 2: Solo imagen de inicio (I2V)
+        if(g[N.IMAGE_FIRST]){
+          g[N.IMAGE_FIRST].inputs.image = (firstImg.subfolder ? firstImg.subfolder+"/" : "") + firstImg.name;
+          r2v.inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+        }
+      } else if(lastImg){
+        // Caso 3: Solo imagen final (L2VA)
+        if(g[N.IMAGE_FIRST]){
+          g[N.IMAGE_FIRST].inputs.image = (lastImg.subfolder ? lastImg.subfolder+"/" : "") + lastImg.name;
+          r2v.inputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+        }
       }
     }
   }
