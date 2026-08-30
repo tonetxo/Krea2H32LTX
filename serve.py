@@ -1046,15 +1046,17 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         except (ConnectionError, BrokenPipeError) as e:
             sys.stderr.write(f"[serve] Client disconnected: {e}\n")
             return
-        finally:
-            resp.close()
         except OSError as e:
-            # If the socket is already closed, write fails can raise BrokenPipe/ConnectionReset here too.
-            # We check and return cleanly.
             if e.errno in (32, 104):  # EPIPE, ECONNRESET
                 sys.stderr.write(f"[serve] Client disconnected during error handler: {e}\n")
                 return
             self.send_error(502, f"Backend error: {e}")
+        finally:
+            if resp:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
 
 
 class ReusableServer(socketserver.ThreadingTCPServer):
