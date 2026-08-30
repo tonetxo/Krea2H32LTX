@@ -125,14 +125,23 @@ function updateServerHint(){
   const hint = $("serverHint");
   if(!hint) return;
   const v = ($("serverUrl")?.value || "").trim();
+  const host = (window.location.hostname || "").trim();
+  const isLan = host && !/^(127\.|localhost$|::1$)/i.test(host);
+
   if(v){
+    if(isLan && /^(http:\/\/)?(127\.|localhost|::1)/i.test(v)){
+      hint.textContent = "Aviso: 127.0.0.1 apunta a este dispositivo cliente. Déjalo en blanco para usar el proxy o usa http://" + host + ":7821";
+      hint.style.color = "var(--err, #ff6b6b)";
+      return;
+    }
+    hint.style.color = "";
     hint.textContent = `URL efectiva: ${v}`;
   } else {
-    const host = (window.location.hostname || "").trim();
-    if(host && !/^(127\.|localhost$|::1$)/i.test(host)){
-      hint.textContent = "proxy activo (same-origin)";
+    hint.style.color = "";
+    if(isLan){
+      hint.textContent = "Proxy activo hacia ComfyUI en el servidor (" + host + ")";
     } else {
-      hint.textContent = "";
+      hint.textContent = "Proxy activo hacia ComfyUI local (:7821)";
     }
   }
 }
@@ -1446,8 +1455,15 @@ function initCommon(){
       const stored = localStorage.getItem(CONFIG.SERVERURL_KEY);
       if(stored){
         const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
+        const host = (window.location.hostname || "").trim();
+        const isLan = host && !/^(127\.|localhost$|::1$)/i.test(host);
+
         if(storedPort && LEGACY_PORTS.includes(storedPort)){
           localStorage.removeItem(CONFIG.SERVERURL_KEY);
+        } else if(isLan && /^(http:\/\/)?(127\.|localhost|::1)/i.test(stored)){
+          // En LAN, 127.0.0.1 es el cliente, no el servidor. Limpiamos para usar el proxy automático.
+          localStorage.removeItem(CONFIG.SERVERURL_KEY);
+          input.value = "";
         } else {
           input.value = stored;
           updateServerHint();

@@ -434,7 +434,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
   </div>
   <div class="grid">
     <div class="controls-col">
-            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="http://127.0.0.1:7821" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="promptLibToggle">
@@ -1421,14 +1421,23 @@ function updateServerHint(){
   const hint = $("serverHint");
   if(!hint) return;
   const v = ($("serverUrl")?.value || "").trim();
+  const host = (window.location.hostname || "").trim();
+  const isLan = host && !/^(127\.|localhost$|::1$)/i.test(host);
+
   if(v){
+    if(isLan && /^(http:\/\/)?(127\.|localhost|::1)/i.test(v)){
+      hint.textContent = "Aviso: 127.0.0.1 apunta a este dispositivo cliente. Déjalo en blanco para usar el proxy o usa http://" + host + ":7821";
+      hint.style.color = "var(--err, #ff6b6b)";
+      return;
+    }
+    hint.style.color = "";
     hint.textContent = `URL efectiva: ${v}`;
   } else {
-    const host = (window.location.hostname || "").trim();
-    if(host && !/^(127\.|localhost$|::1$)/i.test(host)){
-      hint.textContent = "proxy activo (same-origin)";
+    hint.style.color = "";
+    if(isLan){
+      hint.textContent = "Proxy activo hacia ComfyUI en el servidor (" + host + ")";
     } else {
-      hint.textContent = "";
+      hint.textContent = "Proxy activo hacia ComfyUI local (:7821)";
     }
   }
 }
@@ -2742,8 +2751,15 @@ function initCommon(){
       const stored = localStorage.getItem(CONFIG.SERVERURL_KEY);
       if(stored){
         const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
+        const host = (window.location.hostname || "").trim();
+        const isLan = host && !/^(127\.|localhost$|::1$)/i.test(host);
+
         if(storedPort && LEGACY_PORTS.includes(storedPort)){
           localStorage.removeItem(CONFIG.SERVERURL_KEY);
+        } else if(isLan && /^(http:\/\/)?(127\.|localhost|::1)/i.test(stored)){
+          // En LAN, 127.0.0.1 es el cliente, no el servidor. Limpiamos para usar el proxy automático.
+          localStorage.removeItem(CONFIG.SERVERURL_KEY);
+          input.value = "";
         } else {
           input.value = stored;
           updateServerHint();
