@@ -2014,32 +2014,42 @@ function getCurrentSysPrompt(data, mode, styleKey){
 function cleanOllamaResponse(raw){
   if(!raw) return "";
   let text = String(raw).trim();
-  const original = text;
 
   if(/<\/think>/i.test(text)){
     const parts = text.split(/<\/think>/i);
     const after = parts[parts.length - 1].trim();
-    if(after) text = after;
-  } else if(/<\/thought>/i.test(text)){
+    if(after) return after.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
+    const before = parts[0].replace(/<think>/gi, "").trim();
+    const paragraphs = before.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if(paragraphs.length > 0) return paragraphs[paragraphs.length - 1];
+  }
+
+  if(/<\/thought>/i.test(text)){
     const parts = text.split(/<\/thought>/i);
     const after = parts[parts.length - 1].trim();
-    if(after) text = after;
-  } else {
-    text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-    text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
+    if(after) return after.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
+    const before = parts[0].replace(/<thought>/gi, "").trim();
+    const paragraphs = before.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if(paragraphs.length > 0) return paragraphs[paragraphs.length - 1];
   }
 
-  if(text.startsWith("```") && text.endsWith("```")){
-    text = text.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
-  }
-
-  return text.trim() || original;
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
+  text = text.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
+  return text;
 }
 
 async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   const bodyPayload = Object.assign({ stream: true }, payload);
   if(!bodyPayload.options) bodyPayload.options = {};
   if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
+  if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
+
+  const origPlaceholder = outputEl ? outputEl.placeholder : "";
+  if(outputEl){
+    outputEl.value = "";
+    outputEl.placeholder = "Generando prompt...";
+  }
 
   const r = await fetch("/api/generate", {
     method: "POST",
@@ -2050,6 +2060,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
 
   if(!r.ok){
     const t = await r.text().catch(()=>"");
+    if(outputEl) outputEl.placeholder = origPlaceholder;
     throw new Error("HTTP " + r.status + " " + t.slice(0, 200));
   }
 
@@ -2073,13 +2084,11 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
           accumulated += json.response;
           if(outputEl){
             if(accumulated.includes("</think>")){
-              const after = accumulated.split(/<\/think>/i).pop().trim();
-              outputEl.value = after || "[Generando prompt final...]";
+              const after = accumulated.split(/<\/think>/i).pop().trimStart();
+              if(after) outputEl.value = after;
             } else if(accumulated.includes("</thought>")){
-              const after = accumulated.split(/<\/thought>/i).pop().trim();
-              outputEl.value = after || "[Generando prompt final...]";
-            } else {
-              outputEl.value = `[Pensando y analizando (${accumulated.length} caracteres)...]`;
+              const after = accumulated.split(/<\/thought>/i).pop().trimStart();
+              if(after) outputEl.value = after;
             }
           }
         }
@@ -2095,7 +2104,10 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   }
 
   const finalClean = cleanOllamaResponse(accumulated);
-  if(outputEl) outputEl.value = finalClean;
+  if(outputEl){
+    outputEl.value = finalClean;
+    outputEl.placeholder = origPlaceholder;
+  }
   return finalClean;
 }
 
