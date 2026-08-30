@@ -2052,6 +2052,8 @@ async function ensureImagesUploaded(){
     }
     log("Referencias subidas.","l-ok");
     return;
+  }
+
   if(currentMode !== "r2v"){
     if(!localFirstFile && (!localLastFile || currentMode !== "flf2v") && !uploadedFirstImage && !uploadedLastImage){
       throw new Error("Selecciona una imagen de inicio o un último frame.");
