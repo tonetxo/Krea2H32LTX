@@ -1201,24 +1201,6 @@ $("btnClearQueue")?.addEventListener("click", () => {
 $("btnGenerate").addEventListener("click", () => enqueueGeneration());
 
 // --- ENHANCER HELPERS (Krea2-specific) ---
-async function fetchWithRetry(url, options, attempts=3){
-  let lastErr = null;
-  for(let i=0; i<attempts; i++){
-    try {
-      const r = await fetch(url, options);
-      if(r.status >= 500 || r.status === 0){
-        lastErr = new Error("HTTP "+r.status);
-      } else {
-        return r;
-      }
-    } catch(e){
-      lastErr = e;
-    }
-    if(i < attempts-1) await new Promise(r => setTimeout(r, 1000 * (i+1)));
-  }
-  throw lastErr || new Error("fetch failed");
-}
-
 async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
   const wrap = $(wrapId);
   const img = wrap ? wrap.querySelector("img") : null;

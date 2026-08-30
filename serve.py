@@ -977,62 +977,77 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         # pero solo si el origen del cliente es same-origin (mismo host:port).
         client_origin = self._allowed_origin()
 
+        # Reintentos transparentes en caso de saturación transitoria del backend
+        resp = None
+        for attempt in range(3):
+            try:
+                resp = urllib.request.urlopen(req, timeout=600)
+                break
+            except urllib.error.HTTPError as e:
+                # 4xx / 5xx del backend son respuestas válidas, no reintentar
+                try:
+                    self.send_response(e.code)
+                    for k, v in e.headers.items():
+                        if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
+                            self.send_header(k, v)
+                    if not self.path.split("?")[0].startswith("/view"):
+                        self.send_header("Connection", "close")
+                        self.close_connection = True
+                    if client_origin:
+                        self.send_header("Access-Control-Allow-Origin", client_origin)
+                        self.send_header("Vary", "Origin")
+                    self.end_headers()
+                    chunk = e.read(65536)
+                    while chunk:
+                        self.wfile.write(chunk)
+                        chunk = e.read(65536)
+                finally:
+                    e.close()
+                return
+            except (urllib.error.URLError, ConnectionError, OSError) as e:
+                if attempt < 2 and method in ("GET", "HEAD"):
+                    time.sleep(0.25 * (attempt + 1))
+                    continue
+                reason = getattr(e, "reason", str(e))
+                reason_str = str(reason)
+                if "reset" in reason_str.lower() or "broken pipe" in reason_str.lower():
+                    sys.stderr.write(f"[serve] Backend reset: {reason_str} -> {target}\n")
+                    self.send_error(504, f"Backend cerró la conexión (puede estar cargando el modelo): {reason_str}")
+                else:
+                    sys.stderr.write(f"[serve] Backend unreachable ({attempt+1}/3): {reason_str} -> {target}\n")
+                    self.send_error(502, f"Backend unreachable: {reason_str}")
+                return
+
+        if resp is None:
+            return
+
         try:
-            with urllib.request.urlopen(req, timeout=600) as resp:
-                self.send_response(resp.status)
-                # Copy response headers (except transfer-encoding / connection)
-                for k, v in resp.headers.items():
-                    if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
-                        self.send_header(k, v)
-                # Force closing connection on proxy responses under HTTP/1.1 to prevent browser hangs,
-                # but preserve keep-alive for /view requests to allow smooth video streaming.
-                if not self.path.split("?")[0].startswith("/view"):
-                    self.send_header("Connection", "close")
-                    self.close_connection = True
-                if client_origin:
-                    self.send_header("Access-Control-Allow-Origin", client_origin)
-                    self.send_header("Vary", "Origin")
-                self.end_headers()
-                # Stream the body
+            self.send_response(resp.status)
+            # Copy response headers (except transfer-encoding / connection)
+            for k, v in resp.headers.items():
+                if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
+                    self.send_header(k, v)
+            if not self.path.split("?")[0].startswith("/view"):
+                self.send_header("Connection", "close")
+                self.close_connection = True
+            if client_origin:
+                self.send_header("Access-Control-Allow-Origin", client_origin)
+                self.send_header("Vary", "Origin")
+            self.end_headers()
+            # Stream the body
+            chunk = resp.read(1024)
+            while chunk:
+                self.wfile.write(chunk)
+                try:
+                    self.wfile.flush()
+                except Exception:
+                    pass
                 chunk = resp.read(1024)
-                while chunk:
-                    self.wfile.write(chunk)
-                    try:
-                        self.wfile.flush()
-                    except Exception:
-                        pass
-                    chunk = resp.read(1024)
         except (ConnectionError, BrokenPipeError) as e:
-            # Client disconnected early (e.g. browser cancelled request, closed tab, or seeked)
-            # We log a simple line and return cleanly.
             sys.stderr.write(f"[serve] Client disconnected: {e}\n")
             return
-        except urllib.error.HTTPError as e:
-            try:
-                self.send_response(e.code)
-                for k, v in e.headers.items():
-                    if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
-                        self.send_header(k, v)
-                if not self.path.split("?")[0].startswith("/view"):
-                    self.send_header("Connection", "close")
-                    self.close_connection = True
-                if client_origin:
-                    self.send_header("Access-Control-Allow-Origin", client_origin)
-                    self.send_header("Vary", "Origin")
-                self.end_headers()
-                chunk = e.read(65536)
-                while chunk:
-                    self.wfile.write(chunk)
-                    chunk = e.read(65536)
-            finally:
-                e.close()
-        except urllib.error.URLError as e:
-            reason = str(e.reason)
-            if "reset" in reason.lower() or "broken pipe" in reason.lower():
-                sys.stderr.write(f"[serve] Backend reset: {reason} -> {target}\n")
-                self.send_error(504, f"Backend cerró la conexión (puede estar cargando el modelo): {reason}")
-            else:
-                self.send_error(502, f"Backend unreachable: {reason}")
+        finally:
+            resp.close()
         except OSError as e:
             # If the socket is already closed, write fails can raise BrokenPipe/ConnectionReset here too.
             # We check and return cleanly.

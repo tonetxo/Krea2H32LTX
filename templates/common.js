@@ -117,6 +117,26 @@ function randomSeed(){
 
 // --- SERVER / LOG ---
 function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
+
+async function fetchWithRetry(url, options = {}, attempts = 3, delay = 350){
+  for(let i = 0; i < attempts; i++){
+    try {
+      const res = await fetch(url, options);
+      if(res.status === 502 && i < attempts - 1){
+        await new Promise(r => setTimeout(r, delay * (i + 1)));
+        continue;
+      }
+      return res;
+    } catch(err){
+      if(i < attempts - 1 && err.name !== "AbortError"){
+        await new Promise(r => setTimeout(r, delay * (i + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
 function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
 function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
@@ -1699,9 +1719,9 @@ function initCommon(){
       setConn("busy","comprobando...");
       try{
           const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 6000);
+          const timer = setTimeout(() => ctrl.abort(), 8000);
           const target = (server() ? server() : "") + "/system_stats";
-          const r = await fetch(target, { signal: ctrl.signal });
+          const r = await fetchWithRetry(target, { signal: ctrl.signal }, 3, 400);
           clearTimeout(timer);
           if(!r.ok) throw new Error("HTTP "+r.status);
           const data = await r.json();
@@ -1711,7 +1731,7 @@ function initCommon(){
           log("Conexión OK con ComfyUI" + vram, "l-ok");
       }catch(err){
           setConn("bad","sin conexión");
-          const msg = (err.name === "AbortError") ? "Timeout (sin respuesta en 6s)" : err.message;
+          const msg = (err.name === "AbortError") ? "Timeout (sin respuesta en 8s)" : err.message;
           log("Error de conexión: " + msg, "l-err");
           if(server()){
             log("Sugerencia: si estás en LAN, deja el campo de servidor vacío para usar el proxy automático.", "l-info");
