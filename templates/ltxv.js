@@ -36,10 +36,6 @@ const DMD_LORA_NODE = "906";
 const DMD_MODEL_SOURCE = "868";
 let firstPromptId = null;
 const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk","comfy kitchen attention"];
-const LTX2_CHAIN_OFF = "off";
-const LTX2_CHAIN_OLLAMA = "ollama";
-const LTX2_CHAIN_LTX2 = "ltx2";
-const LTX2_CHAIN_BOTH = "both";
 let finalVariantIndex = null;
 let promptSteps = {};
 // Mapa prompt_id -> índice de variante, para que tanto WS como fallback
@@ -360,18 +356,6 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
   const step = promptSteps[promptId] || "1";
   const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
   const media2 = entry.outputs[N.FINAL_SAVE] ? CONFIG.findMedia(entry.outputs[N.FINAL_SAVE]) : null;
-
-  // Mostrar el prompt final generado por LTX2 si está disponible
-  try {
-    const ltx2Preview = entry.outputs[N.LTX2_PREVIEW];
-    if(ltx2Preview && ltx2Preview.text?.length){
-      const finalText = ltx2Preview.text[ltx2Preview.text.length - 1];
-      if(typeof finalText === "string" && finalText.trim()){
-        $("enhancerOutput").value = finalText.trim();
-        log(`✏️ Prompt final LTX2 (slot ${step}): ${finalText.trim().slice(0,120)}...`, "l-ok");
-      }
-    }
-  } catch(_){}
 
   const job = activeJob;
   const firstPassOnly = job ? job.firstPassOnly : true;
@@ -1059,28 +1043,11 @@ function applyWorkflow(workflow, opts={}){
   } else { setMissing("tipo de atención"); }
 
   // Restaurar TextGenerateLTX2Prompt settings
-  const ltx2Node = findByClass("TextGenerateLTX2Prompt");
-  if(ltx2Node && ltx2Node.inputs){
-    const ltx2Temp = ltx2Node.inputs["sampling_mode.temperature"];
-    const ltx2Seed = ltx2Node.inputs["sampling_mode.seed"];
-    if(typeof ltx2Temp === "number"){ $("ltx2Temperature").value = ltx2Temp; $("ltx2TemperatureVal").textContent = ltx2Temp.toFixed(2); }
-    if(typeof ltx2Seed === "number") $("ltx2Seed").value = ltx2Seed;
-    // Cadena: si CLIPTextEncode lee del LTX2_PROMPT => activo
-    const promptTextSource = workflow[N.PROMPT]?.inputs?.text;
-    if(Array.isArray(promptTextSource) && promptTextSource[0] === N.LTX2_PROMPT){
-      $("enhancerChainMode").value = LTX2_CHAIN_LTX2;
-      setApplied("cadena LTX2");
-    } else {
-      $("enhancerChainMode").value = LTX2_CHAIN_OFF;
-      setApplied("cadena off");
-    }
-  } else { setMissing("LTX2 Prompt"); }
-
   // Restaurar raw prompt si existe
   const rawPromptNode = findByClass("PrimitiveStringMultiline");
   if(rawPromptNode && rawPromptNode.inputs && typeof rawPromptNode.inputs.value === "string" && rawPromptNode.inputs.value.length > 0){
     $("prompt").value = rawPromptNode.inputs.value;
-    setApplied("prompt raw");
+    setApplied("prompt");
   }
 
   const powerLora = findByClass("Power Lora Loader (rgthree)");
@@ -1702,38 +1669,15 @@ function buildGraph(mode, job){
     g[N.FIRST_SIGMAS].inputs.sigmas = buildFirstPassSigmas(firstSteps);
   }
 
-  // Cadena de mejora: se rellena el raw prompt siempre
+  // El prompt de entrada para CLIPTextEncode procede siempre de RAW_PROMPT (el texto de #prompt).
   const rawPrompt = promptText.trim();
   if(g[N.RAW_PROMPT] && g[N.RAW_PROMPT].inputs) g[N.RAW_PROMPT].inputs.value = rawPrompt;
-
-  // Configurar nodo TextGenerateLTX2Prompt (siempre presente en el grafo)
-  if(g[N.LTX2_PROMPT] && g[N.LTX2_PROMPT].inputs){
-    g[N.LTX2_PROMPT].inputs["sampling_mode.temperature"] = parseFloat((j ? j.ltx2Temperature : $("ltx2Temperature")?.value) || 0.7);
-    g[N.LTX2_PROMPT].inputs["sampling_mode.seed"] = parseInt((j ? j.ltx2Seed : $("ltx2Seed")?.value) || 2, 10);
-  }
-
-  const chainMode = (j ? j.chainMode : $("enhancerChainMode")?.value) || "off";
-  // Si la cadena es LTX2 o Ambos, CLIPTextEncode lee del nodo Generate LTX2 Prompt;
-  // si es off u Ollama, lee directamente del raw prompt (Ollama ya ha actualizado el textbox).
   if(g[N.PROMPT] && g[N.PROMPT].inputs){
-    if(chainMode === LTX2_CHAIN_LTX2 || chainMode === LTX2_CHAIN_BOTH){
-      g[N.PROMPT].inputs.text = [N.LTX2_PROMPT, 0];
-    } else {
-      g[N.PROMPT].inputs.text = [N.RAW_PROMPT, 0];
-    }
+    g[N.PROMPT].inputs.text = [N.RAW_PROMPT, 0];
   }
-
-  // Si la cadena está desactivada u Ollama, el nodo LTX2 no está conectado a nada útil en generación de vídeo,
-  // así que lo desconectamos explícitamente para que ComfyUI no lo ejecute en ese modo.
-  if(mode !== "ltx2preview" && (chainMode === LTX2_CHAIN_OFF || chainMode === LTX2_CHAIN_OLLAMA)){
-    if(g[N.LTX2_PROMPT] && g[N.LTX2_PROMPT].inputs){
-      // Marcamos el prompt de entrada vacío y desconectamos el clip para evitar que el nodo corra.
-      g[N.LTX2_PROMPT].inputs.prompt = "";
-      if(g[N.LTX2_PREVIEW] && g[N.LTX2_PREVIEW].inputs){
-        delete g[N.LTX2_PREVIEW];
-      }
-    }
-  }
+  // Eliminamos LTX2_PROMPT y LTX2_PREVIEW para que ComfyUI no ejecute el nodo LLM durante la inferencia de vídeo
+  delete g[N.LTX2_PROMPT];
+  delete g[N.LTX2_PREVIEW];
 
   // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
   const bypass = j ? j.dmdBypass : dmdBypass;
@@ -1807,35 +1751,6 @@ function buildGraph(mode, job){
     if(g[N.REFERENCE_2]) delete g[N.REFERENCE_2]; // 870
     if(g[N.RIFE_LOADER]) delete g[N.RIFE_LOADER];
     if(g[N.RIFE_INTERP]) delete g[N.RIFE_INTERP];
-  }
-  else if(mode === "ltx2preview"){
-    // Grafo mínimo solo para generar el prompt con TextGenerateLTX2Prompt.
-    // Preservamos la cadena de modelo real (checkpoint + sage + text encoder + lora)
-    // para que el PowerLoraLoader aplique las LoRAs sobre el mismo contexto
-    // que en la generación completa.
-    for(const k of Object.keys(g)){
-      const keep = [
-        N.CHECKPOINT, N.SAGE_PATCH, N.LORA, N.LTX2_PROMPT, N.LTX2_PREVIEW,
-        N.RAW_PROMPT, N.LTXAV_TEXT_ENCODER
-      ];
-      if(!keep.includes(k)) delete g[k];
-    }
-    // Conectar explícitamente LTX2_PROMPT a RAW_PROMPT
-    if(g[N.LTX2_PROMPT] && g[N.RAW_PROMPT]){
-      g[N.LTX2_PROMPT].inputs.prompt = [N.RAW_PROMPT, 0];
-    }
-    // Reconstruir la cadena de modelo: 646 -> 1001 -> 853.model
-    if(g[N.SAGE_PATCH] && g[N.CHECKPOINT]){
-      g[N.SAGE_PATCH].inputs.model = [N.CHECKPOINT, 0];
-    }
-    if(g[N.LORA]){
-      // El PowerLoraLoader espera un modelo; conectamos a la salida del checkpoint o sage patch.
-      g[N.LORA].inputs.model = [N.CHECKPOINT, 0];
-    }
-    // Asegurar que el nodo preview recibe el texto generado.
-    if(g[N.LTX2_PREVIEW] && g[N.LTX2_PROMPT]){
-      g[N.LTX2_PREVIEW].inputs.source = [N.LTX2_PROMPT, 0];
-    }
   }
   // mode "full" mantiene ambos save nodes para ejecutar 1er pase + final de una vez.
   return g;
@@ -2420,36 +2335,28 @@ $("btnClearQueue")?.addEventListener("click", () => {
 $("btnFirstPass").addEventListener("click",()=>enqueueGeneration(true));
 $("btnFull").addEventListener("click",()=>enqueueGeneration(false));
 
-// --- ENHANCER (LTXV vision-mode uses localFile) ---
-$("btnEnhance").addEventListener("click", async () => {
-  const chainMode = $("enhancerChainMode").value;
-  if(chainMode === LTX2_CHAIN_OFF){
-    log("⚠️ Cadena de mejora desactivada. Activa 'Ollama', 'LTX2' o 'Ambos' para usar el botón.", "l-warn");
-    return;
+// --- ENHANCER (solo Ollama; sin LTX2) ---
+(function initLtxvEnhancerUI(){
+  const chain = $("enhancerChainMode");
+  if(chain){
+    chain.innerHTML = `
+      <option value="off">Desactivado</option>
+      <option value="ollama">Ollama</option>
+    `;
+    chain.value = "ollama";
   }
+  const ltx2Controls = ["ltx2Temperature", "ltx2Seed", "ltx2PreviewText"];
+  for(const id of ltx2Controls){
+    const el = $(id);
+    const row = el?.closest(".enhancer-row");
+    if(row) row.style.display = "none";
+  }
+})();
 
-  // Modo LTX2 puro: ejecutar solo el nodo TextGenerateLTX2Prompt en ComfyUI.
-  if(chainMode === LTX2_CHAIN_LTX2){
-    $("btnEnhance").disabled = true;
-    $("btnEnhance").textContent = "Mejorando (LTX2)...";
-    $("enhancerOutput").value = "";
-    $("ltx2PreviewText").value = "";
-    try {
-      const userPrompt = $("prompt").value.trim();
-      log("Ejecutando Generate LTX2 Prompt en ComfyUI...", "l-info");
-      const ltx2Text = await runLTX2Preview(userPrompt);
-      if(ltx2Text){
-        $("enhancerOutput").value = ltx2Text;
-        $("ltx2PreviewText").value = `[LTX2 · ${ltx2Text.length} chars]\n${ltx2Text}`;
-        log("Prompt LTX2 listo en el panel. Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
-      }
-    } catch(e){
-      log("Error en LTX2: "+e.message, "l-err");
-      $("enhancerOutput").value = "Error: "+e.message;
-    } finally {
-      $("btnEnhance").disabled = false;
-      $("btnEnhance").textContent = "Mejorar prompt";
-    }
+$("btnEnhance").addEventListener("click", async () => {
+  const chainMode = $("enhancerChainMode")?.value || "ollama";
+  if(chainMode === "off"){
+    log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' para usar el botón.", "l-warn");
     return;
   }
 
@@ -2477,25 +2384,9 @@ $("btnEnhance").addEventListener("click", async () => {
   $("btnEnhance").disabled = true;
   $("btnEnhance").textContent = "Mejorando...";
   $("enhancerOutput").value = "";
-  $("ltx2PreviewText").value = "";
   try {
-    const text = await streamOllamaGenerate(payload, $("enhancerOutput"));
-    if(chainMode === LTX2_CHAIN_BOTH){
-      log("Ejecutando segunda fase (LTX2) en ComfyUI a partir del prompt de Ollama...", "l-info");
-      const ltx2Text = await runLTX2Preview(text);
-      if(!ltx2Text){
-        $("ltx2PreviewText").value = `[Ollama]\n${text}\n\n[LTX2]\n(no se pudo previsualizar)`;
-      } else {
-        const score = ltx2ChangeScore(text, ltx2Text);
-        $("ltx2PreviewText").value =
-          `[Ollama · ${text.length} chars]\n${text}\n\n` +
-          `[LTX2 Final · ${ltx2Text.length} chars · Δ ${score.chars} (${(score.pct*100).toFixed(1)}%)]\n${ltx2Text}`;
-        $("enhancerOutput").value = ltx2Text;
-      }
-      log("Prompt mejorado (cadena Ollama + LTX2) listo en el panel. Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
-    } else {
-      log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
-    }
+    await streamOllamaGenerate(payload, $("enhancerOutput"));
+    log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
   } catch(e) {
     log("Error al mejorar: "+e.message, "l-err");
     $("enhancerOutput").value = "Error: "+e.message;
@@ -2505,115 +2396,10 @@ $("btnEnhance").addEventListener("click", async () => {
   }
 });
 
-// Umbral para considerar que LTX2 aportó un cambio significativo sobre el prompt
-const LTX2_MIN_CHANGE_CHARS = 30;
-const LTX2_MIN_CHANGE_PCT = 0.05; // 5% del texto de Ollama
-
-// Devuelve { chars, pct, identical, prefix, suffix }
-function ltx2ChangeScore(a, b){
-  if(!a || !b) return { chars: 0, pct: 0, identical: !a && !b };
-  const at = a.trim(), bt = b.trim();
-  if(at === bt) return { chars: 0, pct: 0, identical: true };
-  let pref = 0;
-  const minLen = Math.min(at.length, bt.length);
-  while(pref < minLen && at[pref] === bt[pref]) pref++;
-  let suf = 0;
-  while(suf < (minLen - pref) && at[at.length - 1 - suf] === bt[bt.length - 1 - suf]) suf++;
-  const middleA = at.slice(pref, at.length - suf);
-  const middleB = bt.slice(pref, bt.length - suf);
-  const middleMax = Math.max(middleA.length, middleB.length);
-  const chars = middleMax + Math.abs(at.length - bt.length);
-  const pct = at.length > 0 ? chars / at.length : 0;
-  return {
-    chars,
-    pct,
-    identical: false,
-    prefix: pref,
-    suffix: suf,
-    addedAtStart: pref === 0 && suf < at.length,
-    addedAtEnd: suf === 0 && pref < at.length,
-  };
-}
-
-async function runLTX2Preview(inputPrompt){
-  const promptToUse = (typeof inputPrompt === "string" && inputPrompt.trim()) ? inputPrompt.trim() : $("prompt").value.trim();
-  const savedJob = activeJob;
-  activeJob = {
-    firstPassOnly: false,
-    seedMode: seedMode,
-    seedValue: parseInt($("seedVal").value || "12345", 10),
-    batchSize: 1,
-    loras: loras,
-    prompt: promptToUse,
-    chainMode: LTX2_CHAIN_LTX2,
-    model: $("modelSelect")?.value,
-    textEncoder: $("textEncoderSelect")?.value,
-    vae: $("vaeSelect")?.value,
-    audioVae: $("audioVaeSelect")?.value,
-    sageType: $("sageAttentionType")?.value,
-    ltx2Temperature: $("ltx2Temperature")?.value,
-    ltx2Seed: $("ltx2Seed")?.value,
-  };
-  try {
-    const graph = buildGraph("ltx2preview", activeJob);
-    const r = await fetch(server()+"/prompt", {
-      method: "POST", headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({prompt: graph, client_id: CLIENT_ID})
-    });
-    if(!r.ok){
-      const t = await r.text().catch(()=>"");
-      throw new Error("HTTP "+r.status+" "+t.slice(0,300));
-    }
-    const data = await r.json();
-    if(data.error) throw new Error(JSON.stringify(data.error));
-    const pid = data.prompt_id;
-    log("⏳ Esperando prompt LTX2...", "l-info");
-    const text = await waitForLTX2Preview(pid, 120);
-    if(!text){
-      log("⚠️ LTX2 no devolvió texto.", "l-warn");
-      return "";
-    }
-    const score = ltx2ChangeScore(promptToUse || "", text);
-    log(`Previsualización LTX2 completada (Δ ${score.chars} chars, ${(score.pct*100).toFixed(1)}%).`, "l-ok");
-    return text;
-  } catch(e) {
-    log("❌ Error previsualizando LTX2: "+e.message, "l-err");
-    return "";
-  } finally {
-    activeJob = savedJob;
-  }
-}
-
-async function waitForLTX2Preview(promptId, maxTries){
-  for(let i = 0; i < maxTries; i++){
-    await new Promise(r => setTimeout(r, 1000));
-    try {
-      const hr = await fetch(server()+"/history/"+promptId);
-      if(!hr.ok) continue;
-      const hist = await hr.json();
-      const entry = hist[promptId];
-      if(!entry) continue;
-      if(entry.status && entry.status.status_str === "error"){
-        throw new Error(entry.status.exception_message || "error en LTX2 preview");
-      }
-      const out = entry.outputs && entry.outputs[N.LTX2_PREVIEW];
-      if(out && out.text && out.text.length){
-        const txt = out.text[out.text.length - 1];
-        if(typeof txt === "string" && txt.trim()) return txt.trim();
-      }
-    } catch(e) {
-      if(e.message.includes("error en LTX2 preview")) throw e;
-      // otherwise retry
-    }
-  }
-  return "";
-}
-
 // --- INIT ---
 updateDuration();
 updateQueueUI();
-// Default enhancer chain for fresh sessions: Ollama usable out of the box.
-if(!$("enhancerChainMode").value) $("enhancerChainMode").value = LTX2_CHAIN_OLLAMA;
+if(!$("enhancerChainMode").value) $("enhancerChainMode").value = "ollama";
 
 // --- FIRST PASS SIGMAS ---
 // Curva base 10-step tal como está en el workflow original.
