@@ -34,7 +34,22 @@ import urllib.parse
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 HOST = sys.argv[4] if len(sys.argv) > 4 else os.environ.get("HOST", "127.0.0.1")
-BACKEND = sys.argv[2] if len(sys.argv) > 2 else "http://127.0.0.1:7821"
+
+def get_backend():
+    if len(sys.argv) > 2:
+        return sys.argv[2]
+    env = os.environ.get("BACKEND_URL")
+    if env:
+        return env
+    for p in (7821, 7822, 7820, 8188):
+        try:
+            with socket.create_connection(("127.0.0.1", p), timeout=0.08):
+                return f"http://127.0.0.1:{p}"
+        except OSError:
+            pass
+    return "http://127.0.0.1:7821"
+
+BACKEND = get_backend()
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
@@ -262,7 +277,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def _parse_backend_ws_host_port(self):
         """Return (host, port) for the backend WebSocket from BACKEND URL."""
         from urllib.parse import urlparse
-        parsed = urlparse(BACKEND)
+        parsed = urlparse(get_backend())
         host = parsed.hostname or "127.0.0.1"
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
         return host, port
@@ -310,7 +325,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         elif self._is_ollama_route():
             self._proxy("HEAD", OLLAMA)
         elif self._is_proxy_route():
-            self._proxy("HEAD", BACKEND)
+            self._proxy("HEAD", get_backend())
         else:
             super().do_HEAD()
 
@@ -629,7 +644,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         elif self._is_ollama_route():
             self._proxy("GET", OLLAMA)
         elif self._is_proxy_route():
-            self._proxy("GET", BACKEND)
+            self._proxy("GET", get_backend())
         else:
             super().do_GET()
 
@@ -653,7 +668,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         elif self._is_ollama_route():
             self._proxy("POST", OLLAMA)
         elif self._is_proxy_route():
-            self._proxy("POST", BACKEND)
+            self._proxy("POST", get_backend())
         else:
             self.send_error(405, "Method Not Allowed")
 
@@ -666,7 +681,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             # navegador deje pasar la POST real.
             self._cors_preflight()
         elif self._is_proxy_route():
-            self._proxy("OPTIONS", BACKEND)
+            self._proxy("OPTIONS", get_backend())
         elif self._is_krea2_upload() or self._is_file_delete() or self._is_video_preprocess() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list():
             # Endpoints custom también necesitan preflight same-origin.
             self._cors_preflight()
