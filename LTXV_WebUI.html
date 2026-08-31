@@ -1006,7 +1006,7 @@ const BASE_GRAPH = {
   },
   "743": {
     "inputs": {
-      "model_name": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+      "model_name": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
     },
     "class_type": "LatentUpscaleModelLoader",
     "_meta": {
@@ -5317,6 +5317,15 @@ function buildGraph(mode, job){
     const baseCkpt = availableLtxvModels.find(m => !m.includes("diffusion_models") && (m.includes("ltxv/") || m.includes("ltx-2") || m.includes("sulphur"))) || "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors";
     g["617"].class_type = "LTXVAudioVAELoader";
     g["617"].inputs.ckpt_name = isDiffusionModel ? baseCkpt : modelChoice;
+  }
+
+  // Latent Upscaler Model (nodo 743 para el 2º pase)
+  if(g["743"] && g["743"].inputs){
+    if(isDiffusionModel || modelChoice.includes("ltx-2.5")){
+      g["743"].inputs.model_name = "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors";
+    } else {
+      g["743"].inputs.model_name = "ltx-2.3-spatial-upscaler-x2-1.1.safetensors";
+    }
   }
 
   const bitDepth = j ? j.bitDepth : getBitDepth();

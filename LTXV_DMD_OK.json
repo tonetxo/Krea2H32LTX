@@ -349,7 +349,7 @@
   },
   "743": {
     "inputs": {
-      "model_name": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+      "model_name": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
     },
     "class_type": "LatentUpscaleModelLoader",
     "_meta": {

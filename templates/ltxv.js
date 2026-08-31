@@ -1637,6 +1637,15 @@ function buildGraph(mode, job){
     g["617"].inputs.ckpt_name = isDiffusionModel ? baseCkpt : modelChoice;
   }
 
+  // Latent Upscaler Model (nodo 743 para el 2º pase)
+  if(g["743"] && g["743"].inputs){
+    if(isDiffusionModel || modelChoice.includes("ltx-2.5")){
+      g["743"].inputs.model_name = "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors";
+    } else {
+      g["743"].inputs.model_name = "ltx-2.3-spatial-upscaler-x2-1.1.safetensors";
+    }
+  }
+
   const bitDepth = j ? j.bitDepth : getBitDepth();
   if(g[N.CREATE_VIDEO_1] && g[N.CREATE_VIDEO_1].inputs) g[N.CREATE_VIDEO_1].inputs.bit_depth = bitDepth;
   if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;
