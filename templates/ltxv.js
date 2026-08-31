@@ -270,22 +270,40 @@ CONFIG.onPreview = function(url, meta){
   const isFirst = activeJob?.firstPassOnly || (!displayedSlots[pid] || !displayedSlots[pid].has(1));
   const slot = isFirst ? 1 : 2;
   const p = $("previewImg" + slot);
+  const pv = $("previewVideo" + slot);
   const e = $("empty" + slot);
   const v = $("video" + slot);
-  if(p && e){
-    p.src = url;
-    p.style.display = "block";
-    e.style.display = "none";
-    if(v && (!displayedSlots[pid] || !displayedSlots[pid].has(slot))){
-      v.style.display = "none";
+  if(!p && !pv) return;
+  const isVideoUrl = typeof url === "string" && (url.startsWith("data:video/mp4") || url.startsWith("data:video/webm"));
+  const target = isVideoUrl && pv ? pv : p;
+  const other  = isVideoUrl ? p : pv;
+  if(target){
+    target.src = url;
+    target.style.display = "block";
+    if(isVideoUrl && target.play) target.play().catch(()=>{});
+  }
+  if(other) other.style.display = "none";
+  if(e) e.style.display = "none";
+  if(v && (!displayedSlots[pid] || !displayedSlots[pid].has(slot))){
+    v.style.display = "none";
+  }
+  if(currentPromptId && promptVariantMap[currentPromptId]){
+    const varIdx = promptVariantMap[currentPromptId];
+    const cardImg = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-live-thumb`);
+    if(cardImg && !isVideoUrl){
+      cardImg.src = url;
+      cardImg.style.opacity = "1";
     }
   }
 };
 
 CONFIG.onClearPreview = function(){
   const p1 = $("previewImg1"), p2 = $("previewImg2");
+  const pv1 = $("previewVideo1"), pv2 = $("previewVideo2");
   if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
   if(p2){ p2.style.display = "none"; p2.removeAttribute("src"); }
+  if(pv1){ pv1.style.display = "none"; pv1.removeAttribute("src"); }
+  if(pv2){ pv2.style.display = "none"; pv2.removeAttribute("src"); }
 };
 
 CONFIG.onPromptError = function(pid){
@@ -1669,6 +1687,28 @@ function buildGraph(mode, job){
         model: modelInput
       };
       g[N.SAGE_PATCH]._meta = { title: "Patch Sage Attention KJ" };
+    }
+  }
+
+  // Model Preview Override (preview animado multi-frame en tiempo real con TAE VAE)
+  const prevMethod = getPreviewMethod();
+  if(prevMethod !== "none"){
+    const previewOverrideKey = "1070";
+    g[previewOverrideKey] = {
+      class_type: "ModelPreviewOverrideKJ",
+      inputs: {
+        model: [N.SAGE_PATCH, 0],
+        max_resolution: 768,
+        jpeg_quality: 80,
+        suppress_default_preview: true,
+        preview_frames: 24,
+        preview_fps: 12,
+        tiny_vae: "taeltx2_3.safetensors"
+      },
+      _meta: { title: "Model Preview Override (animado TAE LTXV)" }
+    };
+    if(g[N.LORA] && g[N.LORA].inputs && g[N.LORA].inputs.model){
+      g[N.LORA].inputs.model = [previewOverrideKey, 0];
     }
   }
 
