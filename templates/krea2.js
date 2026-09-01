@@ -369,7 +369,7 @@ function extractWorkflowFromImage(url){
         let nullPos = dataStart;
         while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
         const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
-        if(keyword === "prompt"){
+        if(keyword === "prompt" || keyword === "workflow"){
           workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
         }
         if(keyword === "sui_image_params" || keyword === "parameters"){
@@ -1126,7 +1126,13 @@ async function runSingleGeneration(index) {
           body:JSON.stringify({
             prompt:graph,
             client_id:CLIENT_ID,
-            extra_data: { preview_method: getPreviewMethod() }
+            extra_data: {
+              extra_pnginfo: {
+                workflow: graph,
+                prompt: graph
+              },
+              preview_method: getPreviewMethod()
+            }
           })
         });
         if(!r.ok){
