@@ -1288,7 +1288,7 @@ const BASE_GRAPH = {
 };
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MiniMax-H3-Ref2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
-const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors"];
+const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors", "taeltx_2.safetensors"];
 const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_w4a8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
@@ -6134,11 +6134,9 @@ async function loadVideoHistory(){
         const card = document.createElement("div");
         card.className = "variant-card";
         const dateStr = new Date(item.mtime * 1000).toLocaleString("es-ES", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
-        const itemJson = JSON.stringify(item).replace(/"/g, "&quot;");
+        const videoUrl = mediaViewUrl(item, { anchor: "#t=0.001" });
         card.innerHTML = `
-          <div class="thumb-wrap" style="position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;">
-            <img class="thumb-img" data-item="${itemJson}" loading="lazy" alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:.6;transition:opacity .2s;">
-          </div>
+          <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
           <div class="variant-info">
             <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
             <span class="variant-icons">
@@ -6153,11 +6151,13 @@ async function loadVideoHistory(){
         card.dataset.type = item.type;
         makeCardDraggable(card);
 
-        card.addEventListener("click", () => {
+        card.addEventListener("click", (e) => {
+          if(e.target.closest("video")) return;
+          if(e.target.closest("button") || e.target.closest(".variant-icons")) return;
           const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
           const baseName = item.filename.replace(/\.[^.]+$/, "");
           requestAnimationFrame(() => showVideo(1, media, { badge: baseName, autoplay: false }));
-          log("▶ Reproduciendo: "+item.filename, "l-ok");
+          log("▶ Reproduciendo en panel principal: "+item.filename, "l-ok");
         });
 
         card.querySelector('[data-action="workflow"]').addEventListener("click", async (e) => {
@@ -6211,7 +6211,6 @@ async function loadVideoHistory(){
           e.stopPropagation();
           visibleCount = Math.min(visibleCount + 30, allItems.length);
           renderBatch();
-          observeThumbs();
         });
         grid.appendChild(moreBtn);
       }
@@ -6220,7 +6219,6 @@ async function loadVideoHistory(){
     }
 
     renderBatch();
-    observeThumbs();
   } catch(err){
     status.textContent = "Error: "+err.message;
   }

@@ -41,7 +41,7 @@ def get_backend():
     env = os.environ.get("BACKEND_URL")
     if env:
         return env
-    for p in (7821, 7822, 7820, 8188):
+    for p in (7821, 7822, 7823, 7824, 7825, 7826, 7827, 7828, 7829, 7830, 7820, 8188):
         try:
             with socket.create_connection(("127.0.0.1", p), timeout=0.08):
                 return f"http://127.0.0.1:{p}"

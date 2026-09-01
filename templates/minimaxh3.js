@@ -2948,11 +2948,9 @@ async function loadVideoHistory(){
         const card = document.createElement("div");
         card.className = "variant-card";
         const dateStr = new Date(item.mtime * 1000).toLocaleString("es-ES", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
-        const itemJson = JSON.stringify(item).replace(/"/g, "&quot;");
+        const videoUrl = mediaViewUrl(item, { anchor: "#t=0.001" });
         card.innerHTML = `
-          <div class="thumb-wrap" style="position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;">
-            <img class="thumb-img" data-item="${itemJson}" loading="lazy" alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:.6;transition:opacity .2s;">
-          </div>
+          <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
           <div class="variant-info">
             <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
             <span class="variant-icons">
@@ -2967,11 +2965,13 @@ async function loadVideoHistory(){
         card.dataset.type = item.type;
         makeCardDraggable(card);
 
-        card.addEventListener("click", () => {
+        card.addEventListener("click", (e) => {
+          if(e.target.closest("video")) return;
+          if(e.target.closest("button") || e.target.closest(".variant-icons")) return;
           const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
           const baseName = item.filename.replace(/\.[^.]+$/, "");
           requestAnimationFrame(() => showVideo(1, media, { badge: baseName, autoplay: false }));
-          log("▶ Reproduciendo: "+item.filename, "l-ok");
+          log("▶ Reproduciendo en panel principal: "+item.filename, "l-ok");
         });
 
         card.querySelector('[data-action="workflow"]').addEventListener("click", async (e) => {
@@ -3025,7 +3025,6 @@ async function loadVideoHistory(){
           e.stopPropagation();
           visibleCount = Math.min(visibleCount + 30, allItems.length);
           renderBatch();
-          observeThumbs();
         });
         grid.appendChild(moreBtn);
       }
@@ -3034,7 +3033,6 @@ async function loadVideoHistory(){
     }
 
     renderBatch();
-    observeThumbs();
   } catch(err){
     status.textContent = "Error: "+err.message;
   }
