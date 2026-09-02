@@ -570,7 +570,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="empty" id="empty1">sin generar</div>
         <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa 1er pase">
-        <video class="preview-video" id="previewVideo1" autoplay loop muted playsinline style="display:none;width:100%;height:100%;object-fit:contain;pointer-events:none;"></video>
+        <video class="preview-img" id="previewVideo1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
         <span class="video-badge" id="badge1"></span>
         <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
         <div class="vid-footer">
@@ -591,7 +591,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="empty" id="empty2">sin generar</div>
         <img class="preview-img" id="previewImg2" style="display:none;" alt="Vista previa 2º pase">
-        <video class="preview-video" id="previewVideo2" autoplay loop muted playsinline style="display:none;width:100%;height:100%;object-fit:contain;pointer-events:none;"></video>
+        <video class="preview-img" id="previewVideo2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
         <span class="video-badge" id="badge2"></span>
         <video id="video2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
         <div class="vid-footer">
@@ -3961,16 +3961,15 @@ CONFIG.onPreview = function(url, meta){
   const isVideoUrl = typeof url === "string" && (url.startsWith("data:video/mp4") || url.startsWith("data:video/webm"));
   const target = isVideoUrl && pv ? pv : p;
   const other  = isVideoUrl ? p : pv;
-  if(target){
-    target.src = url;
-    target.style.display = "block";
-    if(isVideoUrl && target.play) target.play().catch(()=>{});
-  }
+  target.src = url;
+  target.style.display = "block";
   if(other) other.style.display = "none";
   if(e) e.style.display = "none";
   if(v && (!displayedSlots[pid] || !displayedSlots[pid].has(slot))){
     v.style.display = "none";
   }
+  if(isVideoUrl && pv && pv.autoplay !== true){ pv.autoplay = true; pv.muted = true; pv.loop = true; }
+  if(isVideoUrl && target.play) target.play().catch(()=>{});
   if(currentPromptId && promptVariantMap[currentPromptId]){
     const varIdx = promptVariantMap[currentPromptId];
     const cardImg = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-live-thumb`);
@@ -3986,8 +3985,8 @@ CONFIG.onClearPreview = function(){
   const pv1 = $("previewVideo1"), pv2 = $("previewVideo2");
   if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
   if(p2){ p2.style.display = "none"; p2.removeAttribute("src"); }
-  if(pv1){ pv1.style.display = "none"; pv1.removeAttribute("src"); }
-  if(pv2){ pv2.style.display = "none"; pv2.removeAttribute("src"); }
+  if(pv1){ pv1.pause(); pv1.style.display = "none"; pv1.removeAttribute("src"); pv1.load(); }
+  if(pv2){ pv2.pause(); pv2.style.display = "none"; pv2.removeAttribute("src"); pv2.load(); }
 };
 
 CONFIG.onPromptError = function(pid){
@@ -5374,28 +5373,6 @@ function buildGraph(mode, job){
     }
   }
 
-  // Model Preview Override (preview animado multi-frame en tiempo real con TAE VAE)
-  const prevMethod = getPreviewMethod();
-  if(prevMethod !== "none"){
-    const previewOverrideKey = "1070";
-    g[previewOverrideKey] = {
-      class_type: "ModelPreviewOverrideKJ",
-      inputs: {
-        model: [N.SAGE_PATCH, 0],
-        max_resolution: 768,
-        jpeg_quality: 80,
-        suppress_default_preview: true,
-        preview_frames: 24,
-        preview_fps: 12,
-        tiny_vae: "taeltx2_3.safetensors"
-      },
-      _meta: { title: "Model Preview Override (animado TAE LTXV)" }
-    };
-    if(g[N.LORA] && g[N.LORA].inputs && g[N.LORA].inputs.model){
-      g[N.LORA].inputs.model = [previewOverrideKey, 0];
-    }
-  }
-
   // Steps del primer pase: regenerar sigmas interpolando desde la curva base 10-step
   const firstSteps = parseInt((j ? j.firstPassSteps : $("firstPassSteps")?.value) || 10, 10);
   if(g[N.FIRST_SIGMAS] && g[N.FIRST_SIGMAS].inputs){
@@ -5416,6 +5393,37 @@ function buildGraph(mode, job){
   const bypass = j ? j.dmdBypass : dmdBypass;
   if(bypass && g[N.LORA] && g[N.LORA].inputs.model){
     g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
+  }
+
+  // Model Preview Override (preview animado multi-frame en tiempo real L2RGB / NVENC / WebP)
+  const prevMethod = getPreviewMethod();
+  if(prevMethod !== "none"){
+    const previewOverrideKey = "1070";
+    g[previewOverrideKey] = {
+      class_type: "ModelPreviewOverrideKJ",
+      inputs: {
+        model: [N.LORA, 0],
+        max_resolution: 768,
+        jpeg_quality: 80,
+        suppress_default_preview: true,
+        preview_frames: 32,
+        preview_fps: 6,
+        tiny_vae: "none"
+      },
+      _meta: { title: "Model Preview Override (animado LTXV L2RGB)" }
+    };
+    if(g[N.REFERENCE_1] && g[N.REFERENCE_1].inputs && g[N.REFERENCE_1].inputs.model){
+      g[N.REFERENCE_1].inputs.model = [previewOverrideKey, 0];
+    }
+    if(g[N.REFERENCE_2] && g[N.REFERENCE_2].inputs && g[N.REFERENCE_2].inputs.model){
+      g[N.REFERENCE_2].inputs.model = [previewOverrideKey, 0];
+    }
+    if(g[N.SAMPLER_1] && g[N.SAMPLER_1].inputs && g[N.SAMPLER_1].inputs.model && g[N.SAMPLER_1].inputs.model[0] === N.LORA){
+      g[N.SAMPLER_1].inputs.model = [previewOverrideKey, 0];
+    }
+    if(g[N.SAMPLER_2] && g[N.SAMPLER_2].inputs && g[N.SAMPLER_2].inputs.model && g[N.SAMPLER_2].inputs.model[0] === N.LORA){
+      g[N.SAMPLER_2].inputs.model = [previewOverrideKey, 0];
+    }
   }
 
   // Prefijo de archivo configurable
@@ -5987,7 +5995,7 @@ async function runSingleGeneration(index) {
                 workflow: graph,
                 prompt: graph
               },
-              preview_method: getPreviewMethod()
+              preview_method: (getPreviewMethod() === "none" ? "none" : "latent2rgb")
             }
           })
         });
