@@ -1158,7 +1158,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  ["h3OptToggle", "postprocToggle"].forEach(id => {
+  ["h3OptToggle", "postprocToggle", "videoHistoryToggle"].forEach(id => {
     const el = $(id);
     if(el){
       el.addEventListener("click", () => {

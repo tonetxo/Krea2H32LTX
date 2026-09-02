@@ -865,16 +865,19 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
         <div class="log" id="log">listo.</div>
       </div>
 
-      <!-- HISTORIAL DE VÍDEOS -->
+      <!-- HISTORIAL DE VÍDEOS (COLAPSABLE) -->
       <div class="vidbox" id="videoHistoryBox" style="margin-top:12px;">
-        <div class="vid-header">
-          <h3>Historial de Vídeos <span id="historyCountBadge" style="color:var(--accent);font-size:10px;">(0)</span></h3>
-          <div class="vid-actions">
-            <button class="vid-action-btn" id="btnRefreshHistory" title="Refrescar historial">↻ Refrescar</button>
-          </div>
+        <div class="collapsible-header" id="videoHistoryToggle">
+          <span class="arrow">▶</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;">
+            Historial de Vídeos <span id="historyCountBadge" style="color:var(--accent);font-size:10px;">(0)</span>
+          </span>
+          <button class="vid-action-btn" id="btnRefreshHistory" title="Refrescar historial" style="margin-left:auto;" onclick="event.stopPropagation();">↻ Refrescar</button>
         </div>
-        <div class="hint" id="historyHint" style="font-size:10px;margin-bottom:6px;">Vídeos generados recientemente. Haz clic en un vídeo para cargarlo en el reproductor principal.</div>
-        <div class="variant-grid" id="videoHistoryGrid"></div>
+        <div class="collapsible-body" id="videoHistoryBody">
+          <div class="hint" id="historyHint" style="font-size:10px;margin:8px 0 6px;">Vídeos generados recientemente. Haz clic en un vídeo para cargarlo en el reproductor principal.</div>
+          <div class="variant-grid" id="videoHistoryGrid"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -5070,7 +5073,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  ["h3OptToggle", "postprocToggle"].forEach(id => {
+  ["h3OptToggle", "postprocToggle", "videoHistoryToggle"].forEach(id => {
     const el = $(id);
     if(el){
       el.addEventListener("click", () => {
