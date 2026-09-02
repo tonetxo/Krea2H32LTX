@@ -659,8 +659,7 @@ function buildGraph(j){
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
   if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
-    delete g[N.OLLAMA_CHAT_1];
-    delete g[N.OLLAMA_CHAT_2];
+    ["51", "53", "55", "84", "85", "86"].forEach(id => { delete g[id]; });
   }
 
   // 2. Duración y Megapíxeles
