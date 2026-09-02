@@ -1,0 +1,72 @@
+/* ============================================================
+   mmh3x2.css — CSS específico de MMH3X2 (2 segmentos, 4 imgs, 1 video)
+   ============================================================ */
+
+/* Cadena de nodos del pipeline */
+.chain{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 22px;flex-wrap:wrap;}
+.chain .node{padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--panel);}
+.chain .node.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent-dim) inset;}
+.chain .arrow{color:var(--muted-2);}
+
+/* Readonly inputs */
+input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
+
+/* Dropzones y Slots de Medios (4 Imágenes + 1 Vídeo) */
+.media-grid-4{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;}
+.media-slot{position:relative;border:1.5px dashed var(--border);border-radius:7px;background:var(--panel-2);min-height:115px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;padding:6px;transition:border-color .15s,background .15s;}
+.media-slot.drag{border-color:var(--accent);background:var(--accent-dim);}
+.media-slot-header{width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-family:var(--mono);font-size:10px;color:var(--muted);z-index:2;}
+.media-slot-badge{color:var(--accent);font-weight:600;}
+.media-slot-del{background:rgba(0,0,0,.7);border:1px solid var(--border);color:#fff;border-radius:50%;width:20px;height:20px;font-size:10px;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;}
+.media-slot:hover .media-slot-del{display:flex;}
+.media-slot-del:hover{background:#ff4757;border-color:#ff4757;}
+.media-slot img{max-width:100%;max-height:120px;object-fit:contain;border-radius:4px;display:block;margin:0 auto;}
+.media-slot video{max-width:100%;max-height:120px;object-fit:contain;border-radius:4px;background:#000;display:block;margin:0 auto;}
+.media-slot .ph{font-family:var(--mono);font-size:10px;letter-spacing:.03em;color:var(--muted);padding:14px 4px;text-align:center;}
+.media-slot input[type="file"]{display:none;}
+.media-slot-info{font-family:var(--mono);font-size:9.5px;color:var(--muted-2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+
+/* Video Slot dedicado */
+.video-slot-wrap{margin-top:8px;border:1.5px dashed var(--border);border-radius:7px;background:var(--panel-2);padding:8px;cursor:pointer;transition:border-color .15s,background .15s;position:relative;}
+.video-slot-wrap.drag{border-color:var(--accent);background:var(--accent-dim);}
+.video-slot-wrap .ph{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:10px 4px;text-align:center;}
+.video-slot-wrap input[type="file"]{display:none;}
+.video-slot-wrap video{max-width:100%;max-height:140px;object-fit:contain;background:#000;border-radius:4px;display:block;margin:0 auto;}
+
+/* Reproductores y Vidbox */
+.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;position:relative;contain:layout style;margin-bottom:12px;}
+.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;}
+.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;flex:1;}
+.vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
+.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
+.vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;gap:10px;flex-wrap:wrap;}
+.res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
+
+/* Video element */
+video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh;will-change:contents;min-height:140px;}
+.video-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin-bottom:6px;pointer-events:none;}
+
+.empty{height:140px;}
+
+/* Fullscreen vidbox */
+.vidbox:fullscreen, .vidbox:-webkit-full-screen, .vidbox:-moz-full-screen {
+  width: 100vw !important; height: 100vh !important; max-height: none !important;
+  background: #000; border: none; border-radius: 0; padding: 0; position: fixed; top: 0; left: 0; z-index: 9999;
+}
+.vidbox:fullscreen video, .vidbox:-webkit-full-screen video, .vidbox:-moz-full-screen video {
+  width: 100%; height: 100%; object-fit: contain; max-height: none; border-radius: 0;
+}
+.vidbox:fullscreen .vid-header, .vidbox:fullscreen .vid-footer, .vidbox:fullscreen .empty {
+  display: none !important;
+}
+
+/* Tabs para seleccionar vista de reproductor */
+.vid-view-tabs{display:flex;gap:4px;margin-bottom:10px;background:var(--panel-2);padding:3px;border-radius:6px;border:1px solid var(--border);}
+.vid-view-tab{flex:1;text-align:center;padding:5px 8px;font-family:var(--mono);font-size:10.5px;color:var(--muted);border-radius:4px;cursor:pointer;transition:all .15s;}
+.vid-view-tab.active{background:var(--panel);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.3);}
+
+/* Dual prompt tweaks */
+.prompt-box{position:relative;margin-bottom:8px;}
+.prompt-box-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-family:var(--mono);font-size:10px;color:var(--muted);}
+.prompt-box-header span.badge{color:var(--accent);}

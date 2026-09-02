@@ -1,0 +1,1120 @@
+{
+  "1": {
+    "inputs": {
+      "unet_name": "Ligazón para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet (MiniMax H3)"
+    }
+  },
+  "2": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "Kitchen Attention"
+    }
+  },
+  "4": {
+    "inputs": {
+      "video_budget": 0.3,
+      "denser_early_late_steps": false,
+      "model": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "H3SparseAttention",
+    "_meta": {
+      "title": "Sparse Attention 0.3"
+    }
+  },
+  "5": {
+    "inputs": {
+      "shift_video": 12,
+      "shift_audio": 3,
+      "model": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "Sigma Shift"
+    }
+  },
+  "6": {
+    "inputs": {
+      "fused_qkv": "auto",
+      "mlp_memory": "auto",
+      "chunk_rows": 4096,
+      "preserve_precision": true,
+      "precision_mode": "Auto",
+      "qkv_streaming_mode": "Auto",
+      "embedding_memory_mode": "Auto",
+      "kitchen_v_memory_mode": "Standard",
+      "model": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "H3MemoryOptimization",
+    "_meta": {
+      "title": "Memory Optimization"
+    }
+  },
+  "7": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIP (MiniMax H3)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "vae_name": "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE Video"
+    }
+  },
+  "9": {
+    "inputs": {
+      "vae_name": "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE Audio"
+    }
+  },
+  "10": {
+    "inputs": {
+      "image": "1756002-sab, a beautiful tanned, tattooed brunet-flux2Krea2_Turbo_convrot_int8mixed.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "First Frame (i2v ref)"
+    }
+  },
+  "12": {
+    "inputs": {
+      "value": 12
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "Duration (s)"
+    }
+  },
+  "13": {
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Frames (17k+5)"
+    }
+  },
+  "14": {
+    "inputs": {
+      "prompt": [
+        "50",
+        0
+      ],
+      "width": [
+        "78",
+        0
+      ],
+      "height": [
+        "78",
+        1
+      ],
+      "length": [
+        "13",
+        1
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "7",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ],
+      "audio_vae": [
+        "9",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "10",
+        0
+      ],
+      "ref_images.ref_image_1": [
+        "81",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "Segment 1 (i2v)"
+    }
+  },
+  "15": {
+    "inputs": {
+      "noise_seed": 406350973583595
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "Seed"
+    }
+  },
+  "16": {
+    "inputs": {
+      "model": [
+        "6",
+        0
+      ],
+      "conditioning": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Guider 1"
+    }
+  },
+  "17": {
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "Sampler 1"
+    }
+  },
+  "18": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "79",
+        0
+      ],
+      "denoise": 1,
+      "model": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "Scheduler 1 (8 steps)"
+    }
+  },
+  "19": {
+    "inputs": {
+      "noise": [
+        "15",
+        0
+      ],
+      "guider": [
+        "16",
+        0
+      ],
+      "sampler": [
+        "17",
+        0
+      ],
+      "sigmas": [
+        "18",
+        0
+      ],
+      "latent_image": [
+        "14",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "Sampler Custom 1"
+    }
+  },
+  "20": {
+    "inputs": {
+      "samples": [
+        "19",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decode Video 1"
+    }
+  },
+  "21": {
+    "inputs": {
+      "samples": [
+        "19",
+        0
+      ],
+      "vae": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "Decode Audio 1"
+    }
+  },
+  "22": {
+    "inputs": {
+      "fps": [
+        "75",
+        0
+      ],
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "images": [
+        "20",
+        0
+      ],
+      "audio": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Video Seg 1"
+    }
+  },
+  "23": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_seg1",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Seg 1"
+    }
+  },
+  "25": {
+    "inputs": {
+      "indexes": "-48, -47, -46, -45, -44, -43, -42, -41, -40, -39, -38, -37, -36, -35, -34, -33, -32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "GetImagesFromBatchIndexed",
+    "_meta": {
+      "title": "Last 48 frames (2s)"
+    }
+  },
+  "26": {
+    "inputs": {
+      "indexes": "-1",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "GetImagesFromBatchIndexed",
+    "_meta": {
+      "title": "Last frame (full res)"
+    }
+  },
+  "27": {
+    "inputs": {
+      "num_columns": 8,
+      "match_image_size": false,
+      "max_resolution": 4096,
+      "images": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "ImageConcatFromBatch",
+    "_meta": {
+      "title": "Grid 48 refs"
+    }
+  },
+  "28": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_cont_lastframe",
+      "images": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save last frame"
+    }
+  },
+  "29": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_cont_refgrid",
+      "images": [
+        "27",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save ref grid"
+    }
+  },
+  "30": {
+    "inputs": {
+      "prompt": [
+        "55",
+        0
+      ],
+      "width": [
+        "78",
+        0
+      ],
+      "height": [
+        "78",
+        1
+      ],
+      "length": [
+        "13",
+        1
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "7",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ],
+      "audio_vae": [
+        "9",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "26",
+        0
+      ],
+      "ref_images.ref_image_1": [
+        "82",
+        0
+      ],
+      "ref_images.ref_image_2": [
+        "83",
+        0
+      ],
+      "ref_videos.ref_video_0": [
+        "54",
+        0
+      ],
+      "ref_video_audios.ref_video_audio_0": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "Segment 2 (r2v)"
+    }
+  },
+  "32": {
+    "inputs": {
+      "model": [
+        "6",
+        0
+      ],
+      "conditioning": [
+        "70",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Guider 2"
+    }
+  },
+  "33": {
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "Sampler 2"
+    }
+  },
+  "34": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "79",
+        0
+      ],
+      "denoise": 1,
+      "model": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "Scheduler 2 (denoise 0.95)"
+    }
+  },
+  "35": {
+    "inputs": {
+      "noise": [
+        "15",
+        0
+      ],
+      "guider": [
+        "32",
+        0
+      ],
+      "sampler": [
+        "33",
+        0
+      ],
+      "sigmas": [
+        "34",
+        0
+      ],
+      "latent_image": [
+        "68",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "Sampler Custom 2"
+    }
+  },
+  "36": {
+    "inputs": {
+      "samples": [
+        "35",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decode Video 2"
+    }
+  },
+  "37": {
+    "inputs": {
+      "samples": [
+        "35",
+        0
+      ],
+      "vae": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "Decode Audio 2"
+    }
+  },
+  "38": {
+    "inputs": {
+      "fps": [
+        "75",
+        0
+      ],
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "images": [
+        "36",
+        0
+      ],
+      "audio": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Video Seg 2"
+    }
+  },
+  "39": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_seg2",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "38",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Seg 2"
+    }
+  },
+  "40": {
+    "inputs": {
+      "inputcount": 2,
+      "Update inputs": null,
+      "image_1": [
+        "61",
+        0
+      ],
+      "image_2": [
+        "66",
+        0
+      ]
+    },
+    "class_type": "ImageBatchMulti",
+    "_meta": {
+      "title": "Union directa (587f)"
+    }
+  },
+  "41": {
+    "inputs": {
+      "direction": "after",
+      "audio1": [
+        "65",
+        0
+      ],
+      "audio2": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "AudioConcat",
+    "_meta": {
+      "title": "Merge audio"
+    }
+  },
+  "42": {
+    "inputs": {
+      "fps": [
+        "76",
+        0
+      ],
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "images": [
+        "72",
+        0
+      ],
+      "audio": [
+        "41",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Video Final"
+    }
+  },
+  "43": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_cont",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Final"
+    }
+  },
+  "50": {
+    "inputs": {
+      "value": "A continuous video shot of the tattooed woman as in image 1, standing up from her wooden stool and walking forward with a confident, rhythmic stride toward the lens. The camera performs a seamless dolly-back movement, retreating at the same pace as her walk to maintain a steady medium shot as in image 2. Her long brown hair sways gently with each step, and the fabric of her black dress ripples subtly. In the background, the warm glow of the hanging lanterns flickers slightly, and the soft light of the setting sun creates a shimmering halo around her silhouette as she advances through the rustic tropical setting.\noverall_soundscape: The waves and the wind shaking the palm trees, some seagulls chirping, the woman's footsteps on the sand, the murmur of the swimmers walking.\nnon_diegetic_music:N/A"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt original (fuente unica)"
+    }
+  },
+  "51": {
+    "inputs": {
+      "url": "http://127.0.0.1:11434",
+      "model": "baytout3/ultragemma4-12b-heretic-uncensored:Q8_0",
+      "keep_alive": 0,
+      "keep_alive_unit": "minutes"
+    },
+    "class_type": "OllamaConnectivityV2",
+    "_meta": {
+      "title": "Ollama"
+    }
+  },
+  "53": {
+    "inputs": {
+      "system": "You are a video continuation prompt writer for MiniMax H3. You receive the prompt of the first segment followed by a 'Next segment direction' instruction written by the director. Fuse BOTH into one new prompt for the next segment: keep the base scene (subject, style, lighting, camera language, audio direction) from the original prompt, and make the director's direction the main driver of the new action, advancing naturally from where the first segment ends. The next segment will use the last frame and the last two seconds of the previous segment as image and video references, so do not re-describe what is already visible. Output ONLY the continuation prompt, with no preamble, quotes or explanation.",
+      "prompt": [
+        "59",
+        0
+      ],
+      "think": false,
+      "format": "text",
+      "reset_session": false,
+      "connectivity": [
+        "51",
+        0
+      ],
+      "options": [
+        "86",
+        0
+      ]
+    },
+    "class_type": "OllamaChat",
+    "_meta": {
+      "title": "LLM 1: Continuation"
+    }
+  },
+  "54": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "scale_by": 0.5,
+      "image": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "ImageScaleBy",
+    "_meta": {
+      "title": "Scale 2s to half"
+    }
+  },
+  "55": {
+    "inputs": {
+      "system": "You are a video continuation prompt writer for MiniMax H3. You are shown a sequence of frames from the LAST TWO SECONDS of the previous video segment. You also receive a draft continuation prompt. First, briefly describe what is happening in the frames: subject, motion, camera movement, lighting, and audio. Then fuse that description with the draft continuation prompt into ONE final prompt for the next segment. The next segment will use these frames as video reference and the last frame as image reference, so do not re-describe what is already visible; describe the evolution: new motion, new events, continued camera movement, and audio continuity. Output ONLY the final fused prompt, with no preamble, quotes or explanation.",
+      "prompt": [
+        "53",
+        0
+      ],
+      "think": false,
+      "format": "text",
+      "reset_session": false,
+      "connectivity": [
+        "51",
+        0
+      ],
+      "options": [
+        "86",
+        0
+      ],
+      "images": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "OllamaChat",
+    "_meta": {
+      "title": "LLM 2: Vision + Fusion"
+    }
+  },
+  "57": {
+    "inputs": {
+      "indexes": "-48, -44, -40, -36, -32, -28, -24, -20, -16, -12, -8, -4",
+      "images": [
+        "54",
+        0
+      ]
+    },
+    "class_type": "GetImagesFromBatchIndexed",
+    "_meta": {
+      "title": "Sample 12 frames (vision)"
+    }
+  },
+  "58": {
+    "inputs": {
+      "value": "The woman stops, takes off her dress, as image 1, and walks to the shore until he finds a man lying down and slowly sits down inserting the man's penis into his anus, as in image 2, having intense anal sex. The camera keeps framing her completely.\noverall_soundscape: The waves and the wind shaking the palm trees, some seagulls chirping, the woman's footsteps on the sand, the murmur of the swimmers walking\nnon_diegetic_music:N/A"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt guiado seg2 (nueva accion)"
+    }
+  },
+  "59": {
+    "inputs": {
+      "string_a": [
+        "50",
+        0
+      ],
+      "string_b": [
+        "58",
+        0
+      ],
+      "delimiter": "\n\nNext segment direction (must be respected): "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Base + guia seg2"
+    }
+  },
+  "61": {
+    "inputs": {
+      "indexes": "0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "GetImagesFromBatchIndexed",
+    "_meta": {
+      "title": "Seg1 sin ultimo frame (293f)"
+    }
+  },
+  "64": {
+    "inputs": {
+      "indexes": "0",
+      "mode": "replace",
+      "original_images": [
+        "36",
+        0
+      ],
+      "images_to_insert": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "InsertImagesToBatchIndexed",
+    "_meta": {
+      "title": "Seg2 frame0 = frame real"
+    }
+  },
+  "65": {
+    "inputs": {
+      "start_index": 0.0417,
+      "duration": 12.2083,
+      "audio": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "TrimAudioDuration",
+    "_meta": {
+      "title": "Audio seg1 sin 1/24s"
+    }
+  },
+  "66": {
+    "inputs": {
+      "blend_strength": 0.35,
+      "blend_frames": 4,
+      "mode": "transition_only",
+      "video": [
+        "64",
+        0
+      ]
+    },
+    "class_type": "VideoTemporalBlend",
+    "_meta": {
+      "title": "Suavizar empalme (4f)"
+    }
+  },
+  "68": {
+    "inputs": {
+      "av_latent": [
+        "30",
+        1
+      ],
+      "images": [
+        "25",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "H3InjectVideoLatent",
+    "_meta": {
+      "title": "Inyectar 2s reales (img2img)"
+    }
+  },
+  "70": {
+    "inputs": {
+      "frame_idx": 0,
+      "positive": [
+        "30",
+        0
+      ],
+      "latent": [
+        "30",
+        1
+      ],
+      "vae": [
+        "8",
+        0
+      ],
+      "audio_vae": [
+        "9",
+        0
+      ],
+      "image": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3AddGuide",
+    "_meta": {
+      "title": "Anclar ultimo frame (frame 0)"
+    }
+  },
+  "71": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.scale": 2,
+      "quality": "ULTRA",
+      "images": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "RTXVideoSuperResolution",
+    "_meta": {
+      "title": "RTX Video Super Resolution"
+    }
+  },
+  "72": {
+    "inputs": {
+      "multiplier": [
+        "74",
+        0
+      ],
+      "interp_model": [
+        "73",
+        0
+      ],
+      "images": [
+        "71",
+        0
+      ]
+    },
+    "class_type": "FrameInterpolate",
+    "_meta": {
+      "title": "Run Frame Interpolation Model"
+    }
+  },
+  "73": {
+    "inputs": {
+      "model_name": "rife_v4.26.safetensors"
+    },
+    "class_type": "FrameInterpolationModelLoader",
+    "_meta": {
+      "title": "Load Frame Interpolation Model"
+    }
+  },
+  "74": {
+    "inputs": {
+      "value": 2
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "frame interpolation x"
+    }
+  },
+  "75": {
+    "inputs": {
+      "value": 24
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "fps"
+    }
+  },
+  "76": {
+    "inputs": {
+      "expression": "a * b",
+      "values.a": [
+        "74",
+        0
+      ],
+      "values.b": [
+        "75",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Math Expression"
+    }
+  },
+  "77": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "megapixels": 0.7,
+      "resolution_steps": 32,
+      "image": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "Scale Image to Total Pixels"
+    }
+  },
+  "78": {
+    "inputs": {
+      "image": [
+        "77",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "79": {
+    "inputs": {
+      "value": 6
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "steps"
+    }
+  },
+  "81": {
+    "inputs": {
+      "image": "1204002-Wide angle shot of sab, a spanish woman-flux2Krea2_Turbo_convrot_int8mixed.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "82": {
+    "inputs": {
+      "image": "1738001-Wide angle shot of sab, a nude spanish w-flux2krea2_turbo_fp8_scaled.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "83": {
+    "inputs": {
+      "image": "2239001-eva, a young woman with long dark brown-flux2Krea2_Turbo_convrot_int8mixed.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "84": {
+    "inputs": {
+      "text_0": "A continuous video shot opens with the tattooed woman as in image 1, rising from her wooden stool and immediately stepping forward with a confident, rhythmic stride toward the lens. The camera smoothly executes a seamless dolly-back movement, retreating perfectly matched to her pace, maintaining a steady medium shot as she advances. Her long brown hair sways gracefully with each step, and the black fabric of her dress ripples subtly, brilliantly catching the soft, shimmering halo cast by the setting sun. She stops her stride, and in a deliberate, unhurried motion, she pulls her dress down past her hips, allowing the fabric to fall softly to the sand. The camera simultaneously transitions to a wider, full-body frame, ensuring she is captured completely. She turns and begins walking toward the shoreline, her bare feet sinking gently into the sand, bathed in the golden-hour glow. Reaching the water's edge, she spots a man lying down, and proceeds to approach him. Instead of simply dropping, she *slowly* lowers herself down, deliberately settling onto the man's hips, positioning herself to insert his penis into her anus. The camera maintains a consistent, full-body frame, perfectly capturing the slow, sensual onset of their intense anal sex. Her initial movements are measured and controlled before transitioning into a deep, rhythmic, powerful thrust. The scene is steeped in the warm, hazy atmosphere of the tropical sunset, with the gentle foam of the waves providing a perfect foreground contrast.\noverall_soundscape: The waves and the wind shaking the palm trees, some seagulls chirping, the woman's footsteps on the sand, the murmur of the swimmers walking.\nnon_diegetic_music: N/A",
+      "text": [
+        "53",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  },
+  "85": {
+    "inputs": {
+      "text_0": "The tattooed woman continues the powerful, deep, rhythmic thrusting over the man, maintaining the fixed, wide full-body frame that perfectly captures the intensity and geometry of their coupling. Her movements are relentless and deliberate, driving the action forward. The golden-hour light deepens, transforming the scene into a molten gold wash; it intensely catches the glistening sheen of her skin, highlighting the definition of her muscles, and casts rich, long shadows across the wet, textured sand. The gentle foam of the waves continues to lap, sometimes creeping higher to meet their calves. The sequence remains captured in a highly fluid slow-motion style, emphasizing the profound tactile intimacy and the heavy, sensual weight of each connection. Audio continues with the resonant, steady rhythm of the crashing waves, the steady sibilance of the wind through the palm fronds, occasional clear seagulls calls, the crisp sound of her bare feet shifting slightly in the sand, and, most prominently, the deep, wet *squish* and *slap* of their skin during the powerful thrusts.",
+      "text": [
+        "55",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  },
+  "86": {
+    "inputs": {
+      "enable_mirostat": false,
+      "mirostat": 0,
+      "enable_mirostat_eta": false,
+      "mirostat_eta": 0.1,
+      "enable_mirostat_tau": false,
+      "mirostat_tau": 5,
+      "enable_num_ctx": true,
+      "num_ctx": 32768,
+      "enable_repeat_last_n": false,
+      "repeat_last_n": 64,
+      "enable_repeat_penalty": false,
+      "repeat_penalty": 1.1,
+      "enable_temperature": false,
+      "temperature": 0.8,
+      "enable_seed": false,
+      "seed": 1895657022,
+      "enable_stop": false,
+      "stop": "",
+      "enable_tfs_z": false,
+      "tfs_z": 1,
+      "enable_num_predict": false,
+      "num_predict": -1,
+      "enable_top_k": false,
+      "top_k": 40,
+      "enable_top_p": false,
+      "top_p": 0.9,
+      "enable_min_p": false,
+      "min_p": 0,
+      "debug": false
+    },
+    "class_type": "OllamaOptionsV2",
+    "_meta": {
+      "title": "Ollama Options"
+    }
+  },
+  "87": {
+    "inputs": {
+      "purge_cache": true,
+      "purge_models": true,
+      "anything": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: PurgeVRAM",
+    "_meta": {
+      "title": "LayerUtility: Purge VRAM"
+    }
+  }
+}

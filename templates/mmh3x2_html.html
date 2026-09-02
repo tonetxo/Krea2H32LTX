@@ -1,0 +1,417 @@
+  <div class="chain" id="chain">
+    <div class="node" data-n="img">4 imgs + 1 vid</div><div class="arrow">→</div>
+    <div class="node" data-n="seg1">seg 1</div><div class="arrow">→</div>
+    <div class="node" data-n="seg2">seg 2</div><div class="arrow">→</div>
+    <div class="node" data-n="blend">blend</div><div class="arrow">→</div>
+    <div class="node" data-n="rtx">rtx 2x</div><div class="arrow">→</div>
+    <div class="node" data-n="rife">rife x2/x4</div><div class="arrow">→</div>
+    <div class="node" data-n="out">final</div>
+  </div>
+
+  <div class="grid">
+    <div class="controls-col">
+      __COMMON_PANELS__
+
+      <!-- PROMPT 2: SEGMENTO 2 / CONTINUACIÓN -->
+      <div class="panel">
+        <h2>Prompt 2 · Segmento 2 (Continuación)</h2>
+        <div class="row">
+          <textarea id="prompt2" placeholder="Describe la acción o evolución de la escena en el segundo segmento..."></textarea>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button id="btnPrompt2FromEnhancer" class="ghost btn-mini" title="Copiar el texto mejorado por Ollama a este Prompt 2">📋 Pegar de Enhancer</button>
+          <button id="btnClearPrompt2" class="ghost btn-mini" title="Limpiar Prompt 2">✕ Limpiar</button>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Modo de continuidad en grafo</label>
+          <select id="seg2PromptMode">
+            <option value="direct" selected>Directo (usar este texto tal cual)</option>
+            <option value="ollama">Asistido (Ollama en grafo: fusiona visión + texto)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- MEDIOS DE ENTRADA: 4 IMÁGENES + 1 VÍDEO -->
+      <div class="panel">
+        <h2>Imágenes de Referencia (Hasta 4)</h2>
+        <div class="hint" style="font-size:10px;margin-bottom:6px;">Arrastra o haz clic en cada recuadro. Arrastra entre slots o desde el historial para intercambiar.</div>
+        <div class="media-grid-4">
+          <!-- IMAGEN 1: Base Seg 1 -->
+          <div class="media-slot" id="slotImg1" data-slot="1">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 1 · Base Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg1" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput1" accept="image/*">
+            <div class="ph" id="phImg1">arrastra o clic<br><span class="hint">(inicio seg 1)</span></div>
+            <img id="previewSlotImg1" style="display:none;" alt="Img 1">
+            <div class="media-slot-info" id="infoImg1"></div>
+          </div>
+
+          <!-- IMAGEN 2: Ref Seg 1 -->
+          <div class="media-slot" id="slotImg2" data-slot="2">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 2 · Ref Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg2" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput2" accept="image/*">
+            <div class="ph" id="phImg2">arrastra o clic<br><span class="hint">(ref seg 1)</span></div>
+            <img id="previewSlotImg2" style="display:none;" alt="Img 2">
+            <div class="media-slot-info" id="infoImg2"></div>
+          </div>
+
+          <!-- IMAGEN 3: Ref Seg 2 -->
+          <div class="media-slot" id="slotImg3" data-slot="3">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 3 · Ref Seg 2</span>
+              <button class="media-slot-del" id="btnDelImg3" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput3" accept="image/*">
+            <div class="ph" id="phImg3">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
+            <img id="previewSlotImg3" style="display:none;" alt="Img 3">
+            <div class="media-slot-info" id="infoImg3"></div>
+          </div>
+
+          <!-- IMAGEN 4: Ref Seg 2 -->
+          <div class="media-slot" id="slotImg4" data-slot="4">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 4 · Ref Seg 2</span>
+              <button class="media-slot-del" id="btnDelImg4" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput4" accept="image/*">
+            <div class="ph" id="phImg4">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
+            <img id="previewSlotImg4" style="display:none;" alt="Img 4">
+            <div class="media-slot-info" id="infoImg4"></div>
+          </div>
+        </div>
+
+        <!-- VÍDEO DE ENTRADA / REFERENCIA -->
+        <div style="margin-top:10px;">
+          <label style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Vídeo de Referencia para Seg 2 <span class="hint">(Opcional)</span></label>
+          <div class="video-slot-wrap" id="slotVid">
+            <input type="file" id="fileInputVid" accept="video/mp4,video/webm,video/quicktime">
+            <div class="ph" id="phVid">Vacío = usa automáticamente los últimos 2s generados del Seg 1.<br><span style="color:var(--accent);">Arrastra o haz clic aquí para subir un vídeo externo.</span></div>
+            <video id="previewSlotVid" controls muted loop style="display:none;"></video>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+              <span class="media-slot-info" id="infoVid"></span>
+              <button class="ghost btn-mini" id="btnDelVid" style="display:none;">✕ Quitar vídeo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEMILLA -->
+      <div class="panel">
+        <h2>Semilla</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRandom">Aleatoria</div>
+          <div class="seg" id="segFixed">Fija</div>
+        </div>
+        <input type="number" id="seedVal" value="12345" step="1" disabled>
+      </div>
+
+      <!-- RESOLUCIÓN & DURACIÓN -->
+      <div class="panel">
+        <h2>Resolución &amp; Duración</h2>
+        <div class="row slider-row">
+          <label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label>
+          <input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.70">
+          <div class="slider-val" id="mpVal">0.70</div>
+        </div>
+        <div class="row two-col">
+          <div><label>Ancho</label><input type="number" id="width" value="1152" step="32" min="256" class="ro" readonly></div>
+          <div><label>Alto</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div>
+        </div>
+        <div class="row slider-row">
+          <label>Duración por segmento <span class="hint" id="durHint">(5.0s → 124 frames)</span></label>
+          <input type="range" id="durationSlider" min="1.0" max="8.0" step="0.5" value="5.0">
+          <div class="slider-val" id="durationVal">5.0s</div>
+        </div>
+        <div class="hint" id="totalFramesHint" style="margin-top:2px;font-size:10.5px;color:var(--accent);">
+          Total: 2 segmentos x 124f = 248 frames (~10.0s)
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Batch Size (Variantes)</label>
+          <input type="number" id="batchSize" value="1" min="1" max="8">
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
+          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
+        </div>
+      </div>
+
+      <!-- MUESTREO (SAMPLER & STEPS) -->
+      <div class="panel">
+        <h2>Muestreo (Sampler &amp; Steps)</h2>
+        <div class="row slider-row">
+          <label>Pasos (Steps)</label>
+          <input type="range" id="stepsSlider" min="4" max="40" step="1" value="20">
+          <div class="slider-val" id="stepsVal">20</div>
+        </div>
+        <div class="row two-col">
+          <div>
+            <label>Sampler</label>
+            <select id="samplerName">
+              <option value="res_multistep" selected>res_multistep</option>
+              <option value="res_multistep_cfg">res_multistep_cfg</option>
+              <option value="euler">euler</option>
+              <option value="euler_ancestral">euler_ancestral</option>
+              <option value="dpmpp_2m">dpmpp_2m</option>
+            </select>
+          </div>
+          <div>
+            <label>Scheduler</label>
+            <select id="schedulerName">
+              <option value="simple" selected>simple</option>
+              <option value="sgm_uniform">sgm_uniform</option>
+              <option value="normal">normal</option>
+              <option value="ddim_uniform">ddim_uniform</option>
+              <option value="beta">beta</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODELOS & LORAS -->
+      <div class="panel">
+        <h2>Modelos &amp; LoRAs</h2>
+        <div class="row">
+          <label>UNet / Diffusion Model</label>
+          <select id="unetModel"><option value="">Cargando modelos...</option></select>
+        </div>
+        <div class="row">
+          <label>CLIP / Text Encoder</label>
+          <select id="clipModel"><option value="">Cargando CLIPs...</option></select>
+        </div>
+
+        <!-- LoRA 1 -->
+        <div class="lora-slot" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="lora1Toggle"> <span>LoRA 1</span>
+            </label>
+          </div>
+          <select id="lora1Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
+          <div class="slider-row" style="margin-top:4px;">
+            <label style="font-size:10px;">Fuerza</label>
+            <input type="range" id="lora1Strength" min="0" max="2" step="0.05" value="1.0">
+            <div class="slider-val" id="lora1StrengthVal">1.00</div>
+          </div>
+        </div>
+
+        <!-- LoRA 2 -->
+        <div class="lora-slot" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="lora2Toggle"> <span>LoRA 2</span>
+            </label>
+          </div>
+          <select id="lora2Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
+          <div class="slider-row" style="margin-top:4px;">
+            <label style="font-size:10px;">Fuerza</label>
+            <input type="range" id="lora2Strength" min="0" max="2" step="0.05" value="1.0">
+            <div class="slider-val" id="lora2StrengthVal">1.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTIMIZACIONES H3 -->
+      <div class="panel">
+        <div class="collapsible-header" id="h3OptToggle">
+          <span class="arrow">▶</span> Optimizaciones H3 (Transformer &amp; Memoria)
+        </div>
+        <div class="collapsible-body" id="h3OptBody">
+          <div class="row">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="h3SparseToggle" checked> <span>H3 Sparse Attention</span>
+            </label>
+            <div class="slider-row" style="margin-top:6px;">
+              <label style="font-size:10px;">Video Budget</label>
+              <input type="range" id="h3BudgetSlider" min="0.1" max="1.0" step="0.05" value="0.30">
+              <div class="slider-val" id="h3BudgetVal">0.30</div>
+            </div>
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px;font-size:11px;">
+              <input type="checkbox" id="h3EarlyLateToggle" checked> <span>Denser Early / Late Steps</span>
+            </label>
+          </div>
+
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="h3MemToggle" checked> <span>H3 Memory Optimization</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Fused QKV, QKV Streaming, Chunk rows y protección de precisión de pesos.</div>
+          </div>
+
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label>H3 Sigma Shift</label>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Shift Vídeo</label>
+              <input type="range" id="h3ShiftVideo" min="0.5" max="2.0" step="0.05" value="1.0">
+              <div class="slider-val" id="h3ShiftVideoVal">1.00</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Shift Audio</label>
+              <input type="range" id="h3ShiftAudio" min="0.5" max="2.0" step="0.05" value="1.0">
+              <div class="slider-val" id="h3ShiftAudioVal">1.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POSTPROCESADO: RTX SUPER RESOLUTION & RIFE -->
+      <div class="panel">
+        <div class="collapsible-header open" id="postprocToggle">
+          <span class="arrow">▼</span> Postprocesado (RTX Upscaler &amp; RIFE)
+        </div>
+        <div class="collapsible-body open" id="postprocBody">
+          <!-- RTX Video Super Resolution -->
+          <div class="row">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution (2x ULTRA)</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Escala por hardware con Tensor Cores manteniendo detalles nítidos.</div>
+          </div>
+
+          <!-- RIFE Frame Interpolation -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="rifeToggle" checked> <span>Interpolación de Frames (RIFE)</span>
+            </label>
+            <div class="row two-col" style="margin-top:6px;">
+              <div>
+                <label style="font-size:10px;">Multiplicador</label>
+                <select id="rifeMultiplier">
+                  <option value="2" selected>2x (25 fps → 50 fps)</option>
+                  <option value="4">4x (25 fps → 100 fps)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:10px;">Modelo RIFE</label>
+                <select id="rifeModel"><option value="rife_v4.26.safetensors">rife_v4.26</option></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suavizado de empalme temporal -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="blendToggle" checked> <span>Suavizar empalme entre segmentos</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Transición temporal suave (VideoTemporalBlend: 4 frames, fuerza 0.35).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA DE RESULTADOS Y REPRODUCTORES -->
+    <div class="results-col">
+      <!-- TABS DE VISTA DE REPRODUCTORES -->
+      <div class="vid-view-tabs">
+        <div class="vid-view-tab active" data-view="all">Todos los Reproductores</div>
+        <div class="vid-view-tab" data-view="final">Solo Vídeo Final</div>
+        <div class="vid-view-tab" data-view="seg1">Solo Seg 1</div>
+        <div class="vid-view-tab" data-view="seg2">Solo Seg 2</div>
+      </div>
+
+      <!-- REPRODUCTOR FINAL (CONTINUO CON RTX + RIFE) -->
+      <div class="vidbox" id="boxFinal">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Final Continuo</em> (Seg 1 + Seg 2 + RTX + RIFE)</h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptyFinal">sin generar</div>
+        <span class="video-badge" id="badgeFinal"></span>
+        <video id="videoFinal" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeFinal"></span>
+          <span class="res-tag" id="resFinal"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR SEGMENTO 1 -->
+      <div class="vidbox" id="boxSeg1">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Segmento 1</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadSeg1" title="Descargar segmento 1" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameSeg1" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaSeg1" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptySeg1">sin generar</div>
+        <img class="preview-img" id="previewImgSeg1" style="display:none;" alt="Vista previa Seg 1">
+        <video class="preview-img" id="previewVideoSeg1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        <span class="video-badge" id="badgeSeg1"></span>
+        <video id="videoSeg1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeSeg1"></span>
+          <span class="res-tag" id="resSeg1"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR SEGMENTO 2 -->
+      <div class="vidbox" id="boxSeg2">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Segmento 2</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadSeg2" title="Descargar segmento 2" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameSeg2" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaSeg2" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptySeg2">sin generar</div>
+        <img class="preview-img" id="previewImgSeg2" style="display:none;" alt="Vista previa Seg 2">
+        <video class="preview-img" id="previewVideoSeg2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        <span class="video-badge" id="badgeSeg2"></span>
+        <video id="videoSeg2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeSeg2"></span>
+          <span class="res-tag" id="resSeg2"></span>
+        </div>
+      </div>
+
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+
+      <!-- PANEL DE EJECUCIÓN Y COLAS -->
+      <div class="panel" style="margin-bottom:0;">
+        <h2>Ejecución</h2>
+        <div class="btn-row">
+          <button id="btnFull" class="primary" style="flex:2;">⚡ Generar Completo (Seg 1 + Seg 2 + Final)</button>
+          <button id="btnSeg1" style="flex:1;">Solo Seg 1</button>
+          <button id="btnSeg2" style="flex:1;">Solo Seg 2 + Final</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button id="btnStopVideo" disabled>Parar actual</button>
+          <button id="btnStopAll" class="danger" disabled>Parar todo</button>
+          <button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
+        </div>
+        <div class="queue-status-box">
+          <div class="queue-header">
+            <span>COLA DE GENERACIÓN</span>
+            <span id="queueCountBadge" class="queue-badge">0 tareas</span>
+          </div>
+          <div class="queue-items-list" id="queueList"></div>
+        </div>
+      </div>
+
+      <!-- HISTORIAL DE VÍDEOS -->
+      <div class="vidbox" id="videoHistoryBox" style="margin-top:12px;">
+        <div class="vid-header">
+          <h3>Historial de Vídeos <span id="historyCountBadge" style="color:var(--accent);font-size:10px;">(0)</span></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnRefreshHistory" title="Refrescar historial">↻ Refrescar</button>
+          </div>
+        </div>
+        <div class="hint" id="historyHint" style="font-size:10px;margin-bottom:6px;">Vídeos generados recientemente. Haz clic en un vídeo para cargarlo en el reproductor principal.</div>
+        <div class="variant-grid" id="videoHistoryGrid"></div>
+      </div>
+    </div>
+  </div>

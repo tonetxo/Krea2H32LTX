@@ -1,0 +1,5017 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MMH3X2 · Panel Pro</title>
+<style>
+/* ============================================================
+   base.css — CSS compartido entre LTXV y Krea2
+   Extraído de generar_ltxv.py y generar_krea2.py
+   ============================================================ */
+
+:root{--bg:#0a0c0e;--panel:#12161a;--panel-2:#171c21;--border:#242b31;--text:#e7ecef;--muted:#8b96a0;--muted-2:#5b6670;--accent:#57e8c9;--accent-dim:#2a4d47;--warn:#ffb454;--danger:#ff6a6a;--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;--sans:-apple-system,"Segoe UI",Inter,Roboto,sans-serif;}
+*{box-sizing:border-box;}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.45;overscroll-behavior:none;-webkit-overflow-scrolling:auto;overflow-anchor:none;}
+.wrap{max-width:1400px;margin:0 auto;padding:22px 18px 60px;}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+.head h1{font-family:var(--mono);font-size:15px;letter-spacing:.12em;text-transform:uppercase;margin:0;color:var(--text);font-weight:600;}
+.head h1 span{color:var(--accent);}.head .sub{font-family:var(--mono);font-size:11px;color:var(--muted-2);letter-spacing:.04em;}
+.grid{display:grid;grid-template-columns:1fr 1.2fr;gap:20px;}@media(max-width:1000px){.grid{grid-template-columns:1fr;}}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px 16px 18px;margin-bottom:16px;}
+.panel h2{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;display:flex;align-items:center;gap:8px;}
+.panel h2::before{content:"";width:5px;height:5px;background:var(--accent);border-radius:1px;display:inline-block;}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.row{margin-bottom:14px;}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+input[type=text],input[type=number],textarea,select{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;}
+select{cursor:pointer; appearance:none; background-image:url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b96a0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat:no-repeat; background-position:right 8px center; background-size:14px;}
+input[type=number]{font-family:var(--mono);}input:focus,textarea:focus,select:focus{border-color:var(--accent);}
+textarea{resize:vertical;min-height:92px;line-height:1.5;}
+.seed-toggle{display:flex;gap:8px;margin-bottom:8px;}
+.seg{flex:1;text-align:center;padding:7px 0;border:1px solid var(--border);border-radius:5px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;color:var(--muted);background:var(--panel-2);user-select:none;}
+.seg.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.slider-row{display:flex;align-items:center;gap:10px;}
+input[type=range]{flex:1;-webkit-appearance:none;height:3px;background:var(--border);border-radius:2px;outline:none;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 1px var(--accent);}
+.slider-val{font-family:var(--mono);font-size:12px;color:var(--accent);width:52px;text-align:right;flex-shrink:0;}
+.lora{border:1px solid var(--border);border-radius:6px;padding:10px 11px;margin-bottom:8px;background:var(--panel-2);}
+.lora.off{opacity:.5;}
+.lora-top{display:flex;align-items:center;gap:9px;margin-bottom:8px;}
+.switch{width:30px;height:17px;background:var(--border);border-radius:20px;position:relative;cursor:pointer;flex-shrink:0;transition:background .15s;}
+.switch.on{background:var(--accent-dim);border:1px solid var(--accent);}
+.switch i{position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--muted-2);transition:left .15s,background .15s;}
+.switch.on i{left:15px;background:var(--accent);}
+.btn-row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;}
+button{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);color:var(--text);padding:11px 16px;cursor:pointer;transition:all .15s;flex:1;min-width:150px;}
+button.primary{background:var(--accent);border-color:var(--accent);color:#08110f;font-weight:700;}
+button.danger{background:var(--danger);border-color:var(--danger);color:#fff;font-weight:700;}
+button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allowed;}
+.statusbar{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:10px 2px 0;min-height:16px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted-2);flex-shrink:0;}
+.dot.ok{background:var(--accent);box-shadow:0 0 6px var(--accent);}.dot.bad{background:var(--danger);}.dot.busy{background:var(--warn);animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.server-row{display:flex;gap:8px;}.server-row input{flex:1;}
+.results-col{display:flex;flex-direction:column;gap:16px;}
+.time-tag{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.04em;}
+.time-tag.live{color:var(--warn);}
+.variant-time{font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.04em;flex-shrink:0;white-space:nowrap;}
+.empty{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-family:var(--mono);font-size:11px;border:1px dashed var(--border);border-radius:5px;}
+.preview-wrap{position:relative;width:100%;text-align:center;}
+.preview-img{width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);display:block;margin:0 auto;}
+.preview-step-badge{position:absolute;top:12px;left:12px;background:rgba(13,17,23,0.88);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--accent);color:var(--accent);font-family:var(--mono);font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;pointer-events:none;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.6);letter-spacing:0.5px;display:inline-flex;align-items:center;gap:6px;animation:fadeIn .2s ease;}
+.preview-step-badge .spinner-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulseDot 1s infinite alternate;}
+@keyframes pulseDot{0%{opacity:.4;transform:scale(.85);}100%{opacity:1;transform:scale(1.15);}}
+.variant-card-generating{border-color:var(--accent-dim);box-shadow:0 0 0 1px var(--accent-dim);}
+.variant-progress-badge{position:absolute;top:6px;right:6px;background:rgba(13,17,23,0.9);color:var(--accent);font-family:var(--mono);font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid var(--accent);z-index:3;letter-spacing:.02em;}
+.log{font-family:var(--mono);font-size:11px;color:var(--muted-2);background:#050607;border:1px solid var(--border);border-radius:6px;padding:9px 11px;max-height:110px;overflow-y:auto;margin-top:12px;white-space:pre-wrap;}
+.hint{font-size:11px;color:var(--muted-2);margin-top:5px;font-family:var(--mono);}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:10px;}
+.gallery-item{border:1px solid var(--border);border-radius:5px;overflow:hidden;cursor:pointer;position:relative;background:var(--panel-2);touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.gallery-item img{width:100%;height:auto;display:block;transition:transform .2s;}
+.gallery-item:hover img{transform:scale(1.04);}
+.gallery-item.selected{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim);}
+.gallery-item .info-tag{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;background:linear-gradient(transparent, rgba(0,0,0,.88));font-family:var(--mono);font-size:10px;color:var(--text);letter-spacing:.02em;pointer-events:none;}
+.gallery-item .del-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;line-height:1;cursor:pointer;opacity:0;transition:opacity .15s, background .15s;z-index:2;}
+.gallery-item:hover .del-btn{opacity:1;}
+.gallery-item .del-btn:hover{background:var(--danger);border-color:var(--danger);}
+.gallery-item .lq-badge{position:absolute;top:4px;left:4px;background:rgba(255,180,84,.9);color:#1a1200;font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;z-index:2;letter-spacing:.03em;}
+.panel-head-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.panel-head-row h2{margin:0;}
+.btn-mini{padding:5px 9px;font-size:10px;min-width:auto;flex:none;}
+.prompt-actions{display:flex;gap:8px;margin-top:8px;}
+.prompt-actions button{padding:6px 10px;font-size:10px;min-width:auto;}
+.prompt-tree{max-height:260px;overflow-y:auto;font-size:12px;user-select:none;}
+.pt-folder{margin-left:14px;}
+.pt-folder-label{cursor:pointer;color:var(--muted);font-family:var(--mono);font-size:10.5px;padding:2px 0;display:flex;align-items:center;gap:4px;}
+.pt-folder-label:hover{color:var(--text);}
+.pt-folder-del{margin-left:auto;opacity:0;cursor:pointer;color:var(--danger);font-size:14px;line-height:1;padding:0 2px;border-radius:3px;}
+.pt-folder-label:hover .pt-folder-del{opacity:1;}
+.pt-folder-del:hover{background:rgba(255,106,106,.15);}
+.pt-folder-arrow{font-size:9px;width:10px;display:inline-block;transition:transform .15s;}
+.pt-folder.open > .pt-folder-arrow{transform:rotate(90deg);}
+.pt-children{display:none;margin-left:12px;border-left:1px solid var(--border);padding-left:4px;}
+.pt-folder.open > .pt-children{display:block;}
+.pt-item{cursor:pointer;padding:3px 6px;border-radius:4px;color:var(--text);font-size:12px;}
+.pt-item:hover{background:var(--panel-2);}
+.pt-item.selected{background:var(--accent-dim);color:var(--accent);}
+.pt-empty{color:var(--muted-2);font-size:10px;padding:6px 0;}
+.variant-gallery{margin-top:20px;}
+.variant-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(200px,1fr));gap:12px;}
+.variant-card{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.variant-info{padding:8px;font-size:11px;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between;align-items:center;gap:6px;}
+.variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
+.variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
+.variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
+.variant-seed-display{color:var(--accent);cursor:pointer;user-select:text;display:flex;align-items:center;gap:6px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.variant-seed-display:hover{color:#fff;}
+.copy-icon{font-size:12px;opacity:.7;transition:opacity .2s;}
+.variant-seed-display:hover .copy-icon{opacity:1;}
+
+/* Tooltip de metadata al hacer hover en una variant-card */
+.variant-tooltip{position:fixed;z-index:5000;max-width:340px;background:var(--panel);border:1px solid var(--accent-dim);border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:10.5px;color:var(--text);line-height:1.55;letter-spacing:.02em;box-shadow:0 8px 24px rgba(0,0,0,.55);pointer-events:none;opacity:0;transform:translateY(2px);transition:opacity .12s,transform .12s;white-space:normal;word-break:break-word;}
+.variant-tooltip.show{opacity:1;transform:translateY(0);}
+.variant-tooltip .vt-title{color:var(--accent);text-transform:uppercase;letter-spacing:.08em;font-size:9.5px;margin-bottom:6px;}
+.variant-tooltip .vt-row{display:flex;gap:8px;align-items:flex-start;}
+.variant-tooltip .vt-key{color:var(--muted);flex:0 0 84px;}
+.variant-tooltip .vt-val{color:var(--text);flex:1;min-width:0;word-break:break-all;}
+.variant-tooltip .vt-lora{padding-left:0;margin:2px 0;color:var(--text);}
+.variant-tooltip .vt-lora.off{color:var(--muted-2);}
+.variant-tooltip .vt-lora .vt-lora-name{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap;}
+.variant-tooltip .vt-empty{color:var(--muted-2);font-style:italic;}
+.collapsible-header{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;padding:4px 0;font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);}
+.collapsible-header:hover{color:var(--text);}
+.collapsible-header .arrow{font-size:9px;transition:transform .2s;}
+.collapsible-header.open .arrow{transform:rotate(90deg);}
+.collapsible-body{overflow:hidden;max-height:0;transition:max-height .4s ease;}
+.collapsible-body.open{max-height:5000px;}
+.enhancer-row{margin-bottom:10px;}
+.enhancer-row label{font-size:11px;color:var(--muted-2);margin-bottom:3px;}
+.enhancer-row select,.enhancer-row input[type=number]{width:100%;}
+.enhancer-row .slider-row input[type=range]{flex:1;}
+.enhancer-output{width:100%;background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 9px;font-family:var(--sans);font-size:13px;outline:none;resize:vertical;min-height:60px;line-height:1.5;}
+.enhancer-output:focus{border-color:var(--accent);}
+.enhancer-actions{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+.enhancer-actions button{flex:1;min-width:120px;}
+.modal-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.7);z-index:100;display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-content{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;}
+.modal-content h2{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 14px;}
+.modal-tabs{display:flex;gap:4px;margin-bottom:14px;}
+.modal-tab{padding:6px 14px;border:1px solid var(--border);border-radius:4px;cursor:pointer;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--panel-2);}
+.modal-tab.active{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.sysprompt-row{border:1px solid var(--border);border-radius:5px;padding:10px;margin-bottom:8px;background:var(--panel-2);}
+.sysprompt-row .spr-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.sysprompt-row .spr-name{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);}
+.sysprompt-row .spr-del{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:3px;min-width:auto;flex:0;}
+.sysprompt-row .spr-del:hover{background:var(--danger);color:#fff;}
+.sysprompt-row textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-family:var(--sans);font-size:12px;outline:none;resize:vertical;min-height:50px;line-height:1.4;}
+.sysprompt-row textarea:focus{border-color:var(--accent);}
+.modal-actions{display:flex;gap:10px;margin-top:14px;justify-content:flex-end;}
+.modal-actions button{min-width:100px;flex:0;}
+@keyframes seedFlash{0%{background-color:var(--panel-2);border-color:var(--border);}50%{background-color:var(--accent-dim);border-color:var(--accent);box-shadow:0 0 10px var(--accent);}100%{background-color:var(--panel-2);border-color:var(--border);}}
+.seed-updated{animation:seedFlash 1.5s ease-out;}
+
+/* Drag hacia fuera: cursor de agarrar en medios arrastrables */
+[draggable="true"]{cursor:grab;}
+[draggable="true"]:active{cursor:grabbing;}
+/* Los <video> ya tienen controles; el cursor grab solo en el borde */
+video[draggable="true"]{cursor:grab;}
+video[draggable="true"]:active{cursor:grabbing;}
+/* Las tarjetas de galería/variantes ya tienen cursor:pointer; mantenemos pointer
+   y dejamos que el navegador muestre el ghost de arrastre. */
+.variant-card[draggable="true"],.gallery-item[draggable="true"]{cursor:grab;}
+.variant-card[draggable="true"]:active,.gallery-item[draggable="true"]:active{cursor:grabbing;}
+
+/* --- QUEUE STATUS COMPONENT --- */
+.queue-status-box {
+  background: var(--bg-1, #101116);
+  border: 1px solid var(--border, #2a2b36);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.queue-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.queue-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--fg);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue-total-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--surface, #20222b);
+  border: 1px solid var(--border, #2a2b36);
+  color: var(--muted-2, #8e90a6);
+  white-space: nowrap;
+}
+.queue-total-badge.active {
+  background: rgba(87, 232, 201, 0.12);
+  border-color: var(--accent, #57e8c9);
+  color: var(--accent, #57e8c9);
+}
+.queue-total-num {
+  font-weight: 700;
+}
+.queue-splits {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.queue-split-card {
+  background: var(--panel, #181920);
+  border: 1px solid var(--border, #2a2b36);
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.queue-split-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted-2, #8e90a6);
+  font-family: var(--mono);
+}
+.queue-split-main {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--fg, #e2e4f0);
+}
+.queue-split-sub {
+  font-size: 9.5px;
+  color: var(--muted-2, #8e90a6);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue-items-accordion {
+  border-top: 1px solid var(--border, #2a2b36);
+  padding-top: 6px;
+  margin-top: 2px;
+}
+.queue-items-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted-2, #8e90a6);
+  cursor: pointer;
+  user-select: none;
+}
+.queue-items-header:hover {
+  color: var(--accent, #57e8c9);
+}
+.queue-items-body {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.queue-items-accordion.open .queue-items-body {
+  display: flex;
+}
+.queue-items-accordion.open .queue-items-header .arrow {
+  transform: rotate(90deg);
+}
+.queue-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-2, #14151a);
+  border: 1px solid var(--border, #2a2b36);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg);
+}
+.queue-item-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.queue-item-id {
+  color: var(--accent, #57e8c9);
+  font-weight: 700;
+}
+.queue-item-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-1, #b2b5cc);
+}
+.queue-item-del {
+  cursor: pointer;
+  color: var(--muted-2, #8e90a6);
+  padding: 0 4px;
+  font-size: 12px;
+}
+.queue-item-del:hover {
+  color: #ff5555;
+}
+/* ============================================================
+   mmh3x2.css — CSS específico de MMH3X2 (2 segmentos, 4 imgs, 1 video)
+   ============================================================ */
+
+/* Cadena de nodos del pipeline */
+.chain{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--muted-2);letter-spacing:.08em;text-transform:uppercase;margin:2px 0 22px;flex-wrap:wrap;}
+.chain .node{padding:3px 8px;border:1px solid var(--border);border-radius:3px;background:var(--panel);}
+.chain .node.active{border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent-dim) inset;}
+.chain .arrow{color:var(--muted-2);}
+
+/* Readonly inputs */
+input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
+
+/* Dropzones y Slots de Medios (4 Imágenes + 1 Vídeo) */
+.media-grid-4{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;}
+.media-slot{position:relative;border:1.5px dashed var(--border);border-radius:7px;background:var(--panel-2);min-height:115px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;padding:6px;transition:border-color .15s,background .15s;}
+.media-slot.drag{border-color:var(--accent);background:var(--accent-dim);}
+.media-slot-header{width:100%;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-family:var(--mono);font-size:10px;color:var(--muted);z-index:2;}
+.media-slot-badge{color:var(--accent);font-weight:600;}
+.media-slot-del{background:rgba(0,0,0,.7);border:1px solid var(--border);color:#fff;border-radius:50%;width:20px;height:20px;font-size:10px;cursor:pointer;display:none;align-items:center;justify-content:center;line-height:1;}
+.media-slot:hover .media-slot-del{display:flex;}
+.media-slot-del:hover{background:#ff4757;border-color:#ff4757;}
+.media-slot img{max-width:100%;max-height:120px;object-fit:contain;border-radius:4px;display:block;margin:0 auto;}
+.media-slot video{max-width:100%;max-height:120px;object-fit:contain;border-radius:4px;background:#000;display:block;margin:0 auto;}
+.media-slot .ph{font-family:var(--mono);font-size:10px;letter-spacing:.03em;color:var(--muted);padding:14px 4px;text-align:center;}
+.media-slot input[type="file"]{display:none;}
+.media-slot-info{font-family:var(--mono);font-size:9.5px;color:var(--muted-2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+
+/* Video Slot dedicado */
+.video-slot-wrap{margin-top:8px;border:1.5px dashed var(--border);border-radius:7px;background:var(--panel-2);padding:8px;cursor:pointer;transition:border-color .15s,background .15s;position:relative;}
+.video-slot-wrap.drag{border-color:var(--accent);background:var(--accent-dim);}
+.video-slot-wrap .ph{font-family:var(--mono);font-size:10.5px;color:var(--muted);padding:10px 4px;text-align:center;}
+.video-slot-wrap input[type="file"]{display:none;}
+.video-slot-wrap video{max-width:100%;max-height:140px;object-fit:contain;background:#000;border-radius:4px;display:block;margin:0 auto;}
+
+/* Reproductores y Vidbox */
+.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;position:relative;contain:layout style;margin-bottom:12px;}
+.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;}
+.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;flex:1;}
+.vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
+.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
+.vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;gap:10px;flex-wrap:wrap;}
+.res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
+
+/* Video element */
+video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh;will-change:contents;min-height:140px;}
+.video-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin-bottom:6px;pointer-events:none;}
+
+.empty{height:140px;}
+
+/* Fullscreen vidbox */
+.vidbox:fullscreen, .vidbox:-webkit-full-screen, .vidbox:-moz-full-screen {
+  width: 100vw !important; height: 100vh !important; max-height: none !important;
+  background: #000; border: none; border-radius: 0; padding: 0; position: fixed; top: 0; left: 0; z-index: 9999;
+}
+.vidbox:fullscreen video, .vidbox:-webkit-full-screen video, .vidbox:-moz-full-screen video {
+  width: 100%; height: 100%; object-fit: contain; max-height: none; border-radius: 0;
+}
+.vidbox:fullscreen .vid-header, .vidbox:fullscreen .vid-footer, .vidbox:fullscreen .empty {
+  display: none !important;
+}
+
+/* Tabs para seleccionar vista de reproductor */
+.vid-view-tabs{display:flex;gap:4px;margin-bottom:10px;background:var(--panel-2);padding:3px;border-radius:6px;border:1px solid var(--border);}
+.vid-view-tab{flex:1;text-align:center;padding:5px 8px;font-family:var(--mono);font-size:10.5px;color:var(--muted);border-radius:4px;cursor:pointer;transition:all .15s;}
+.vid-view-tab.active{background:var(--panel);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.3);}
+
+/* Dual prompt tweaks */
+.prompt-box{position:relative;margin-bottom:8px;}
+.prompt-box-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-family:var(--mono);font-size:10px;color:var(--muted);}
+.prompt-box-header span.badge{color:var(--accent);}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>MMH3X2 <span>//</span> panel pro</h1><div class="sub">grafo: MMH3X2_4IMG</div></div>
+  <div class="chain" id="chain">
+    <div class="node" data-n="img">4 imgs + 1 vid</div><div class="arrow">→</div>
+    <div class="node" data-n="seg1">seg 1</div><div class="arrow">→</div>
+    <div class="node" data-n="seg2">seg 2</div><div class="arrow">→</div>
+    <div class="node" data-n="blend">blend</div><div class="arrow">→</div>
+    <div class="node" data-n="rtx">rtx 2x</div><div class="arrow">→</div>
+    <div class="node" data-n="rife">rife x2/x4</div><div class="arrow">→</div>
+    <div class="node" data-n="out">final</div>
+  </div>
+
+  <div class="grid">
+    <div class="controls-col">
+            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="promptLibToggle">
+          <span class="arrow">▶</span> Biblioteca de Prompts
+        </div>
+        <div class="collapsible-body" id="promptLibBody">
+          <div id="promptTree" class="prompt-tree"></div>
+          <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnMovePrompt" class="ghost">Mover</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
+          <div class="prompt-actions"><button id="btnExportPrompts" class="ghost">Exportar</button><button id="btnImportPrompts" class="ghost">Importar</button></div>
+          <div class="hint" style="font-size:10px;margin-top:4px;">Usa <code style="color:var(--accent)">/</code> para clasificar: <code>casa/pasillo/noche</code> (los dos primeros son carpetas)</div>
+        </div>
+      </div>
+
+      <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
+
+      <!-- ENHANCER PANEL -->
+      <div class="panel">
+        <div class="collapsible-header" id="enhancerToggle">
+          <span class="arrow">▶</span> Mejorar prompt con IA
+        </div>
+        <div class="collapsible-body" id="enhancerBody">
+          <div class="enhancer-row">
+            <label>Modelo</label>
+            <select id="enhancerModel"><option value="">Cargando modelos...</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="enhancerMode"><option value="text">Texto</option><option value="vision">Visión</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Estilo</label>
+            <select id="enhancerStyle"></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Cadena de mejora</label>
+            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">Ollama</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Temperatura LTX2 <span class="hint">(Generate LTX2 Prompt)</span></label>
+            <div class="slider-row"><input type="range" id="ltx2Temperature" min="0" max="1.5" step="0.05" value="0.7"><div class="slider-val" id="ltx2TemperatureVal">0.70</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Seed LTX2</label>
+            <input type="number" id="ltx2Seed" value="2" step="1">
+          </div>
+          <div class="enhancer-row">
+            <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
+          </div>
+          <div class="enhancer-row">
+            <label>Cadena Ollama + LTX2 <span class="hint">(comparativa)</span></label>
+            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt de Ollama y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
+          </div>
+          <div class="enhancer-row">
+            <label>Resultado Ollama</label>
+            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado de Ollama aparecerá aquí..."></textarea>
+          </div>
+          <div class="enhancer-actions">
+            <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
+            <button id="btnSaveEnhanced">Guardar en biblioteca</button>
+            <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROMPT 2: SEGMENTO 2 / CONTINUACIÓN -->
+      <div class="panel">
+        <h2>Prompt 2 · Segmento 2 (Continuación)</h2>
+        <div class="row">
+          <textarea id="prompt2" placeholder="Describe la acción o evolución de la escena en el segundo segmento..."></textarea>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button id="btnPrompt2FromEnhancer" class="ghost btn-mini" title="Copiar el texto mejorado por Ollama a este Prompt 2">📋 Pegar de Enhancer</button>
+          <button id="btnClearPrompt2" class="ghost btn-mini" title="Limpiar Prompt 2">✕ Limpiar</button>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Modo de continuidad en grafo</label>
+          <select id="seg2PromptMode">
+            <option value="direct" selected>Directo (usar este texto tal cual)</option>
+            <option value="ollama">Asistido (Ollama en grafo: fusiona visión + texto)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- MEDIOS DE ENTRADA: 4 IMÁGENES + 1 VÍDEO -->
+      <div class="panel">
+        <h2>Imágenes de Referencia (Hasta 4)</h2>
+        <div class="hint" style="font-size:10px;margin-bottom:6px;">Arrastra o haz clic en cada recuadro. Arrastra entre slots o desde el historial para intercambiar.</div>
+        <div class="media-grid-4">
+          <!-- IMAGEN 1: Base Seg 1 -->
+          <div class="media-slot" id="slotImg1" data-slot="1">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 1 · Base Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg1" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput1" accept="image/*">
+            <div class="ph" id="phImg1">arrastra o clic<br><span class="hint">(inicio seg 1)</span></div>
+            <img id="previewSlotImg1" style="display:none;" alt="Img 1">
+            <div class="media-slot-info" id="infoImg1"></div>
+          </div>
+
+          <!-- IMAGEN 2: Ref Seg 1 -->
+          <div class="media-slot" id="slotImg2" data-slot="2">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 2 · Ref Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg2" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput2" accept="image/*">
+            <div class="ph" id="phImg2">arrastra o clic<br><span class="hint">(ref seg 1)</span></div>
+            <img id="previewSlotImg2" style="display:none;" alt="Img 2">
+            <div class="media-slot-info" id="infoImg2"></div>
+          </div>
+
+          <!-- IMAGEN 3: Ref Seg 2 -->
+          <div class="media-slot" id="slotImg3" data-slot="3">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 3 · Ref Seg 2</span>
+              <button class="media-slot-del" id="btnDelImg3" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput3" accept="image/*">
+            <div class="ph" id="phImg3">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
+            <img id="previewSlotImg3" style="display:none;" alt="Img 3">
+            <div class="media-slot-info" id="infoImg3"></div>
+          </div>
+
+          <!-- IMAGEN 4: Ref Seg 2 -->
+          <div class="media-slot" id="slotImg4" data-slot="4">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 4 · Ref Seg 2</span>
+              <button class="media-slot-del" id="btnDelImg4" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput4" accept="image/*">
+            <div class="ph" id="phImg4">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
+            <img id="previewSlotImg4" style="display:none;" alt="Img 4">
+            <div class="media-slot-info" id="infoImg4"></div>
+          </div>
+        </div>
+
+        <!-- VÍDEO DE ENTRADA / REFERENCIA -->
+        <div style="margin-top:10px;">
+          <label style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Vídeo de Referencia para Seg 2 <span class="hint">(Opcional)</span></label>
+          <div class="video-slot-wrap" id="slotVid">
+            <input type="file" id="fileInputVid" accept="video/mp4,video/webm,video/quicktime">
+            <div class="ph" id="phVid">Vacío = usa automáticamente los últimos 2s generados del Seg 1.<br><span style="color:var(--accent);">Arrastra o haz clic aquí para subir un vídeo externo.</span></div>
+            <video id="previewSlotVid" controls muted loop style="display:none;"></video>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+              <span class="media-slot-info" id="infoVid"></span>
+              <button class="ghost btn-mini" id="btnDelVid" style="display:none;">✕ Quitar vídeo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEMILLA -->
+      <div class="panel">
+        <h2>Semilla</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRandom">Aleatoria</div>
+          <div class="seg" id="segFixed">Fija</div>
+        </div>
+        <input type="number" id="seedVal" value="12345" step="1" disabled>
+      </div>
+
+      <!-- RESOLUCIÓN & DURACIÓN -->
+      <div class="panel">
+        <h2>Resolución &amp; Duración</h2>
+        <div class="row slider-row">
+          <label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label>
+          <input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.70">
+          <div class="slider-val" id="mpVal">0.70</div>
+        </div>
+        <div class="row two-col">
+          <div><label>Ancho</label><input type="number" id="width" value="1152" step="32" min="256" class="ro" readonly></div>
+          <div><label>Alto</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div>
+        </div>
+        <div class="row slider-row">
+          <label>Duración por segmento <span class="hint" id="durHint">(5.0s → 124 frames)</span></label>
+          <input type="range" id="durationSlider" min="1.0" max="8.0" step="0.5" value="5.0">
+          <div class="slider-val" id="durationVal">5.0s</div>
+        </div>
+        <div class="hint" id="totalFramesHint" style="margin-top:2px;font-size:10.5px;color:var(--accent);">
+          Total: 2 segmentos x 124f = 248 frames (~10.0s)
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Batch Size (Variantes)</label>
+          <input type="number" id="batchSize" value="1" min="1" max="8">
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
+          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
+        </div>
+      </div>
+
+      <!-- MUESTREO (SAMPLER & STEPS) -->
+      <div class="panel">
+        <h2>Muestreo (Sampler &amp; Steps)</h2>
+        <div class="row slider-row">
+          <label>Pasos (Steps)</label>
+          <input type="range" id="stepsSlider" min="4" max="40" step="1" value="20">
+          <div class="slider-val" id="stepsVal">20</div>
+        </div>
+        <div class="row two-col">
+          <div>
+            <label>Sampler</label>
+            <select id="samplerName">
+              <option value="res_multistep" selected>res_multistep</option>
+              <option value="res_multistep_cfg">res_multistep_cfg</option>
+              <option value="euler">euler</option>
+              <option value="euler_ancestral">euler_ancestral</option>
+              <option value="dpmpp_2m">dpmpp_2m</option>
+            </select>
+          </div>
+          <div>
+            <label>Scheduler</label>
+            <select id="schedulerName">
+              <option value="simple" selected>simple</option>
+              <option value="sgm_uniform">sgm_uniform</option>
+              <option value="normal">normal</option>
+              <option value="ddim_uniform">ddim_uniform</option>
+              <option value="beta">beta</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODELOS & LORAS -->
+      <div class="panel">
+        <h2>Modelos &amp; LoRAs</h2>
+        <div class="row">
+          <label>UNet / Diffusion Model</label>
+          <select id="unetModel"><option value="">Cargando modelos...</option></select>
+        </div>
+        <div class="row">
+          <label>CLIP / Text Encoder</label>
+          <select id="clipModel"><option value="">Cargando CLIPs...</option></select>
+        </div>
+
+        <!-- LoRA 1 -->
+        <div class="lora-slot" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="lora1Toggle"> <span>LoRA 1</span>
+            </label>
+          </div>
+          <select id="lora1Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
+          <div class="slider-row" style="margin-top:4px;">
+            <label style="font-size:10px;">Fuerza</label>
+            <input type="range" id="lora1Strength" min="0" max="2" step="0.05" value="1.0">
+            <div class="slider-val" id="lora1StrengthVal">1.00</div>
+          </div>
+        </div>
+
+        <!-- LoRA 2 -->
+        <div class="lora-slot" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="lora2Toggle"> <span>LoRA 2</span>
+            </label>
+          </div>
+          <select id="lora2Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
+          <div class="slider-row" style="margin-top:4px;">
+            <label style="font-size:10px;">Fuerza</label>
+            <input type="range" id="lora2Strength" min="0" max="2" step="0.05" value="1.0">
+            <div class="slider-val" id="lora2StrengthVal">1.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTIMIZACIONES H3 -->
+      <div class="panel">
+        <div class="collapsible-header" id="h3OptToggle">
+          <span class="arrow">▶</span> Optimizaciones H3 (Transformer &amp; Memoria)
+        </div>
+        <div class="collapsible-body" id="h3OptBody">
+          <div class="row">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="h3SparseToggle" checked> <span>H3 Sparse Attention</span>
+            </label>
+            <div class="slider-row" style="margin-top:6px;">
+              <label style="font-size:10px;">Video Budget</label>
+              <input type="range" id="h3BudgetSlider" min="0.1" max="1.0" step="0.05" value="0.30">
+              <div class="slider-val" id="h3BudgetVal">0.30</div>
+            </div>
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px;font-size:11px;">
+              <input type="checkbox" id="h3EarlyLateToggle" checked> <span>Denser Early / Late Steps</span>
+            </label>
+          </div>
+
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="h3MemToggle" checked> <span>H3 Memory Optimization</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Fused QKV, QKV Streaming, Chunk rows y protección de precisión de pesos.</div>
+          </div>
+
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label>H3 Sigma Shift</label>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Shift Vídeo</label>
+              <input type="range" id="h3ShiftVideo" min="0.5" max="2.0" step="0.05" value="1.0">
+              <div class="slider-val" id="h3ShiftVideoVal">1.00</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Shift Audio</label>
+              <input type="range" id="h3ShiftAudio" min="0.5" max="2.0" step="0.05" value="1.0">
+              <div class="slider-val" id="h3ShiftAudioVal">1.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POSTPROCESADO: RTX SUPER RESOLUTION & RIFE -->
+      <div class="panel">
+        <div class="collapsible-header open" id="postprocToggle">
+          <span class="arrow">▼</span> Postprocesado (RTX Upscaler &amp; RIFE)
+        </div>
+        <div class="collapsible-body open" id="postprocBody">
+          <!-- RTX Video Super Resolution -->
+          <div class="row">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution (2x ULTRA)</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Escala por hardware con Tensor Cores manteniendo detalles nítidos.</div>
+          </div>
+
+          <!-- RIFE Frame Interpolation -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="rifeToggle" checked> <span>Interpolación de Frames (RIFE)</span>
+            </label>
+            <div class="row two-col" style="margin-top:6px;">
+              <div>
+                <label style="font-size:10px;">Multiplicador</label>
+                <select id="rifeMultiplier">
+                  <option value="2" selected>2x (25 fps → 50 fps)</option>
+                  <option value="4">4x (25 fps → 100 fps)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:10px;">Modelo RIFE</label>
+                <select id="rifeModel"><option value="rife_v4.26.safetensors">rife_v4.26</option></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suavizado de empalme temporal -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="blendToggle" checked> <span>Suavizar empalme entre segmentos</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Transición temporal suave (VideoTemporalBlend: 4 frames, fuerza 0.35).</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA DE RESULTADOS Y REPRODUCTORES -->
+    <div class="results-col">
+      <!-- TABS DE VISTA DE REPRODUCTORES -->
+      <div class="vid-view-tabs">
+        <div class="vid-view-tab active" data-view="all">Todos los Reproductores</div>
+        <div class="vid-view-tab" data-view="final">Solo Vídeo Final</div>
+        <div class="vid-view-tab" data-view="seg1">Solo Seg 1</div>
+        <div class="vid-view-tab" data-view="seg2">Solo Seg 2</div>
+      </div>
+
+      <!-- REPRODUCTOR FINAL (CONTINUO CON RTX + RIFE) -->
+      <div class="vidbox" id="boxFinal">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Final Continuo</em> (Seg 1 + Seg 2 + RTX + RIFE)</h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptyFinal">sin generar</div>
+        <span class="video-badge" id="badgeFinal"></span>
+        <video id="videoFinal" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeFinal"></span>
+          <span class="res-tag" id="resFinal"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR SEGMENTO 1 -->
+      <div class="vidbox" id="boxSeg1">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Segmento 1</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadSeg1" title="Descargar segmento 1" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameSeg1" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaSeg1" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptySeg1">sin generar</div>
+        <img class="preview-img" id="previewImgSeg1" style="display:none;" alt="Vista previa Seg 1">
+        <video class="preview-img" id="previewVideoSeg1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        <span class="video-badge" id="badgeSeg1"></span>
+        <video id="videoSeg1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeSeg1"></span>
+          <span class="res-tag" id="resSeg1"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR SEGMENTO 2 -->
+      <div class="vidbox" id="boxSeg2">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Segmento 2</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadSeg2" title="Descargar segmento 2" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameSeg2" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaSeg2" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptySeg2">sin generar</div>
+        <img class="preview-img" id="previewImgSeg2" style="display:none;" alt="Vista previa Seg 2">
+        <video class="preview-img" id="previewVideoSeg2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        <span class="video-badge" id="badgeSeg2"></span>
+        <video id="videoSeg2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeSeg2"></span>
+          <span class="res-tag" id="resSeg2"></span>
+        </div>
+      </div>
+
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+
+      <!-- PANEL DE EJECUCIÓN Y COLAS -->
+      <div class="panel" style="margin-bottom:0;">
+        <h2>Ejecución</h2>
+        <div class="btn-row">
+          <button id="btnFull" class="primary" style="flex:2;">⚡ Generar Completo (Seg 1 + Seg 2 + Final)</button>
+          <button id="btnSeg1" style="flex:1;">Solo Seg 1</button>
+          <button id="btnSeg2" style="flex:1;">Solo Seg 2 + Final</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button id="btnStopVideo" disabled>Parar actual</button>
+          <button id="btnStopAll" class="danger" disabled>Parar todo</button>
+          <button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
+        </div>
+        <div class="queue-status-box">
+          <div class="queue-header">
+            <span>COLA DE GENERACIÓN</span>
+            <span id="queueCountBadge" class="queue-badge">0 tareas</span>
+          </div>
+          <div class="queue-items-list" id="queueList"></div>
+        </div>
+      </div>
+
+      <!-- HISTORIAL DE VÍDEOS -->
+      <div class="vidbox" id="videoHistoryBox" style="margin-top:12px;">
+        <div class="vid-header">
+          <h3>Historial de Vídeos <span id="historyCountBadge" style="color:var(--accent);font-size:10px;">(0)</span></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnRefreshHistory" title="Refrescar historial">↻ Refrescar</button>
+          </div>
+        </div>
+        <div class="hint" id="historyHint" style="font-size:10px;margin-bottom:6px;">Vídeos generados recientemente. Haz clic en un vídeo para cargarlo en el reproductor principal.</div>
+        <div class="variant-grid" id="videoHistoryGrid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+const BASE_GRAPH = {
+  "1": {
+    "inputs": {
+      "unet_name": "Ligazón para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet (MiniMax H3)"
+    }
+  },
+  "2": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "Kitchen Attention"
+    }
+  },
+  "4": {
+    "inputs": {
+      "video_budget": 0.3,
+      "denser_early_late_steps": false,
+      "model": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "H3SparseAttention",
+    "_meta": {
+      "title": "Sparse Attention 0.3"
+    }
+  },
+  "5": {
+    "inputs": {
+      "shift_video": 12,
+      "shift_audio": 3,
+      "model": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3SigmaShift",
+    "_meta": {
+      "title": "Sigma Shift"
+    }
+  },
+  "6": {
+    "inputs": {
+      "fused_qkv": "auto",
+      "mlp_memory": "auto",
+      "chunk_rows": 4096,
+      "preserve_precision": true,
+      "precision_mode": "Auto",
+      "qkv_streaming_mode": "Auto",
+      "embedding_memory_mode": "Auto",
+      "kitchen_v_memory_mode": "Standard",
+      "model": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "H3MemoryOptimization",
+    "_meta": {
+      "title": "Memory Optimization"
+    }
+  },
+  "7": {
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIP (MiniMax H3)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "vae_name": "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE Video"
+    }
+  },
+  "9": {
+    "inputs": {
+      "vae_name": "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE Audio"
+    }
+  },
+  "10": {
+    "inputs": {
+      "image": "1756002-sab, a beautiful tanned, tattooed brunet-flux2Krea2_Turbo_convrot_int8mixed.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "First Frame (i2v ref)"
+    }
+  },
+  "12": {
+    "inputs": {
+      "value": 12
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "Duration (s)"
+    }
+  },
+  "13": {
+    "inputs": {
+      "expression": "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Frames (17k+5)"
+    }
+  },
+  "14": {
+    "inputs": {
+      "prompt": [
+        "50",
+        0
+      ],
+      "width": [
+        "78",
+        0
+      ],
+      "height": [
+        "78",
+        1
+      ],
+      "length": [
+        "13",
+        1
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "7",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ],
+      "audio_vae": [
+        "9",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "10",
+        0
+      ],
+      "ref_images.ref_image_1": [
+        "81",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "Segment 1 (i2v)"
+    }
+  },
+  "15": {
+    "inputs": {
+      "noise_seed": 406350973583595
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "Seed"
+    }
+  },
+  "16": {
+    "inputs": {
+      "model": [
+        "6",
+        0
+      ],
+      "conditioning": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Guider 1"
+    }
+  },
+  "17": {
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "Sampler 1"
+    }
+  },
+  "18": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "79",
+        0
+      ],
+      "denoise": 1,
+      "model": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "Scheduler 1 (8 steps)"
+    }
+  },
+  "19": {
+    "inputs": {
+      "noise": [
+        "15",
+        0
+      ],
+      "guider": [
+        "16",
+        0
+      ],
+      "sampler": [
+        "17",
+        0
+      ],
+      "sigmas": [
+        "18",
+        0
+      ],
+      "latent_image": [
+        "14",
+        1
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "Sampler Custom 1"
+    }
+  },
+  "20": {
+    "inputs": {
+      "samples": [
+        "19",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decode Video 1"
+    }
+  },
+  "21": {
+    "inputs": {
+      "samples": [
+        "19",
+        0
+      ],
+      "vae": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "Decode Audio 1"
+    }
+  },
+  "22": {
+    "inputs": {
+      "fps": [
+        "75",
+        0
+      ],
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "images": [
+        "20",
+        0
+      ],
+      "audio": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Video Seg 1"
+    }
+  },
+  "23": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_seg1",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Seg 1"
+    }
+  },
+  "25": {
+    "inputs": {
+      "indexes": "-48, -47, -46, -45, -44, -43, -42, -41, -40, -39, -38, -37, -36, -35, -34, -33, -32, -31, -30, -29, -28, -27, -26, -25, -24, -23, -22, -21, -20, -19, -18, -17, -16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "GetImagesFromBatchIndexed",
+    "_meta": {
+      "title": "Last 48 frames (2s)"
+    }
+  },
+  "26": {
+    "inputs": {
+      "indexes": "-1",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "GetImagesFromBatchIndexed",
+    "_meta": {
+      "title": "Last frame (full res)"
+    }
+  },
+  "27": {
+    "inputs": {
+      "num_columns": 8,
+      "match_image_size": false,
+      "max_resolution": 4096,
+      "images": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "ImageConcatFromBatch",
+    "_meta": {
+      "title": "Grid 48 refs"
+    }
+  },
+  "28": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_cont_lastframe",
+      "images": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save last frame"
+    }
+  },
+  "29": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_cont_refgrid",
+      "images": [
+        "27",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save ref grid"
+    }
+  },
+  "30": {
+    "inputs": {
+      "prompt": [
+        "55",
+        0
+      ],
+      "width": [
+        "78",
+        0
+      ],
+      "height": [
+        "78",
+        1
+      ],
+      "length": [
+        "13",
+        1
+      ],
+      "ref_image_size": "match",
+      "clip": [
+        "7",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ],
+      "audio_vae": [
+        "9",
+        0
+      ],
+      "ref_images.ref_image_0": [
+        "26",
+        0
+      ],
+      "ref_images.ref_image_1": [
+        "82",
+        0
+      ],
+      "ref_images.ref_image_2": [
+        "83",
+        0
+      ],
+      "ref_videos.ref_video_0": [
+        "54",
+        0
+      ],
+      "ref_video_audios.ref_video_audio_0": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3ReferenceToVideo",
+    "_meta": {
+      "title": "Segment 2 (r2v)"
+    }
+  },
+  "32": {
+    "inputs": {
+      "model": [
+        "6",
+        0
+      ],
+      "conditioning": [
+        "70",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Guider 2"
+    }
+  },
+  "33": {
+    "inputs": {
+      "sampler_name": "res_multistep"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "Sampler 2"
+    }
+  },
+  "34": {
+    "inputs": {
+      "scheduler": "simple",
+      "steps": [
+        "79",
+        0
+      ],
+      "denoise": 1,
+      "model": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "Scheduler 2 (denoise 0.95)"
+    }
+  },
+  "35": {
+    "inputs": {
+      "noise": [
+        "15",
+        0
+      ],
+      "guider": [
+        "32",
+        0
+      ],
+      "sampler": [
+        "33",
+        0
+      ],
+      "sigmas": [
+        "34",
+        0
+      ],
+      "latent_image": [
+        "68",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "Sampler Custom 2"
+    }
+  },
+  "36": {
+    "inputs": {
+      "samples": [
+        "35",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "Decode Video 2"
+    }
+  },
+  "37": {
+    "inputs": {
+      "samples": [
+        "35",
+        0
+      ],
+      "vae": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "VAEDecodeAudio",
+    "_meta": {
+      "title": "Decode Audio 2"
+    }
+  },
+  "38": {
+    "inputs": {
+      "fps": [
+        "75",
+        0
+      ],
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "images": [
+        "36",
+        0
+      ],
+      "audio": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Video Seg 2"
+    }
+  },
+  "39": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_seg2",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "38",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Seg 2"
+    }
+  },
+  "40": {
+    "inputs": {
+      "inputcount": 2,
+      "Update inputs": null,
+      "image_1": [
+        "61",
+        0
+      ],
+      "image_2": [
+        "66",
+        0
+      ]
+    },
+    "class_type": "ImageBatchMulti",
+    "_meta": {
+      "title": "Union directa (587f)"
+    }
+  },
+  "41": {
+    "inputs": {
+      "direction": "after",
+      "audio1": [
+        "65",
+        0
+      ],
+      "audio2": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "AudioConcat",
+    "_meta": {
+      "title": "Merge audio"
+    }
+  },
+  "42": {
+    "inputs": {
+      "fps": [
+        "76",
+        0
+      ],
+      "bit_depth": 8,
+      "color_space": "sRGB",
+      "images": [
+        "72",
+        0
+      ],
+      "audio": [
+        "41",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Video Final"
+    }
+  },
+  "43": {
+    "inputs": {
+      "filename_prefix": "video/MiniMax_H3_cont",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Final"
+    }
+  },
+  "50": {
+    "inputs": {
+      "value": "A continuous video shot of the tattooed woman as in image 1, standing up from her wooden stool and walking forward with a confident, rhythmic stride toward the lens. The camera performs a seamless dolly-back movement, retreating at the same pace as her walk to maintain a steady medium shot as in image 2. Her long brown hair sways gently with each step, and the fabric of her black dress ripples subtly. In the background, the warm glow of the hanging lanterns flickers slightly, and the soft light of the setting sun creates a shimmering halo around her silhouette as she advances through the rustic tropical setting.\noverall_soundscape: The waves and the wind shaking the palm trees, some seagulls chirping, the woman's footsteps on the sand, the murmur of the swimmers walking.\nnon_diegetic_music:N/A"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt original (fuente unica)"
+    }
+  },
+  "51": {
+    "inputs": {
+      "url": "http://127.0.0.1:11434",
+      "model": "baytout3/ultragemma4-12b-heretic-uncensored:Q8_0",
+      "keep_alive": 0,
+      "keep_alive_unit": "minutes"
+    },
+    "class_type": "OllamaConnectivityV2",
+    "_meta": {
+      "title": "Ollama"
+    }
+  },
+  "53": {
+    "inputs": {
+      "system": "You are a video continuation prompt writer for MiniMax H3. You receive the prompt of the first segment followed by a 'Next segment direction' instruction written by the director. Fuse BOTH into one new prompt for the next segment: keep the base scene (subject, style, lighting, camera language, audio direction) from the original prompt, and make the director's direction the main driver of the new action, advancing naturally from where the first segment ends. The next segment will use the last frame and the last two seconds of the previous segment as image and video references, so do not re-describe what is already visible. Output ONLY the continuation prompt, with no preamble, quotes or explanation.",
+      "prompt": [
+        "59",
+        0
+      ],
+      "think": false,
+      "format": "text",
+      "reset_session": false,
+      "connectivity": [
+        "51",
+        0
+      ],
+      "options": [
+        "86",
+        0
+      ]
+    },
+    "class_type": "OllamaChat",
+    "_meta": {
+      "title": "LLM 1: Continuation"
+    }
+  },
+  "54": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "scale_by": 0.5,
+      "image": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "ImageScaleBy",
+    "_meta": {
+      "title": "Scale 2s to half"
+    }
+  },
+  "55": {
+    "inputs": {
+      "system": "You are a video continuation prompt writer for MiniMax H3. You are shown a sequence of frames from the LAST TWO SECONDS of the previous video segment. You also receive a draft continuation prompt. First, briefly describe what is happening in the frames: subject, motion, camera movement, lighting, and audio. Then fuse that description with the draft continuation prompt into ONE final prompt for the next segment. The next segment will use these frames as video reference and the last frame as image reference, so do not re-describe what is already visible; describe the evolution: new motion, new events, continued camera movement, and audio continuity. Output ONLY the final fused prompt, with no preamble, quotes or explanation.",
+      "prompt": [
+        "53",
+        0
+      ],
+      "think": false,
+      "format": "text",
+      "reset_session": false,
+      "connectivity": [
+        "51",
+        0
+      ],
+      "options": [
+        "86",
+        0
+      ],
+      "images": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "OllamaChat",
+    "_meta": {
+      "title": "LLM 2: Vision + Fusion"
+    }
+  },
+  "57": {
+    "inputs": {
+      "indexes": "-48, -44, -40, -36, -32, -28, -24, -20, -16, -12, -8, -4",
+      "images": [
+        "54",
+        0
+      ]
+    },
+    "class_type": "GetImagesFromBatchIndexed",
+    "_meta": {
+      "title": "Sample 12 frames (vision)"
+    }
+  },
+  "58": {
+    "inputs": {
+      "value": "The woman stops, takes off her dress, as image 1, and walks to the shore until he finds a man lying down and slowly sits down inserting the man's penis into his anus, as in image 2, having intense anal sex. The camera keeps framing her completely.\noverall_soundscape: The waves and the wind shaking the palm trees, some seagulls chirping, the woman's footsteps on the sand, the murmur of the swimmers walking\nnon_diegetic_music:N/A"
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt guiado seg2 (nueva accion)"
+    }
+  },
+  "59": {
+    "inputs": {
+      "string_a": [
+        "50",
+        0
+      ],
+      "string_b": [
+        "58",
+        0
+      ],
+      "delimiter": "\n\nNext segment direction (must be respected): "
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Base + guia seg2"
+    }
+  },
+  "61": {
+    "inputs": {
+      "indexes": "0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292",
+      "images": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "GetImagesFromBatchIndexed",
+    "_meta": {
+      "title": "Seg1 sin ultimo frame (293f)"
+    }
+  },
+  "64": {
+    "inputs": {
+      "indexes": "0",
+      "mode": "replace",
+      "original_images": [
+        "36",
+        0
+      ],
+      "images_to_insert": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "InsertImagesToBatchIndexed",
+    "_meta": {
+      "title": "Seg2 frame0 = frame real"
+    }
+  },
+  "65": {
+    "inputs": {
+      "start_index": 0.0417,
+      "duration": 12.2083,
+      "audio": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "TrimAudioDuration",
+    "_meta": {
+      "title": "Audio seg1 sin 1/24s"
+    }
+  },
+  "66": {
+    "inputs": {
+      "blend_strength": 0.35,
+      "blend_frames": 4,
+      "mode": "transition_only",
+      "video": [
+        "64",
+        0
+      ]
+    },
+    "class_type": "VideoTemporalBlend",
+    "_meta": {
+      "title": "Suavizar empalme (4f)"
+    }
+  },
+  "68": {
+    "inputs": {
+      "av_latent": [
+        "30",
+        1
+      ],
+      "images": [
+        "25",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "H3InjectVideoLatent",
+    "_meta": {
+      "title": "Inyectar 2s reales (img2img)"
+    }
+  },
+  "70": {
+    "inputs": {
+      "frame_idx": 0,
+      "positive": [
+        "30",
+        0
+      ],
+      "latent": [
+        "30",
+        1
+      ],
+      "vae": [
+        "8",
+        0
+      ],
+      "audio_vae": [
+        "9",
+        0
+      ],
+      "image": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "MiniMaxH3AddGuide",
+    "_meta": {
+      "title": "Anclar ultimo frame (frame 0)"
+    }
+  },
+  "71": {
+    "inputs": {
+      "resize_type": "scale by multiplier",
+      "resize_type.scale": 2,
+      "quality": "ULTRA",
+      "images": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "RTXVideoSuperResolution",
+    "_meta": {
+      "title": "RTX Video Super Resolution"
+    }
+  },
+  "72": {
+    "inputs": {
+      "multiplier": [
+        "74",
+        0
+      ],
+      "interp_model": [
+        "73",
+        0
+      ],
+      "images": [
+        "71",
+        0
+      ]
+    },
+    "class_type": "FrameInterpolate",
+    "_meta": {
+      "title": "Run Frame Interpolation Model"
+    }
+  },
+  "73": {
+    "inputs": {
+      "model_name": "rife_v4.26.safetensors"
+    },
+    "class_type": "FrameInterpolationModelLoader",
+    "_meta": {
+      "title": "Load Frame Interpolation Model"
+    }
+  },
+  "74": {
+    "inputs": {
+      "value": 2
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "frame interpolation x"
+    }
+  },
+  "75": {
+    "inputs": {
+      "value": 24
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "fps"
+    }
+  },
+  "76": {
+    "inputs": {
+      "expression": "a * b",
+      "values.a": [
+        "74",
+        0
+      ],
+      "values.b": [
+        "75",
+        0
+      ]
+    },
+    "class_type": "ComfyMathExpression",
+    "_meta": {
+      "title": "Math Expression"
+    }
+  },
+  "77": {
+    "inputs": {
+      "upscale_method": "nearest-exact",
+      "megapixels": 0.7,
+      "resolution_steps": 32,
+      "image": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "ImageScaleToTotalPixels",
+    "_meta": {
+      "title": "Scale Image to Total Pixels"
+    }
+  },
+  "78": {
+    "inputs": {
+      "image": [
+        "77",
+        0
+      ]
+    },
+    "class_type": "GetImageSize",
+    "_meta": {
+      "title": "Get Image Size"
+    }
+  },
+  "79": {
+    "inputs": {
+      "value": 6
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "steps"
+    }
+  },
+  "81": {
+    "inputs": {
+      "image": "1204002-Wide angle shot of sab, a spanish woman-flux2Krea2_Turbo_convrot_int8mixed.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "82": {
+    "inputs": {
+      "image": "1738001-Wide angle shot of sab, a nude spanish w-flux2krea2_turbo_fp8_scaled.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "83": {
+    "inputs": {
+      "image": "2239001-eva, a young woman with long dark brown-flux2Krea2_Turbo_convrot_int8mixed.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "84": {
+    "inputs": {
+      "text_0": "A continuous video shot opens with the tattooed woman as in image 1, rising from her wooden stool and immediately stepping forward with a confident, rhythmic stride toward the lens. The camera smoothly executes a seamless dolly-back movement, retreating perfectly matched to her pace, maintaining a steady medium shot as she advances. Her long brown hair sways gracefully with each step, and the black fabric of her dress ripples subtly, brilliantly catching the soft, shimmering halo cast by the setting sun. She stops her stride, and in a deliberate, unhurried motion, she pulls her dress down past her hips, allowing the fabric to fall softly to the sand. The camera simultaneously transitions to a wider, full-body frame, ensuring she is captured completely. She turns and begins walking toward the shoreline, her bare feet sinking gently into the sand, bathed in the golden-hour glow. Reaching the water's edge, she spots a man lying down, and proceeds to approach him. Instead of simply dropping, she *slowly* lowers herself down, deliberately settling onto the man's hips, positioning herself to insert his penis into her anus. The camera maintains a consistent, full-body frame, perfectly capturing the slow, sensual onset of their intense anal sex. Her initial movements are measured and controlled before transitioning into a deep, rhythmic, powerful thrust. The scene is steeped in the warm, hazy atmosphere of the tropical sunset, with the gentle foam of the waves providing a perfect foreground contrast.\noverall_soundscape: The waves and the wind shaking the palm trees, some seagulls chirping, the woman's footsteps on the sand, the murmur of the swimmers walking.\nnon_diegetic_music: N/A",
+      "text": [
+        "53",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  },
+  "85": {
+    "inputs": {
+      "text_0": "The tattooed woman continues the powerful, deep, rhythmic thrusting over the man, maintaining the fixed, wide full-body frame that perfectly captures the intensity and geometry of their coupling. Her movements are relentless and deliberate, driving the action forward. The golden-hour light deepens, transforming the scene into a molten gold wash; it intensely catches the glistening sheen of her skin, highlighting the definition of her muscles, and casts rich, long shadows across the wet, textured sand. The gentle foam of the waves continues to lap, sometimes creeping higher to meet their calves. The sequence remains captured in a highly fluid slow-motion style, emphasizing the profound tactile intimacy and the heavy, sensual weight of each connection. Audio continues with the resonant, steady rhythm of the crashing waves, the steady sibilance of the wind through the palm fronds, occasional clear seagulls calls, the crisp sound of her bare feet shifting slightly in the sand, and, most prominently, the deep, wet *squish* and *slap* of their skin during the powerful thrusts.",
+      "text": [
+        "55",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Show Text 🐍"
+    }
+  },
+  "86": {
+    "inputs": {
+      "enable_mirostat": false,
+      "mirostat": 0,
+      "enable_mirostat_eta": false,
+      "mirostat_eta": 0.1,
+      "enable_mirostat_tau": false,
+      "mirostat_tau": 5,
+      "enable_num_ctx": true,
+      "num_ctx": 32768,
+      "enable_repeat_last_n": false,
+      "repeat_last_n": 64,
+      "enable_repeat_penalty": false,
+      "repeat_penalty": 1.1,
+      "enable_temperature": false,
+      "temperature": 0.8,
+      "enable_seed": false,
+      "seed": 1895657022,
+      "enable_stop": false,
+      "stop": "",
+      "enable_tfs_z": false,
+      "tfs_z": 1,
+      "enable_num_predict": false,
+      "num_predict": -1,
+      "enable_top_k": false,
+      "top_k": 40,
+      "enable_top_p": false,
+      "top_p": 0.9,
+      "enable_min_p": false,
+      "min_p": 0,
+      "debug": false
+    },
+    "class_type": "OllamaOptionsV2",
+    "_meta": {
+      "title": "Ollama Options"
+    }
+  },
+  "87": {
+    "inputs": {
+      "purge_cache": true,
+      "purge_models": true,
+      "anything": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "LayerUtility: PurgeVRAM",
+    "_meta": {
+      "title": "LayerUtility: Purge VRAM"
+    }
+  }
+};
+const AVAILABLE_MODELS = [];
+const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MiniMax-H3-Ref2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MysticXXX_MMH3-V4.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
+const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors", "taeltx_2.safetensors"];
+const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_w4a8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
+const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
+const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
+const LTXV_UI_PORT = "8000";
+const MINIMAXH3_UI_PORT = "8002";
+// common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
+//
+// This file is injected BEFORE the UI-specific JS (ltxv.js / krea2.js).
+// All top-level code that uses CONFIG or $ is deferred to initCommon(),
+// which the UI-specific JS calls after defining CONFIG.
+//
+// Required CONFIG fields:
+//   PROMPTS_KEY, LORA_STATE_KEY, ENHANCER_SYSKEY, SERVERURL_KEY,
+//   N, DEFAULT_BACKEND_PORT, UI_TYPE, DEFAULT_MODEL,
+//   ENHANCER_DEFAULT_PROMPTS, loras,
+//   findMedia(nodeOutput), showMedia(slot, media, options),
+//   addToVariantGallery(media, seedValue, timeText, slot, variantIndex),
+//   onSeedUpdate(realSeed),
+//   displayResult(entry, realSeed, tTotal, promptId) -> return value controls post-processing:
+//     - boolean true: skip common finalize (used by LTXV step 1 -> step 2).
+//     - object { skipFinalize: true }: same as boolean true.
+//     - object { foundOutput: false }: no usable media found; do not mark handled,
+//       so pollFallback keeps retrying.
+//     - otherwise (false/undefined): standard finalize.
+//   onPromptError(pid), startNextVariant(index), onBatchComplete(),
+//   onStopCurrent(pid), onStopAll()
+
+const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
+let socket = null;
+let currentBatchIndex = 0;
+let totalBatchSize = 0;
+let variantCounter = 0;
+let pendingSeeds = {};
+let handledPrompts = new Set();
+let processingPrompts = new Set();
+let batchSeedMode = "random";
+let currentPromptId = null;
+let timers = {};
+let loras = [];
+let selectedPromptKey = null;
+let lastPromptDir = "";
+let sysPromptEditData = null;
+let sysPromptEditMode = "text";
+
+const LEGACY_PORTS = ["7822", "7821"];
+let DEFAULT_BACKEND_PORT = "7821";
+const $ = (id) => document.getElementById(id);
+
+// --- TIMERS ---
+function fmtMs(ms){
+  const s = Math.floor(ms / 1000);
+  return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function startTimer(promptId, slot){
+  if(timers[promptId]) return;
+  const t = { start: Date.now(), iv: null };
+  const el = $("time"+slot);
+  t.iv = setInterval(() => {
+    if(!timers[promptId]) return;
+    const live = `⏱ ${fmtMs(Date.now() - t.start)}`;
+    el.textContent = live;
+    el.classList.add("live");
+  }, 500);
+  timers[promptId] = t;
+}
+
+function stopTimer(promptId){
+  const t = timers[promptId];
+  if(!t) return null;
+  const total = Date.now() - t.start;
+  if(t.iv){ clearInterval(t.iv); t.iv = null; }
+  delete timers[promptId];
+  return { total, text: `⏱ ${fmtMs(total)}` };
+}
+
+function discardTimer(promptId){
+  const t = timers[promptId];
+  if(!t) return;
+  if(t.iv) clearInterval(t.iv);
+  delete timers[promptId];
+}
+
+function extractTimings(entry, N){
+  if(!entry || !entry.status) return null;
+  const msgs = entry.status.messages || [];
+  if(!Array.isArray(msgs) || msgs.length === 0) return null;
+
+  let tStart = null, tSuccess = null;
+  const nodeTimes = {};
+  for(const m of msgs){
+    if(!Array.isArray(m) || m.length < 2) continue;
+    const type = m[0];
+    const data = m[1] || {};
+    if(type === "execution_start" && data.timestamp != null){
+      tStart = data.timestamp;
+    } else if(type === "execution_success" && data.timestamp != null){
+      tSuccess = data.timestamp;
+    } else if(type === "executing" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      if(nodeTimes[data.node].start == null) nodeTimes[data.node].start = data.timestamp;
+    } else if(type === "executed" && data.node != null && data.timestamp != null){
+      if(!nodeTimes[data.node]) nodeTimes[data.node] = { start: null, end: null };
+      nodeTimes[data.node].end = data.timestamp;
+    }
+  }
+
+  const total = (tStart != null && tSuccess != null) ? (tSuccess - tStart) : null;
+  const t1 = nodeTimes[N.FIRST_SAVE] && nodeTimes[N.FIRST_SAVE].start != null && nodeTimes[N.FIRST_SAVE].end != null
+             ? (nodeTimes[N.FIRST_SAVE].end - nodeTimes[N.FIRST_SAVE].start) : null;
+  const t2 = nodeTimes[N.FINAL_SAVE] && nodeTimes[N.FINAL_SAVE].start != null && nodeTimes[N.FINAL_SAVE].end != null
+             ? (nodeTimes[N.FINAL_SAVE].end - nodeTimes[N.FINAL_SAVE].start) : null;
+
+  if(total == null && t1 == null && t2 == null) return null;
+  return { t1, t2, total };
+}
+
+// --- SEED ---
+function randomSeed(){
+  return Math.floor(Math.random() * 0x100000000);
+}
+
+// --- SERVER / LOG ---
+function server(){ return $("serverUrl").value.replace(/\/+$/,""); }
+
+async function fetchWithRetry(url, options = {}, attempts = 3, delay = 350){
+  for(let i = 0; i < attempts; i++){
+    try {
+      const res = await fetch(url, options);
+      if(res.status === 502 && i < attempts - 1){
+        await new Promise(r => setTimeout(r, delay * (i + 1)));
+        continue;
+      }
+      return res;
+    } catch(err){
+      if(i < attempts - 1 && err.name !== "AbortError"){
+        await new Promise(r => setTimeout(r, delay * (i + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
+function getFriendlyRatio(w, h){
+  if(!w || !h) return "16:9";
+  const r = w / h;
+  const known = [
+    { name: "16:9", val: 16/9 },
+    { name: "9:16", val: 9/16 },
+    { name: "1:1", val: 1/1 },
+    { name: "4:3", val: 4/3 },
+    { name: "3:4", val: 3/4 },
+    { name: "3:2", val: 3/2 },
+    { name: "2:3", val: 2/3 },
+    { name: "21:9", val: 21/9 },
+    { name: "9:21", val: 9/21 },
+    { name: "4:5", val: 4/5 },
+    { name: "5:4", val: 5/4 }
+  ];
+  let best = known[0];
+  let minDiff = Math.abs(r - best.val);
+  for(const k of known){
+    const diff = Math.abs(r - k.val);
+    if(diff < minDiff){
+      minDiff = diff;
+      best = k;
+    }
+  }
+  if(minDiff / best.val < 0.05){
+    return best.name;
+  }
+  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+  const g = gcd(Math.round(w), Math.round(h)) || 1;
+  const rw = Math.round(w / g);
+  const rh = Math.round(h / g);
+  if(rw < 50 && rh < 50){
+    return `${rw}:${rh}`;
+  }
+  return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
+}
+
+function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
+function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+
+function updateServerHint(){
+  const hint = $("serverHint");
+  if(!hint) return;
+  const v = ($("serverUrl")?.value || "").trim();
+  const host = (window.location.hostname || "").trim();
+  const isLan = host && !/^(127\.|localhost$|::1$)/i.test(host);
+
+  if(v){
+    if(isLan && /^(http:\/\/)?(127\.|localhost|::1)/i.test(v)){
+      hint.textContent = "Aviso: 127.0.0.1 apunta a este dispositivo cliente. Déjalo en blanco para usar el proxy o usa http://" + host + ":7821";
+      hint.style.color = "var(--err, #ff6b6b)";
+      return;
+    }
+    hint.style.color = "";
+    hint.textContent = `URL efectiva: ${v}`;
+  } else {
+    hint.style.color = "";
+    if(isLan){
+      hint.textContent = "Proxy activo hacia ComfyUI en el servidor (" + host + ")";
+    } else {
+      hint.textContent = "Proxy activo hacia ComfyUI local (:7821)";
+    }
+  }
+}
+
+// --- PREVIEWS (TAE VAE / TAESD / Latent2RGB) ---
+function getPreviewMethod(){
+  const sel = $("previewMethod");
+  return sel ? sel.value : "taesd";
+}
+
+let currentPreviewUrl = null;
+
+async function handleBinaryPreview(data) {
+  try {
+    let buffer;
+    if (data instanceof Blob) {
+      buffer = await data.arrayBuffer();
+    } else if (data instanceof ArrayBuffer) {
+      buffer = data;
+    } else {
+      return;
+    }
+    if (!buffer || buffer.byteLength < 8) return;
+    const view = new DataView(buffer);
+    const eventType = view.getUint32(0, false);
+    let blob = null;
+    let meta = null;
+
+    if (eventType === 1) {
+      // BinaryEventTypes.PREVIEW_IMAGE: [event_type: uint32][image_type: uint32][image_bytes...]
+      const imageType = view.getUint32(4, false);
+      const mime = (imageType === 2) ? "image/png" : "image/jpeg";
+      blob = new Blob([buffer.slice(8)], { type: mime });
+    } else if (eventType === 4) {
+      // BinaryEventTypes.PREVIEW_IMAGE_WITH_METADATA: [event_type: uint32][meta_len: uint32][meta_json_utf8][image_bytes...]
+      const metaLen = view.getUint32(4, false);
+      if (buffer.byteLength >= 8 + metaLen) {
+        const metaBytes = new Uint8Array(buffer, 8, metaLen);
+        const metaStr = new TextDecoder().decode(metaBytes);
+        try { meta = JSON.parse(metaStr); } catch(_) {}
+        const mime = (meta && meta.image_type) || "image/jpeg";
+        blob = new Blob([buffer.slice(8 + metaLen)], { type: mime });
+      }
+    } else if (eventType === 2) {
+      // BinaryEventTypes.UNENCODED_PREVIEW_IMAGE
+      blob = new Blob([buffer.slice(4)], { type: "image/jpeg" });
+    }
+
+    if (blob) {
+      const oldUrl = currentPreviewUrl;
+      currentPreviewUrl = URL.createObjectURL(blob);
+      if (oldUrl) {
+        try { URL.revokeObjectURL(oldUrl); } catch(_) {}
+      }
+      if (CONFIG.onPreview) {
+        CONFIG.onPreview(currentPreviewUrl, meta);
+      }
+    }
+  } catch (err) {
+    console.warn("[WS Binary Preview] Error procesando frame:", err);
+  }
+}
+
+function clearPreview() {
+  if (currentPreviewUrl) {
+    try { URL.revokeObjectURL(currentPreviewUrl); } catch(_) {}
+    currentPreviewUrl = null;
+  }
+  if (CONFIG.onClearPreview) {
+    CONFIG.onClearPreview();
+  }
+}
+
+function handleStepProgress(data) {
+  if (!data) return;
+  const { value, max, prompt_id, node } = data;
+  if (value != null && max != null && max > 0) {
+    const pct = Math.round((value / max) * 100);
+    setRun("busy", `Muestreando (${value}/${max} · ${pct}%)`);
+    if (CONFIG.onProgress) {
+      CONFIG.onProgress(value, max, prompt_id, node);
+    }
+  }
+}
+
+// --- WEBSOCKET ---
+function getWebSocketUrl() {
+  const s = server();
+  if(s){
+    return s.replace(/^http:\/\//i, 'ws://').replace(/^https:\/\//i, 'wss://') + '/ws?clientId=' + CLIENT_ID;
+  }
+  const proto = (window.location.protocol === "https:") ? "wss:" : "ws:";
+  const host = window.location.host;
+  return `${proto}//${host}/ws?clientId=${CLIENT_ID}`;
+}
+
+function connectSocket() {
+    if(socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+    const url = getWebSocketUrl();
+    try {
+      socket = new WebSocket(url);
+      socket.binaryType = "blob";
+      socket.onopen = () => {
+          try {
+              socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
+          } catch(e){ console.warn("WS feature_flags no enviados:", e); }
+          console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)");
+      };
+      socket.onmessage = (event) => {
+          if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
+            handleBinaryPreview(event.data);
+            return;
+          }
+          let msg;
+          try { msg = JSON.parse(event.data); } catch(e) {
+              console.warn("WS mensaje no-JSON, ignorando:", String(event.data).slice(0,80));
+              return;
+          }
+          if(msg.type === 'progress') handleStepProgress(msg.data);
+          if(msg.type === 'kj_preview_override'){
+            if(msg.data && msg.data.image){
+              const mime = msg.data.mime || "image/jpeg";
+              const dataUrl = `data:${mime};base64,${msg.data.image}`;
+              if(CONFIG.onPreview) CONFIG.onPreview(dataUrl, msg.data);
+            }
+          }
+          if(msg.type === 'execution_success') handlePromptDone(msg.data.prompt_id);
+          if(msg.type === 'executed' && CONFIG.onNodeExecuted){
+            try { CONFIG.onNodeExecuted(msg.data); } catch(e){ console.warn("onNodeExecuted error:", e); }
+          }
+          if(msg.type === 'execution_error') {
+              const pid = msg.data && msg.data.prompt_id;
+              log(`Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
+              if(pid){
+                handledPrompts.add(pid);
+                delete pendingSeeds[pid];
+                discardTimer(pid);
+                if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
+              }
+              clearPreview();
+              currentBatchIndex++;
+              processNextBatch();
+          }
+      };
+      socket.onerror = (err) => console.error("WS Error", err);
+      socket.onclose = () => {
+        // Fallback activo sin error bloqueante
+      };
+    } catch(err){
+      console.warn("No se pudo abrir WebSocket:", err);
+    }
+}
+
+// --- COMFYUI SERVER QUEUE MONITOR ---
+let serverQueueState = { running: 0, pending: 0 };
+async function fetchServerQueueStatus(){
+  try {
+    const r = await fetch(server() + "/queue");
+    if(r.ok){
+      const data = await r.json();
+      serverQueueState.running = Array.isArray(data.queue_running) ? data.queue_running.length : 0;
+      serverQueueState.pending = Array.isArray(data.queue_pending) ? data.queue_pending.length : 0;
+    }
+  } catch(_){}
+  if(typeof updateQueueUI === "function") updateQueueUI();
+}
+
+// Polling suave cada 3s para reflejar trabajos lanzados desde otros dispositivos
+setInterval(fetchServerQueueStatus, 3000);
+
+// --- HANDLE PROMPT DONE ---
+// Procesa un prompt_id terminado, venga del WS o del polling de respaldo.
+// Idempotente: si ya se ha procesado, no hace nada.
+async function handlePromptDone(promptId) {
+    if(handledPrompts.has(promptId)) return;
+    if(processingPrompts.has(promptId)) return; // ya lo está consultando otro
+    processingPrompts.add(promptId);
+    let entry;
+    try {
+        const hr = await fetch(server()+"/history/"+promptId);
+        if(!hr.ok) {
+            log(`⏳ Esperando resultado (HTTP ${hr.status})...`, "l-ok");
+            processingPrompts.delete(promptId);
+            return;
+        }
+        const hist = await hr.json();
+        entry = hist[promptId];
+    } catch(e) {
+        log(`⚠️ Error consultando history: ${e.message}`, "l-err");
+        processingPrompts.delete(promptId);
+        return;
+    }
+    if(!entry || !entry.outputs) {
+        processingPrompts.delete(promptId);
+        return; // aún no ha terminado
+    }
+
+    const statusInfo = entry.status ? { completed: entry.status.completed, status_str: entry.status.status_str } : null;
+    if(window.DEBUG) console.debug("[handlePromptDone]", promptId, statusInfo, Object.keys(entry.outputs));
+
+    if(entry.status && entry.status.status_str === "error") {
+        const errMsg = entry.status.exception_message || (entry.status.messages || []).filter(m => m[0] === "execution_error").map(m => m[1] && m[1].exception_message).filter(Boolean)[0] || "error desconocido del backend";
+        log(`❌ Error en backend: ${errMsg}`, "l-err");
+        if(entry.status.exception_type) log(`   Tipo: ${entry.status.exception_type}`, "l-err");
+        handledPrompts.add(promptId);
+        processingPrompts.delete(promptId);
+        delete pendingSeeds[promptId];
+        discardTimer(promptId);
+        if(CONFIG.onPromptError) CONFIG.onPromptError(promptId);
+        currentBatchIndex++;
+        processNextBatch();
+        return;
+    }
+
+    // Si el prompt fue cancelado (Stop All / Stop Video) y ya no está en pendingSeeds,
+    // descartamos silenciosamente cualquier execution_success tardío del backend.
+    if(!(promptId in pendingSeeds)){
+        handledPrompts.add(promptId);
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    const realSeed = (promptId in pendingSeeds) ? pendingSeeds[promptId] : null;
+    if(realSeed !== null) {
+        if(CONFIG.onSeedUpdate) CONFIG.onSeedUpdate(realSeed);
+        log(`🎲 Semilla usada: ${realSeed}`, "l-ok");
+    }
+
+    const timings = extractTimings(entry, CONFIG.N);
+    const clientResult = stopTimer(promptId);
+    const tTotal = (timings && timings.total != null) ? fmtMs(timings.total) :
+                   (clientResult ? fmtMs(clientResult.total) : null);
+    const t1 = (timings && timings.t1 != null) ? fmtMs(timings.t1) : null;
+    const t2 = (timings && timings.t2 != null) ? fmtMs(timings.t2) : null;
+
+    const displayResult = await CONFIG.displayResult(entry, realSeed, tTotal, promptId, { t1, t2 });
+    const skipFinalize = displayResult === true || (displayResult && displayResult.skipFinalize === true);
+    const foundOutput = !(displayResult && displayResult.foundOutput === false);
+
+    if(!foundOutput) {
+        // displayResult vio outputs pero aún no hay media usable; pollFallback reintentará.
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    if(skipFinalize) {
+        // LTXV paso 1->2 ya gestionó sus estados; liberamos el lock para ese prompt_id.
+        processingPrompts.delete(promptId);
+        return;
+    }
+
+    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
+    handledPrompts.add(promptId);
+    processingPrompts.delete(promptId);
+    delete pendingSeeds[promptId];
+    variantCounter++;
+    currentBatchIndex++;
+    processNextBatch();
+}
+
+function pollFallback(promptId) {
+    let tries = 0;
+    const iv = setInterval(async () => {
+        tries++;
+        if(handledPrompts.has(promptId) || tries > 180) { clearInterval(iv); return; }
+        await handlePromptDone(promptId);
+        if(handledPrompts.has(promptId)) clearInterval(iv);
+    }, 4000);
+}
+
+function processNextBatch() {
+    if(currentBatchIndex < totalBatchSize) {
+        setTimeout(() => CONFIG.startNextVariant(currentBatchIndex), 1000);
+    } else {
+        setRun("ok", "Batch finalizado");
+        log("🏁 Todas las variantes han sido procesadas.", "l-ok");
+        CONFIG.onBatchComplete();
+    }
+}
+
+// --- PROMPT LIBRARY ---
+// Helper: lee el store de prompts como objeto; si está corrupto o no es un
+// objeto plano, lo resetea a {} para no romper la UI entera.
+function _readPromptStore(){
+  const raw = localStorage.getItem(CONFIG.PROMPTS_KEY);
+  if(!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if(parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+  } catch(e){ console.warn("Prompt store corrupto, reseteado:", e); }
+  try { localStorage.removeItem(CONFIG.PROMPTS_KEY); } catch(_){}
+  log("⚠️ Prompts guardados corruptos, reseteados.", "l-warn");
+  return {};
+}
+
+function _readOpenState(){
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CONFIG.PROMPTS_KEY + '_open') || '{}');
+    return (parsed && typeof parsed === "object" && !Array.isArray(parsed)) ? parsed : {};
+  } catch(e){ return {}; }
+}
+
+async function _syncPromptsWithServer(){
+  try {
+    const res = await fetch("/api/prompts?key=" + encodeURIComponent(CONFIG.PROMPTS_KEY));
+    if(res.ok){
+      const serverData = await res.json();
+      if(serverData && typeof serverData === "object" && !Array.isArray(serverData)){
+        const local = _readPromptStore();
+        if(Object.keys(serverData).length > 0){
+          localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(serverData));
+          return serverData;
+        } else if(Object.keys(local).length > 0){
+          // El servidor no tenía prompts pero este cliente sí: subimos al servidor
+          _savePromptsToServer(local);
+          return local;
+        }
+      }
+    }
+  } catch(e){
+    console.warn("[Prompts Sync] No se pudo conectar con el servidor de prompts:", e);
+  }
+  return _readPromptStore();
+}
+
+async function _savePromptsToServer(data){
+  try {
+    await fetch("/api/prompts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: CONFIG.PROMPTS_KEY, prompts: data })
+    });
+  } catch(e){
+    console.warn("[Prompts Sync] Error al guardar prompts en servidor:", e);
+  }
+}
+
+async function loadPrompts(skipSync = false){
+  if(!skipSync){
+    await _syncPromptsWithServer();
+  }
+  let saved = _readPromptStore();
+  let dirty = false;
+  for(const key of Object.keys(saved)){
+    if(key.endsWith('/') || !key.split('/').pop()){
+      delete saved[key]; dirty = true;
+    }
+  }
+  if(dirty){
+    localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+    _savePromptsToServer(saved);
+  }
+
+  const tree = $("promptTree");
+  if(!tree) return;
+  tree.innerHTML = '';
+
+  if(Object.keys(saved).length === 0){
+    tree.innerHTML = '<div class="pt-empty">sin prompts guardados</div>';
+    return;
+  }
+
+  const root = { children: {}, prompts: [] };
+
+  for(const key of Object.keys(saved).sort()){
+    const parts = key.split('/');
+    const promptName = parts.pop();
+    let node = root;
+    for(const part of parts){
+      if(!node.children[part]) node.children[part] = { children: {}, prompts: [] };
+      node = node.children[part];
+    }
+    node.prompts.push({ key, name: promptName });
+  }
+
+  const openState = _readOpenState();
+
+  function renderNode(node, container, path){
+    for(const folderName of Object.keys(node.children).sort()){
+      const folderPath = path ? `${path}/${folderName}` : folderName;
+      const folderDiv = document.createElement('div');
+      folderDiv.className = 'pt-folder';
+      if(openState[folderPath]) folderDiv.classList.add('open');
+
+      const label = document.createElement('div');
+      label.className = 'pt-folder-label';
+      const arrow = document.createElement('span');
+      arrow.className = 'pt-folder-arrow';
+      arrow.textContent = '▶';
+      label.appendChild(arrow);
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = folderName;
+      label.appendChild(nameSpan);
+      const delFolder = document.createElement('span');
+      delFolder.className = 'pt-folder-del';
+      delFolder.textContent = '×';
+      delFolder.title = 'Eliminar carpeta y todo su contenido';
+      label.appendChild(delFolder);
+
+      delFolder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
+        const saved = _readPromptStore();
+        let count = 0;
+        for(const key of Object.keys(saved)){
+          if(key === folderPath || key.startsWith(folderPath + '/')){
+            delete saved[key]; count++;
+          }
+        }
+        localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+        _savePromptsToServer(saved);
+        loadPrompts(true);
+        log(`Carpeta "${folderPath}" eliminada (${count} prompt(s)).`, "l-ok");
+      });
+
+      label.addEventListener("click", (e) => {
+        if(e.target === delFolder) return;
+        folderDiv.classList.toggle("open");
+        openState[folderPath] = folderDiv.classList.contains("open");
+        localStorage.setItem(CONFIG.PROMPTS_KEY + '_open', JSON.stringify(openState));
+      });
+
+      const childrenDiv = document.createElement('div');
+      childrenDiv.className = 'pt-children';
+      renderNode(node.children[folderName], childrenDiv, folderPath);
+
+      folderDiv.appendChild(label);
+      folderDiv.appendChild(childrenDiv);
+      container.appendChild(folderDiv);
+    }
+    for(const p of node.prompts){
+      const item = document.createElement('div');
+      item.className = 'pt-item';
+      if(p.key === selectedPromptKey) item.classList.add('selected');
+      item.textContent = p.name;
+      item.title = p.key;
+      item.dataset.key = p.key;
+      item.addEventListener("click", () => {
+        const saved = _readPromptStore();
+        if(saved[p.key]){
+          $("prompt").value = saved[p.key];
+          selectedPromptKey = p.key;
+          document.querySelectorAll(".pt-item").forEach(i => i.classList.remove("selected"));
+          item.classList.add("selected");
+        }
+      });
+      container.appendChild(item);
+    }
+  }
+
+  renderNode(root, tree, '');
+}
+
+function savePrompt(){
+  const defaultName = selectedPromptKey || (lastPromptDir ? lastPromptDir + "/" : "");
+  const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):", defaultName);
+  if(!name) return;
+  const text = $("prompt").value;
+  const saved = _readPromptStore();
+  if(saved[name] && name !== selectedPromptKey){
+    const preview = saved[name].slice(0, 80);
+    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
+  }
+  saved[name] = text;
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  _savePromptsToServer(saved);
+  selectedPromptKey = name;
+  const parts = name.split('/');
+  if(parts.length > 1) lastPromptDir = parts.slice(0, -1).join('/');
+  loadPrompts(true);
+  log(`Prompt "${name}" guardado.`, "l-ok");
+}
+
+function movePrompt(){
+  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para mover.", "l-err"); return; }
+  const oldName = selectedPromptKey;
+  const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
+  if(!newName || newName === oldName) return;
+  const saved = _readPromptStore();
+  if(saved[newName]){
+    if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
+  }
+  saved[newName] = saved[oldName];
+  delete saved[oldName];
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  _savePromptsToServer(saved);
+  selectedPromptKey = newName;
+  loadPrompts(true);
+  log(`Prompt movido: "${oldName}" → "${newName}"`, "l-ok");
+}
+
+function deletePrompt(){
+  if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para eliminar.", "l-err"); return; }
+  if(!confirm(`¿Eliminar "${selectedPromptKey}"?`)) return;
+  const saved = _readPromptStore();
+  delete saved[selectedPromptKey];
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+  _savePromptsToServer(saved);
+  selectedPromptKey = null;
+  loadPrompts(true);
+  log(`Prompt eliminado.`, "l-ok");
+}
+
+// --- LORA STATE ---
+function saveLoraState() { localStorage.setItem(CONFIG.LORA_STATE_KEY, JSON.stringify(loras)); }
+function loadLoraState() {
+  const saved = localStorage.getItem(CONFIG.LORA_STATE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length === 3) {
+        parsed.forEach((l, i) => {
+          if (AVAILABLE_LORAS.includes(l.lora) || l.lora === "") loras[i] = l;
+        });
+      }
+    } catch (e) { console.error("Error cargando estado LoRA", e); }
+  }
+}
+function loadModels(){
+  const sel = $("modelSelect");
+  if(!sel) return;
+  sel.innerHTML = "";
+  for(const m of AVAILABLE_MODELS){
+    const opt = document.createElement("option");
+    opt.value = m;
+    opt.textContent = m;
+    if(m === CONFIG.DEFAULT_MODEL) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+function renderLoras(){
+  const wrap=$("loraList");
+  if(!wrap) return;
+  wrap.innerHTML="";
+  loras.forEach((l,i)=>{
+    const box=document.createElement("div");
+    box.className="lora"+(l.on?"":" off");
+    let optionsHtml = '<option value="">-- Ninguno --</option>';
+    AVAILABLE_LORAS.forEach(path => {
+      const selected = path === l.lora ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+    });
+    box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
+    <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
+    <div class="slider-row"><input type="range" min="-4" max="4" step="0.05" value="${l.strength}" data-field="strength" data-i="${i}"><div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div></div>`;
+    wrap.appendChild(box);
+  });
+  wrap.querySelectorAll(".switch").forEach(sw=>sw.addEventListener("click",()=>{loras[+sw.dataset.i].on=!loras[+sw.dataset.i].on;renderLoras();saveLoraState();}));
+  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel=>sel.addEventListener("change",()=>{loras[+sel.dataset.i].lora=sel.value;saveLoraState();}));
+  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
+}
+
+// --- ENHANCER ---
+function loadSysPrompts(){
+  const defaults = JSON.parse(JSON.stringify(CONFIG.ENHANCER_DEFAULT_PROMPTS));
+  const saved = localStorage.getItem(CONFIG.ENHANCER_SYSKEY);
+  if(saved){
+    try {
+      const parsed = JSON.parse(saved);
+      for(const mode of Object.keys(defaults)){
+        if(!parsed[mode]) parsed[mode] = defaults[mode];
+        else {
+          for(const k of Object.keys(defaults[mode])){
+            if(!parsed[mode][k]) parsed[mode][k] = defaults[mode][k];
+          }
+        }
+      }
+      return parsed;
+    } catch(e) {}
+  }
+  return defaults;
+}
+
+function saveSysPrompts(data){
+  localStorage.setItem(CONFIG.ENHANCER_SYSKEY, JSON.stringify(data));
+}
+
+function populateStyleSelect(data, mode){
+  const sel = $("enhancerStyle");
+  sel.innerHTML = "";
+  const styles = data[mode] || {};
+  for(const key of Object.keys(styles).sort()){
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = styles[key].name || key;
+    sel.appendChild(opt);
+  }
+}
+
+function getCurrentSysPrompt(data, mode, styleKey){
+  const styles = data[mode] || {};
+  const entry = styles[styleKey];
+  return entry ? entry.prompt : "";
+}
+
+function cleanOllamaResponse(raw){
+  if(!raw) return "";
+  let text = String(raw).trim();
+
+  if(/<\/think>/i.test(text)){
+    const parts = text.split(/<\/think>/i);
+    const after = parts[parts.length - 1].trim();
+    if(after) return after.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
+    const before = parts[0].replace(/<think>/gi, "").trim();
+    const paragraphs = before.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if(paragraphs.length > 0) return paragraphs[paragraphs.length - 1];
+  }
+
+  if(/<\/thought>/i.test(text)){
+    const parts = text.split(/<\/thought>/i);
+    const after = parts[parts.length - 1].trim();
+    if(after) return after.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
+    const before = parts[0].replace(/<thought>/gi, "").trim();
+    const paragraphs = before.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+    if(paragraphs.length > 0) return paragraphs[paragraphs.length - 1];
+  }
+
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
+  text = text.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/\n?```$/, "").trim();
+  return text;
+}
+
+async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
+  const bodyPayload = Object.assign({ stream: true }, payload);
+  if(!bodyPayload.options) bodyPayload.options = {};
+  if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
+  if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
+
+  const origPlaceholder = outputEl ? outputEl.placeholder : "";
+  if(outputEl){
+    outputEl.value = "";
+    outputEl.placeholder = "Generando prompt...";
+  }
+
+  const r = await fetch("/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyPayload),
+    signal
+  });
+
+  if(!r.ok){
+    const t = await r.text().catch(()=>"");
+    if(outputEl) outputEl.placeholder = origPlaceholder;
+    throw new Error("HTTP " + r.status + " " + t.slice(0, 200));
+  }
+
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let accumulated = "";
+  let buffer = "";
+
+  while(true){
+    const { done, value } = await reader.read();
+    if(done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for(const line of lines){
+      if(!line.trim()) continue;
+      try {
+        const json = JSON.parse(line);
+        if(json.response){
+          accumulated += json.response;
+          if(outputEl){
+            if(accumulated.includes("</think>")){
+              const after = accumulated.split(/<\/think>/i).pop().trimStart();
+              if(after) outputEl.value = after;
+            } else if(accumulated.includes("</thought>")){
+              const after = accumulated.split(/<\/thought>/i).pop().trimStart();
+              if(after) outputEl.value = after;
+            }
+          }
+        }
+      } catch(e){}
+    }
+  }
+
+  if(buffer && buffer.trim()){
+    try {
+      const json = JSON.parse(buffer.trim());
+      if(json.response) accumulated += json.response;
+    } catch(e){}
+  }
+
+  const finalClean = cleanOllamaResponse(accumulated);
+  if(outputEl){
+    outputEl.value = finalClean;
+    outputEl.placeholder = origPlaceholder;
+  }
+  return finalClean;
+}
+
+function makeCollapsible(toggleId, bodyId, onOpen){
+  const h = $(toggleId), b = $(bodyId);
+  if(!h || !b) return;
+  h.addEventListener("click", () => {
+    h.classList.toggle("open");
+    b.classList.toggle("open");
+    const arrow = h.querySelector(".arrow");
+    if(arrow) arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+    if(h.classList.contains("open") && onOpen) onOpen();
+  });
+}
+
+async function loadEnhancerModels(){
+  const sel = $("enhancerModel");
+  try {
+    const r = await fetch("/api/tags");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    const models = data.models || [];
+    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
+    for(const m of models){
+      const opt = document.createElement("option");
+      opt.value = m.name;
+      opt.textContent = m.name;
+      sel.appendChild(opt);
+    }
+    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
+    if(defaultModel) sel.value = defaultModel.name;
+  } catch(e) {
+    sel.innerHTML = '<option value="">Ollama no disponible</option>';
+    console.warn("No se pudieron cargar modelos:", e.message);
+  }
+}
+
+function renderSysPromptEditor(){
+  const container = $("sysPromptEditor");
+  if(!container) return;
+  const data = sysPromptEditData;
+  const mode = sysPromptEditMode;
+  const styles = data[mode] || {};
+  const keys = Object.keys(styles).sort();
+  container.innerHTML = "";
+  for(const key of keys){
+    const entry = styles[key];
+    const isDefault = (key === "A" || key === "B") && CONFIG.ENHANCER_DEFAULT_PROMPTS[mode] && CONFIG.ENHANCER_DEFAULT_PROMPTS[mode][key];
+    const row = document.createElement("div");
+    row.className = "sysprompt-row";
+    row.innerHTML = `
+      <div class="spr-top">
+        <span class="spr-name">${key}</span>
+        <input type="text" class="spr-name-input" value="${escapeHtml(entry.name)}" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:11px;">
+        ${isDefault ? "" : '<button class="spr-del" data-key="'+key+'">×</button>'}
+      </div>
+      <textarea data-key="${key}">${escapeHtml(entry.prompt)}</textarea>
+    `;
+    container.appendChild(row);
+  }
+  container.querySelectorAll(".spr-del").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.key;
+      delete sysPromptEditData[mode][key];
+      renderSysPromptEditor();
+    });
+  });
+}
+
+// --- STOP ---
+function enableStopButtons(v){ $("btnStopVideo").disabled = !v; $("btnStopAll").disabled = !v; }
+
+async function stopCurrentVideo(){
+  if(!currentPromptId) return;
+  const pid = currentPromptId;
+  currentPromptId = null;
+  try {
+    // Interrumpir la ejecución activa en el backend ComfyUI
+    await fetch(server()+"/interrupt", { method:"POST" });
+    // Opcional: borrar el prompt de la cola si estuviese pendiente
+    await fetch(server()+"/queue", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({delete:[pid]})
+    });
+  } catch(e) { console.warn("stopCurrentVideo: fallo al interrumpir backend:", e); }
+  discardTimer(pid);
+  delete pendingSeeds[pid];
+  handledPrompts.add(pid);
+  clearPreview();
+  if(CONFIG.onStopCurrent) CONFIG.onStopCurrent(pid);
+  log("⏹ Generación actual detenida.", "l-err");
+  currentBatchIndex++;
+  processNextBatch();
+}
+
+async function stopAll(){
+  try {
+    // Interrumpir la ejecución activa en el backend ComfyUI
+    await fetch(server()+"/interrupt", { method:"POST" });
+    // Limpiar toda la cola pendiente en el backend ComfyUI
+    await fetch(server()+"/queue", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({clear:true})
+    });
+  } catch(e) { /* si falla, igual limpiamos local */ }
+  for(const pid of Object.keys(pendingSeeds)) {
+    discardTimer(pid);
+    handledPrompts.add(pid);
+    delete pendingSeeds[pid];
+  }
+  clearPreview();
+  if(CONFIG.onStopAll) CONFIG.onStopAll();
+  setRun("bad", "Detenido por usuario");
+  log("🛑 Generación detenida.", "l-err");
+}
+
+// --- ZOOM / PAN / FULLSCREEN (shared) ---
+function getImageVisibleRect(img){
+  const rect = img.getBoundingClientRect();
+  const natW = img.naturalWidth || rect.width;
+  const natH = img.naturalHeight || rect.height;
+  if(!natW || !natH) return rect;
+  const scale = Math.min(rect.width / natW, rect.height / natH);
+  const visW = natW * scale;
+  const visH = natH * scale;
+  return {
+    left: rect.left + (rect.width - visW) / 2,
+    top: rect.top + (rect.height - visH) / 2,
+    width: visW,
+    height: visH,
+    right: rect.left + (rect.width + visW) / 2,
+    bottom: rect.top + (rect.height + visH) / 2
+  };
+}
+
+function setupZoomPan(wrapId, imgId, resetBtnId, fullscreenBtnId){
+  let zoomLevel = 1, zoomPanX = 0, zoomPanY = 0, zoomDragging = false, zoomStartX, zoomStartY, zoomStartPanX, zoomStartPanY;
+  let panMoved = false;
+  // Guardar estado de zoom/pan al entrar/salir de fullscreen
+  let fsSavedZoom = null;
+  const wrap = $(wrapId);
+  if(!wrap) return { resetZoom: ()=>{}, isFullscreen: ()=>false };
+
+  function getImg(){ return $(imgId); }
+
+  function resetZoom(){
+    zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
+    const img = getImg();
+    if(img){
+      img.style.transform = "none";
+      void img.offsetWidth;
+    }
+    wrap.style.cursor = "grab";
+    bindImgTouch();
+  }
+
+  function applyZoom(){
+    const img = getImg();
+    if(img) img.style.transform = `translate(${zoomPanX}px,${zoomPanY}px) scale(${zoomLevel})`;
+  }
+
+  wrap.addEventListener("wheel", (e) => {
+    const img = getImg();
+    if(!img || img.style.display === "none") return;
+    e.preventDefault();
+    const visRect = getImageVisibleRect(img);
+    if(e.clientX < visRect.left || e.clientX > visRect.right || e.clientY < visRect.top || e.clientY > visRect.bottom) return;
+    const mx = e.clientX - visRect.left;
+    const my = e.clientY - visRect.top;
+    const cx = visRect.width / 2;
+    const cy = visRect.height / 2;
+    const old = zoomLevel;
+    zoomLevel *= (e.deltaY < 0) ? 1.12 : 0.88;
+    zoomLevel = Math.max(1, Math.min(20, zoomLevel));
+    const ratio = zoomLevel / old;
+    zoomPanX += (mx - cx) * (1 - ratio);
+    zoomPanY += (my - cy) * (1 - ratio);
+    applyZoom();
+  });
+
+  wrap.addEventListener("mousedown", (e) => {
+    const img = getImg();
+    if(!img || img.style.display === "none" || zoomLevel <= 1) return;
+    e.preventDefault();
+    zoomDragging = true;
+    panMoved = false;
+    zoomStartX = e.clientX; zoomStartY = e.clientY;
+    zoomStartPanX = zoomPanX; zoomStartPanY = zoomPanY;
+    wrap.style.cursor = "grabbing";
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if(!zoomDragging) return;
+    e.preventDefault();
+    const dx = e.clientX - zoomStartX;
+    const dy = e.clientY - zoomStartY;
+    if(Math.abs(dx) > 3 || Math.abs(dy) > 3) panMoved = true;
+    zoomPanX = zoomStartPanX + dx;
+    zoomPanY = zoomStartPanY + dy;
+    applyZoom();
+  });
+
+  window.addEventListener("mouseup", () => {
+    if(!zoomDragging) return;
+    zoomDragging = false;
+    wrap.style.cursor = "grab";
+  });
+
+  // --- Soporte táctil: pinch-zoom + pan + swipe (móvil) ---
+  let touchPinching = false, touchStartDist = 0, touchStartZoom = 1;
+  let touchStartCenterX = 0, touchStartCenterY = 0, touchStartPanX = 0, touchStartPanY = 0;
+  let touchPanning = false, touchStartT1X = 0, touchStartT1Y = 0;
+  let swipeFn = null;
+  let swipeStartX = 0, swipeStartY = 0, swipeStartT = 0, swipeTracking = false;
+
+  function touchDist(t1, t2){
+    const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function onTouchStart(e){
+    const img = getImg();
+    if(!img || img.style.display === "none") return;
+    if(e.touches.length === 2){
+      e.preventDefault();
+      touchPinching = true; touchPanning = false; zoomDragging = false; panMoved = true; swipeTracking = false;
+      touchStartDist = touchDist(e.touches[0], e.touches[1]);
+      touchStartZoom = zoomLevel;
+      const rect = wrap.getBoundingClientRect();
+      touchStartCenterX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      touchStartCenterY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      touchStartPanX = zoomPanX; touchStartPanY = zoomPanY;
+    } else if(e.touches.length === 1 && zoomLevel > 1){
+      e.preventDefault();
+      touchPanning = true; touchPinching = false; panMoved = false; zoomDragging = false; swipeTracking = false;
+      touchStartT1X = e.touches[0].clientX; touchStartT1Y = e.touches[0].clientY;
+      touchStartPanX = zoomPanX; touchStartPanY = zoomPanY;
+    } else if(e.touches.length === 1 && zoomLevel <= 1){
+      // Swipe horizontal para cambiar de imagen (solo cuando no hay zoom)
+      swipeTracking = true; touchPinching = false; touchPanning = false;
+      swipeStartX = e.touches[0].clientX; swipeStartY = e.touches[0].clientY;
+      swipeStartT = Date.now();
+    }
+  }
+
+  function onTouchMove(e){
+    if(swipeTracking && e.touches.length === 1 && zoomLevel <= 1){
+      // Solo prevenir el scroll si el movimiento es mayormente horizontal (swipe)
+      const dx = e.touches[0].clientX - swipeStartX;
+      const dy = e.touches[0].clientY - swipeStartY;
+      if(Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.5){
+        e.preventDefault();
+      }
+    } else if(touchPinching && e.touches.length === 2){
+      e.preventDefault();
+      const rect = wrap.getBoundingClientRect();
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      const visRect = getImageVisibleRect(getImg());
+      const ax = cx, ay = cy;
+      const wrapCx = visRect.width / 2, wrapCy = visRect.height / 2;
+      const mx = ax - visRect.left, my = ay - visRect.top;
+      const dist = touchDist(e.touches[0], e.touches[1]);
+      if(touchStartDist > 0){
+        zoomLevel = Math.max(1, Math.min(20, touchStartZoom * (dist / touchStartDist)));
+      }
+      // pan según desplazamiento del centro respecto al inicio
+      zoomPanX = touchStartPanX + (cx - touchStartCenterX);
+      zoomPanY = touchStartPanY + (cy - touchStartCenterY);
+      applyZoom();
+    } else if(touchPanning && e.touches.length === 1){
+      e.preventDefault();
+      const dx = e.touches[0].clientX - touchStartT1X;
+      const dy = e.touches[0].clientY - touchStartT1Y;
+      if(Math.abs(dx) > 3 || Math.abs(dy) > 3) panMoved = true;
+      zoomPanX = touchStartPanX + dx;
+      zoomPanY = touchStartPanY + dy;
+      applyZoom();
+    }
+  }
+
+  function onTouchEnd(e){
+    if(e.touches.length === 0){
+      touchPinching = false; touchPanning = false;
+      if(swipeTracking && swipeFn){
+        const dx = (e.changedTouches[0] ? e.changedTouches[0].clientX : 0) - swipeStartX;
+        const dy = (e.changedTouches[0] ? e.changedTouches[0].clientY : 0) - swipeStartY;
+        const dt = Date.now() - swipeStartT;
+        if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 800){
+          swipeFn(dx < 0 ? 1 : -1);
+        }
+      }
+      swipeTracking = false;
+    } else if(e.touches.length === 1){
+      // queda un dedo: pasar a pan con el dedo restante
+      touchPinching = false;
+      if(zoomLevel > 1){
+        touchPanning = true; panMoved = false;
+        touchStartT1X = e.touches[0].clientX; touchStartT1Y = e.touches[0].clientY;
+        touchStartPanX = zoomPanX; touchStartPanY = zoomPanY;
+      } else { touchPanning = false; }
+    }
+  }
+  function onTouchCancel(){ touchPinching = false; touchPanning = false; swipeTracking = false; }
+
+  function bindImgTouch(){
+    const img = getImg();
+    if(!img || img._zoomTouchBound) return;
+    img.addEventListener("touchstart", onTouchStart, { passive: false });
+    img.addEventListener("touchmove", onTouchMove, { passive: false });
+    img.addEventListener("touchend", onTouchEnd);
+    img.addEventListener("touchcancel", onTouchCancel);
+    img._zoomTouchBound = true;
+  }
+  bindImgTouch();
+
+  wrap.addEventListener("touchstart", onTouchStart, { passive: false });
+  wrap.addEventListener("touchmove", onTouchMove, { passive: false });
+  wrap.addEventListener("touchend", onTouchEnd);
+  wrap.addEventListener("touchcancel", onTouchCancel);
+
+  if(resetBtnId){
+    const btn = $(resetBtnId);
+    if(btn) btn.addEventListener("click", (e) => { e.stopPropagation(); resetZoom(); });
+  }
+
+  function enterFs(){
+    const img = getImg();
+    // Guardar estado de zoom/pan actual antes de resetear para fullscreen
+    fsSavedZoom = { level: zoomLevel, panX: zoomPanX, panY: zoomPanY, wrapCss: wrap.style.cssText || "", imgCss: img ? (img.style.cssText || "") : "" };
+    wrap.dataset.fsPrev = wrap.style.cssText || "";
+    wrap.style.cssText = "position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;margin:0!important;padding:0!important;background:#000;border-radius:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;";
+    if(img){
+      img.dataset.fsPrev = img.style.cssText || "";
+      img.style.cssText = "display:block!important;width:100vw!important;height:100vh!important;max-width:100vw!important;max-height:100vh!important;object-fit:contain!important;transform:none!important;transform-origin:center center!important;";
+    }
+    // Resetear zoom/pan para fullscreen (empezar fresco)
+    zoomLevel = 1; zoomPanX = 0; zoomPanY = 0;
+  }
+  function exitFs(){
+    const img = getImg();
+    if(wrap.dataset.fsPrev !== undefined){ wrap.style.cssText = wrap.dataset.fsPrev; delete wrap.dataset.fsPrev; }
+    else { wrap.style.cssText = ""; }
+    if(img){
+      if(img.dataset.fsPrev !== undefined){ img.style.cssText = img.dataset.fsPrev; delete img.dataset.fsPrev; }
+      else { img.style.cssText = ""; }
+    }
+    // Restaurar estado de zoom/pan anterior al fullscreen
+    if(fsSavedZoom){
+      zoomLevel = fsSavedZoom.level;
+      zoomPanX = fsSavedZoom.panX;
+      zoomPanY = fsSavedZoom.panY;
+      fsSavedZoom = null;
+    }
+    applyZoom();
+    // Asegurar que el wrap sigue visible (display flex o block según el caso)
+    if(wrap.style.display === "" || wrap.style.display === "none") wrap.style.display = "flex";
+  }
+
+  function isFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+
+  if(fullscreenBtnId){
+    const btn = $(fullscreenBtnId);
+    if(btn){
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if(!document.fullscreenElement && !document.webkitFullscreenElement){
+          if(wrap.requestFullscreen) wrap.requestFullscreen();
+          else if(wrap.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
+        } else {
+          if(document.exitFullscreen) document.exitFullscreen();
+          else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+      });
+    }
+  }
+
+  wrap.addEventListener("fullscreenchange", () => {
+    if(document.fullscreenElement || document.webkitFullscreenElement) enterFs();
+    else exitFs();
+  });
+  wrap.addEventListener("webkitfullscreenchange", () => {
+    if(document.fullscreenElement || document.webkitFullscreenElement) enterFs();
+    else exitFs();
+  });
+
+  function getState(){ return { zoomLevel, zoomPanX, zoomPanY }; }
+
+  // Retornar también si el último mousedown+mouseup fue un pan (para que el caller pueda ignorar el click)
+  function wasPan(){ return panMoved; }
+
+  function onSwipe(fn){ swipeFn = fn; }
+
+  return { resetZoom, getState, isFullscreen, wasPan, onSwipe };
+}
+
+// --- SHARED GALLERY HELPERS ---
+// Usados por addToVariantGallery() en ltxv.js y krea2.js.
+
+function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+
+// Redimensiona un File/Blob a un lado máximo (manteniendo proporción) y devuelve
+// base64 JPEG (sin el prefijo data:). Útil para enviar imágenes a Ollama sin
+// superar el tope de body del servidor (~4 MB por defecto).
+async function resizeFileToBase64(file, maxSide){
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  c.getContext("2d").drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+
+// Variante que acepta una URL (usada por Krea2 desde refImg.src).
+async function imageToResizedBase64(srcUrl, maxSide){
+  const resp = await fetch(srcUrl);
+  const blob = await resp.blob();
+  return resizeFileToBase64(blob, maxSide);
+}
+
+function mediaViewUrl(media, extra){
+  const ts = extra && extra.ts != null ? extra.ts : Date.now();
+  const anchor = extra && extra.anchor ? extra.anchor : "";
+  const f = encodeURIComponent(media.filename || "");
+  const s = encodeURIComponent(media.subfolder || "");
+  const t = encodeURIComponent(media.type || "output");
+  return `${server()}/view?filename=${f}&subfolder=${s}&type=${t}&t=${ts}${anchor}`;
+}
+
+async function copySeedToClipboard(seedSpan, seedValue){
+  try {
+    await navigator.clipboard.writeText(String(seedValue));
+    const originalHTML = seedSpan.innerHTML;
+    seedSpan.innerHTML = '<span class="seed-text">¡Copiado!</span> <span class="copy-icon">✅</span>';
+    setTimeout(() => { seedSpan.innerHTML = originalHTML; }, 1200);
+  } catch(err){
+    console.error("Error al copiar:", err);
+  }
+}
+
+// Borrado de un fichero de output/temp via /api/file_delete.
+// Trata 404 como éxito (ya no estaba en disco) y elimina la tarjeta del DOM.
+// Callbacks opcionales: onOk(grid, box), onMissing(grid, box).
+async function deleteMediaFile(card, delBtn, media, grid, box, logPrefix, onOk, onMissing){
+  if(!confirm(`¿Eliminar este fichero del disco y de la galería?`)) return;
+  delBtn.disabled = true;
+  try {
+    const r = await fetch("/api/file_delete", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        filename: media.filename,
+        subfolder: media.subfolder || "",
+        type: media.type || "output",
+      }),
+    });
+    if(!r.ok){
+      const t = await r.text().catch(()=>"");
+      throw new Error("HTTP "+r.status+" "+(t||"").slice(0,200));
+    }
+    const j = await r.json();
+    if(!j.ok && !j.deleted) throw new Error("Respuesta inesperada del backend");
+    card.remove();
+    log("🗑️ "+logPrefix+" eliminado del disco: "+media.filename, "l-ok");
+    if(onOk) onOk(grid, box);
+  } catch(err){
+    if(err.message.includes("404")){
+      card.remove();
+      log("🗑️ "+logPrefix+" ya no estaba en disco, eliminado de la galería: "+media.filename, "l-ok");
+      if(onMissing) onMissing(grid, box);
+    } else {
+      log("❌ No se pudo borrar del disco: "+err.message, "l-err");
+      delBtn.disabled = false;
+    }
+  }
+}
+
+// Construye una tarjeta de variante común y la inserta en el grid.
+// CONFIG.renderVariantMedia(card, url, media) debe devolver el HTML del
+// elemento media (<video> o <img>) y opcionalmente configurar
+// atributos (crossorigin, controls, preload, etc.).
+// `meta` (opcional): objeto con metadata de la generación (loas, sliders, etc.)
+//   o string preformateado. Se muestra en el tooltip al hacer hover. Si es
+//   objeto, se formatea como filas clave/valor. Se guarda en card.dataset.meta
+//   como JSON para sobrevivir a re-renders.
+// Devuelve la tarjeta creada (ya insertada en el grid).
+function buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort, meta){
+  const hasSeed = seedValue !== null && seedValue !== undefined;
+  const idx = variantIndex != null ? variantIndex : (currentBatchIndex + 1);
+  const displayText = hasSeed ? String(seedValue) : (slot ? (slot === 1 ? "1er pase" : (slot === 2 ? "final" : `Var. #${idx}`)) : `Var. #${idx}`);
+  const tooltipText = hasSeed ? "Click para copiar semilla" : "Semilla no disponible";
+  const timeStr = timeText || "";
+
+  const card = document.createElement("div");
+  card.className = "variant-card";
+  card.dataset.filename = media.filename || "";
+  card.dataset.subfolder = media.subfolder || "";
+  card.dataset.type = media.type || "output";
+  if(slot != null) card.dataset.slot = String(slot);
+  card.dataset.variantIndex = String(idx);
+  if(meta != null){
+    card.dataset.meta = (typeof meta === "string") ? meta : JSON.stringify(meta);
+  }
+
+  const url = mediaViewUrl(media, { anchor: "#t=0.1" });
+  const mediaHtml = CONFIG.renderVariantMedia
+    ? CONFIG.renderVariantMedia(card, url, media)
+    : `<img src="${url}">`;
+
+  card.innerHTML = `
+    <span class="variant-badge">Var ${idx} · ${typeShort}</span>
+    ${mediaHtml}
+    <div class="variant-info">
+      <span class="variant-seed-display" title="${tooltipText}">
+        <span class="seed-text">${displayText}</span>
+        <span class="copy-icon">📋</span>
+      </span>
+      <span class="variant-time" title="Tiempo de inferencia">⏱ ${timeStr}</span>
+      <span class="variant-icons">
+        <button class="variant-del-btn" title="Eliminar de la galería" onclick="event.stopPropagation();">×</button>
+      </span>
+    </div>
+  `;
+
+  // Tooltip de metadata al hacer hover.
+  if(meta != null){
+    card.addEventListener("mouseenter", () => showVariantTooltip(card));
+    card.addEventListener("mouseleave", () => hideVariantTooltip());
+    card.addEventListener("mousemove", (e) => positionVariantTooltip(e));
+  }
+
+  // Hacer la tarjeta arrastrable hacia fuera (otra UI, escritorio, etc.).
+  makeCardDraggable(card);
+
+  grid.appendChild(card);
+  return card;
+}
+
+// --- TOOLTIP DE METADATA ---
+// Un único tooltip global reutilizado para todas las variant-cards.
+let _variantTooltipEl = null;
+
+function _ensureVariantTooltip(){
+  if(_variantTooltipEl) return _variantTooltipEl;
+  _variantTooltipEl = document.createElement("div");
+  _variantTooltipEl.className = "variant-tooltip";
+  _variantTooltipEl.id = "variantTooltip";
+  document.body.appendChild(_variantTooltipEl);
+  return _variantTooltipEl;
+}
+
+function positionVariantTooltip(e){
+  if(!_variantTooltipEl || !_variantTooltipEl.classList.contains("show")) return;
+  const pad = 14;
+  const tw = _variantTooltipEl.offsetWidth || 280;
+  const th = _variantTooltipEl.offsetHeight || 80;
+  let x = e.clientX + 16;
+  let y = e.clientY + 16;
+  if(x + tw + pad > window.innerWidth) x = e.clientX - tw - 16;
+  if(y + th + pad > window.innerHeight) y = e.clientY - th - 16;
+  _variantTooltipEl.style.left = Math.max(pad, x) + "px";
+  _variantTooltipEl.style.top = Math.max(pad, y) + "px";
+}
+
+function showVariantTooltip(card){
+  const el = _ensureVariantTooltip();
+  const raw = card.dataset.meta;
+  if(!raw) return;
+  let html;
+  try {
+    const obj = JSON.parse(raw);
+    html = formatVariantMeta(obj);
+  } catch(_){
+    html = raw; // string preformateado
+  }
+  el.innerHTML = html;
+  el.classList.add("show");
+  // Posición inicial cerca de la tarjeta.
+  const r = card.getBoundingClientRect();
+  el.style.left = Math.max(14, r.left) + "px";
+  el.style.top = Math.max(14, r.bottom + 8) + "px";
+}
+
+function hideVariantTooltip(){
+  if(_variantTooltipEl) _variantTooltipEl.classList.remove("show");
+}
+
+// Formatea un objeto meta {title?, rows:[[k,v]...], loras:[{name,strength,on}...]}
+// como HTML para el tooltip.
+function formatVariantMeta(obj){
+  if(!obj || typeof obj !== "object") return String(obj || "");
+  const parts = [];
+  if(obj.title) parts.push(`<div class="vt-title">${escapeHtml(obj.title)}</div>`);
+  if(Array.isArray(obj.rows)){
+    for(const [k, v] of obj.rows){
+      parts.push(`<div class="vt-row"><span class="vt-key">${escapeHtml(String(k))}</span><span class="vt-val">${escapeHtml(String(v))}</span></div>`);
+    }
+  }
+  if(Array.isArray(obj.loras) && obj.loras.length){
+    parts.push(`<div class="vt-row" style="margin-top:6px;"><span class="vt-key">LoRAs</span><span class="vt-val">`);
+    for(const l of obj.loras){
+      const cls = l.on ? "vt-lora" : "vt-lora off";
+      const name = escapeHtml(l.name || "—");
+      const strength = l.strength != null ? ` · ${l.strength}` : "";
+      const status = l.on ? "" : " (off)";
+      parts.push(`<div class="${cls}"><span class="vt-lora-name" title="${name}">${name}</span>${escapeHtml(strength)}${escapeHtml(status)}</div>`);
+    }
+    parts.push(`</span></div>`);
+  }
+  if(parts.length === 0) return `<div class="vt-empty">sin metadata</div>`;
+  return parts.join("");
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+
+// --- INIT: all top-level code that uses $ or CONFIG ---
+// Called by the UI-specific JS after CONFIG is defined.
+function initCommon(){
+  loras = CONFIG.loras;
+  DEFAULT_BACKEND_PORT = CONFIG.DEFAULT_BACKEND_PORT;
+
+  // Auto-pick server URL
+  (function autoPickServerUrl(){
+    try {
+      const input = $("serverUrl");
+      if(!input) return;
+      const stored = localStorage.getItem(CONFIG.SERVERURL_KEY);
+      if(stored){
+        const storedPort = (stored.match(/:(\d+)\b/) || [])[1];
+        const host = (window.location.hostname || "").trim();
+        const isLan = host && !/^(127\.|localhost$|::1$)/i.test(host);
+
+        if(storedPort && LEGACY_PORTS.includes(storedPort)){
+          localStorage.removeItem(CONFIG.SERVERURL_KEY);
+        } else if(isLan && /^(http:\/\/)?(127\.|localhost|::1)/i.test(stored)){
+          // En LAN, 127.0.0.1 es el cliente, no el servidor. Limpiamos para usar el proxy automático.
+          localStorage.removeItem(CONFIG.SERVERURL_KEY);
+          input.value = "";
+        } else {
+          input.value = stored;
+          updateServerHint();
+          return;
+        }
+      }
+      updateServerHint();
+    } catch(e) { /* si falla, queda el placeholder */ }
+  })();
+
+  $("serverUrl").addEventListener("change", (e) => {
+    try { localStorage.setItem(CONFIG.SERVERURL_KEY, e.target.value.trim()); } catch(_){}
+    updateServerHint();
+  });
+  $("serverUrl").addEventListener("input", updateServerHint);
+
+  // Preview method persistence
+  (function initPreviewMethod(){
+    const sel = $("previewMethod");
+    if(!sel) return;
+    const key = CONFIG.PREVIEW_METHOD_KEY || "ltx_preview_method";
+    try {
+      const stored = localStorage.getItem(key);
+      if(stored && ["taesd", "latent2rgb", "auto", "none"].includes(stored)){
+        sel.value = stored;
+      }
+    } catch(_){}
+    sel.addEventListener("change", (e) => {
+      try { localStorage.setItem(key, e.target.value); } catch(_){}
+    });
+  })();
+
+  // Prompt library buttons
+  $("btnSavePrompt").addEventListener("click", savePrompt);
+  $("btnMovePrompt").addEventListener("click", movePrompt);
+  $("btnDeletePrompt").addEventListener("click", deletePrompt);
+  loadPrompts();
+
+  // LoRA state
+  loadLoraState(); renderLoras(); loadModels();
+
+  // Enhancer shared listeners
+  $("enhancerToggle").addEventListener("click", () => {
+    const h = $("enhancerToggle");
+    const b = $("enhancerBody");
+    h.classList.toggle("open");
+    b.classList.toggle("open");
+    const arrow = h.querySelector(".arrow");
+    arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+  });
+
+  $("enhancerMode").addEventListener("change", () => {
+    const data = loadSysPrompts();
+    populateStyleSelect(data, $("enhancerMode").value);
+  });
+
+  $("btnUseAsPrompt").addEventListener("click", () => {
+    const text = $("enhancerOutput").value.trim();
+    if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
+    $("prompt").value = text;
+    log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
+  });
+
+  $("btnSaveEnhanced").addEventListener("click", () => {
+    const text = $("enhancerOutput").value.trim();
+    if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
+    const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
+    const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);
+    if(!name) return;
+    const saved = _readPromptStore();
+    if(saved[name]){
+      if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
+    }
+    saved[name] = text;
+    localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+    selectedPromptKey = name;
+    const parts = name.split('/');
+    if(parts.length > 1) lastPromptDir = parts.slice(0, -1).join('/');
+    loadPrompts();
+    log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
+  });
+
+  // Sysprompt modal
+  const sysPromptModal = document.createElement("div");
+  sysPromptModal.className = "modal-overlay";
+  sysPromptModal.id = "sysPromptModal";
+  sysPromptModal.innerHTML = '<div class="modal-content">' +
+    '<h2>Editar System Prompts</h2>' +
+    '<div class="modal-tabs" id="sysPromptTabs">' +
+      '<div class="modal-tab active" data-tab="text">Texto</div>' +
+      '<div class="modal-tab" data-tab="vision">Visión</div>' +
+    '</div>' +
+    '<div id="sysPromptEditor"></div>' +
+    '<div class="modal-actions">' +
+      '<button id="btnAddSysPrompt" class="ghost">+ Añadir estilo</button>' +
+      '<button id="btnSaveSysPrompts" class="primary">Guardar</button>' +
+      '<button id="btnCancelSysPrompts" class="ghost">Cancelar</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(sysPromptModal);
+
+  $("btnAddSysPrompt").addEventListener("click", () => {
+    const mode = sysPromptEditMode;
+    if(!sysPromptEditData[mode]) sysPromptEditData[mode] = {};
+    const keys = Object.keys(sysPromptEditData[mode]);
+    let nextKey = "C";
+    for(let i = 67; i < 91; i++){
+      const k = String.fromCharCode(i);
+      if(!keys.includes(k)){ nextKey = k; break; }
+    }
+    sysPromptEditData[mode][nextKey] = { name: "Nuevo estilo", prompt: "" };
+    renderSysPromptEditor();
+  });
+  $("btnSaveSysPrompts").addEventListener("click", () => {
+    const container = $("sysPromptEditor");
+    container.querySelectorAll(".sysprompt-row").forEach(row => {
+      const key = row.querySelector("textarea").dataset.key;
+      const name = row.querySelector(".spr-name-input").value;
+      const prompt = row.querySelector("textarea").value;
+      if(sysPromptEditData[sysPromptEditMode] && sysPromptEditData[sysPromptEditMode][key]){
+        sysPromptEditData[sysPromptEditMode][key].name = name;
+        sysPromptEditData[sysPromptEditMode][key].prompt = prompt;
+      }
+    });
+    saveSysPrompts(sysPromptEditData);
+    populateStyleSelect(sysPromptEditData, $("enhancerMode").value);
+    $("sysPromptModal").classList.remove("open");
+    log("✅ System prompts guardados.", "l-ok");
+  });
+  $("btnCancelSysPrompts").addEventListener("click", () => {
+    $("sysPromptModal").classList.remove("open");
+  });
+  document.querySelectorAll(".modal-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".modal-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      sysPromptEditMode = tab.dataset.tab;
+      renderSysPromptEditor();
+    });
+  });
+
+  $("btnEditSysPrompts").addEventListener("click", () => {
+    sysPromptEditData = loadSysPrompts();
+    sysPromptEditMode = "text";
+    renderSysPromptEditor();
+    const tabs = document.querySelectorAll(".modal-tab");
+    tabs.forEach(t => t.classList.remove("active"));
+    const textTab = document.querySelector('.modal-tab[data-tab="text"]');
+    if(textTab) textTab.classList.add("active");
+    $("sysPromptModal").classList.add("open");
+  });
+
+  // Collapsibles
+  makeCollapsible("promptLibToggle", "promptLibBody");
+  makeCollapsible("loraToggle", "loraBody");
+
+  // Export prompts
+  $("btnExportPrompts").addEventListener("click", () => {
+    const saved = _readPromptStore();
+    const json = JSON.stringify(saved, null, 2);
+    const blob = new Blob([json], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = CONFIG.UI_TYPE + "_prompts.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    log(`📥 ${Object.keys(saved).length} prompts exportados.`, "l-ok");
+  });
+
+  // Import prompts
+  $("btnImportPrompts").addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const imported = JSON.parse(ev.target.result);
+          if(typeof imported !== 'object' || Array.isArray(imported)){
+            throw new Error("formato inválido (se esperaba un objeto)");
+          }
+          const saved = _readPromptStore();
+          let added = 0, overwritten = 0;
+          for(const [key, val] of Object.entries(imported)){
+            if(typeof val !== 'string') continue;
+            if(saved[key]) overwritten++; else added++;
+            saved[key] = val;
+          }
+          localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+          loadPrompts();
+          log(`📤 ${added} prompts importados (${overwritten} sobrescritos).`, "l-ok");
+        } catch(err){
+          log("❌ Error importando: " + err.message, "l-err");
+        }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  });
+
+  // Init enhancer
+  (async () => {
+    await loadEnhancerModels();
+    const data = loadSysPrompts();
+    populateStyleSelect(data, $("enhancerMode").value);
+  })();
+
+  // Stop buttons
+  $("btnStopVideo").addEventListener("click", stopCurrentVideo);
+  $("btnStopAll").addEventListener("click", stopAll);
+
+  // Test connection
+  $("btnTest").addEventListener("click", async ()=>{
+      setConn("busy","comprobando...");
+      try{
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 8000);
+          const target = (server() ? server() : "") + "/system_stats";
+          const r = await fetchWithRetry(target, { signal: ctrl.signal }, 3, 400);
+          clearTimeout(timer);
+          if(!r.ok) throw new Error("HTTP "+r.status);
+          const data = await r.json();
+          setConn("ok","conectado");
+          connectSocket();
+          const vram = data?.devices?.[0]?.vram_free ? ` (VRAM libre: ${(data.devices[0].vram_free / 1024 / 1024 / 1024).toFixed(1)} GB)` : "";
+          log("Conexión OK con ComfyUI" + vram, "l-ok");
+      }catch(err){
+          setConn("bad","sin conexión");
+          const msg = (err.name === "AbortError") ? "Timeout (sin respuesta en 8s)" : err.message;
+          log("Error de conexión: " + msg, "l-err");
+          if(server()){
+            log("Sugerencia: si estás en LAN, deja el campo de servidor vacío para usar el proxy automático.", "l-info");
+          }
+      }
+  });
+}
+
+// --- DRAG HACIA FUERA (drag-out) ---
+// Permite arrastrar medios mostrados (vídeos/imágenes) hacia otras ventanas
+// (LTXV ↔ Krea2) o hacia el sistema operativo (escritorio, otras apps).
+//
+// - En dragstart: establece text/uri-list (URL del backend), DownloadURL
+//   (para arrastrar al filesystem como descarga) y application/x-ltxv-media
+//   (JSON con {filename, subfolder, type} para drag entre las dos UIs).
+// - En drop: si no hay archivos del OS pero hay text/uri-list o el MIME
+//   custom, hace fetch de la URL y llama al handler de archivo del destino.
+
+const LTXV_MEDIA_MIME = "application/x-ltxv-media";
+
+// Registra un elemento <video>/<img> como fuente arrastrable.
+// `getMedia` debe devolver un objeto {filename, subfolder, type} o null.
+function makeDragSource(el, getMedia){
+  if(!el) return;
+  el.addEventListener("dragstart", (e) => {
+    const media = getMedia();
+    if(!media || !media.filename) { e.preventDefault(); return; }
+    const url = mediaViewUrl(media, { anchor: "" });
+    const display = media.filename || "media";
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.setData("text/plain", url);
+    e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+    // DownloadURL permite arrastrar al escritorio como archivo descargado.
+    // El navegador exige el formato: mime:filename:URL
+    const isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(media.filename);
+    const mime = isVideo ? "video/mp4" : "image/png";
+    e.dataTransfer.setData("DownloadURL", `${mime}:${display}:${url}`);
+  });
+}
+
+// Registra una tarjeta (.variant-card / .gallery-item) como fuente arrastrable.
+// Lee los datos del dataset del card.
+function makeCardDraggable(card){
+  if(!card) return;
+  card.setAttribute("draggable", "true");
+  card.addEventListener("dragstart", (e) => {
+    const media = {
+      filename: card.dataset.filename,
+      subfolder: card.dataset.subfolder || "",
+      type: card.dataset.type || "output",
+    };
+    if(!media.filename){ e.preventDefault(); return; }
+    const url = mediaViewUrl(media, { anchor: card.dataset.slot ? "" : "#t=0.1" });
+    e.dataTransfer.effectAllowed = "copy";
+    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.setData("text/plain", url);
+    e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+    const isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(media.filename);
+    const mime = isVideo ? "video/mp4" : "image/png";
+    e.dataTransfer.setData("DownloadURL", `${mime}:${media.filename}:${url}`);
+  });
+}
+
+// Habilita un dropzone para aceptar drag entre UIs (no solo archivos del OS).
+// `onFile(file, filename)` se llama con un File descargado desde la URL arrastrada.
+// El dropzone ya debe tener sus listeners de drop para archivos del OS; este
+// helper añade lógica para leer text/uri-list o el MIME custom cuando no hay
+// files en dataTransfer.
+function enableInterUIDrop(el, onFile){
+  if(!el) return;
+  el.addEventListener("dragover", (e) => {
+    // Permitir drop de URLs (no solo archivos)
+    if(!e.dataTransfer.types.includes("Files")){
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  });
+  el.addEventListener("drop", async (e) => {
+    // Si hay archivos del OS, los maneja el listener existente.
+    if(e.dataTransfer.files && e.dataTransfer.files.length > 0) return;
+    // Si no hay archivos, intentamos leer una URL arrastrada desde otra UI.
+    const custom = e.dataTransfer.getData(LTXV_MEDIA_MIME);
+    const uri = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+    if(!uri && !custom) return;
+    e.preventDefault();
+    e.stopPropagation();
+    let media;
+    if(custom){
+      try { media = JSON.parse(custom); } catch(_){ media = null; }
+    }
+    // Caso 1: el medio trae un dataURL embebido (historial IndexedDB de Krea2).
+    // Lo convertimos directamente a File sin pasar por la red.
+    if(media && media._dataUrl && media._dataUrl.startsWith("data:")){
+      try {
+        const r = await fetch(media._dataUrl);
+        const blob = await r.blob();
+        const filename = media.filename || "dragged_media.png";
+        const file = new File([blob], filename, { type: blob.type || "image/png" });
+        onFile(file, filename);
+        return;
+      } catch(err){ log("❌ No se pudo cargar el medio arrastrado: "+err.message, "l-err"); return; }
+    }
+    // Caso 2: URL del backend (http). Descargamos y convertimos a File.
+    const url = uri || (media ? mediaViewUrl(media, { anchor: "" }) : null);
+    if(!url) return;
+    try {
+      const r = await fetch(url);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const blob = await r.blob();
+      const filename = (media && media.filename) || url.split("/").pop().split("?")[0] || "dragged_media";
+      const file = new File([blob], filename, { type: blob.type || (media && /\.(mp4|webm|mov)$/i.test(media.filename) ? "video/mp4" : "image/png") });
+      onFile(file, filename);
+    } catch(err){
+      log("❌ No se pudo cargar el medio arrastrado: "+err.message, "l-err");
+    }
+  });
+}
+// mmh3x2.js — MMH3X2-specific JavaScript (2 segmentos, 4 imágenes, 1 vídeo, RTX y RIFE).
+// Injected AFTER common.js. CONFIG must be defined before initCommon().
+
+const CONFIG = {
+  PROMPTS_KEY: 'mmh3x2_prompts',
+  LORA_STATE_KEY: 'mmh3x2_loras_state',
+  ENHANCER_SYSKEY: 'mmh3x2_enhancer_sysprompts',
+  SERVERURL_KEY: 'mmh3x2_serverUrl',
+  DEFAULT_BACKEND_PORT: "7821",
+  UI_TYPE: "mmh3x2",
+  DEFAULT_MODEL: "",
+  DEFAULT_VAE: "Checkpoint",
+  N: {
+    UNET: "1",
+    ATTN: "2",
+    SPARSE: "4",
+    SIGMA_SHIFT: "5",
+    MEM_OPT: "6",
+    CLIP: "7",
+    VAE_VID: "8",
+    VAE_AUD: "9",
+    IMG1: "10",
+    DURATION: "12",
+    FRAMES_EXPR: "13",
+    REF2V_SEG1: "14",
+    SEED: "15",
+    GUIDER_1: "16",
+    SAMPLER_1: "17",
+    SCHEDULER_1: "18",
+    SAMPLE_1: "19",
+    DECODE_VID_1: "20",
+    DECODE_AUD_1: "21",
+    CREATE_VID_1: "22",
+    SAVE_VID_1: "23",
+    LAST_48: "25",
+    LAST_FRAME: "26",
+    SAVE_LAST_FRAME: "28",
+    SAVE_REF_GRID: "29",
+    REF2V_SEG2: "30",
+    GUIDER_2: "32",
+    SAMPLER_2: "33",
+    SCHEDULER_2: "34",
+    SAMPLE_2: "35",
+    DECODE_VID_2: "36",
+    DECODE_AUD_2: "37",
+    CREATE_VID_2: "38",
+    SAVE_VID_2: "39",
+    IMAGE_BATCH: "40",
+    AUDIO_CONCAT: "41",
+    CREATE_VID_FINAL: "42",
+    SAVE_VID_FINAL: "43",
+    PROMPT_1: "50",
+    OLLAMA_CONN: "51",
+    OLLAMA_CHAT_1: "53",
+    SCALE_2S: "54",
+    OLLAMA_CHAT_2: "55",
+    PROMPT_2: "58",
+    BLEND: "66",
+    INJECT_LATENT: "68",
+    ADD_GUIDE: "70",
+    RTX: "71",
+    RIFE: "72",
+    RIFE_LOADER: "73",
+    RIFE_MULT: "74",
+    BASE_FPS: "75",
+    FPS_EXPR: "76",
+    MEGAPIXELS: "77",
+    GET_SIZE: "78",
+    STEPS: "79",
+    IMG2: "81",
+    IMG3: "82",
+    IMG4: "83",
+    PURGE: "87"
+  },
+  loras: [
+    { on: false, lora: "", strength: 1.0 },
+    { on: false, lora: "", strength: 1.0 }
+  ],
+  ENHANCER_DEFAULT_PROMPTS: {
+    text: {
+      A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for MiniMaxH3 video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. Respond in English with ONLY the enhanced prompt." },
+      B: { name: "Estilo B (continuación de acción)", prompt: "You are an assistant specialized in visual continuity and scene escalation. Describe the direct, logical evolution of the ongoing action for the next video segment. Respond in English with ONLY the enhanced continuation prompt." }
+    },
+    vision: {
+      A: { name: "Estilo A (descriptivo)", prompt: "Analyze the provided reference image and describe composition, subjects, lighting, colors, and motion for a video segment. Respond in English with ONLY the enhanced prompt." }
+    }
+  }
+};
+
+const N = CONFIG.N;
+
+// Estado de imágenes y vídeo
+let mediaSlots = {
+  1: { file: null, dataUrl: null, uploaded: null, name: "" },
+  2: { file: null, dataUrl: null, uploaded: null, name: "" },
+  3: { file: null, dataUrl: null, uploaded: null, name: "" },
+  4: { file: null, dataUrl: null, uploaded: null, name: "" }
+};
+let videoSlot = { file: null, dataUrl: null, uploaded: null, name: "" };
+
+// Jobs y Cola
+let activeJob = null;
+let currentPromptId = null;
+let promptVariantMap = {};
+let promptSteps = {};
+let pendingSeeds = {};
+let displayedSlots = {};
+let currentActiveSamplerSlot = 1; // 1 o 2
+
+// UI Tabs
+let currentViewMode = "all";
+
+// Callbacks CONFIG requeridos por common.js
+CONFIG.findMedia = function(output){
+  if(!output) return null;
+  // Puede ser SaveVideo (videos o gifs) o SaveImage
+  const vids = output.videos || output.gifs || output.images;
+  if(Array.isArray(vids) && vids.length > 0){
+    const item = vids[0];
+    const fn = item.filename || item;
+    const sub = item.subfolder || "";
+    const type = item.type || "output";
+    return server() + `/view?filename=${encodeURIComponent(fn)}&subfolder=${encodeURIComponent(sub)}&type=${encodeURIComponent(type)}`;
+  }
+  return null;
+};
+
+CONFIG.showMedia = function(url, meta){
+  // Determinamos a qué reproductor pertenece según el nodo ejecutado o meta
+  // Si no se especifica, por defecto al final o según la respuesta del backend
+  const targetPlayer = meta?.targetSlot || 3;
+  if(targetPlayer === 1){
+    displayVideoInPlayer(1, url);
+  } else if(targetPlayer === 2){
+    displayVideoInPlayer(2, url);
+  } else {
+    displayVideoInPlayer(3, url);
+  }
+};
+
+CONFIG.onPreview = function(url, meta){
+  // Determina si estamos muestreando el segmento 1 o el segmento 2
+  const slot = (currentActiveSamplerSlot === 2) ? "Seg2" : "Seg1";
+  const p = $("previewImg" + slot);
+  const pv = $("previewVideo" + slot);
+  const e = $("empty" + slot);
+  const v = $("video" + slot);
+  if(!p && !pv) return;
+
+  const isVideoUrl = typeof url === "string" && (url.startsWith("data:video/mp4") || url.startsWith("data:video/webm"));
+  const target = isVideoUrl && pv ? pv : p;
+  const other = isVideoUrl ? p : pv;
+
+  target.src = url;
+  target.style.display = "block";
+  if(other) other.style.display = "none";
+  if(e) e.style.display = "none";
+  if(v) v.style.display = "none";
+  if(isVideoUrl && pv && pv.autoplay !== true){ pv.autoplay = true; pv.muted = true; pv.loop = true; }
+  if(isVideoUrl && target.play) target.play().catch(()=>{});
+};
+
+CONFIG.onClearPreview = function(){
+  ["Seg1", "Seg2"].forEach(slot => {
+    const p = $("previewImg" + slot);
+    const pv = $("previewVideo" + slot);
+    if(p){ p.style.display = "none"; p.removeAttribute("src"); }
+    if(pv){ pv.pause(); pv.style.display = "none"; pv.removeAttribute("src"); pv.load(); }
+  });
+};
+
+CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
+  const gallery = $("variantGalleryBox");
+  const grid = $("variantGrid");
+  if(!gallery || !grid) return;
+  gallery.style.display = "block";
+
+  const countBadge = $("variantCount");
+  const totalCards = grid.querySelectorAll(".variant-card").length + 1;
+  if(countBadge) countBadge.textContent = `(${totalCards})`;
+
+  const card = document.createElement("div");
+  card.className = "variant-card";
+  card.innerHTML = `
+    <div class="thumb-wrap">
+      <video src="${url}#t=0.001" preload="metadata" muted playsinline loop style="width:100%;height:140px;object-fit:cover;cursor:pointer;"></video>
+      <span class="variant-badge">Var ${varIdx} · Seed ${seed}</span>
+    </div>
+    <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
+      <button class="ghost btn-mini btn-load-card" title="Cargar en reproductor principal">▶ Cargar</button>
+      <button class="ghost btn-mini btn-del-card" title="Quitar de galería">✕</button>
+    </div>
+  `;
+
+  const videoEl = card.querySelector("video");
+  videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
+  videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0; });
+  videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url); });
+
+  card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, url); });
+  card.querySelector(".btn-del-card").addEventListener("click", () => {
+    card.remove();
+    const remaining = grid.querySelectorAll(".variant-card").length;
+    if(countBadge) countBadge.textContent = remaining > 0 ? `(${remaining})` : "";
+    if(remaining === 0) gallery.style.display = "none";
+  });
+
+  grid.insertBefore(card, grid.firstChild);
+};
+
+CONFIG.onSeedUpdate = function(newSeed){
+  const sv = $("seedVal");
+  if(sv && $("segRandom").classList.contains("on")){
+    sv.value = newSeed;
+  }
+};
+
+CONFIG.onPromptError = function(pid){
+  delete promptSteps[pid];
+  delete pendingSeeds[pid];
+  delete promptVariantMap[pid];
+  delete displayedSlots[pid];
+  finishCurrentJob();
+};
+
+CONFIG.startNextVariant = async function(){
+  if(!activeJob) return;
+  if(currentBatchIndex < totalBatchSize){
+    const nextSeed = activeJob.seedMode === "random" ? Math.floor(Math.random()*1000000000) : (activeJob.seed + currentBatchIndex);
+    variantCounter++;
+    activeJob.currentVariantIndex = variantCounter;
+    currentBatchIndex++;
+    await enqueueJobVariant(activeJob, nextSeed, variantCounter);
+  } else {
+    finishCurrentJob();
+  }
+};
+
+CONFIG.onBatchComplete = function(){
+  finishCurrentJob();
+};
+
+CONFIG.onStopCurrent = async function(){
+  if(!currentPromptId) return;
+  try {
+    await fetch(server()+"/interrupt", { method: "POST" });
+    log("⏹ Interrupción solicitada para la tarea actual", "l-warn");
+  } catch(e){
+    log(`Error al interrumpir: ${e.message}`, "l-err");
+  }
+};
+
+CONFIG.onStopAll = async function(){
+  try {
+    await fetch(server()+"/interrupt", { method: "POST" });
+    await fetch(server()+"/queue", { method: "POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({clear:true}) });
+    jobQueue = [];
+    activeJob = null;
+    currentPromptId = null;
+    updateQueueUI();
+    log("⏹ Todas las tareas canceladas y cola vaciada", "l-warn");
+  } catch(e){
+    log(`Error al cancelar todo: ${e.message}`, "l-err");
+  }
+};
+
+// ==========================================
+// RENDER Y GESTIÓN DE REPRODUCTORES
+// ==========================================
+function displayVideoInPlayer(slotIndex, url){
+  const suffix = (slotIndex === 1) ? "Seg1" : (slotIndex === 2 ? "Seg2" : "Final");
+  const video = $("video" + suffix);
+  const empty = $("empty" + suffix);
+  const pImg = $("previewImg" + suffix);
+  const pVid = $("previewVideo" + suffix);
+  const btnDl = $("btnDownload" + suffix);
+  const btnExt = $("btnExtractFrame" + suffix);
+  const btnMeta = $("btnLoadMeta" + suffix);
+  const timeTag = $("time" + suffix);
+  const resTag = $("res" + suffix);
+
+  if(empty) empty.style.display = "none";
+  if(pImg) pImg.style.display = "none";
+  if(pVid){ pVid.pause(); pVid.style.display = "none"; }
+
+  if(video){
+    video.src = url;
+    video.style.display = "block";
+    video.load();
+    video.onloadedmetadata = () => {
+      if(timeTag) timeTag.textContent = `${video.duration.toFixed(1)}s`;
+      if(resTag) resTag.textContent = `${video.videoWidth}x${video.videoHeight}`;
+    };
+  }
+
+  if(btnDl){
+    btnDl.style.display = "inline-flex";
+    btnDl.onclick = () => {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `MMH3X2_${suffix}_${Date.now()}.mp4`;
+      a.click();
+    };
+  }
+
+  if(btnExt){
+    btnExt.style.display = "inline-flex";
+    btnExt.onclick = () => {
+      extractCurrentFrame(video, slotIndex);
+    };
+  }
+
+  if(btnMeta){
+    btnMeta.disabled = false;
+  }
+}
+
+// Extrae un frame del vídeo reproducido y permite asignarlo a uno de los 4 slots de imagen
+function extractCurrentFrame(videoEl, fromSlot){
+  if(!videoEl || videoEl.videoWidth === 0) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = videoEl.videoWidth;
+  canvas.height = videoEl.videoHeight;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL("image/png");
+
+  // Asignar por defecto a la siguiente imagen lógica o al slot seleccionado
+  const targetSlot = (fromSlot === 1) ? 3 : 1;
+  setMediaSlotData(targetSlot, null, dataUrl, `Frame extraído de Seg ${fromSlot}`);
+  log(`📸 Frame de ${videoEl.currentTime.toFixed(2)}s asignado al Slot de Imagen ${targetSlot}`, "l-ok");
+}
+
+// ==========================================
+// GESTIÓN DE MEDIOS (4 IMÁGENES + 1 VÍDEO)
+// ==========================================
+function setupMediaSlots(){
+  for(let i = 1; i <= 4; i++){
+    const slotEl = $(`slotImg${i}`);
+    const fileInput = $(`fileInput${i}`);
+    const delBtn = $(`btnDelImg${i}`);
+
+    if(slotEl && fileInput){
+      slotEl.addEventListener("click", (e) => {
+        if(e.target === delBtn || delBtn.contains(e.target)) return;
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if(file) handleImageFile(i, file);
+      });
+
+      // Drag & Drop
+      slotEl.addEventListener("dragover", (e) => { e.preventDefault(); slotEl.classList.add("drag"); });
+      slotEl.addEventListener("dragleave", () => { slotEl.classList.remove("drag"); });
+      slotEl.addEventListener("drop", (e) => {
+        e.preventDefault();
+        slotEl.classList.remove("drag");
+        const file = e.dataTransfer.files[0];
+        if(file && file.type.startsWith("image/")){
+          handleImageFile(i, file);
+        } else {
+          // Chequear si es una URL arrastrada
+          const url = e.dataTransfer.getData("text/plain");
+          if(url) handleImageUrl(i, url);
+        }
+      });
+    }
+
+    if(delBtn){
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        clearMediaSlot(i);
+      });
+    }
+  }
+
+  // Vídeo de referencia opcional
+  const vidSlot = $("slotVid");
+  const vidInput = $("fileInputVid");
+  const btnDelVid = $("btnDelVid");
+
+  if(vidSlot && vidInput){
+    vidSlot.addEventListener("click", (e) => {
+      if(e.target === btnDelVid || (btnDelVid && btnDelVid.contains(e.target))) return;
+      vidInput.click();
+    });
+
+    vidInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if(file) handleVideoFile(file);
+    });
+
+    vidSlot.addEventListener("dragover", (e) => { e.preventDefault(); vidSlot.classList.add("drag"); });
+    vidSlot.addEventListener("dragleave", () => { vidSlot.classList.remove("drag"); });
+    vidSlot.addEventListener("drop", (e) => {
+      e.preventDefault();
+      vidSlot.classList.remove("drag");
+      const file = e.dataTransfer.files[0];
+      if(file && file.type.startsWith("video/")){
+        handleVideoFile(file);
+      }
+    });
+  }
+
+  if(btnDelVid){
+    btnDelVid.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearVideoSlot();
+    });
+  }
+
+  // Soporte para pegar con Ctrl+V
+  window.addEventListener("paste", (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for(let item of items){
+      if(item.kind === 'file' && item.type.startsWith('image/')){
+        const blob = item.getAsFile();
+        // Buscar el primer slot vacío o sobreescribir el 1
+        let target = 1;
+        for(let s = 1; s <= 4; s++){
+          if(!mediaSlots[s].dataUrl && !mediaSlots[s].file){ target = s; break; }
+        }
+        handleImageFile(target, blob);
+        break;
+      }
+    }
+  });
+}
+
+function handleImageFile(slotIdx, file){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    setMediaSlotData(slotIdx, file, e.target.result, file.name);
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleImageUrl(slotIdx, url){
+  setMediaSlotData(slotIdx, null, url, url.split("/").pop().split("?")[0]);
+}
+
+function setMediaSlotData(slotIdx, file, dataUrl, name){
+  mediaSlots[slotIdx] = { file, dataUrl, uploaded: null, name };
+  const img = $(`previewSlotImg${slotIdx}`);
+  const ph = $(`phImg${slotIdx}`);
+  const info = $(`infoImg${slotIdx}`);
+
+  if(img){
+    img.src = dataUrl;
+    img.style.display = "block";
+    img.onload = () => {
+      if(slotIdx === 1) updateCalculatedResolution(img.naturalWidth, img.naturalHeight);
+      if(info) info.textContent = `${img.naturalWidth}x${img.naturalHeight} · ${name || 'img'}`;
+    };
+  }
+  if(ph) ph.style.display = "none";
+}
+
+function clearMediaSlot(slotIdx){
+  mediaSlots[slotIdx] = { file: null, dataUrl: null, uploaded: null, name: "" };
+  const img = $(`previewSlotImg${slotIdx}`);
+  const ph = $(`phImg${slotIdx}`);
+  const info = $(`infoImg${slotIdx}`);
+  const fileInput = $(`fileInput${slotIdx}`);
+
+  if(img){ img.removeAttribute("src"); img.style.display = "none"; }
+  if(ph) ph.style.display = "block";
+  if(info) info.textContent = "";
+  if(fileInput) fileInput.value = "";
+}
+
+function handleVideoFile(file){
+  const url = URL.createObjectURL(file);
+  videoSlot = { file, dataUrl: url, uploaded: null, name: file.name };
+  const v = $("previewSlotVid");
+  const ph = $("phVid");
+  const info = $("infoVid");
+  const btnDel = $("btnDelVid");
+
+  if(v){
+    v.src = url;
+    v.style.display = "block";
+  }
+  if(ph) ph.style.display = "none";
+  if(info) info.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+  if(btnDel) btnDel.style.display = "inline-flex";
+}
+
+function clearVideoSlot(){
+  videoSlot = { file: null, dataUrl: null, uploaded: null, name: "" };
+  const v = $("previewSlotVid");
+  const ph = $("phVid");
+  const info = $("infoVid");
+  const btnDel = $("btnDelVid");
+  const input = $("fileInputVid");
+
+  if(v){ v.removeAttribute("src"); v.style.display = "none"; }
+  if(ph) ph.style.display = "block";
+  if(info) info.textContent = "";
+  if(btnDel) btnDel.style.display = "none";
+  if(input) input.value = "";
+}
+
+// Sube todas las imágenes y vídeos pendientes antes de encolar
+async function ensureAllMediaUploaded(){
+  for(let i = 1; i <= 4; i++){
+    const slot = mediaSlots[i];
+    if(slot.file && !slot.uploaded){
+      slot.uploaded = await uploadSingleFile(slot.file, `mmh3x2_slot_${i}.png`);
+    } else if(slot.dataUrl && !slot.uploaded && slot.dataUrl.startsWith("data:")){
+      const blob = dataUrlToBlob(slot.dataUrl);
+      slot.uploaded = await uploadSingleFile(blob, `mmh3x2_slot_${i}.png`);
+    }
+  }
+
+  if(videoSlot.file && !videoSlot.uploaded){
+    videoSlot.uploaded = await uploadSingleFile(videoSlot.file, videoSlot.name || "mmh3x2_ref_vid.mp4");
+  }
+}
+
+async function uploadSingleFile(fileOrBlob, filename){
+  const fd = new FormData();
+  fd.append("image", fileOrBlob, filename);
+  fd.append("overwrite", "true");
+  const r = await fetch(server() + "/upload/image", { method: "POST", body: fd });
+  if(!r.ok) throw new Error("Fallo al subir archivo multimedia a ComfyUI");
+  const d = await r.json();
+  return { name: d.name, subfolder: d.subfolder || "", type: d.type || "input" };
+}
+
+function dataUrlToBlob(dataUrl){
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+  return new Blob([u8arr], { type: mime });
+}
+
+// ==========================================
+// CÁLCULOS DE RESOLUCIÓN Y DURACIÓN
+// ==========================================
+function updateCalculatedResolution(origW, origH){
+  const mp = parseFloat($("mpSlider")?.value || "0.70");
+  const ar = (origW && origH) ? (origW / origH) : (16 / 9);
+
+  // Ancho y alto proporcionales que multipliquen ~ mp * 1,000,000 píxeles redondeados a múltiplos de 32
+  const targetPixels = mp * 1000000;
+  let h = Math.round(Math.sqrt(targetPixels / ar) / 32) * 32;
+  let w = Math.round((h * ar) / 32) * 32;
+  w = Math.max(256, w);
+  h = Math.max(256, h);
+
+  if($("width")) $("width").value = w;
+  if($("height")) $("height").value = h;
+  if($("arDetectHint")) $("arDetectHint").textContent = `(${ar.toFixed(2)}:1 · ${w}x${h})`;
+}
+
+function updateDurationFrames(){
+  const dur = parseFloat($("durationSlider")?.value || "5.0");
+  // Fórmula MiniMax H3: max(5, round(a*24)) + (5 - (max(5, round(a*24)) % 17)) % 17
+  const baseFrames = Math.max(5, Math.round(dur * 24));
+  const framesPerSeg = baseFrames + ((5 - (baseFrames % 17)) % 17);
+  const totalFrames = framesPerSeg * 2;
+  const totalSecs = (totalFrames / 24).toFixed(1);
+
+  if($("durHint")) $("durHint").textContent = `(${dur.toFixed(1)}s → ${framesPerSeg} frames)`;
+  if($("durationVal")) $("durationVal").textContent = `${dur.toFixed(1)}s`;
+  if($("totalFramesHint")){
+    $("totalFramesHint").textContent = `Total: 2 segmentos x ${framesPerSeg}f = ${totalFrames} frames (~${totalSecs}s a 24fps)`;
+  }
+}
+
+// ==========================================
+// CONSTRUCCIÓN DEL GRAFO (buildGraph)
+// ==========================================
+function buildGraph(j){
+  const g = JSON.parse(JSON.stringify(BASE_GRAPH));
+
+  // 1. Prompts
+  const p1 = (j ? j.prompt : $("prompt")?.value) || "";
+  const p2 = (j ? j.prompt2 : $("prompt2")?.value) || "";
+  if(g[N.PROMPT_1]?.inputs) g[N.PROMPT_1].inputs.value = p1;
+  if(g[N.PROMPT_2]?.inputs) g[N.PROMPT_2].inputs.value = p2;
+
+  // Modo del Prompt 2: Directo o Asistido Ollama
+  const seg2Mode = $("seg2PromptMode")?.value || "direct";
+  if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
+    // Conectar directamente al prompt 2 del usuario, omitiendo la llamada interna a Ollama
+    g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
+    delete g[N.OLLAMA_CHAT_1];
+    delete g[N.OLLAMA_CHAT_2];
+  }
+
+  // 2. Duración y Megapíxeles
+  const dur = parseFloat((j ? j.duration : $("durationSlider")?.value) || "5.0");
+  if(g[N.DURATION]?.inputs) g[N.DURATION].inputs.value = dur;
+
+  const mp = parseFloat((j ? j.megapixels : $("mpSlider")?.value) || "0.70");
+  if(g[N.MEGAPIXELS]?.inputs) g[N.MEGAPIXELS].inputs.megapixels = mp;
+
+  // 3. Semilla
+  const seed = (j ? j.seed : parseInt($("seedVal")?.value || "12345", 10));
+  if(g[N.SEED]?.inputs) g[N.SEED].inputs.noise_seed = seed;
+
+  // 4. Pasos (Steps)
+  const steps = parseInt((j ? j.steps : $("stepsSlider")?.value) || "20", 10);
+  if(g[N.STEPS]?.inputs) g[N.STEPS].inputs.value = steps;
+  if(g[N.SCHEDULER_1]?.inputs) g[N.SCHEDULER_1].inputs.steps = steps;
+  if(g[N.SCHEDULER_2]?.inputs) g[N.SCHEDULER_2].inputs.steps = steps;
+
+  // 5. Sampler y Scheduler
+  const sampler = (j ? j.sampler : $("samplerName")?.value) || "res_multistep";
+  const scheduler = (j ? j.scheduler : $("schedulerName")?.value) || "simple";
+  if(g[N.SAMPLER_1]?.inputs) g[N.SAMPLER_1].inputs.sampler_name = sampler;
+  if(g[N.SAMPLER_2]?.inputs) g[N.SAMPLER_2].inputs.sampler_name = sampler;
+  if(g[N.SCHEDULER_1]?.inputs) g[N.SCHEDULER_1].inputs.scheduler = scheduler;
+  if(g[N.SCHEDULER_2]?.inputs) g[N.SCHEDULER_2].inputs.scheduler = scheduler;
+
+  // 6. Modelos: UNet y CLIP
+  const unet = $("unetModel")?.value;
+  if(unet && g[N.UNET]?.inputs) g[N.UNET].inputs.unet_name = unet;
+  const clip = $("clipModel")?.value;
+  if(clip && g[N.CLIP]?.inputs) g[N.CLIP].inputs.clip_name = clip;
+
+  // 7. Pipeline de Modelo Base & Optimizaciones H3
+  let currentModelNode = N.MEM_OPT;
+
+  // Sparse Attention
+  const sparseOn = $("h3SparseToggle") ? $("h3SparseToggle").checked : true;
+  if(sparseOn && g[N.SPARSE]?.inputs){
+    g[N.SPARSE].inputs.video_budget = parseFloat($("h3BudgetSlider")?.value || "0.30");
+    g[N.SPARSE].inputs.denser_early_late_steps = $("h3EarlyLateToggle") ? $("h3EarlyLateToggle").checked : true;
+  } else if(!sparseOn && g[N.SPARSE]){
+    // Bypass nodo 4: conectar nodo 5 directamente al nodo 2
+    if(g[N.SIGMA_SHIFT]?.inputs) g[N.SIGMA_SHIFT].inputs.model = [N.ATTN, 0];
+    delete g[N.SPARSE];
+  }
+
+  // Memory Optimization
+  const memOn = $("h3MemToggle") ? $("h3MemToggle").checked : true;
+  if(!memOn && g[N.MEM_OPT]){
+    // Bypass nodo 6: conectar directo al nodo 5
+    currentModelNode = N.SIGMA_SHIFT;
+    delete g[N.MEM_OPT];
+  }
+
+  // Sigma Shift
+  if(g[N.SIGMA_SHIFT]?.inputs){
+    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat($("h3ShiftVideo")?.value || "1.0");
+    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat($("h3ShiftAudio")?.value || "1.0");
+  }
+
+  // 8. Inyección dinámica de LoRAs
+  if($("lora1Toggle")?.checked && $("lora1Select")?.value){
+    const l1 = $("lora1Select").value;
+    const s1 = parseFloat($("lora1Strength")?.value || "1.0");
+    g["145_1"] = {
+      class_type: "LoraLoaderModelOnly",
+      inputs: { model: [currentModelNode, 0], lora_name: l1, strength_model: s1 },
+      _meta: { title: "LoRA 1" }
+    };
+    currentModelNode = "145_1";
+  }
+
+  if($("lora2Toggle")?.checked && $("lora2Select")?.value){
+    const l2 = $("lora2Select").value;
+    const s2 = parseFloat($("lora2Strength")?.value || "1.0");
+    g["145_2"] = {
+      class_type: "LoraLoaderModelOnly",
+      inputs: { model: [currentModelNode, 0], lora_name: l2, strength_model: s2 },
+      _meta: { title: "LoRA 2" }
+    };
+    currentModelNode = "145_2";
+  }
+
+  // 9. ModelPreviewOverrideKJ (Live preview animado multi-frame en tiempo real)
+  const prevMethod = getPreviewMethod();
+  if(prevMethod !== "none"){
+    const previewOverrideKey = "170";
+    g[previewOverrideKey] = {
+      class_type: "ModelPreviewOverrideKJ",
+      inputs: {
+        model: [currentModelNode, 0],
+        max_resolution: 768,
+        jpeg_quality: 80,
+        suppress_default_preview: true,
+        preview_frames: 32,
+        preview_fps: 6,
+        tiny_vae: "none"
+      },
+      _meta: { title: "Model Preview Override (animado L2RGB)" }
+    };
+    currentModelNode = previewOverrideKey;
+  }
+
+  // Conectar el modelo resultante a Guiders y Schedulers
+  if(g[N.GUIDER_1]?.inputs) g[N.GUIDER_1].inputs.model = [currentModelNode, 0];
+  if(g[N.SCHEDULER_1]?.inputs) g[N.SCHEDULER_1].inputs.model = [currentModelNode, 0];
+  if(g[N.GUIDER_2]?.inputs) g[N.GUIDER_2].inputs.model = [currentModelNode, 0];
+  if(g[N.SCHEDULER_2]?.inputs) g[N.SCHEDULER_2].inputs.model = [currentModelNode, 0];
+
+  // 10. Conexión de Imágenes de Entrada (Slots 1..4)
+  if(mediaSlots[1].uploaded && g[N.IMG1]?.inputs) g[N.IMG1].inputs.image = mediaSlots[1].uploaded.name;
+  if(mediaSlots[2].uploaded && g[N.IMG2]?.inputs) g[N.IMG2].inputs.image = mediaSlots[2].uploaded.name;
+  if(mediaSlots[3].uploaded && g[N.IMG3]?.inputs) g[N.IMG3].inputs.image = mediaSlots[3].uploaded.name;
+  if(mediaSlots[4].uploaded && g[N.IMG4]?.inputs) g[N.IMG4].inputs.image = mediaSlots[4].uploaded.name;
+
+  // 11. Vídeo de Referencia para Seg 2
+  if(videoSlot.uploaded && g[N.REF2V_SEG2]?.inputs){
+    // Inyectar un LoadVideo / nodo de imagen para el vídeo subido por el usuario
+    g["195_user_vid"] = {
+      class_type: "VHS_LoadVideo",
+      inputs: { video: videoSlot.uploaded.name, force_rate: 0, force_size: "Disabled", custom_width: 512, custom_height: 512, frame_load_cap: 0, skip_first_frames: 0, select_every_nth: 1 },
+      _meta: { title: "Vídeo Ref Usuario" }
+    };
+    // Conectar como ref_video
+    if(g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0']){
+      g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0'] = ["195_user_vid", 0];
+    }
+  }
+
+  // 12. Postprocesado: RTX Video Super Resolution y RIFE
+  const rtxOn = $("rtxToggle") ? $("rtxToggle").checked : true;
+  const rifeOn = $("rifeToggle") ? $("rifeToggle").checked : true;
+  const blendOn = $("blendToggle") ? $("blendToggle").checked : true;
+
+  if(!blendOn && g[N.BLEND]){
+    // Bypass nodo 66: pasar directamente la imagen de 64 a 40
+    if(g[N.IMAGE_BATCH]?.inputs) g[N.IMAGE_BATCH].inputs.image_2 = ["64", 0];
+    delete g[N.BLEND];
+  }
+
+  let finalImagesSource = [N.IMAGE_BATCH, 0];
+
+  if(rtxOn && g[N.RTX]?.inputs){
+    g[N.RTX].inputs.images = finalImagesSource;
+    finalImagesSource = [N.RTX, 0];
+  } else {
+    delete g[N.RTX];
+  }
+
+  if(rifeOn && g[N.RIFE]?.inputs){
+    const mult = parseInt($("rifeMultiplier")?.value || "2", 10);
+    if(g[N.RIFE_MULT]?.inputs) g[N.RIFE_MULT].inputs.value = mult;
+    const rifeModel = $("rifeModel")?.value || "rife_v4.26.safetensors";
+    if(g[N.RIFE_LOADER]?.inputs) g[N.RIFE_LOADER].inputs.model_name = rifeModel;
+    g[N.RIFE].inputs.images = finalImagesSource;
+    finalImagesSource = [N.RIFE, 0];
+  } else {
+    delete g[N.RIFE];
+    delete g[N.RIFE_LOADER];
+    delete g[N.RIFE_MULT];
+    // Ajustar fps de CreateVideo final a los fps base sin multiplicar
+    if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.fps = [N.BASE_FPS, 0];
+  }
+
+  if(g[N.CREATE_VID_FINAL]?.inputs){
+    g[N.CREATE_VID_FINAL].inputs.images = finalImagesSource;
+  }
+
+  // 13. Prefijos de guardado de vídeo
+  const prefix = ($("filenamePrefix")?.value || "video/MiniMax_H3").trim();
+  if(g[N.SAVE_VID_1]?.inputs) g[N.SAVE_VID_1].inputs.filename_prefix = prefix + "_seg1";
+  if(g[N.SAVE_VID_2]?.inputs) g[N.SAVE_VID_2].inputs.filename_prefix = prefix + "_seg2";
+  if(g[N.SAVE_VID_FINAL]?.inputs) g[N.SAVE_VID_FINAL].inputs.filename_prefix = prefix + "_cont";
+
+  // 14. Modo de Ejecución (Completo vs Solo Seg 1 vs Solo Seg 2)
+  const runMode = j?.runMode || "full";
+  if(runMode === "seg1_only"){
+    // Eliminar nodos del segmento 2 y final para que ComfyUI pare tras guardar Seg 1
+    const nodesToDelete = [
+      N.REF2V_SEG2, N.SAMPLE_2, N.DECODE_VID_2, N.DECODE_AUD_2, N.CREATE_VID_2, N.SAVE_VID_2,
+      N.IMAGE_BATCH, N.AUDIO_CONCAT, N.CREATE_VID_FINAL, N.SAVE_VID_FINAL,
+      N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.RTX, N.RIFE, N.RIFE_LOADER, N.RIFE_MULT
+    ];
+    nodesToDelete.forEach(id => { delete g[id]; });
+  }
+
+  return g;
+}
+
+// ==========================================
+// EJECUCIÓN Y COLAS
+// ==========================================
+async function queueJob(runMode){
+  const p1 = $("prompt")?.value?.trim();
+  if(!p1){
+    log("⚠️ Por favor escribe al menos el Prompt 1 (Segmento 1)", "l-warn");
+    return;
+  }
+
+  try {
+    await ensureAllMediaUploaded();
+  } catch(e){
+    log(`❌ Error preparando medios: ${e.message}`, "l-err");
+    return;
+  }
+
+  const batchSize = parseInt($("batchSize")?.value || "1", 10);
+  const seedMode = $("segRandom").classList.contains("on") ? "random" : "fixed";
+  const baseSeed = parseInt($("seedVal")?.value || "12345", 10);
+
+  const job = {
+    id: "job_" + Date.now(),
+    runMode: runMode || "full",
+    prompt: p1,
+    prompt2: $("prompt2")?.value?.trim() || "",
+    duration: parseFloat($("durationSlider")?.value || "5.0"),
+    megapixels: parseFloat($("mpSlider")?.value || "0.70"),
+    steps: parseInt($("stepsSlider")?.value || "20", 10),
+    sampler: $("samplerName")?.value || "res_multistep",
+    scheduler: $("schedulerName")?.value || "simple",
+    seedMode,
+    seed: baseSeed,
+    batchSize
+  };
+
+  if(!activeJob){
+    startJob(job);
+  } else {
+    jobQueue.push(job);
+    updateQueueUI();
+    log(`📥 Tarea añadida a la cola (${jobQueue.length} en espera)`, "l-ok");
+  }
+}
+
+async function startJob(job){
+  activeJob = job;
+  updateQueueUI();
+  try {
+    connectSocket();
+    totalBatchSize = job.batchSize || 1;
+    currentBatchIndex = 0;
+    variantCounter = 0;
+    const seedUsed = job.seedMode === "random" ? Math.floor(Math.random()*1000000000) : job.seed;
+    variantCounter++;
+    job.currentVariantIndex = variantCounter;
+    currentBatchIndex++;
+    await enqueueJobVariant(job, seedUsed, variantCounter);
+  } catch(e){
+    log(`❌ Error al iniciar tarea: ${e.message}`, "l-err");
+    finishCurrentJob();
+  }
+}
+
+async function enqueueJobVariant(job, seedUsed, varIdx){
+  try {
+    CONFIG.onSeedUpdate(seedUsed);
+    const graph = buildGraph({ ...job, seed: seedUsed });
+
+    log(`🚀 Procesando ${job.runMode === 'seg1_only' ? 'Solo Seg 1' : 'Vídeo MMH3X2'} · Var ${varIdx} (seed ${seedUsed})...`);
+    const r = await fetch(server() + "/prompt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: graph,
+        client_id: CLIENT_ID,
+        extra_data: {
+          extra_pnginfo: { workflow: graph, prompt: graph },
+          preview_method: (getPreviewMethod() === "none" ? "none" : "latent2rgb")
+        }
+      })
+    });
+
+    if(!r.ok){
+      const t = await r.text().catch(()=>"");
+      throw new Error("HTTP " + r.status + " " + t.slice(0, 300));
+    }
+
+    const data = await r.json();
+    if(data.error) throw new Error(JSON.stringify(data.error));
+
+    pendingSeeds[data.prompt_id] = seedUsed;
+    promptVariantMap[data.prompt_id] = varIdx;
+    currentPromptId = data.prompt_id;
+    promptSteps[data.prompt_id] = "1";
+    startTimer(data.prompt_id, 1);
+    pollFallback(data.prompt_id);
+  } catch(e){
+    log(`❌ No se pudo encolar: ${e.message}`, "l-err");
+    finishCurrentJob();
+  }
+}
+
+function finishCurrentJob(){
+  activeJob = null;
+  currentPromptId = null;
+  updateQueueUI();
+  if(jobQueue.length > 0){
+    const nextJob = jobQueue.shift();
+    startJob(nextJob);
+  }
+}
+
+// ==========================================
+// HISTORIAL DE VÍDEOS (/api/mmh3x2_list)
+// ==========================================
+async function loadVideoHistory(){
+  const grid = $("videoHistoryGrid");
+  const countBadge = $("historyCountBadge");
+  if(!grid) return;
+
+  try {
+    const r = await fetch(server() + "/api/mmh3x2_list");
+    if(!r.ok) return;
+    const data = await r.json();
+    const items = data.items || [];
+    if(countBadge) countBadge.textContent = `(${items.length})`;
+    grid.innerHTML = "";
+
+    if(items.length === 0){
+      grid.innerHTML = '<div class="hint" style="padding:12px;text-align:center;">No hay vídeos generados aún.</div>';
+      return;
+    }
+
+    items.forEach(item => {
+      const url = server() + `/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
+      const card = document.createElement("div");
+      card.className = "variant-card";
+      card.innerHTML = `
+        <div class="thumb-wrap">
+          <video src="${url}#t=0.001" preload="metadata" muted playsinline loop style="width:100%;height:130px;object-fit:cover;cursor:pointer;"></video>
+          <span class="variant-badge" style="font-size:9.5px;">${item.filename}</span>
+        </div>
+        <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
+          <button class="ghost btn-mini btn-play-hist" title="Ver en reproductor">▶ Ver</button>
+          <a class="ghost btn-mini" href="${url}" download="${item.filename}" title="Descargar">⬇</a>
+          <button class="ghost btn-mini btn-del-hist" title="Eliminar archivo">✕</button>
+        </div>
+      `;
+
+      const videoEl = card.querySelector("video");
+      videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
+      videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0; });
+      videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url); });
+
+      card.querySelector(".btn-play-hist").addEventListener("click", () => { displayVideoInPlayer(3, url); });
+      card.querySelector(".btn-del-hist").addEventListener("click", async () => {
+        if(!confirm(`¿Eliminar ${item.filename}?`)) return;
+        try {
+          await fetch(server() + `/api/file_delete?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`, { method: "POST" });
+          card.remove();
+          loadVideoHistory();
+        } catch(err){
+          log(`Error eliminando archivo: ${err.message}`, "l-err");
+        }
+      });
+
+      grid.appendChild(card);
+    });
+  } catch(e){
+    // Silencioso si falla la carga
+  }
+}
+
+// ==========================================
+// INICIALIZACIÓN
+// ==========================================
+window.addEventListener("DOMContentLoaded", () => {
+  setupMediaSlots();
+
+  // Botones de ejecución
+  if($("btnFull")) $("btnFull").addEventListener("click", () => { queueJob("full"); });
+  if($("btnSeg1")) $("btnSeg1").addEventListener("click", () => { queueJob("seg1_only"); });
+  if($("btnSeg2")) $("btnSeg2").addEventListener("click", () => { queueJob("seg2_only"); });
+
+  if($("btnStopVideo")) $("btnStopVideo").addEventListener("click", () => { CONFIG.onStopCurrent(); });
+  if($("btnStopAll")) $("btnStopAll").addEventListener("click", () => { CONFIG.onStopAll(); });
+  if($("btnClearQueue")) $("btnClearQueue").addEventListener("click", () => {
+    jobQueue = [];
+    updateQueueUI();
+    log("Cola de tareas vaciada", "l-ok");
+  });
+
+  if($("btnRefreshHistory")) $("btnRefreshHistory").addEventListener("click", () => { loadVideoHistory(); });
+
+  // Pegar de Enhancer a Prompt 2
+  if($("btnPrompt2FromEnhancer")) $("btnPrompt2FromEnhancer").addEventListener("click", () => {
+    const text = $("enhancerOutput")?.value;
+    if(text){
+      $("prompt2").value = text;
+      log("Prompt de Enhancer copiado a Prompt 2 (Segmento 2)", "l-ok");
+    } else {
+      log("No hay texto generado en el Enhancer", "l-warn");
+    }
+  });
+
+  if($("btnClearPrompt2")) $("btnClearPrompt2").addEventListener("click", () => {
+    $("prompt2").value = "";
+  });
+
+  // Slider de Megapíxeles
+  if($("mpSlider")){
+    $("mpSlider").addEventListener("input", (e) => {
+      $("mpVal").textContent = parseFloat(e.target.value).toFixed(2);
+      const img1 = $("previewSlotImg1");
+      updateCalculatedResolution(img1?.naturalWidth || 1280, img1?.naturalHeight || 720);
+    });
+  }
+
+  // Slider de Duración
+  if($("durationSlider")){
+    $("durationSlider").addEventListener("input", () => {
+      updateDurationFrames();
+    });
+  }
+
+  // Slider de Pasos
+  if($("stepsSlider")){
+    $("stepsSlider").addEventListener("input", (e) => {
+      $("stepsVal").textContent = e.target.value;
+    });
+  }
+
+  // Slider de Budget Sparse Attention
+  if($("h3BudgetSlider")){
+    $("h3BudgetSlider").addEventListener("input", (e) => {
+      $("h3BudgetVal").textContent = parseFloat(e.target.value).toFixed(2);
+    });
+  }
+
+  // Sliders de Shift
+  if($("h3ShiftVideo")){
+    $("h3ShiftVideo").addEventListener("input", (e) => {
+      $("h3ShiftVideoVal").textContent = parseFloat(e.target.value).toFixed(2);
+    });
+  }
+  if($("h3ShiftAudio")){
+    $("h3ShiftAudio").addEventListener("input", (e) => {
+      $("h3ShiftAudioVal").textContent = parseFloat(e.target.value).toFixed(2);
+    });
+  }
+
+  // Sliders de LoRA
+  if($("lora1Strength")){
+    $("lora1Strength").addEventListener("input", (e) => {
+      $("lora1StrengthVal").textContent = parseFloat(e.target.value).toFixed(2);
+    });
+  }
+  if($("lora2Strength")){
+    $("lora2Strength").addEventListener("input", (e) => {
+      $("lora2StrengthVal").textContent = parseFloat(e.target.value).toFixed(2);
+    });
+  }
+
+  // Tabs de Vista de Reproductores
+  document.querySelectorAll(".vid-view-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".vid-view-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const mode = tab.getAttribute("data-view");
+      currentViewMode = mode;
+      const bFinal = $("boxFinal"), b1 = $("boxSeg1"), b2 = $("boxSeg2");
+      if(mode === "all"){
+        if(bFinal) bFinal.style.display = "flex";
+        if(b1) b1.style.display = "flex";
+        if(b2) b2.style.display = "flex";
+      } else if(mode === "final"){
+        if(bFinal) bFinal.style.display = "flex";
+        if(b1) b1.style.display = "none";
+        if(b2) b2.style.display = "none";
+      } else if(mode === "seg1"){
+        if(bFinal) bFinal.style.display = "none";
+        if(b1) b1.style.display = "flex";
+        if(b2) b2.style.display = "none";
+      } else if(mode === "seg2"){
+        if(bFinal) bFinal.style.display = "none";
+        if(b1) b1.style.display = "none";
+        if(b2) b2.style.display = "flex";
+      }
+    });
+  });
+
+  // Collapsibles
+  ["h3OptToggle", "postprocToggle"].forEach(id => {
+    const el = $(id);
+    if(el){
+      el.addEventListener("click", () => {
+        const body = $(id.replace("Toggle", "Body"));
+        el.classList.toggle("open");
+        if(body) body.classList.toggle("open");
+      });
+    }
+  });
+
+  // Llenar selectores de modelos si existen las variables globales inyectadas
+  if(typeof AVAILABLE_UNETS !== "undefined" && $("unetModel")){
+    const sel = $("unetModel");
+    sel.innerHTML = AVAILABLE_UNETS.map(m => `<option value="${m}">${m.split("/").pop()}</option>`).join("");
+  }
+  if(typeof AVAILABLE_CLIPS !== "undefined" && $("clipModel")){
+    const sel = $("clipModel");
+    sel.innerHTML = AVAILABLE_CLIPS.map(m => `<option value="${m}">${m.split("/").pop()}</option>`).join("");
+  }
+  if(typeof AVAILABLE_LORAS !== "undefined"){
+    ["lora1Select", "lora2Select"].forEach(id => {
+      const sel = $(id);
+      if(sel){
+        sel.innerHTML = '<option value="">(ninguno)</option>' +
+          AVAILABLE_LORAS.map(l => `<option value="${l}">${l.split("/").pop()}</option>`).join("");
+      }
+    });
+  }
+
+  // Inicializar cálculos
+  updateCalculatedResolution(1280, 720);
+  updateDurationFrames();
+  loadVideoHistory();
+});
+
+</script>
+</body>
+</html>

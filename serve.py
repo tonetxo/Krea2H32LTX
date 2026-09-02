@@ -53,7 +53,7 @@ BACKEND = get_backend()
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess", "/api/prompts")
+CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/mmh3x2_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess", "/api/prompts")
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
@@ -350,6 +350,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         return path == "/api/minimaxh3_list"
 
+    def _is_mmh3x2_list(self):
+        path = self.path.split("?")[0]
+        return path == "/api/mmh3x2_list"
+
     def _is_krea2_upload(self):
         path = self.path.split("?")[0]
         return path == "/api/krea2_upload"
@@ -637,7 +641,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_krea2_list()
         elif self._is_ltxv_list():
             self._do_ltxv_list()
-        elif self._is_minimaxh3_list():
+        elif self._is_minimaxh3_list() or self._is_mmh3x2_list():
             self._do_minimaxh3_list()
         elif self._is_prompts_route():
             self._do_prompts_get()
@@ -655,7 +659,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_ltxv_list():
             self._send_json(405, {"error": "method not allowed"})
-        elif self._is_minimaxh3_list():
+        elif self._is_minimaxh3_list() or self._is_mmh3x2_list():
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_prompts_route():
             self._do_prompts_post()
@@ -682,7 +686,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._cors_preflight()
         elif self._is_proxy_route():
             self._proxy("OPTIONS", get_backend())
-        elif self._is_krea2_upload() or self._is_file_delete() or self._is_video_preprocess() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list():
+        elif self._is_krea2_upload() or self._is_file_delete() or self._is_video_preprocess() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list() or self._is_mmh3x2_list():
             # Endpoints custom también necesitan preflight same-origin.
             self._cors_preflight()
         else:
