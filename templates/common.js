@@ -327,6 +327,9 @@ function connectSocket() {
               return;
           }
           if(msg.type === 'progress') handleStepProgress(msg.data);
+          if(msg.type === 'executing' && CONFIG.onNodeExecuting){
+            try { CONFIG.onNodeExecuting(msg.data); } catch(e){ console.warn("onNodeExecuting error:", e); }
+          }
           if(msg.type === 'kj_preview_override'){
             if(msg.data && msg.data.image){
               const mime = msg.data.mime || "image/jpeg";

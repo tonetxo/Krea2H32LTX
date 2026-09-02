@@ -135,10 +135,19 @@ CONFIG.showMedia = function(url, meta){
   }
 };
 
+CONFIG.onNodeExecuting = function(data){
+  if(!data) return;
+  const nid = String(data.node);
+  // Conmutar a slot Seg 2 tan pronto como empiece la inferencia del Segmento 2
+  if(nid === N.SAMPLE_2 || nid === N.REF2V_SEG2 || nid === N.DECODE_VID_2 || nid === N.CREATE_VID_2){
+    currentActiveSamplerSlot = 2;
+  }
+};
+
 CONFIG.onNodeExecuted = function(data){
   if(!data) return;
   const nid = String(data.node);
-  if(nid === N.SAMPLE_1){
+  if(nid === N.SAMPLE_1 || nid === N.SAVE_VID_1){
     currentActiveSamplerSlot = 2;
   }
   if(nid === N.SAVE_VID_1 && data.output){
@@ -163,6 +172,11 @@ CONFIG.onPreview = function(url, meta){
   const v = $("video" + slot);
   if(!p && !pv) return;
 
+  // Si Seg 1 ya terminó y tiene vídeo cargado, jamás pisarlo con previsualizaciones
+  if(slot === "Seg1" && v && v.src && v.style.display === "block"){
+    return;
+  }
+
   const isVideoUrl = typeof url === "string" && (url.startsWith("data:video/mp4") || url.startsWith("data:video/webm"));
   const target = isVideoUrl && pv ? pv : p;
   const other = isVideoUrl ? p : pv;
@@ -171,7 +185,7 @@ CONFIG.onPreview = function(url, meta){
   target.style.display = "block";
   if(other) other.style.display = "none";
   if(e) e.style.display = "none";
-  if(v) v.style.display = "none";
+  if(v && !v.src) v.style.display = "none";
   if(isVideoUrl && pv && pv.autoplay !== true){ pv.autoplay = true; pv.muted = true; pv.loop = true; }
   if(isVideoUrl && target.play) target.play().catch(()=>{});
 };
@@ -665,6 +679,17 @@ function buildGraph(j){
   // 2. Duración y Megapíxeles
   const dur = parseFloat((j ? j.duration : $("durationSlider")?.value) || "5.0");
   if(g[N.DURATION]?.inputs) g[N.DURATION].inputs.value = dur;
+
+  // Cálculo dinámico exacto de frames para corte y empalme (resuelve IndexError en nodo 61)
+  const baseFrames = Math.max(5, Math.round(dur * 24));
+  const framesPerSeg = baseFrames + ((5 - (baseFrames % 17)) % 17);
+  if(g["61"]?.inputs){
+    g["61"].inputs.indexes = Array.from({ length: framesPerSeg - 1 }, (_, i) => i).join(", ");
+  }
+  if(g["65"]?.inputs){
+    g["65"].inputs.start_index = 0.0;
+    g["65"].inputs.duration = parseFloat(((framesPerSeg - 1) / 24).toFixed(4));
+  }
 
   const mp = parseFloat((j ? j.megapixels : $("mpSlider")?.value) || "0.70");
   if(g[N.MEGAPIXELS]?.inputs) g[N.MEGAPIXELS].inputs.megapixels = mp;
