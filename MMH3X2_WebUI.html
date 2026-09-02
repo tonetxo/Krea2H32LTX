@@ -585,12 +585,12 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <div><label>Alto</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div>
         </div>
         <div class="row slider-row">
-          <label>Duración por segmento <span class="hint" id="durHint">(5.0s → 124 frames)</span></label>
-          <input type="range" id="durationSlider" min="1.0" max="8.0" step="0.5" value="5.0">
-          <div class="slider-val" id="durationVal">5.0s</div>
+          <label>Duración por segmento <span class="hint" id="durHint">(15.0s → 362 frames)</span></label>
+          <input type="range" id="durationSlider" min="1.0" max="15.0" step="0.5" value="15.0">
+          <div class="slider-val" id="durationVal">15.0s</div>
         </div>
         <div class="hint" id="totalFramesHint" style="margin-top:2px;font-size:10.5px;color:var(--accent);">
-          Total: 2 segmentos x 124f = 248 frames (~10.0s)
+          Total: 2 segmentos x 362f = 724 frames (~30.2s a 24fps)
         </div>
         <div class="row" style="margin-top:8px;">
           <label>Batch Size (Variantes)</label>
@@ -708,13 +708,13 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <label>H3 Sigma Shift</label>
             <div class="slider-row" style="margin-top:4px;">
               <label style="font-size:10px;">Shift Vídeo</label>
-              <input type="range" id="h3ShiftVideo" min="0.5" max="2.0" step="0.05" value="1.0">
-              <div class="slider-val" id="h3ShiftVideoVal">1.00</div>
+              <input type="range" id="h3ShiftVideo" min="1.0" max="30.0" step="0.5" value="12.0">
+              <div class="slider-val" id="h3ShiftVideoVal">12.0</div>
             </div>
             <div class="slider-row" style="margin-top:4px;">
               <label style="font-size:10px;">Shift Audio</label>
-              <input type="range" id="h3ShiftAudio" min="0.5" max="2.0" step="0.05" value="1.0">
-              <div class="slider-val" id="h3ShiftAudioVal">1.00</div>
+              <input type="range" id="h3ShiftAudio" min="0.5" max="15.0" step="0.5" value="3.0">
+              <div class="slider-val" id="h3ShiftAudioVal">3.0</div>
             </div>
           </div>
         </div>
@@ -4557,7 +4557,7 @@ function updateCalculatedResolution(origW, origH){
 }
 
 function updateDurationFrames(){
-  const dur = parseFloat($("durationSlider")?.value || "5.0");
+  const dur = parseFloat($("durationSlider")?.value || "15.0");
   const baseFrames = Math.max(5, Math.round(dur * 24));
   const framesPerSeg = baseFrames + ((5 - (baseFrames % 17)) % 17);
   const totalFrames = framesPerSeg * 2;
@@ -4589,7 +4589,7 @@ function buildGraph(j){
   }
 
   // 2. Duración y Megapíxeles
-  const dur = parseFloat((j ? j.duration : $("durationSlider")?.value) || "5.0");
+  const dur = parseFloat((j ? j.duration : $("durationSlider")?.value) || "15.0");
   if(g[N.DURATION]?.inputs) g[N.DURATION].inputs.value = dur;
 
   // Cálculo dinámico exacto de frames para corte y empalme (resuelve IndexError en nodo 61)
@@ -4650,10 +4650,10 @@ function buildGraph(j){
     delete g[N.MEM_OPT];
   }
 
-  // Sigma Shift
+  // Sigma Shift (valores estándar MiniMax H3: 12.0 vídeo, 3.0 audio)
   if(g[N.SIGMA_SHIFT]?.inputs){
-    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat($("h3ShiftVideo")?.value || "1.0");
-    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat($("h3ShiftAudio")?.value || "1.0");
+    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat($("h3ShiftVideo")?.value || "12.0");
+    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat($("h3ShiftAudio")?.value || "3.0");
   }
 
   // 8. Inyección dinámica de LoRAs
@@ -4806,7 +4806,7 @@ async function queueJob(runMode){
     runMode: runMode || "full",
     prompt: p1,
     prompt2: $("prompt2")?.value?.trim() || "",
-    duration: parseFloat($("durationSlider")?.value || "5.0"),
+    duration: parseFloat($("durationSlider")?.value || "15.0"),
     megapixels: parseFloat($("mpSlider")?.value || "0.70"),
     steps: parseInt($("stepsSlider")?.value || "20", 10),
     sampler: $("samplerName")?.value || "res_multistep",
@@ -5016,12 +5016,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if($("h3ShiftVideo")){
     $("h3ShiftVideo").addEventListener("input", (e) => {
-      $("h3ShiftVideoVal").textContent = parseFloat(e.target.value).toFixed(2);
+      $("h3ShiftVideoVal").textContent = parseFloat(e.target.value).toFixed(1);
     });
   }
   if($("h3ShiftAudio")){
     $("h3ShiftAudio").addEventListener("input", (e) => {
-      $("h3ShiftAudioVal").textContent = parseFloat(e.target.value).toFixed(2);
+      $("h3ShiftAudioVal").textContent = parseFloat(e.target.value).toFixed(1);
     });
   }
 

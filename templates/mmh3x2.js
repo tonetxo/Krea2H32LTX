@@ -645,7 +645,7 @@ function updateCalculatedResolution(origW, origH){
 }
 
 function updateDurationFrames(){
-  const dur = parseFloat($("durationSlider")?.value || "5.0");
+  const dur = parseFloat($("durationSlider")?.value || "15.0");
   const baseFrames = Math.max(5, Math.round(dur * 24));
   const framesPerSeg = baseFrames + ((5 - (baseFrames % 17)) % 17);
   const totalFrames = framesPerSeg * 2;
@@ -677,7 +677,7 @@ function buildGraph(j){
   }
 
   // 2. Duración y Megapíxeles
-  const dur = parseFloat((j ? j.duration : $("durationSlider")?.value) || "5.0");
+  const dur = parseFloat((j ? j.duration : $("durationSlider")?.value) || "15.0");
   if(g[N.DURATION]?.inputs) g[N.DURATION].inputs.value = dur;
 
   // Cálculo dinámico exacto de frames para corte y empalme (resuelve IndexError en nodo 61)
@@ -738,10 +738,10 @@ function buildGraph(j){
     delete g[N.MEM_OPT];
   }
 
-  // Sigma Shift
+  // Sigma Shift (valores estándar MiniMax H3: 12.0 vídeo, 3.0 audio)
   if(g[N.SIGMA_SHIFT]?.inputs){
-    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat($("h3ShiftVideo")?.value || "1.0");
-    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat($("h3ShiftAudio")?.value || "1.0");
+    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat($("h3ShiftVideo")?.value || "12.0");
+    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat($("h3ShiftAudio")?.value || "3.0");
   }
 
   // 8. Inyección dinámica de LoRAs
@@ -894,7 +894,7 @@ async function queueJob(runMode){
     runMode: runMode || "full",
     prompt: p1,
     prompt2: $("prompt2")?.value?.trim() || "",
-    duration: parseFloat($("durationSlider")?.value || "5.0"),
+    duration: parseFloat($("durationSlider")?.value || "15.0"),
     megapixels: parseFloat($("mpSlider")?.value || "0.70"),
     steps: parseInt($("stepsSlider")?.value || "20", 10),
     sampler: $("samplerName")?.value || "res_multistep",
@@ -1104,12 +1104,12 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if($("h3ShiftVideo")){
     $("h3ShiftVideo").addEventListener("input", (e) => {
-      $("h3ShiftVideoVal").textContent = parseFloat(e.target.value).toFixed(2);
+      $("h3ShiftVideoVal").textContent = parseFloat(e.target.value).toFixed(1);
     });
   }
   if($("h3ShiftAudio")){
     $("h3ShiftAudio").addEventListener("input", (e) => {
-      $("h3ShiftAudioVal").textContent = parseFloat(e.target.value).toFixed(2);
+      $("h3ShiftAudioVal").textContent = parseFloat(e.target.value).toFixed(1);
     });
   }
 
