@@ -3988,6 +3988,7 @@ const CONFIG = {
 };
 
 const N = CONFIG.N;
+initCommon();
 
 // Estado de imágenes y vídeo
 let mediaSlots = {
@@ -3998,12 +3999,11 @@ let mediaSlots = {
 };
 let videoSlot = { file: null, dataUrl: null, uploaded: null, name: "" };
 
-// Jobs y Cola
+// Jobs y Cola (NOTA: variables globales compartidas con common.js se usan directamente sin redeclarar con let)
+let jobQueue = [];
 let activeJob = null;
-let currentPromptId = null;
 let promptVariantMap = {};
 let promptSteps = {};
-let pendingSeeds = {};
 let displayedSlots = {};
 let currentActiveSamplerSlot = 1; // 1 o 2
 
@@ -4013,7 +4013,6 @@ let currentViewMode = "all";
 // Callbacks CONFIG requeridos por common.js
 CONFIG.findMedia = function(output){
   if(!output) return null;
-  // Puede ser SaveVideo (videos o gifs) o SaveImage
   const vids = output.videos || output.gifs || output.images;
   if(Array.isArray(vids) && vids.length > 0){
     const item = vids[0];
@@ -4026,8 +4025,6 @@ CONFIG.findMedia = function(output){
 };
 
 CONFIG.showMedia = function(url, meta){
-  // Determinamos a qué reproductor pertenece según el nodo ejecutado o meta
-  // Si no se especifica, por defecto al final o según la respuesta del backend
   const targetPlayer = meta?.targetSlot || 3;
   if(targetPlayer === 1){
     displayVideoInPlayer(1, url);
@@ -4038,8 +4035,27 @@ CONFIG.showMedia = function(url, meta){
   }
 };
 
+CONFIG.onNodeExecuted = function(data){
+  if(!data) return;
+  const nid = String(data.node);
+  if(nid === N.SAMPLE_1){
+    currentActiveSamplerSlot = 2;
+  }
+  if(nid === N.SAVE_VID_1 && data.output){
+    const m1 = CONFIG.findMedia(data.output);
+    if(m1) displayVideoInPlayer(1, m1);
+  }
+  if(nid === N.SAVE_VID_2 && data.output){
+    const m2 = CONFIG.findMedia(data.output);
+    if(m2) displayVideoInPlayer(2, m2);
+  }
+  if(nid === N.SAVE_VID_FINAL && data.output){
+    const mf = CONFIG.findMedia(data.output);
+    if(mf) displayVideoInPlayer(3, mf);
+  }
+};
+
 CONFIG.onPreview = function(url, meta){
-  // Determina si estamos muestreando el segmento 1 o el segmento 2
   const slot = (currentActiveSamplerSlot === 2) ? "Seg2" : "Seg1";
   const p = $("previewImg" + slot);
   const pv = $("previewVideo" + slot);
@@ -4108,9 +4124,45 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
   grid.insertBefore(card, grid.firstChild);
 };
 
+CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings){
+  let found = false;
+  if(entry.outputs[N.SAVE_VID_1]){
+    const m1 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_1]);
+    if(m1){ displayVideoInPlayer(1, m1); found = true; }
+  }
+  if(entry.outputs[N.SAVE_VID_2]){
+    const m2 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_2]);
+    if(m2){ displayVideoInPlayer(2, m2); found = true; }
+  }
+  if(entry.outputs[N.SAVE_VID_FINAL]){
+    const mf = CONFIG.findMedia(entry.outputs[N.SAVE_VID_FINAL]);
+    if(mf){
+      displayVideoInPlayer(3, mf);
+      const varIndex = promptVariantMap[promptId] || (variantCounter + 1);
+      CONFIG.addToVariantGallery(mf, realSeed, varIndex);
+      found = true;
+    }
+  }
+
+  delete pendingSeeds[promptId];
+  delete promptVariantMap[promptId];
+  delete displayedSlots[promptId];
+  handledPrompts.add(promptId);
+
+  currentBatchIndex++;
+  if(currentBatchIndex < totalBatchSize){
+    log(`➡️ Siguiente variante ${currentBatchIndex + 1}/${totalBatchSize}...`, "l-ok");
+    await CONFIG.startNextVariant();
+  } else {
+    log(`🏁 Generación completada (${totalBatchSize} variantes).`, "l-ok");
+    finishCurrentJob();
+  }
+  return found;
+};
+
 CONFIG.onSeedUpdate = function(newSeed){
   const sv = $("seedVal");
-  if(sv && $("segRandom").classList.contains("on")){
+  if(sv && $("segRandom")?.classList.contains("on")){
     sv.value = newSeed;
   }
 };
@@ -4129,7 +4181,6 @@ CONFIG.startNextVariant = async function(){
     const nextSeed = activeJob.seedMode === "random" ? Math.floor(Math.random()*1000000000) : (activeJob.seed + currentBatchIndex);
     variantCounter++;
     activeJob.currentVariantIndex = variantCounter;
-    currentBatchIndex++;
     await enqueueJobVariant(activeJob, nextSeed, variantCounter);
   } else {
     finishCurrentJob();
@@ -4143,7 +4194,7 @@ CONFIG.onBatchComplete = function(){
 CONFIG.onStopCurrent = async function(){
   if(!currentPromptId) return;
   try {
-    await fetch(server()+"/interrupt", { method: "POST" });
+    await fetch(server() + "/interrupt", { method: "POST" });
     log("⏹ Interrupción solicitada para la tarea actual", "l-warn");
   } catch(e){
     log(`Error al interrumpir: ${e.message}`, "l-err");
@@ -4152,8 +4203,8 @@ CONFIG.onStopCurrent = async function(){
 
 CONFIG.onStopAll = async function(){
   try {
-    await fetch(server()+"/interrupt", { method: "POST" });
-    await fetch(server()+"/queue", { method: "POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({clear:true}) });
+    await fetch(server() + "/interrupt", { method: "POST" });
+    await fetch(server() + "/queue", { method: "POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({clear:true}) });
     jobQueue = [];
     activeJob = null;
     currentPromptId = null;
@@ -4163,6 +4214,35 @@ CONFIG.onStopAll = async function(){
     log(`Error al cancelar todo: ${e.message}`, "l-err");
   }
 };
+
+function updateQueueUI(){
+  const count = jobQueue.length;
+  const badge = $("queueCountBadge");
+  if(badge) badge.textContent = count > 0 ? `${count} tarea${count > 1 ? 's' : ''}` : "0 tareas";
+  const clearBtn = $("btnClearQueue");
+  if(clearBtn) clearBtn.disabled = count === 0;
+  enableStopButtons(!!activeJob);
+
+  const list = $("queueList");
+  if(!list) return;
+  if(!activeJob && count === 0){
+    list.innerHTML = '<div class="hint" style="padding:6px;text-align:center;font-size:10px;">En reposo</div>';
+    return;
+  }
+  let html = "";
+  if(activeJob){
+    html += `<div class="queue-item active" style="font-size:10.5px;color:var(--accent);margin-bottom:4px;">
+      ▶ Ejecutando: ${activeJob.runMode || 'Completo'} (Var ${currentBatchIndex + 1}/${totalBatchSize})
+    </div>`;
+  }
+  jobQueue.forEach((job, idx) => {
+    html += `<div class="queue-item" style="display:flex;justify-content:space-between;align-items:center;font-size:10px;padding:2px 0;">
+      <span>#${idx+1} · ${job.runMode || 'Completo'} (${job.batchSize || 1} var)</span>
+      <button class="ghost btn-mini" style="font-size:9px;padding:1px 4px;" onclick="jobQueue.splice(${idx},1);updateQueueUI();">✕</button>
+    </div>`;
+  });
+  list.innerHTML = html;
+}
 
 // ==========================================
 // RENDER Y GESTIÓN DE REPRODUCTORES
@@ -4215,7 +4295,6 @@ function displayVideoInPlayer(slotIndex, url){
   }
 }
 
-// Extrae un frame del vídeo reproducido y permite asignarlo a uno de los 4 slots de imagen
 function extractCurrentFrame(videoEl, fromSlot){
   if(!videoEl || videoEl.videoWidth === 0) return;
   const canvas = document.createElement("canvas");
@@ -4225,7 +4304,6 @@ function extractCurrentFrame(videoEl, fromSlot){
   ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
   const dataUrl = canvas.toDataURL("image/png");
 
-  // Asignar por defecto a la siguiente imagen lógica o al slot seleccionado
   const targetSlot = (fromSlot === 1) ? 3 : 1;
   setMediaSlotData(targetSlot, null, dataUrl, `Frame extraído de Seg ${fromSlot}`);
   log(`📸 Frame de ${videoEl.currentTime.toFixed(2)}s asignado al Slot de Imagen ${targetSlot}`, "l-ok");
@@ -4251,7 +4329,6 @@ function setupMediaSlots(){
         if(file) handleImageFile(i, file);
       });
 
-      // Drag & Drop
       slotEl.addEventListener("dragover", (e) => { e.preventDefault(); slotEl.classList.add("drag"); });
       slotEl.addEventListener("dragleave", () => { slotEl.classList.remove("drag"); });
       slotEl.addEventListener("drop", (e) => {
@@ -4261,7 +4338,6 @@ function setupMediaSlots(){
         if(file && file.type.startsWith("image/")){
           handleImageFile(i, file);
         } else {
-          // Chequear si es una URL arrastrada
           const url = e.dataTransfer.getData("text/plain");
           if(url) handleImageUrl(i, url);
         }
@@ -4276,7 +4352,6 @@ function setupMediaSlots(){
     }
   }
 
-  // Vídeo de referencia opcional
   const vidSlot = $("slotVid");
   const vidInput = $("fileInputVid");
   const btnDelVid = $("btnDelVid");
@@ -4311,13 +4386,11 @@ function setupMediaSlots(){
     });
   }
 
-  // Soporte para pegar con Ctrl+V
   window.addEventListener("paste", (e) => {
     const items = (e.clipboardData || e.originalEvent.clipboardData).items;
     for(let item of items){
       if(item.kind === 'file' && item.type.startsWith('image/')){
         const blob = item.getAsFile();
-        // Buscar el primer slot vacío o sobreescribir el 1
         let target = 1;
         for(let s = 1; s <= 4; s++){
           if(!mediaSlots[s].dataUrl && !mediaSlots[s].file){ target = s; break; }
@@ -4403,7 +4476,6 @@ function clearVideoSlot(){
   if(input) input.value = "";
 }
 
-// Sube todas las imágenes y vídeos pendientes antes de encolar
 async function ensureAllMediaUploaded(){
   for(let i = 1; i <= 4; i++){
     const slot = mediaSlots[i];
@@ -4447,7 +4519,6 @@ function updateCalculatedResolution(origW, origH){
   const mp = parseFloat($("mpSlider")?.value || "0.70");
   const ar = (origW && origH) ? (origW / origH) : (16 / 9);
 
-  // Ancho y alto proporcionales que multipliquen ~ mp * 1,000,000 píxeles redondeados a múltiplos de 32
   const targetPixels = mp * 1000000;
   let h = Math.round(Math.sqrt(targetPixels / ar) / 32) * 32;
   let w = Math.round((h * ar) / 32) * 32;
@@ -4461,7 +4532,6 @@ function updateCalculatedResolution(origW, origH){
 
 function updateDurationFrames(){
   const dur = parseFloat($("durationSlider")?.value || "5.0");
-  // Fórmula MiniMax H3: max(5, round(a*24)) + (5 - (max(5, round(a*24)) % 17)) % 17
   const baseFrames = Math.max(5, Math.round(dur * 24));
   const framesPerSeg = baseFrames + ((5 - (baseFrames % 17)) % 17);
   const totalFrames = framesPerSeg * 2;
@@ -4486,10 +4556,8 @@ function buildGraph(j){
   if(g[N.PROMPT_1]?.inputs) g[N.PROMPT_1].inputs.value = p1;
   if(g[N.PROMPT_2]?.inputs) g[N.PROMPT_2].inputs.value = p2;
 
-  // Modo del Prompt 2: Directo o Asistido Ollama
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
   if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
-    // Conectar directamente al prompt 2 del usuario, omitiendo la llamada interna a Ollama
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
     delete g[N.OLLAMA_CHAT_1];
     delete g[N.OLLAMA_CHAT_2];
@@ -4535,7 +4603,6 @@ function buildGraph(j){
     g[N.SPARSE].inputs.video_budget = parseFloat($("h3BudgetSlider")?.value || "0.30");
     g[N.SPARSE].inputs.denser_early_late_steps = $("h3EarlyLateToggle") ? $("h3EarlyLateToggle").checked : true;
   } else if(!sparseOn && g[N.SPARSE]){
-    // Bypass nodo 4: conectar nodo 5 directamente al nodo 2
     if(g[N.SIGMA_SHIFT]?.inputs) g[N.SIGMA_SHIFT].inputs.model = [N.ATTN, 0];
     delete g[N.SPARSE];
   }
@@ -4543,7 +4610,6 @@ function buildGraph(j){
   // Memory Optimization
   const memOn = $("h3MemToggle") ? $("h3MemToggle").checked : true;
   if(!memOn && g[N.MEM_OPT]){
-    // Bypass nodo 6: conectar directo al nodo 5
     currentModelNode = N.SIGMA_SHIFT;
     delete g[N.MEM_OPT];
   }
@@ -4611,13 +4677,11 @@ function buildGraph(j){
 
   // 11. Vídeo de Referencia para Seg 2
   if(videoSlot.uploaded && g[N.REF2V_SEG2]?.inputs){
-    // Inyectar un LoadVideo / nodo de imagen para el vídeo subido por el usuario
     g["195_user_vid"] = {
       class_type: "VHS_LoadVideo",
       inputs: { video: videoSlot.uploaded.name, force_rate: 0, force_size: "Disabled", custom_width: 512, custom_height: 512, frame_load_cap: 0, skip_first_frames: 0, select_every_nth: 1 },
       _meta: { title: "Vídeo Ref Usuario" }
     };
-    // Conectar como ref_video
     if(g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0']){
       g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0'] = ["195_user_vid", 0];
     }
@@ -4629,7 +4693,6 @@ function buildGraph(j){
   const blendOn = $("blendToggle") ? $("blendToggle").checked : true;
 
   if(!blendOn && g[N.BLEND]){
-    // Bypass nodo 66: pasar directamente la imagen de 64 a 40
     if(g[N.IMAGE_BATCH]?.inputs) g[N.IMAGE_BATCH].inputs.image_2 = ["64", 0];
     delete g[N.BLEND];
   }
@@ -4654,7 +4717,6 @@ function buildGraph(j){
     delete g[N.RIFE];
     delete g[N.RIFE_LOADER];
     delete g[N.RIFE_MULT];
-    // Ajustar fps de CreateVideo final a los fps base sin multiplicar
     if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.fps = [N.BASE_FPS, 0];
   }
 
@@ -4671,7 +4733,6 @@ function buildGraph(j){
   // 14. Modo de Ejecución (Completo vs Solo Seg 1 vs Solo Seg 2)
   const runMode = j?.runMode || "full";
   if(runMode === "seg1_only"){
-    // Eliminar nodos del segmento 2 y final para que ComfyUI pare tras guardar Seg 1
     const nodesToDelete = [
       N.REF2V_SEG2, N.SAMPLE_2, N.DECODE_VID_2, N.DECODE_AUD_2, N.CREATE_VID_2, N.SAVE_VID_2,
       N.IMAGE_BATCH, N.AUDIO_CONCAT, N.CREATE_VID_FINAL, N.SAVE_VID_FINAL,
@@ -4701,7 +4762,7 @@ async function queueJob(runMode){
   }
 
   const batchSize = parseInt($("batchSize")?.value || "1", 10);
-  const seedMode = $("segRandom").classList.contains("on") ? "random" : "fixed";
+  const seedMode = $("segRandom")?.classList.contains("on") ? "random" : "fixed";
   const baseSeed = parseInt($("seedVal")?.value || "12345", 10);
 
   const job = {
@@ -4739,7 +4800,6 @@ async function startJob(job){
     const seedUsed = job.seedMode === "random" ? Math.floor(Math.random()*1000000000) : job.seed;
     variantCounter++;
     job.currentVariantIndex = variantCounter;
-    currentBatchIndex++;
     await enqueueJobVariant(job, seedUsed, variantCounter);
   } catch(e){
     log(`❌ Error al iniciar tarea: ${e.message}`, "l-err");
@@ -4750,6 +4810,7 @@ async function startJob(job){
 async function enqueueJobVariant(job, seedUsed, varIdx){
   try {
     CONFIG.onSeedUpdate(seedUsed);
+    currentActiveSamplerSlot = 1;
     const graph = buildGraph({ ...job, seed: seedUsed });
 
     log(`🚀 Procesando ${job.runMode === 'seg1_only' ? 'Solo Seg 1' : 'Vídeo MMH3X2'} · Var ${varIdx} (seed ${seedUsed})...`);
@@ -4778,7 +4839,7 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
     promptVariantMap[data.prompt_id] = varIdx;
     currentPromptId = data.prompt_id;
     promptSteps[data.prompt_id] = "1";
-    startTimer(data.prompt_id, 1);
+    startTimer(data.prompt_id, "Final");
     pollFallback(data.prompt_id);
   } catch(e){
     log(`❌ No se pudo encolar: ${e.message}`, "l-err");
@@ -4863,7 +4924,6 @@ async function loadVideoHistory(){
 window.addEventListener("DOMContentLoaded", () => {
   setupMediaSlots();
 
-  // Botones de ejecución
   if($("btnFull")) $("btnFull").addEventListener("click", () => { queueJob("full"); });
   if($("btnSeg1")) $("btnSeg1").addEventListener("click", () => { queueJob("seg1_only"); });
   if($("btnSeg2")) $("btnSeg2").addEventListener("click", () => { queueJob("seg2_only"); });
@@ -4878,7 +4938,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if($("btnRefreshHistory")) $("btnRefreshHistory").addEventListener("click", () => { loadVideoHistory(); });
 
-  // Pegar de Enhancer a Prompt 2
   if($("btnPrompt2FromEnhancer")) $("btnPrompt2FromEnhancer").addEventListener("click", () => {
     const text = $("enhancerOutput")?.value;
     if(text){
@@ -4893,7 +4952,6 @@ window.addEventListener("DOMContentLoaded", () => {
     $("prompt2").value = "";
   });
 
-  // Slider de Megapíxeles
   if($("mpSlider")){
     $("mpSlider").addEventListener("input", (e) => {
       $("mpVal").textContent = parseFloat(e.target.value).toFixed(2);
@@ -4902,28 +4960,24 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Slider de Duración
   if($("durationSlider")){
     $("durationSlider").addEventListener("input", () => {
       updateDurationFrames();
     });
   }
 
-  // Slider de Pasos
   if($("stepsSlider")){
     $("stepsSlider").addEventListener("input", (e) => {
       $("stepsVal").textContent = e.target.value;
     });
   }
 
-  // Slider de Budget Sparse Attention
   if($("h3BudgetSlider")){
     $("h3BudgetSlider").addEventListener("input", (e) => {
       $("h3BudgetVal").textContent = parseFloat(e.target.value).toFixed(2);
     });
   }
 
-  // Sliders de Shift
   if($("h3ShiftVideo")){
     $("h3ShiftVideo").addEventListener("input", (e) => {
       $("h3ShiftVideoVal").textContent = parseFloat(e.target.value).toFixed(2);
@@ -4935,7 +4989,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Sliders de LoRA
   if($("lora1Strength")){
     $("lora1Strength").addEventListener("input", (e) => {
       $("lora1StrengthVal").textContent = parseFloat(e.target.value).toFixed(2);
@@ -4947,7 +5000,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Tabs de Vista de Reproductores
   document.querySelectorAll(".vid-view-tab").forEach(tab => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".vid-view-tab").forEach(t => t.classList.remove("active"));
@@ -4975,7 +5027,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Collapsibles
   ["h3OptToggle", "postprocToggle"].forEach(id => {
     const el = $(id);
     if(el){
@@ -4987,7 +5038,6 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Llenar selectores de modelos si existen las variables globales inyectadas
   if(typeof AVAILABLE_UNETS !== "undefined" && $("unetModel")){
     const sel = $("unetModel");
     sel.innerHTML = AVAILABLE_UNETS.map(m => `<option value="${m}">${m.split("/").pop()}</option>`).join("");
@@ -5006,10 +5056,10 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Inicializar cálculos
   updateCalculatedResolution(1280, 720);
   updateDurationFrames();
   loadVideoHistory();
+  updateQueueUI();
 });
 
 </script>
