@@ -1046,28 +1046,33 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             for k, v in resp.headers.items():
                 if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
                     self.send_header(k, v)
-            if not self.path.split("?")[0].startswith("/view"):
+            is_view = self.path.split("?")[0].startswith("/view")
+            if not is_view:
                 self.send_header("Connection", "close")
                 self.close_connection = True
-            if client_origin:
-                self.send_header("Access-Control-Allow-Origin", client_origin)
-                self.send_header("Vary", "Origin")
+            else:
+                self.send_header("Connection", "keep-alive")
+            
+            allowed = client_origin or "*"
+            self.send_header("Access-Control-Allow-Origin", allowed)
+            self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
+            self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
+            self.send_header("Vary", "Origin")
             self.end_headers()
-            # Stream the body
-            chunk = resp.read(1024)
+
+            # Stream the body in 64KB chunks
+            chunk = resp.read(65536)
             while chunk:
                 self.wfile.write(chunk)
-                try:
-                    self.wfile.flush()
-                except Exception:
-                    pass
-                chunk = resp.read(1024)
-        except (ConnectionError, BrokenPipeError) as e:
-            sys.stderr.write(f"[serve] Client disconnected: {e}\n")
+                chunk = resp.read(65536)
+            try:
+                self.wfile.flush()
+            except Exception:
+                pass
+        except (ConnectionError, BrokenPipeError):
             return
         except OSError as e:
             if e.errno in (32, 104):  # EPIPE, ECONNRESET
-                sys.stderr.write(f"[serve] Client disconnected during error handler: {e}\n")
                 return
             self.send_error(502, f"Backend error: {e}")
         finally:

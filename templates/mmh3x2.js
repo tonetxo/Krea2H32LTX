@@ -385,6 +385,13 @@ function displayVideoInPlayer(slotIndex, url){
       if(timeTag) timeTag.textContent = `${video.duration.toFixed(1)}s`;
       if(resTag) resTag.textContent = `${video.videoWidth}x${video.videoHeight}`;
     };
+    video.onerror = (e) => {
+      const err = video.error;
+      const code = err ? err.code : "desconocido";
+      const msg = err ? err.message : "";
+      console.error(`Error cargando vídeo slot ${suffix} (código ${code}):`, msg);
+      log(`⚠️ Vídeo ${suffix}: error de reproducción (${code}). Prueba el botón '⬇ Descargar' si el navegador no soporta el formato.`, "l-err");
+    };
   }
 
   if(btnDl){

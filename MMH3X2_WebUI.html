@@ -365,7 +365,7 @@ input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
 .res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
 
 /* Video element */
-video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh;will-change:contents;min-height:140px;}
+video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh;object-fit:contain;margin:0 auto;will-change:contents;min-height:140px;}
 .video-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin-bottom:6px;pointer-events:none;}
 
 .empty{height:140px;}
@@ -4296,6 +4296,13 @@ function displayVideoInPlayer(slotIndex, url){
     video.onloadedmetadata = () => {
       if(timeTag) timeTag.textContent = `${video.duration.toFixed(1)}s`;
       if(resTag) resTag.textContent = `${video.videoWidth}x${video.videoHeight}`;
+    };
+    video.onerror = (e) => {
+      const err = video.error;
+      const code = err ? err.code : "desconocido";
+      const msg = err ? err.message : "";
+      console.error(`Error cargando vídeo slot ${suffix} (código ${code}):`, msg);
+      log(`⚠️ Vídeo ${suffix}: error de reproducción (${code}). Prueba el botón '⬇ Descargar' si el navegador no soporta el formato.`, "l-err");
     };
   }
 
