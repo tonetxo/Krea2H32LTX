@@ -175,7 +175,15 @@ function getFriendlyRatio(w, h){
   return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
 }
 
-function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function log(msg, cls){
+  const el = $("log");
+  if(!el){ console.log(`[log] ${msg}`); return; }
+  const line = document.createElement("div");
+  if(cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
 function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
 function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
 

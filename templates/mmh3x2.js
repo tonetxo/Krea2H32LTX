@@ -1140,11 +1140,13 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if(typeof AVAILABLE_UNETS !== "undefined" && $("unetModel")){
     const sel = $("unetModel");
-    sel.innerHTML = AVAILABLE_UNETS.map(m => `<option value="${m}">${m.split("/").pop()}</option>`).join("");
+    const defaultUnet = BASE_GRAPH[N.UNET]?.inputs?.unet_name || "";
+    sel.innerHTML = AVAILABLE_UNETS.map(m => `<option value="${m}" ${m === defaultUnet ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
   }
   if(typeof AVAILABLE_CLIPS !== "undefined" && $("clipModel")){
     const sel = $("clipModel");
-    sel.innerHTML = AVAILABLE_CLIPS.map(m => `<option value="${m}">${m.split("/").pop()}</option>`).join("");
+    const defaultClip = BASE_GRAPH[N.CLIP]?.inputs?.clip_name || "";
+    sel.innerHTML = AVAILABLE_CLIPS.map(m => `<option value="${m}" ${m === defaultClip ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
   }
   if(typeof AVAILABLE_LORAS !== "undefined"){
     ["lora1Select", "lora2Select"].forEach(id => {
@@ -1155,6 +1157,42 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Poblar prompts por defecto si están vacíos
+  if($("prompt") && !$("prompt").value.trim() && BASE_GRAPH[N.PROMPT_1]?.inputs?.value){
+    $("prompt").value = BASE_GRAPH[N.PROMPT_1].inputs.value;
+  }
+  if($("prompt2") && !$("prompt2").value.trim() && BASE_GRAPH[N.PROMPT_2]?.inputs?.value){
+    $("prompt2").value = BASE_GRAPH[N.PROMPT_2].inputs.value;
+  }
+
+  // Poblar imágenes por defecto del grafo en los slots
+  const defaultImgs = [
+    BASE_GRAPH[N.IMG1]?.inputs?.image,
+    BASE_GRAPH[N.IMG2]?.inputs?.image,
+    BASE_GRAPH[N.IMG3]?.inputs?.image,
+    BASE_GRAPH[N.IMG4]?.inputs?.image
+  ];
+  defaultImgs.forEach((fn, idx) => {
+    const slotIdx = idx + 1;
+    if(fn && !mediaSlots[slotIdx].file && !mediaSlots[slotIdx].dataUrl){
+      mediaSlots[slotIdx].uploaded = { name: fn, subfolder: "", type: "input" };
+      mediaSlots[slotIdx].name = fn;
+      const url = server() + `/view?filename=${encodeURIComponent(fn)}&type=input`;
+      const img = $(`previewSlotImg${slotIdx}`);
+      const ph = $(`phImg${slotIdx}`);
+      const info = $(`infoImg${slotIdx}`);
+      if(img){
+        img.src = url;
+        img.style.display = "block";
+        img.onload = () => {
+          if(slotIdx === 1) updateCalculatedResolution(img.naturalWidth, img.naturalHeight);
+          if(info) info.textContent = `${img.naturalWidth}x${img.naturalHeight} · ${fn.slice(0, 25)}…`;
+        };
+      }
+      if(ph) ph.style.display = "none";
+    }
+  });
 
   updateCalculatedResolution(1280, 720);
   updateDurationFrames();
