@@ -199,6 +199,75 @@ CONFIG.showMedia = function(media, meta){
   displayVideoInPlayer(targetPlayer, media);
 };
 
+function recalcResolution(){
+  if($("mpVal") && $("mpSlider")) $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
+  const img1 = $("previewSlotImg1");
+  updateCalculatedResolution(img1?.naturalWidth || 1280, img1?.naturalHeight || 720);
+}
+
+CONFIG.variantMeta = function(){
+  const p1 = $("prompt")?.value?.trim() || "";
+  const p2 = $("prompt2")?.value?.trim() || "";
+  const seg2Mode = $("seg2PromptMode")?.value || "direct";
+  const dur = $("durationSlider")?.value || "15.0";
+  const mp = $("mpSlider")?.value || "0.70";
+  const steps = $("stepsSlider")?.value || "20";
+  const sampler = $("samplerName")?.value || "res_multistep";
+  const scheduler = $("schedulerName")?.value || "simple";
+  const unet = $("unetModel")?.value?.split('/')?.pop() || "";
+  const clip = $("clipModel")?.value?.split('/')?.pop() || "";
+  const w = $("width")?.value || "1280";
+  const h = $("height")?.value || "720";
+  const rMode = $("rifeMultiplier")?.value || "2";
+
+  const lorasActive = [];
+  if($("lora1Toggle")?.checked && $("lora1Select")?.value){
+    lorasActive.push(`${$("lora1Select").value.split('/').pop()} (${$("lora1Strength")?.value || "1.0"})`);
+  }
+  if($("lora2Toggle")?.checked && $("lora2Select")?.value){
+    lorasActive.push(`${$("lora2Select").value.split('/').pop()} (${$("lora2Strength")?.value || "1.0"})`);
+  }
+
+  const rows = [
+    ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
+    ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
+    ["Modo Seg 2", seg2Mode === "guided" ? "Guía Ollama (continuación)" : "Prompt Directo"],
+    ["Duración", `${dur}s por segmento`],
+    ["Resolución", `${w}×${h} (${mp} MP)`],
+    ["Pasos (Steps)", steps],
+    ["Sampler", sampler],
+    ["Scheduler", scheduler],
+    ["UNet", unet],
+    ["CLIP", clip],
+    ["LoRAs", lorasActive.length ? lorasActive.join(", ") : "ninguno"],
+    ["RIFE", `${rMode}x`]
+  ];
+
+  return { title: "Parámetros MMH3X2", rows, loras: lorasActive };
+};
+
+function formatWorkflowToMeta(workflow){
+  if(!workflow || typeof workflow !== "object") return null;
+  const rows = [];
+  if(workflow["50"]?.inputs?.value) rows.push(["Prompt 1", String(workflow["50"].inputs.value).slice(0, 80)]);
+  else if(workflow["6"]?.inputs?.text) rows.push(["Prompt", String(workflow["6"].inputs.text).slice(0, 80)]);
+  if(workflow["58"]?.inputs?.value) rows.push(["Prompt 2", String(workflow["58"].inputs.value).slice(0, 80)]);
+  if(workflow["12"]?.inputs?.value) rows.push(["Duración", `${workflow["12"].inputs.value}s`]);
+  if(workflow["79"]?.inputs?.value) rows.push(["Pasos", workflow["79"].inputs.value]);
+  else if(workflow["124"]?.inputs?.steps) rows.push(["Pasos", workflow["124"].inputs.steps]);
+  if(workflow["123"]?.inputs?.sampler_name) rows.push(["Sampler", workflow["123"].inputs.sampler_name]);
+  if(workflow["124"]?.inputs?.scheduler) rows.push(["Scheduler", workflow["124"].inputs.scheduler]);
+  else if(workflow["18"]?.inputs?.scheduler) rows.push(["Scheduler", workflow["18"].inputs.scheduler]);
+  if(workflow["15"]?.inputs?.noise_seed !== undefined) rows.push(["Seed", workflow["15"].inputs.noise_seed]);
+  if(workflow["77"]?.inputs?.megapixels) rows.push(["Megapixels", workflow["77"].inputs.megapixels]);
+  const loras = [];
+  if(workflow["145_1"]?.inputs?.lora_name) loras.push(`${workflow["145_1"].inputs.lora_name.split('/').pop()} (${workflow["145_1"].inputs.strength_model || 1})`);
+  if(workflow["145_2"]?.inputs?.lora_name) loras.push(`${workflow["145_2"].inputs.lora_name.split('/').pop()} (${workflow["145_2"].inputs.strength_model || 1})`);
+  if(loras.length) rows.push(["LoRAs", loras.join(", ")]);
+
+  return { title: "Metadata Vídeo", rows, loras };
+}
+
 CONFIG.onNodeExecuted = function(data){
   if(!data) return;
   const nid = String(data.node);
@@ -528,9 +597,16 @@ CONFIG.addToVariantGallery = function(mediaOrUrl, seed, varIdx, promptText){
     }, { once: true });
   }
 
+  const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
+  if(meta) card.dataset.meta = JSON.stringify(meta);
+  card.addEventListener("mouseenter", () => showVariantTooltip(card));
+  card.addEventListener("mouseleave", () => hideVariantTooltip());
+  card.addEventListener("mousemove", (e) => positionVariantTooltip(e));
+
   card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, mediaOrUrl, { autoplay: true, filename: `Var ${varIdx}` }); });
   card.querySelector(".btn-del-card").addEventListener("click", () => {
     card.remove();
+    hideVariantTooltip();
     const remaining = grid.querySelectorAll(".variant-card").length;
     if(countBadge) countBadge.textContent = remaining > 0 ? `(${remaining})` : "";
     if(remaining === 0) gallery.style.display = "none";
@@ -828,9 +904,33 @@ function applyWorkflow(workflow){
     if($("lora2Val")) $("lora2Val").textContent = workflow["145_2"].inputs.strength_model || 1.0;
   }
 
-  // 8. Toggles postprocesado
+  // 8. Sampler & Scheduler
+  const samplerNode = workflow["123"] || findByClass("KSamplerSelect");
+  if(samplerNode?.inputs?.sampler_name && $("samplerName")){
+    $("samplerName").value = samplerNode.inputs.sampler_name;
+  }
+  const schedNode = workflow["18"] || workflow["34"] || workflow["124"] || findByClass("BasicScheduler");
+  if(schedNode?.inputs?.scheduler && $("schedulerName")){
+    $("schedulerName").value = schedNode.inputs.scheduler;
+  }
+
+  // 9. Modelos UNet & CLIP
+  const unetNode = workflow["14"] || workflow["10"] || findByClass("UNETLoader");
+  if(unetNode?.inputs?.unet_name && $("unetModel")){
+    $("unetModel").value = unetNode.inputs.unet_name;
+  }
+  const clipNode = workflow["11"] || findByClass("CLIPLoader");
+  if(clipNode?.inputs?.clip_name && $("clipModel")){
+    $("clipModel").value = clipNode.inputs.clip_name;
+  }
+
+  // 10. Toggles postprocesado y RIFE
+  const rifeNode = workflow["72"] || findByClass("FrameInterpolate");
+  if($("rifeToggle")) $("rifeToggle").checked = !!rifeNode;
+  if(rifeNode?.inputs?.multiplier && $("rifeMultiplier")){
+    $("rifeMultiplier").value = String(rifeNode.inputs.multiplier);
+  }
   if($("rtxToggle")) $("rtxToggle").checked = !!findByClass("RTXVideoSuperResolution");
-  if($("rifeToggle")) $("rifeToggle").checked = !!findByClass("FrameInterpolate");
   if($("blendToggle")) $("blendToggle").checked = !!findByClass("VideoTemporalBlend");
 
   saveState();
@@ -2034,6 +2134,26 @@ async function loadVideoHistory(){
             }
           }, { once: true });
         }
+
+        card.addEventListener("mouseenter", async () => {
+          if(!card.dataset.meta && item.filename){
+            try {
+              const rawUrl = mediaViewUrl(item);
+              const wf = await extractWorkflowFromMP4(rawUrl);
+              if(wf){
+                const metaObj = formatWorkflowToMeta(wf);
+                if(metaObj){
+                  card.dataset.meta = JSON.stringify(metaObj);
+                  showVariantTooltip(card);
+                }
+              }
+            } catch(_){}
+          } else if(card.dataset.meta){
+            showVariantTooltip(card);
+          }
+        });
+        card.addEventListener("mouseleave", () => hideVariantTooltip());
+        card.addEventListener("mousemove", (e) => positionVariantTooltip(e));
 
         card.addEventListener("click", (e) => {
           if(e.target.closest("video")) return;

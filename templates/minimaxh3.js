@@ -2965,6 +2965,31 @@ async function loadVideoHistory(){
         card.dataset.type = item.type;
         makeCardDraggable(card);
 
+        card.addEventListener("mouseenter", async () => {
+          if(!card.dataset.meta && item.filename){
+            try {
+              const wfUrl = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
+              const wf = await extractWorkflowFromMP4(wfUrl);
+              if(wf){
+                const p = wf["6"]?.inputs?.text || wf["50"]?.inputs?.value || "";
+                const rows = [
+                  ["Prompt", p ? (p.length > 80 ? p.slice(0, 77) + "..." : p) : "(vacío)"],
+                  ["Sampler", wf["123"]?.inputs?.sampler_name || "—"],
+                  ["Scheduler", wf["124"]?.inputs?.scheduler || "—"],
+                  ["Pasos", wf["124"]?.inputs?.steps || "—"],
+                  ["Seed", wf["15"]?.inputs?.noise_seed ?? "—"]
+                ];
+                card.dataset.meta = JSON.stringify({ title: "Metadata Vídeo", rows });
+                showVariantTooltip(card);
+              }
+            } catch(_){}
+          } else if(card.dataset.meta){
+            showVariantTooltip(card);
+          }
+        });
+        card.addEventListener("mouseleave", () => hideVariantTooltip());
+        card.addEventListener("mousemove", (e) => positionVariantTooltip(e));
+
         card.addEventListener("click", (e) => {
           if(e.target.closest("video")) return;
           if(e.target.closest("button") || e.target.closest(".variant-icons")) return;
