@@ -684,11 +684,30 @@
       "title": "Ollama"
     }
   },
+  "52": {
+    "inputs": {
+      "empty_cache": true,
+      "gc_collect": true,
+      "unload_all_models": true,
+      "any_input": [
+        "59",
+        0
+      ],
+      "image_pass": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "VRAM_Debug",
+    "_meta": {
+      "title": "VRAM Purge for Ollama"
+    }
+  },
   "53": {
     "inputs": {
       "system": "You are a video continuation prompt writer for MiniMax H3. You receive the prompt of the first segment followed by a 'Next segment direction' instruction written by the director. Fuse BOTH into one new prompt for the next segment: keep the base scene (subject, style, lighting, camera language, audio direction) from the original prompt, and make the director's direction the main driver of the new action, advancing naturally from where the first segment ends. The next segment will use the last frame and the last two seconds of the previous segment as image and video references, so do not re-describe what is already visible. Output ONLY the continuation prompt, with no preamble, quotes or explanation.",
       "prompt": [
-        "59",
+        "52",
         0
       ],
       "think": false,
@@ -741,8 +760,8 @@
         0
       ],
       "images": [
-        "57",
-        0
+        "52",
+        1
       ]
     },
     "class_type": "OllamaChat",

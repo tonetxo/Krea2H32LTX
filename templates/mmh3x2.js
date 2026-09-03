@@ -302,8 +302,12 @@ CONFIG.onNodeExecuting = function(data){
     log("🎞️ Extrayendo fotogramas de anclaje de Seg 1...", "l-busy");
   } else if(node === "54" || node === "57"){
     log("🔍 Muestreando fotogramas para visión...", "l-busy");
+  } else if(node === "52"){
+    log("🧹 Liberando VRAM de ComfyUI (14 GB) para que Ollama se ejecute 100% en GPU...", "l-busy");
+    const t2 = $("previewStepTextSeg2");
+    if(t2) t2.textContent = "Liberando VRAM...";
   } else if(node === "51" || node === "53" || node === "55" || node === "59"){
-    log("🤖 Ollama: Analizando visión y redactando continuidad para Seg 2...", "l-busy");
+    log("🤖 Ollama (GPU): Analizando visión y redactando continuidad para Seg 2...", "l-busy");
     const t2 = $("previewStepTextSeg2");
     const b2 = $("previewStepSeg2");
     const w2 = $("previewWrapSeg2");
@@ -1241,7 +1245,7 @@ function buildGraph(j){
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
   if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
-    ["51", "53", "55", "86"].forEach(id => { delete g[id]; });
+    ["51", "52", "53", "55", "86"].forEach(id => { delete g[id]; });
   }
 
   // 2. Duración y Megapíxeles
