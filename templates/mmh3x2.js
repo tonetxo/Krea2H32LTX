@@ -642,9 +642,144 @@ function updateQueueUI(){
 }
 
 // ==========================================
-// RENDER Y GESTIÓN DE REPRODUCTORES
 // ==========================================
-function displayVideoInPlayer(slotIndex, url, options = {}){
+// RENDER Y GESTIÓN DE REPRODUCTORES (H3/LTX PATTERN)
+// ==========================================
+const currentMedia = { 1: null, 2: null, 3: null };
+
+// --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS MP4 ---
+async function extractWorkflowFromMP4Buffer(arrayBuffer){
+  const bytes = new Uint8Array(arrayBuffer);
+  let startIdx = -1;
+  const marker = new TextEncoder().encode('"prompt": {');
+  outer: for(let i = 0; i <= bytes.length - marker.length; i++){
+    for(let j = 0; j < marker.length; j++){
+      if(bytes[i + j] !== marker[j]) continue outer;
+    }
+    startIdx = i + marker.length - 1;
+    break;
+  }
+  if(startIdx < 0){
+    for(let i = 0; i < bytes.length - 4; i++){
+      if(bytes[i] !== 0x7B || bytes[i+1] !== 0x22) continue;
+      let j = i + 2;
+      while(j < bytes.length && bytes[j] >= 0x30 && bytes[j] <= 0x39) j++;
+      if(j === i + 2) continue;
+      if(bytes[j] !== 0x22) continue;
+      let k = j + 1;
+      while(k < bytes.length && (bytes[k] === 0x20 || bytes[k] === 0x09 || bytes[k] === 0x0A || bytes[k] === 0x0D)) k++;
+      if(bytes[k] === 0x3A){
+        let m = k + 1;
+        while(m < bytes.length && (bytes[m] === 0x20 || bytes[m] === 0x09 || bytes[m] === 0x0A || bytes[m] === 0x0D)) m++;
+        if(bytes[m] === 0x7B){ startIdx = i; break; }
+      }
+    }
+  }
+  if(startIdx < 0) return null;
+  const decoder = new TextDecoder("latin1");
+  let depth = 0, inString = false, escape = false;
+  let collected = "";
+  const CHUNK = 65536;
+  for(let pos = startIdx; pos < bytes.length; pos += CHUNK){
+    const slice = bytes.subarray(pos, Math.min(pos + CHUNK, bytes.length));
+    const piece = decoder.decode(slice, { stream: true });
+    for(let i = 0; i < piece.length; i++){
+      const c = piece[i];
+      collected += c;
+      if(inString){
+        if(escape){ escape = false; }
+        else if(c === '\\'){ escape = true; }
+        else if(c === '"'){ inString = false; }
+      } else {
+        if(c === '"'){ inString = true; }
+        else if(c === '{'){ depth++; }
+        else if(c === '}'){ depth--; if(depth === 0){
+          try { return JSON.parse(collected); }
+          catch(e){ console.warn("No se pudo parsear workflow del MP4:", e.message); return null; }
+        } }
+      }
+    }
+  }
+  decoder.decode();
+  return null;
+}
+
+async function extractWorkflowFromMP4(url){
+  const r = await fetch(url);
+  if(!r.ok) throw new Error("HTTP "+r.status);
+  return extractWorkflowFromMP4Buffer(await r.arrayBuffer());
+}
+
+function applyWorkflow(workflow){
+  if(!workflow || typeof workflow !== "object") return;
+  function findByClass(gt){
+    for(const k of Object.keys(workflow)){
+      if(workflow[k] && workflow[k].class_type === gt) return workflow[k];
+    }
+    return null;
+  }
+
+  // 1. Prompt 1 & Prompt 2
+  if(workflow["50"]?.inputs?.value && $("prompt")){
+    $("prompt").value = workflow["50"].inputs.value;
+  }
+  if(workflow["58"]?.inputs?.value && $("prompt2")){
+    $("prompt2").value = workflow["58"].inputs.value;
+  }
+
+  // 2. Modo Segmento 2 (Ollama vs Directo)
+  const isGuided = !!(workflow["53"] || workflow["55"]);
+  if($("seg2PromptMode")){
+    $("seg2PromptMode").value = isGuided ? "guided" : "direct";
+  }
+
+  // 3. Duración
+  if(workflow["12"]?.inputs?.value && $("durationSlider")){
+    $("durationSlider").value = workflow["12"].inputs.value;
+    updateDurationFrames();
+  }
+
+  // 4. Megapíxeles
+  if(workflow["77"]?.inputs?.megapixels && $("mpSlider")){
+    $("mpSlider").value = workflow["77"].inputs.megapixels;
+    recalcResolution();
+  }
+
+  // 5. Steps
+  if(workflow["79"]?.inputs?.value && $("stepsSlider")){
+    $("stepsSlider").value = workflow["79"].inputs.value;
+    if($("stepsVal")) $("stepsVal").textContent = workflow["79"].inputs.value;
+  }
+
+  // 6. Seed
+  if(workflow["15"]?.inputs?.noise_seed !== undefined && $("seedVal")){
+    $("seedVal").value = workflow["15"].inputs.noise_seed;
+    setSeedMode("fixed");
+  }
+
+  // 7. LoRAs
+  if(workflow["145_1"]?.inputs && $("lora1Toggle")){
+    $("lora1Toggle").checked = true;
+    if($("lora1Select")) $("lora1Select").value = workflow["145_1"].inputs.lora_name || "";
+    if($("lora1Strength")) $("lora1Strength").value = workflow["145_1"].inputs.strength_model || 1.0;
+    if($("lora1Val")) $("lora1Val").textContent = workflow["145_1"].inputs.strength_model || 1.0;
+  }
+  if(workflow["145_2"]?.inputs && $("lora2Toggle")){
+    $("lora2Toggle").checked = true;
+    if($("lora2Select")) $("lora2Select").value = workflow["145_2"].inputs.lora_name || "";
+    if($("lora2Strength")) $("lora2Strength").value = workflow["145_2"].inputs.strength_model || 1.0;
+    if($("lora2Val")) $("lora2Val").textContent = workflow["145_2"].inputs.strength_model || 1.0;
+  }
+
+  // 8. Toggles postprocesado
+  if($("rtxToggle")) $("rtxToggle").checked = !!findByClass("RTXVideoSuperResolution");
+  if($("rifeToggle")) $("rifeToggle").checked = !!findByClass("FrameInterpolate");
+  if($("blendToggle")) $("blendToggle").checked = !!findByClass("VideoTemporalBlend");
+
+  saveState();
+}
+
+function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
   const suffix = (slotIndex === 1) ? "Seg1" : (slotIndex === 2 ? "Seg2" : "Final");
   const video = $("video" + suffix);
   const empty = $("empty" + suffix);
@@ -657,6 +792,27 @@ function displayVideoInPlayer(slotIndex, url, options = {}){
   const resTag = $("res" + suffix);
   const badge = $("badge" + suffix);
 
+  if(!mediaOrUrl) return;
+
+  // Resolver media y url
+  let media = null;
+  let videoUrl = "";
+  if(typeof mediaOrUrl === "string"){
+    videoUrl = mediaOrUrl.includes("#") ? mediaOrUrl : (mediaOrUrl + "#t=0.001");
+    media = options.media || {
+      filename: options.filename || "",
+      subfolder: options.subfolder || "video",
+      type: options.type || "output"
+    };
+  } else {
+    media = mediaOrUrl;
+    const f = encodeURIComponent(media.filename || "");
+    const s = encodeURIComponent(media.subfolder || "");
+    const t = encodeURIComponent(media.type || "output");
+    videoUrl = `${server()}/view?filename=${f}&subfolder=${s}&type=${t}#t=0.001`;
+  }
+  currentMedia[slotIndex] = media;
+
   if(empty) empty.style.display = "none";
   if(pImg) pImg.style.display = "none";
   if(pVid){ pVid.pause(); pVid.style.display = "none"; }
@@ -664,73 +820,181 @@ function displayVideoInPlayer(slotIndex, url, options = {}){
   const step = $("previewStep" + suffix);
   if(wrap) wrap.style.display = "none";
   if(step) step.style.display = "none";
-  if(slotIndex === 3){
-    const wrapFin = $("previewWrapFinal");
-    const stepFin = $("previewStepFinal");
-    if(wrapFin) wrapFin.style.display = "none";
-    if(stepFin) stepFin.style.display = "none";
-  }
 
-  if(badge && options.filename){
-    badge.textContent = options.filename;
+  const fn = media.filename || options.filename;
+  if(badge && fn){
+    badge.textContent = fn;
     badge.style.display = "inline-block";
   }
 
   if(video){
-    const videoUrl = url.includes("#") ? url : (url + "#t=0.001");
+    video.crossOrigin = "anonymous";
     video.src = videoUrl;
     video.style.display = "block";
-    if(options.autoplay){
-      video.play().catch(()=>{});
+    if(options.autoplay !== false){
+      video.play().catch(err => console.log("Autoplay bloqueado:", err));
     }
-    video.onloadedmetadata = () => {
-      if(timeTag) timeTag.textContent = `${video.duration.toFixed(1)}s`;
-      if(resTag) resTag.textContent = `${video.videoWidth}x${video.videoHeight}`;
+    const onMeta = () => {
+      const vw = video.videoWidth || 0, vh = video.videoHeight || 0;
+      if(vw && vh){
+        function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+        const d = gcd(vw, vh) || 1;
+        if(resTag) resTag.textContent = `${vw}×${vh} · ${vw/d}:${vh/d}`;
+      }
+      if(timeTag && video.duration) timeTag.textContent = `${video.duration.toFixed(1)}s`;
+      video.removeEventListener("loadedmetadata", onMeta);
     };
-    video.onerror = (e) => {
+    if(video.videoWidth && video.videoHeight){
+      onMeta();
+    } else {
+      video.addEventListener("loadedmetadata", onMeta);
+    }
+    video.onerror = () => {
       const err = video.error;
       const code = err ? err.code : "desconocido";
-      const msg = err ? err.message : "";
-      console.error(`Error cargando vídeo slot ${suffix} (código ${code}):`, msg);
-      log(`⚠️ Vídeo ${suffix}: error de reproducción (${code}). Prueba el botón '⬇ Descargar' si el navegador no soporta el formato.`, "l-err");
+      console.error(`Error cargando vídeo slot ${suffix} (código ${code})`);
+      log(`⚠️ Vídeo ${suffix}: error de reproducción (${code}). Prueba '⬇ Descargar' si el navegador no soporta el formato.`, "l-err");
     };
   }
 
   if(btnDl){
     btnDl.style.display = "inline-flex";
-    btnDl.onclick = () => {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `MMH3X2_${suffix}_${Date.now()}.mp4`;
-      a.click();
+    btnDl.onclick = async () => {
+      const m = currentMedia[slotIndex];
+      const dlUrl = m?.filename ? `${server()}/view?filename=${encodeURIComponent(m.filename)}&subfolder=${encodeURIComponent(m.subfolder||"")}&type=${encodeURIComponent(m.type||"output")}` : videoUrl;
+      const filename = m?.filename || `MMH3X2_${suffix}.mp4`;
+      btnDl.disabled = true;
+      const orig = btnDl.innerHTML;
+      btnDl.textContent = "⏳";
+      try {
+        const r = await fetch(dlUrl);
+        if(!r.ok) throw new Error("HTTP " + r.status);
+        const blob = await r.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+        log(`⬇ Descargado ${filename}`, "l-ok");
+      } catch(err){
+        log("❌ Error descargando: " + err.message, "l-err");
+      } finally {
+        btnDl.disabled = false;
+        btnDl.innerHTML = orig;
+      }
     };
   }
 
   if(btnExt){
     btnExt.style.display = "inline-flex";
     btnExt.onclick = () => {
-      extractCurrentFrame(video, slotIndex);
+      captureFrameFromPlayer(slotIndex);
     };
   }
 
   if(btnMeta){
     btnMeta.disabled = false;
+    btnMeta.onclick = async () => {
+      const m = currentMedia[slotIndex];
+      if(!m || !m.filename){ log("⚠️ No hay metadatos para recuperar", "l-err"); return; }
+      const wfUrl = `${server()}/view?filename=${encodeURIComponent(m.filename)}&subfolder=${encodeURIComponent(m.subfolder||"")}&type=${encodeURIComponent(m.type||"output")}`;
+      btnMeta.disabled = true;
+      const orig = btnMeta.innerHTML;
+      btnMeta.textContent = "⏳";
+      try {
+        const workflow = await extractWorkflowFromMP4(wfUrl);
+        if(workflow){
+          applyWorkflow(workflow);
+          log(`📋 Workflow restaurado desde ${m.filename}`, "l-ok");
+        } else {
+          log(`ℹ️ ${m.filename} no contiene metadatos de workflow.`, "l-warn");
+        }
+      } catch(err){
+        log("❌ Error leyendo workflow: " + err.message, "l-err");
+      } finally {
+        btnMeta.disabled = false;
+        btnMeta.innerHTML = orig;
+      }
+    };
   }
 }
 
-function extractCurrentFrame(videoEl, fromSlot){
-  if(!videoEl || videoEl.videoWidth === 0) return;
-  const canvas = document.createElement("canvas");
-  canvas.width = videoEl.videoWidth;
-  canvas.height = videoEl.videoHeight;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL("image/png");
-
-  const targetSlot = (fromSlot === 1) ? 3 : 1;
-  setMediaSlotData(targetSlot, null, dataUrl, `Frame extraído de Seg ${fromSlot}`);
-  log(`📸 Frame de ${videoEl.currentTime.toFixed(2)}s asignado al Slot de Imagen ${targetSlot}`, "l-ok");
+// Alias showVideo
+function showVideo(slotIndex, media, options = {}){
+  displayVideoInPlayer(slotIndex, media, options);
 }
+
+// --- Extracción de fotograma exacto (patrón H3/LTX) ---
+const FRAME_STEP = 1 / 24;
+
+function nudgeFrame(slotIndex, delta){
+  const suffix = (slotIndex === 1) ? "Seg1" : (slotIndex === 2 ? "Seg2" : "Final");
+  const v = $("video" + suffix);
+  if(!v || !v.src || v.style.display === "none") return;
+  const dur = v.duration || 0;
+  if(!dur || !isFinite(dur)) return;
+  v.pause();
+  const t = Math.min(Math.max(0, (v.currentTime || 0) + delta * FRAME_STEP), dur);
+  v.currentTime = t;
+}
+
+async function captureFrameFromPlayer(slotIndex){
+  const suffix = (slotIndex === 1) ? "Seg1" : (slotIndex === 2 ? "Seg2" : "Final");
+  const v = $("video" + suffix);
+  if(!v || !v.src || v.style.display === "none"){
+    log("⚠️ No hay vídeo cargado en este reproductor", "l-err");
+    return;
+  }
+  const btn = $("btnExtractFrame" + suffix);
+  if(btn) btn.disabled = true;
+  try {
+    if(v.readyState < 2){
+      await new Promise((res) => {
+        const onLoaded = () => { v.removeEventListener("loadeddata", onLoaded); res(); };
+        v.addEventListener("loadeddata", onLoaded, { once: true });
+        setTimeout(res, 800);
+      });
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = v.videoWidth || 640;
+    canvas.height = v.videoHeight || 360;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    let dataUrl;
+    try {
+      dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    } catch(secErr){
+      log("❌ Canvas protegido por CORS. No se puede extraer el frame.", "l-err");
+      return;
+    }
+    const targetSlot = (slotIndex === 1) ? 3 : (slotIndex === 2 ? 4 : 1);
+    setMediaSlotData(targetSlot, null, dataUrl, `Frame ${v.currentTime.toFixed(2)}s de ${suffix}`);
+    log(`📸 Frame de ${v.currentTime.toFixed(2)}s asignado al Slot de Imagen ${targetSlot}`, "l-ok");
+  } catch(e){
+    log("❌ Error extrayendo frame: " + e.message, "l-err");
+  } finally {
+    if(btn) btn.disabled = false;
+  }
+}
+
+// Atajos de teclado en reproductores (Flechas izq/der para frames, F para extraer)
+[1, 2, 3].forEach(slot => {
+  const suffix = (slot === 1) ? "Seg1" : (slot === 2 ? "Seg2" : "Final");
+  const box = $("box" + suffix);
+  if(box){
+    box.setAttribute("tabindex", "0");
+    box.addEventListener("keydown", (e) => {
+      if(!e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && ["ArrowLeft", "ArrowRight"].includes(e.key)){
+        e.preventDefault();
+        nudgeFrame(slot, e.key === "ArrowRight" ? 1 : -1);
+      } else if(e.key === "f" || e.key === "F"){
+        captureFrameFromPlayer(slot);
+      }
+    });
+  }
+});
 
 // ==========================================
 // PERSISTENCIA DE SESIÓN (AJUSTES & MEDIOS)
@@ -1621,6 +1885,7 @@ async function loadVideoHistory(){
         </div>
         <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
           <button class="ghost btn-mini btn-play-hist" title="Ver en reproductor">▶ Ver</button>
+          <button class="ghost btn-mini btn-meta-hist" title="Restaurar workflow">📋</button>
           <a class="ghost btn-mini" href="${url}" download="${item.filename}" title="Descargar">⬇</a>
           <button class="ghost btn-mini btn-del-hist" title="Eliminar archivo">✕</button>
         </div>
@@ -1642,6 +1907,27 @@ async function loadVideoHistory(){
       card.querySelector(".btn-play-hist").addEventListener("click", () => {
         displayVideoInPlayer(3, url, { autoplay: true, filename: item.filename });
         log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
+      });
+      card.querySelector(".btn-meta-hist").addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        const orig = btn.textContent;
+        btn.textContent = "⏳";
+        try {
+          const wf = await extractWorkflowFromMP4(url);
+          if(wf){
+            applyWorkflow(wf);
+            log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
+          } else {
+            log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
+          }
+        } catch(err){
+          log("❌ Error leyendo workflow: " + err.message, "l-err");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = orig;
+        }
       });
       card.querySelector(".btn-del-hist").addEventListener("click", async () => {
         if(!confirm(`¿Eliminar ${item.filename}?`)) return;
