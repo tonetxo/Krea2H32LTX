@@ -98,6 +98,44 @@
             </div>
           </div>
         </div>
+
+        <!-- PISTAS DE AUDIO -->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap;">
+            <label style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0;">Pistas de Audio <span class="hint">(Guía &amp; BGM)</span></label>
+            <select id="audioMode" style="width:auto;padding:3px 6px;font-size:10px;height:24px;">
+              <option value="none" selected>Sin audio externo (IA estándar)</option>
+              <option value="guide">Guía de Ritmo IA (ref_audio)</option>
+              <option value="passthrough">Pista Directa Final (BGM limpio)</option>
+              <option value="hybrid">Híbrido (Guía Ritmo + Pista Limpia)</option>
+            </select>
+          </div>
+          <div class="audio-grid-2">
+            <!-- AUDIO 1 -->
+            <div class="audio-slot-wrap" id="slotAudio1" data-slot="audio1">
+              <div class="media-slot-header">
+                <span class="media-slot-badge">Audio 1 · Seg 1 / Global</span>
+                <button class="media-slot-del" id="btnDelAudio1" title="Quitar audio">✕</button>
+              </div>
+              <input type="file" id="fileInputAudio1" accept="audio/*">
+              <div class="ph" id="phAudio1">arrastra o clic audio<br><span class="hint">(WAV, MP3, FLAC)</span></div>
+              <audio id="previewAudio1" controls style="display:none;"></audio>
+              <div class="media-slot-info" id="infoAudio1"></div>
+            </div>
+
+            <!-- AUDIO 2 -->
+            <div class="audio-slot-wrap" id="slotAudio2" data-slot="audio2">
+              <div class="media-slot-header">
+                <span class="media-slot-badge">Audio 2 · Seg 2 (Opcional)</span>
+                <button class="media-slot-del" id="btnDelAudio2" title="Quitar audio">✕</button>
+              </div>
+              <input type="file" id="fileInputAudio2" accept="audio/*">
+              <div class="ph" id="phAudio2">arrastra o clic audio<br><span class="hint">(WAV, MP3, FLAC)</span></div>
+              <audio id="previewAudio2" controls style="display:none;"></audio>
+              <div class="media-slot-info" id="infoAudio2"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- SEMILLA -->

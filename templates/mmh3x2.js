@@ -149,7 +149,7 @@ RULES:
 const N = CONFIG.N;
 initCommon();
 
-// Estado de imágenes y vídeo
+// Estado de imágenes, vídeo y audio
 let mediaSlots = {
   1: { file: null, dataUrl: null, uploaded: null, name: "" },
   2: { file: null, dataUrl: null, uploaded: null, name: "" },
@@ -157,6 +157,10 @@ let mediaSlots = {
   4: { file: null, dataUrl: null, uploaded: null, name: "" }
 };
 let videoSlot = { file: null, dataUrl: null, uploaded: null, name: "" };
+let audioSlots = {
+  1: { file: null, dataUrl: null, uploaded: null, name: "" },
+  2: { file: null, dataUrl: null, uploaded: null, name: "" }
+};
 
 let jobQueue = [];
 let activeJob = null;
@@ -248,10 +252,17 @@ CONFIG.variantMeta = function(){
     lorasActive.push(`${$("lora2Select").value.split('/').pop()} (${$("lora2Strength")?.value || "1.0"})`);
   }
 
+  const audioMode = $("audioMode")?.value || "none";
+  let audioDesc = "sin audio externo";
+  if(audioMode === "guide") audioDesc = "Guía Ritmo IA (ref_audio)";
+  else if(audioMode === "passthrough") audioDesc = "Pista Directa Final (BGM limpio)";
+  else if(audioMode === "hybrid") audioDesc = "Híbrido (Guía Ritmo + Pista Limpia)";
+
   const rows = [
     ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
     ["Modo Seg 2", seg2Mode === "guided" ? "Guía Ollama (continuación)" : "Prompt Directo"],
+    ["Modo Audio", audioDesc],
     ["Duración Seg 1", `${dur1.toFixed(1)}s (${f1}f)`],
     ["Duración Seg 2", `${dur2.toFixed(1)}s (${f2}f)`],
     ["Duración Total", `${(fTotal / 24).toFixed(1)}s (${fTotal}f)`],
@@ -1274,7 +1285,8 @@ function saveSettings(){
     rtxToggle: $("rtxToggle") ? $("rtxToggle").checked : true,
     rifeToggle: $("rifeToggle") ? $("rifeToggle").checked : true,
     rifeMultiplier: $("rifeMultiplier")?.value || "2",
-    rifeModel: $("rifeModel")?.value || "rife_v4.26.safetensors"
+    rifeModel: $("rifeModel")?.value || "rife_v4.26.safetensors",
+    audioMode: $("audioMode")?.value || "none"
   };
   try {
     localStorage.setItem(MMH3X2_SETTINGS_KEY, JSON.stringify(s));
@@ -1375,6 +1387,7 @@ function restoreSettings(){
     if(s.rifeToggle !== undefined && $("rifeToggle")) $("rifeToggle").checked = s.rifeToggle;
     if(s.rifeMultiplier !== undefined && $("rifeMultiplier")) $("rifeMultiplier").value = s.rifeMultiplier;
     if(s.rifeModel && $("rifeModel")) $("rifeModel").value = s.rifeModel;
+    if(s.audioMode !== undefined && $("audioMode")) $("audioMode").value = s.audioMode;
 
     return true;
   } catch(e){
@@ -1389,7 +1402,7 @@ async function restoreSavedMedia(){
 
   let restoredAny = false;
   for(const rec of records){
-    if(rec.key && rec.key.startsWith("slot_") && rec.key !== "slot_vid"){
+    if(rec.key && rec.key.startsWith("slot_") && rec.key !== "slot_vid" && !rec.key.startsWith("slot_audio_")){
       const slotIdx = parseInt(rec.key.replace("slot_", ""), 10);
       if(slotIdx >= 1 && slotIdx <= 4 && rec.dataUrl){
         setMediaSlotData(slotIdx, null, rec.dataUrl, rec.name || `slot_${slotIdx}.png`, false);
@@ -1408,6 +1421,12 @@ async function restoreSavedMedia(){
       if(info) info.textContent = `${rec.name || 'video'} (${(rec.blob.size / 1024 / 1024).toFixed(1)} MB)`;
       if(btnDel) btnDel.style.display = "inline-flex";
       restoredAny = true;
+    } else if(rec.key === "slot_audio_1" && rec.blob){
+      handleAudioFile(1, rec.blob, false);
+      restoredAny = true;
+    } else if(rec.key === "slot_audio_2" && rec.blob){
+      handleAudioFile(2, rec.blob, false);
+      restoredAny = true;
     }
   }
   return restoredAny;
@@ -1415,12 +1434,12 @@ async function restoreSavedMedia(){
 
 function attachAutoSaveListeners(){
   const inputIds = [
-    "prompt", "prompt2", "seg2PromptMode", "durationSlider", "mpSlider", "stepsSlider",
+    "prompt", "prompt2", "seg2PromptMode", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
     "unetModel", "clipModel", "h3SparseToggle", "h3BudgetSlider", "h3EarlyLateToggle",
     "h3MemToggle", "h3ShiftVideo", "h3ShiftAudio", "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
-    "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel"
+    "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode"
   ];
 
   inputIds.forEach(id => {
@@ -1525,6 +1544,44 @@ function setupMediaSlots(){
     });
   }
 
+  // Audio Slots (1 y 2)
+  for(let i = 1; i <= 2; i++){
+    const slotEl = $(`slotAudio${i}`);
+    const fileInput = $(`fileInputAudio${i}`);
+    const delBtn = $(`btnDelAudio${i}`);
+
+    if(slotEl && fileInput){
+      slotEl.addEventListener("click", (e) => {
+        if(e.target === delBtn || (delBtn && delBtn.contains(e.target))) return;
+        if(e.target.tagName === "AUDIO") return;
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if(file) handleAudioFile(i, file);
+      });
+
+      slotEl.addEventListener("dragover", (e) => { e.preventDefault(); slotEl.classList.add("drag"); });
+      slotEl.addEventListener("dragleave", () => { slotEl.classList.remove("drag"); });
+      slotEl.addEventListener("drop", (e) => {
+        e.preventDefault();
+        slotEl.classList.remove("drag");
+        const file = e.dataTransfer.files[0];
+        if(file && (file.type.startsWith("audio/") || /\.(mp3|wav|ogg|flac|m4a|aac)$/i.test(file.name))){
+          handleAudioFile(i, file);
+        }
+      });
+    }
+
+    if(delBtn){
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        clearAudioSlot(i);
+      });
+    }
+  }
+
   window.addEventListener("paste", (e) => {
     const items = (e.clipboardData || e.originalEvent.clipboardData).items;
     for(let item of items){
@@ -1539,6 +1596,38 @@ function setupMediaSlots(){
       }
     }
   });
+}
+
+function handleAudioFile(slotIdx, file, shouldSave = true){
+  const url = URL.createObjectURL(file);
+  audioSlots[slotIdx] = { file, dataUrl: url, uploaded: null, name: file.name };
+  const a = $(`previewAudio${slotIdx}`);
+  const ph = $(`phAudio${slotIdx}`);
+  const info = $(`infoAudio${slotIdx}`);
+
+  if(a){
+    a.src = url;
+    a.style.display = "block";
+  }
+  if(ph) ph.style.display = "none";
+  if(info) info.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+  if(shouldSave){
+    dbSaveSlot("slot_audio_" + slotIdx, { blob: file, name: file.name });
+  }
+}
+
+function clearAudioSlot(slotIdx){
+  audioSlots[slotIdx] = { file: null, dataUrl: null, uploaded: null, name: "" };
+  const a = $(`previewAudio${slotIdx}`);
+  const ph = $(`phAudio${slotIdx}`);
+  const info = $(`infoAudio${slotIdx}`);
+  const input = $(`fileInputAudio${slotIdx}`);
+
+  if(a){ a.removeAttribute("src"); a.style.display = "none"; }
+  if(ph) ph.style.display = "block";
+  if(info) info.textContent = "";
+  if(input) input.value = "";
+  dbDeleteSlot("slot_audio_" + slotIdx);
 }
 
 function handleImageFile(slotIdx, file){
@@ -1630,6 +1719,10 @@ async function ensureAllMediaUploaded(){
     if((slot.file || slot.dataUrl) && !slot.uploaded) needUpload++;
   }
   if(videoSlot.file && !videoSlot.uploaded) needUpload++;
+  for(let i = 1; i <= 2; i++){
+    const aSlot = audioSlots[i];
+    if(aSlot.file && !aSlot.uploaded) needUpload++;
+  }
 
   if(needUpload > 0){
     log(`📤 Subiendo ${needUpload} archivo(s) de medios a ComfyUI...`, "l-busy");
@@ -1655,6 +1748,14 @@ async function ensureAllMediaUploaded(){
 
   if(videoSlot.file && !videoSlot.uploaded){
     videoSlot.uploaded = await uploadSingleFile(videoSlot.file, videoSlot.name || "mmh3x2_ref_vid.mp4");
+  }
+
+  for(let i = 1; i <= 2; i++){
+    const aSlot = audioSlots[i];
+    if(aSlot.file && !aSlot.uploaded){
+      const ext = aSlot.name.split('.').pop() || "wav";
+      aSlot.uploaded = await uploadSingleFile(aSlot.file, `mmh3x2_audio_${i}.${ext}`);
+    }
   }
 }
 
@@ -1904,7 +2005,100 @@ function buildGraph(j){
     }
   }
 
-  // 12. Postprocesado: RTX Video Super Resolution y RIFE
+  // 12. Enrutamiento de Audio (Guía de Ritmo IA & Pista Directa Final)
+  const audioMode = (j ? j.audioMode : $("audioMode")?.value) || "none";
+  const a1 = audioSlots[1]?.uploaded?.name || (audioSlots[1]?.file ? audioSlots[1].file.name : null);
+  const a2 = audioSlots[2]?.uploaded?.name || (audioSlots[2]?.file ? audioSlots[2].file.name : null);
+  const totalDurExact = parseFloat((((calcFramesForDuration(dur1) - 1) + calcFramesForDuration(dur2)) / 24).toFixed(4));
+
+  if(audioMode !== "none" && (a1 || a2)){
+    if(a1){
+      g["190_load_audio1"] = {
+        inputs: { audio: a1 },
+        class_type: "LoadAudio",
+        _meta: { title: "Audio Entrada 1" }
+      };
+    }
+    if(a2){
+      g["191_load_audio2"] = {
+        inputs: { audio: a2 },
+        class_type: "LoadAudio",
+        _meta: { title: "Audio Entrada 2" }
+      };
+    }
+
+    // A. Condicionamiento de Ritmo IA (ref_audios en MiniMaxH3ReferenceToVideo)
+    if(audioMode === "guide" || audioMode === "hybrid"){
+      if(a1 && g[N.REF2V_SEG1]?.inputs){
+        g[N.REF2V_SEG1].inputs["ref_audios.ref_audio_0"] = ["190_load_audio1", 0];
+      }
+      if(g[N.REF2V_SEG2]?.inputs){
+        if(a2){
+          g[N.REF2V_SEG2].inputs["ref_audios.ref_audio_0"] = ["191_load_audio2", 0];
+        } else if(a1){
+          g[N.REF2V_SEG2].inputs["ref_audios.ref_audio_0"] = ["190_load_audio1", 0];
+        }
+      }
+    }
+
+    // B. Pista Directa en el Vídeo Final (sustituye el audio sintetizado en CreateVideo nodo 42)
+    if(audioMode === "passthrough" || audioMode === "hybrid"){
+      if(a1 && !a2){
+        g["192_trim_final_audio"] = {
+          inputs: {
+            audio: ["190_load_audio1", 0],
+            start_index: 0.0,
+            duration: totalDurExact
+          },
+          class_type: "TrimAudioDuration",
+          _meta: { title: "Audio Global recortado" }
+        };
+        if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
+      } else if(a1 && a2){
+        g["193_trim_audio1"] = {
+          inputs: {
+            audio: ["190_load_audio1", 0],
+            start_index: 0.0,
+            duration: parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4))
+          },
+          class_type: "TrimAudioDuration",
+          _meta: { title: "Audio Seg 1 recortado" }
+        };
+        g["194_trim_audio2"] = {
+          inputs: {
+            audio: ["191_load_audio2", 0],
+            start_index: 0.0,
+            duration: parseFloat((calcFramesForDuration(dur2) / 24).toFixed(4))
+          },
+          class_type: "TrimAudioDuration",
+          _meta: { title: "Audio Seg 2 recortado" }
+        };
+        g["195_concat_direct_audio"] = {
+          inputs: {
+            direction: "after",
+            audio1: ["193_trim_audio1", 0],
+            audio2: ["194_trim_audio2", 0]
+          },
+          class_type: "AudioConcat",
+          _meta: { title: "Concatenar Audios Directos" }
+        };
+        if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["195_concat_direct_audio", 0];
+      } else if(!a1 && a2){
+        g["192_trim_final_audio"] = {
+          inputs: {
+            audio: ["191_load_audio2", 0],
+            start_index: 0.0,
+            duration: totalDurExact
+          },
+          class_type: "TrimAudioDuration",
+          _meta: { title: "Audio Seg 2 recortado" }
+        };
+        if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
+      }
+    }
+  }
+
+  // 13. Postprocesado: RTX Video Super Resolution y RIFE
   const rtxOn = $("rtxToggle") ? $("rtxToggle").checked : true;
   const rifeOn = $("rifeToggle") ? $("rifeToggle").checked : true;
   const blendOn = $("blendToggle") ? $("blendToggle").checked : true;
@@ -1941,13 +2135,13 @@ function buildGraph(j){
     g[N.CREATE_VID_FINAL].inputs.images = finalImagesSource;
   }
 
-  // 13. Prefijos de guardado de vídeo
+  // 14. Prefijos de guardado de vídeo
   const prefix = ($("filenamePrefix")?.value || "video/MiniMax_H3").trim();
   if(g[N.SAVE_VID_1]?.inputs) g[N.SAVE_VID_1].inputs.filename_prefix = prefix + "_seg1";
   if(g[N.SAVE_VID_2]?.inputs) g[N.SAVE_VID_2].inputs.filename_prefix = prefix + "_seg2";
   if(g[N.SAVE_VID_FINAL]?.inputs) g[N.SAVE_VID_FINAL].inputs.filename_prefix = prefix + "_cont";
 
-  // 14. Modo de Ejecución (Completo vs Solo Seg 1 vs Solo Seg 2)
+  // 15. Modo de Ejecución (Completo vs Solo Seg 1 vs Solo Seg 2)
   const runMode = j?.runMode || "full";
   if(runMode === "seg1_only"){
     const nodesToDelete = [
@@ -1993,6 +2187,7 @@ async function queueJob(runMode){
     steps: parseInt($("stepsSlider")?.value || "20", 10),
     sampler: $("samplerName")?.value || "res_multistep",
     scheduler: $("schedulerName")?.value || "simple",
+    audioMode: $("audioMode")?.value || "none",
     seedMode,
     seed: baseSeed,
     batchSize
