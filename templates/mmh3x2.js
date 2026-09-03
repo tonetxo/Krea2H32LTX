@@ -199,6 +199,22 @@ CONFIG.showMedia = function(media, meta){
   displayVideoInPlayer(targetPlayer, media);
 };
 
+let seedMode = "random";
+
+function setSeedMode(mode){
+  if(mode === "fixed"){
+    seedMode = "fixed";
+    $("segFixed")?.classList.add("on");
+    $("segRandom")?.classList.remove("on");
+    if($("seedVal")) $("seedVal").disabled = false;
+  } else {
+    seedMode = "random";
+    $("segRandom")?.classList.add("on");
+    $("segFixed")?.classList.remove("on");
+    if($("seedVal")) $("seedVal").disabled = true;
+  }
+}
+
 function recalcResolution(){
   if($("mpVal") && $("mpSlider")) $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
   const img1 = $("previewSlotImg1");
@@ -933,7 +949,7 @@ function applyWorkflow(workflow){
   if($("rtxToggle")) $("rtxToggle").checked = !!findByClass("RTXVideoSuperResolution");
   if($("blendToggle")) $("blendToggle").checked = !!findByClass("VideoTemporalBlend");
 
-  saveState();
+  saveSettings();
 }
 
 function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
