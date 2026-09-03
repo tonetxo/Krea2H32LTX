@@ -225,7 +225,11 @@ CONFIG.variantMeta = function(){
   const p1 = $("prompt")?.value?.trim() || "";
   const p2 = $("prompt2")?.value?.trim() || "";
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
-  const dur = $("durationSlider")?.value || "15.0";
+  const dur1 = parseFloat($("durationSlider1")?.value || $("durationSlider")?.value || "15.0");
+  const dur2 = parseFloat($("durationSlider2")?.value || "15.0");
+  const f1 = calcFramesForDuration(dur1);
+  const f2 = calcFramesForDuration(dur2);
+  const fTotal = (f1 - 1) + f2;
   const mp = $("mpSlider")?.value || "0.70";
   const steps = $("stepsSlider")?.value || "20";
   const sampler = $("samplerName")?.value || "res_multistep";
@@ -248,7 +252,9 @@ CONFIG.variantMeta = function(){
     ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
     ["Modo Seg 2", seg2Mode === "guided" ? "Guía Ollama (continuación)" : "Prompt Directo"],
-    ["Duración", `${dur}s por segmento`],
+    ["Duración Seg 1", `${dur1.toFixed(1)}s (${f1}f)`],
+    ["Duración Seg 2", `${dur2.toFixed(1)}s (${f2}f)`],
+    ["Duración Total", `${(fTotal / 24).toFixed(1)}s (${fTotal}f)`],
     ["Resolución", `${w}×${h} (${mp} MP)`],
     ["Pasos (Steps)", steps],
     ["Sampler", sampler],
@@ -882,11 +888,16 @@ function applyWorkflow(workflow){
     $("seg2PromptMode").value = isGuided ? "guided" : "direct";
   }
 
-  // 3. Duración
-  if(workflow["12"]?.inputs?.value && $("durationSlider")){
-    $("durationSlider").value = workflow["12"].inputs.value;
-    updateDurationFrames();
+  // 3. Duración (Segmentos 1 y 2)
+  if(workflow["12"]?.inputs?.value && $("durationSlider1")){
+    $("durationSlider1").value = workflow["12"].inputs.value;
   }
+  if(workflow["12_seg2"]?.inputs?.value && $("durationSlider2")){
+    $("durationSlider2").value = workflow["12_seg2"].inputs.value;
+  } else if(workflow["12"]?.inputs?.value && $("durationSlider2")){
+    $("durationSlider2").value = workflow["12"].inputs.value;
+  }
+  updateDurationFrames();
 
   // 4. Megapíxeles
   if(workflow["77"]?.inputs?.megapixels && $("mpSlider")){
@@ -1237,7 +1248,8 @@ function saveSettings(){
     seg2PromptMode: $("seg2PromptMode")?.value || "direct",
     seedMode: $("segRandom")?.classList.contains("on") ? "random" : "fixed",
     seedVal: $("seedVal")?.value || "12345",
-    duration: $("durationSlider")?.value || "15.0",
+    duration1: $("durationSlider1")?.value || $("durationSlider")?.value || "15.0",
+    duration2: $("durationSlider2")?.value || "15.0",
     megapixels: $("mpSlider")?.value || "0.70",
     batchSize: $("batchSize")?.value || "1",
     filenamePrefix: $("filenamePrefix")?.value || "video/MiniMax_H3",
@@ -1299,11 +1311,17 @@ function restoreSettings(){
     }
     if(s.seedVal !== undefined && $("seedVal")) $("seedVal").value = s.seedVal;
 
-    if(s.duration !== undefined && $("durationSlider")){
-      $("durationSlider").value = s.duration;
-      if($("durationVal")) $("durationVal").textContent = parseFloat(s.duration).toFixed(1) + "s";
-      updateDurationFrames();
+    if(s.duration1 !== undefined && $("durationSlider1")){
+      $("durationSlider1").value = s.duration1;
+    } else if(s.duration !== undefined && $("durationSlider1")){
+      $("durationSlider1").value = s.duration;
     }
+    if(s.duration2 !== undefined && $("durationSlider2")){
+      $("durationSlider2").value = s.duration2;
+    } else if(s.duration !== undefined && $("durationSlider2")){
+      $("durationSlider2").value = s.duration;
+    }
+    updateDurationFrames();
     if(s.megapixels !== undefined && $("mpSlider")){
       $("mpSlider").value = s.megapixels;
       if($("mpVal")) $("mpVal").textContent = parseFloat(s.megapixels).toFixed(2);
@@ -1687,15 +1705,19 @@ function calcFramesForDuration(dur){
 }
 
 function updateDurationFrames(){
-  const dur = parseFloat($("durationSlider")?.value || "15.0");
-  const framesPerSeg = calcFramesForDuration(dur);
-  const totalFrames = framesPerSeg * 2;
+  const dur1 = parseFloat($("durationSlider1")?.value || $("durationSlider")?.value || "15.0");
+  const dur2 = parseFloat($("durationSlider2")?.value || "15.0");
+  const frames1 = calcFramesForDuration(dur1);
+  const frames2 = calcFramesForDuration(dur2);
+  const totalFrames = (frames1 - 1) + frames2;
   const totalSecs = (totalFrames / 24).toFixed(1);
 
-  if($("durHint")) $("durHint").textContent = `(${dur.toFixed(1)}s → ${framesPerSeg} frames)`;
-  if($("durationVal")) $("durationVal").textContent = `${dur.toFixed(1)}s`;
+  if($("durHint1")) $("durHint1").textContent = `(${dur1.toFixed(1)}s → ${frames1}f)`;
+  if($("durationVal1")) $("durationVal1").textContent = `${dur1.toFixed(1)}s`;
+  if($("durHint2")) $("durHint2").textContent = `(${dur2.toFixed(1)}s → ${frames2}f)`;
+  if($("durationVal2")) $("durationVal2").textContent = `${dur2.toFixed(1)}s`;
   if($("totalFramesHint")){
-    $("totalFramesHint").textContent = `Total: 2 segmentos x ${framesPerSeg}f = ${totalFrames} frames (~${totalSecs}s a 24fps)`;
+    $("totalFramesHint").textContent = `Total: Seg 1 (${frames1}f) + Seg 2 (${frames2}f) = ${totalFrames} frames (~${totalSecs}s a 24fps · Máx 30s)`;
   }
 }
 
@@ -1729,17 +1751,37 @@ function buildGraph(j){
   }
 
   // 2. Duración y Megapíxeles
-  const dur = parseFloat((j ? j.duration : $("durationSlider")?.value) || "15.0");
-  if(g[N.DURATION]?.inputs) g[N.DURATION].inputs.value = dur;
+  const dur1 = parseFloat((j ? (j.duration1 || j.duration) : ($("durationSlider1")?.value || $("durationSlider")?.value)) || "15.0");
+  const dur2 = parseFloat((j ? (j.duration2 || j.duration) : ($("durationSlider2")?.value || "15.0")) || "15.0");
 
-  // Cálculo dinámico exacto de frames para corte y empalme (resuelve salto de frames en nodo 61)
-  const framesPerSeg = calcFramesForDuration(dur);
+  if(g[N.DURATION]?.inputs) g[N.DURATION].inputs.value = dur1;
+
+  // Nodo de duración y math para Segmento 2
+  g["12_seg2"] = {
+    inputs: { value: dur2 },
+    class_type: "PrimitiveFloat",
+    _meta: { title: "Duration Seg 2 (s)" }
+  };
+  g["13_seg2"] = {
+    inputs: {
+      expression: "max(5, round(a * 24)) + (5 - (max(5, round(a * 24)) % 17)) % 17",
+      "values.a": ["12_seg2", 0]
+    },
+    class_type: "ComfyMathExpression",
+    _meta: { title: "Frames Seg 2 (17k+5)" }
+  };
+  if(g[N.REF2V_SEG2]?.inputs){
+    g[N.REF2V_SEG2].inputs.length = ["13_seg2", 1];
+  }
+
+  // Cálculo dinámico exacto de frames para corte y empalme
+  const framesSeg1 = calcFramesForDuration(dur1);
   if(g["61"]?.inputs){
-    g["61"].inputs.indexes = Array.from({ length: framesPerSeg - 1 }, (_, i) => i).join(", ");
+    g["61"].inputs.indexes = Array.from({ length: framesSeg1 - 1 }, (_, i) => i).join(", ");
   }
   if(g["65"]?.inputs){
     g["65"].inputs.start_index = 0.0;
-    g["65"].inputs.duration = parseFloat(((framesPerSeg - 1) / 24).toFixed(4));
+    g["65"].inputs.duration = parseFloat(((framesSeg1 - 1) / 24).toFixed(4));
   }
 
   const mp = parseFloat((j ? j.megapixels : $("mpSlider")?.value) || "0.70");
@@ -1945,7 +1987,8 @@ async function queueJob(runMode){
     runMode: runMode || "full",
     prompt: p1,
     prompt2: $("prompt2")?.value?.trim() || "",
-    duration: parseFloat($("durationSlider")?.value || "15.0"),
+    duration1: parseFloat($("durationSlider1")?.value || $("durationSlider")?.value || "15.0"),
+    duration2: parseFloat($("durationSlider2")?.value || "15.0"),
     megapixels: parseFloat($("mpSlider")?.value || "0.70"),
     steps: parseInt($("stepsSlider")?.value || "20", 10),
     sampler: $("samplerName")?.value || "res_multistep",
@@ -2295,9 +2338,29 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if($("durationSlider")){
-    $("durationSlider").addEventListener("input", () => {
+  if($("durationSlider1")){
+    $("durationSlider1").addEventListener("input", (e) => {
+      let dur1 = parseFloat(e.target.value);
+      let dur2 = parseFloat($("durationSlider2")?.value || "15.0");
+      if(dur1 + dur2 > 30.0){
+        dur2 = Math.max(1.0, Math.round((30.0 - dur1) * 2) / 2);
+        if($("durationSlider2")) $("durationSlider2").value = dur2.toFixed(1);
+      }
       updateDurationFrames();
+      scheduleSaveSettings();
+    });
+  }
+
+  if($("durationSlider2")){
+    $("durationSlider2").addEventListener("input", (e) => {
+      let dur2 = parseFloat(e.target.value);
+      let dur1 = parseFloat($("durationSlider1")?.value || "15.0");
+      if(dur1 + dur2 > 30.0){
+        dur1 = Math.max(1.0, Math.round((30.0 - dur2) * 2) / 2);
+        if($("durationSlider1")) $("durationSlider1").value = dur1.toFixed(1);
+      }
+      updateDurationFrames();
+      scheduleSaveSettings();
     });
   }
 

@@ -123,12 +123,17 @@
           <div><label>Alto</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div>
         </div>
         <div class="row slider-row">
-          <label>Duración por segmento <span class="hint" id="durHint">(15.0s → 362 frames)</span></label>
-          <input type="range" id="durationSlider" min="1.0" max="15.0" step="0.5" value="15.0">
-          <div class="slider-val" id="durationVal">15.0s</div>
+          <label>Duración Segmento 1 <span class="hint" id="durHint1">(15.0s → 362f)</span></label>
+          <input type="range" id="durationSlider1" min="1.0" max="29.0" step="0.5" value="15.0">
+          <div class="slider-val" id="durationVal1">15.0s</div>
+        </div>
+        <div class="row slider-row">
+          <label>Duración Segmento 2 <span class="hint" id="durHint2">(15.0s → 362f)</span></label>
+          <input type="range" id="durationSlider2" min="1.0" max="29.0" step="0.5" value="15.0">
+          <div class="slider-val" id="durationVal2">15.0s</div>
         </div>
         <div class="hint" id="totalFramesHint" style="margin-top:2px;font-size:10.5px;color:var(--accent);">
-          Total: 2 segmentos x 362f = 724 frames (~30.2s a 24fps)
+          Total: Seg 1 (362f) + Seg 2 (362f) = 723 frames (~30.0s a 24fps · Máx 30s)
         </div>
         <div class="row" style="margin-top:8px;">
           <label>Batch Size (Variantes)</label>
