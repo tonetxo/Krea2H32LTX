@@ -1006,7 +1006,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         if not filename or "/" in filename or "\\" in filename or ".." in filename:
             self._send_json(400, {"error": "filename inválido"})
             return
-        if "/" in subfolder or "\\" in subfolder or ".." in subfolder:
+        if ".." in subfolder or subfolder.startswith("/") or subfolder.startswith("\\"):
             self._send_json(400, {"error": "subfolder inválido"})
             return
         if ftype not in ("output", "temp", "input"):
