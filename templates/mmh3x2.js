@@ -240,38 +240,43 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
 
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings){
   let found = false;
-  if(entry.outputs[N.SAVE_VID_1]){
-    const m1 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_1]);
-    if(m1){ displayVideoInPlayer(1, m1); found = true; }
-  }
-  if(entry.outputs[N.SAVE_VID_2]){
-    const m2 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_2]);
-    if(m2){ displayVideoInPlayer(2, m2); found = true; }
-  }
-  if(entry.outputs[N.SAVE_VID_FINAL]){
-    const mf = CONFIG.findMedia(entry.outputs[N.SAVE_VID_FINAL]);
-    if(mf){
-      displayVideoInPlayer(3, mf);
-      const varIndex = promptVariantMap[promptId] || (variantCounter + 1);
-      CONFIG.addToVariantGallery(mf, realSeed, varIndex);
-      found = true;
+  try {
+    if(entry?.outputs?.[N.SAVE_VID_1]){
+      const m1 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_1]);
+      if(m1){ displayVideoInPlayer(1, m1); found = true; }
+    }
+    if(entry?.outputs?.[N.SAVE_VID_2]){
+      const m2 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_2]);
+      if(m2){ displayVideoInPlayer(2, m2); found = true; }
+    }
+    if(entry?.outputs?.[N.SAVE_VID_FINAL]){
+      const mf = CONFIG.findMedia(entry.outputs[N.SAVE_VID_FINAL]);
+      if(mf){
+        displayVideoInPlayer(3, mf);
+        const varIndex = promptVariantMap[promptId] || (variantCounter + 1);
+        CONFIG.addToVariantGallery(mf, realSeed, varIndex);
+        found = true;
+      }
+    }
+  } catch(e){
+    console.error("Error mostrando resultados de media:", e);
+    log(`⚠️ Error renderizando medios: ${e.message}`, "l-err");
+  } finally {
+    delete pendingSeeds[promptId];
+    delete promptVariantMap[promptId];
+    delete displayedSlots[promptId];
+    handledPrompts.add(promptId);
+
+    currentBatchIndex++;
+    if(currentBatchIndex < totalBatchSize){
+      log(`➡️ Siguiente variante ${currentBatchIndex + 1}/${totalBatchSize}...`, "l-ok");
+      await CONFIG.startNextVariant();
+    } else {
+      log(`🏁 Generación completada (${totalBatchSize} variantes).`, "l-ok");
+      finishCurrentJob();
     }
   }
-
-  delete pendingSeeds[promptId];
-  delete promptVariantMap[promptId];
-  delete displayedSlots[promptId];
-  handledPrompts.add(promptId);
-
-  currentBatchIndex++;
-  if(currentBatchIndex < totalBatchSize){
-    log(`➡️ Siguiente variante ${currentBatchIndex + 1}/${totalBatchSize}...`, "l-ok");
-    await CONFIG.startNextVariant();
-  } else {
-    log(`🏁 Generación completada (${totalBatchSize} variantes).`, "l-ok");
-    finishCurrentJob();
-  }
-  return found;
+  return true;
 };
 
 CONFIG.onSeedUpdate = function(newSeed){
@@ -306,12 +311,15 @@ CONFIG.onBatchComplete = function(){
 };
 
 CONFIG.onStopCurrent = async function(){
-  if(!currentPromptId) return;
   try {
-    await fetch(server() + "/interrupt", { method: "POST" });
-    log("⏹ Interrupción solicitada para la tarea actual", "l-warn");
+    if(currentPromptId){
+      await fetch(server() + "/interrupt", { method: "POST" });
+      log("⏹ Interrupción solicitada para la tarea actual", "l-warn");
+    }
   } catch(e){
     log(`Error al interrumpir: ${e.message}`, "l-err");
+  } finally {
+    finishCurrentJob();
   }
 };
 
@@ -329,12 +337,27 @@ CONFIG.onStopAll = async function(){
   }
 };
 
+let queueIdleCount = 0;
 function updateQueueUI(){
   const count = jobQueue.length;
   const badge = $("queueCountBadge");
   if(badge) badge.textContent = count > 0 ? `${count} tarea${count > 1 ? 's' : ''}` : "0 tareas";
   const clearBtn = $("btnClearQueue");
-  if(clearBtn) clearBtn.disabled = count === 0;
+  if(clearBtn) clearBtn.disabled = (count === 0 && !activeJob);
+
+  // Auto-recuperación si activeJob quedó huérfano con ComfyUI en reposo
+  if(activeJob && typeof serverQueueState !== "undefined" && serverQueueState.running === 0 && serverQueueState.pending === 0){
+    queueIdleCount++;
+    if(queueIdleCount >= 2){
+      queueIdleCount = 0;
+      console.warn("Liberando activeJob huérfano (ComfyUI está en reposo)");
+      finishCurrentJob();
+      return;
+    }
+  } else {
+    queueIdleCount = 0;
+  }
+
   enableStopButtons(!!activeJob);
 
   const list = $("queueList");
@@ -911,6 +934,14 @@ async function queueJob(runMode){
     batchSize
   };
 
+  // Si activeJob estaba retenido pero ComfyUI no tiene ninguna tarea activa, liberar el bloqueo
+  const comfyIdle = (typeof serverQueueState !== "undefined") && serverQueueState.running === 0 && serverQueueState.pending === 0;
+  if(activeJob && (!currentPromptId || comfyIdle)){
+    console.warn("Liberando activeJob huérfano (ComfyUI está libre)");
+    activeJob = null;
+    currentPromptId = null;
+  }
+
   if(!activeJob){
     startJob(job);
   } else {
@@ -1063,8 +1094,10 @@ window.addEventListener("DOMContentLoaded", () => {
   if($("btnStopAll")) $("btnStopAll").addEventListener("click", () => { CONFIG.onStopAll(); });
   if($("btnClearQueue")) $("btnClearQueue").addEventListener("click", () => {
     jobQueue = [];
+    activeJob = null;
+    currentPromptId = null;
     updateQueueUI();
-    log("Cola de tareas vaciada", "l-ok");
+    log("Cola de tareas vaciada y estado reseteado", "l-ok");
   });
 
   if($("btnRefreshHistory")) $("btnRefreshHistory").addEventListener("click", () => { loadVideoHistory(); });
