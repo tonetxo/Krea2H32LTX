@@ -70,3 +70,11 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
 .prompt-box{position:relative;margin-bottom:8px;}
 .prompt-box-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-family:var(--mono);font-size:10px;color:var(--muted);}
 .prompt-box-header span.badge{color:var(--accent);}
+
+/* Variantes e Historial (vídeo) adaptados sin recortar (como en H3) */
+.variant-card video,.variant-card .thumb-img{width:100%;height:auto;max-height:220px;object-fit:contain;background:#000;min-height:120px;display:block;transition:transform .2s,opacity .2s;}
+.variant-card:hover .thumb-img{transform:scale(1.03);}
+.variant-card .thumb-wrap{position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;}
+.variant-badge{background:rgba(0,0,0,0.75);color:var(--accent);font-family:var(--mono);font-size:10px;padding:3px 6px;border-radius:4px;border:1px solid var(--accent);display:inline-block;margin:4px 6px 0;pointer-events:none;}
+.variant-meta-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:12px;}
+.variant-meta-btn:hover{color:var(--accent);background:rgba(87,232,201,.12);}

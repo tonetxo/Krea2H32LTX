@@ -459,7 +459,7 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
   card.className = "variant-card";
   card.innerHTML = `
     <div class="thumb-wrap">
-      <video src="${url}#t=0.001" preload="metadata" muted playsinline loop style="width:100%;height:140px;object-fit:cover;cursor:pointer;"></video>
+      <video src="${url}#t=0.001" preload="metadata" muted playsinline loop style="width:100%;height:auto;max-height:220px;object-fit:contain;cursor:pointer;"></video>
       <span class="variant-badge">Var ${varIdx} · Seed ${seed}</span>
     </div>
     <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
@@ -1610,7 +1610,7 @@ async function loadVideoHistory(){
       card.className = "variant-card";
       card.innerHTML = `
         <div class="thumb-wrap">
-          <video src="${url}#t=0.001" preload="metadata" muted playsinline loop style="width:100%;height:130px;object-fit:cover;cursor:pointer;"></video>
+          <video src="${url}#t=0.001" preload="metadata" muted playsinline loop style="width:100%;height:auto;max-height:220px;object-fit:contain;cursor:pointer;"></video>
           <span class="variant-badge" style="font-size:9.5px;">${item.filename}</span>
         </div>
         <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
