@@ -153,6 +153,8 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
     return { foundOutput: false };
   }
   showImage(media);
+  const t1 = $("time1");
+  if(t1 && timeText){ t1.textContent = `⏱ ${timeText}`; t1.classList.remove("live"); }
   addToVariantGallery(media, realSeed, timeText);
   return { foundOutput: true };
 };
@@ -241,7 +243,6 @@ $("btnSendH3")?.addEventListener("click", () => {
   else log("↗️ Abriendo MiniMax H3 con la imagen: "+filename, "l-ok");
 });
 
-let _fsResetTimer = null;
 // Global fullscreen handler removed — setupZoomPan handles enter/exit per wrap.
 
 // --- VARIANT GALLERY (Krea2 image version with IndexedDB) ---

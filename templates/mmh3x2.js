@@ -165,6 +165,20 @@ let promptSteps = {};
 let displayedSlots = {};
 let currentActiveSamplerSlot = 1; // 1 o 2
 
+// Control de tiempos precisos de inferencia por etapas
+let stageTimers = {
+  startPrompt: 0,
+  startSeg1: 0,
+  endSeg1: 0,
+  startSeg2: 0,
+  endSeg2: 0,
+  startFinal: 0,
+  endFinal: 0,
+  ivSeg1: null,
+  ivSeg2: null,
+  ivFinal: null
+};
+
 // UI Tabs
 let currentViewMode = "all";
 
@@ -192,6 +206,25 @@ CONFIG.onNodeExecuted = function(data){
     currentActiveSamplerSlot = 2;
   }
   if((nid === String(N.SAVE_VID_1) || nid === "23") && data.output){
+    if(stageTimers.ivSeg1){ clearInterval(stageTimers.ivSeg1); stageTimers.ivSeg1 = null; }
+    stageTimers.endSeg1 = Date.now();
+    const seg1Ms = stageTimers.endSeg1 - (stageTimers.startSeg1 || stageTimers.startPrompt || Date.now());
+    const el1 = $("timeSeg1");
+    if(el1){ el1.textContent = `⏱ ${fmtMs(seg1Ms)}`; el1.classList.remove("live"); }
+
+    // Iniciar timer en vivo para Segmento 2 si está pendiente
+    stageTimers.startSeg2 = Date.now();
+    const el2 = $("timeSeg2");
+    if(el2){
+      el2.textContent = "⏱ 00:00";
+      el2.classList.add("live");
+      if(stageTimers.ivSeg2) clearInterval(stageTimers.ivSeg2);
+      stageTimers.ivSeg2 = setInterval(() => {
+        const elapsed = Date.now() - stageTimers.startSeg2;
+        if(el2) el2.textContent = `⏱ ${fmtMs(elapsed)}`;
+      }, 500);
+    }
+
     const m1 = CONFIG.findMedia(data.output);
     if(m1){
       displayVideoInPlayer(1, m1);
@@ -199,6 +232,12 @@ CONFIG.onNodeExecuted = function(data){
     }
   }
   if((nid === String(N.SAVE_VID_2) || nid === "39") && data.output){
+    if(stageTimers.ivSeg2){ clearInterval(stageTimers.ivSeg2); stageTimers.ivSeg2 = null; }
+    stageTimers.endSeg2 = Date.now();
+    const seg2Ms = stageTimers.endSeg2 - (stageTimers.startSeg2 || stageTimers.startPrompt || Date.now());
+    const el2 = $("timeSeg2");
+    if(el2){ el2.textContent = `⏱ ${fmtMs(seg2Ms)}`; el2.classList.remove("live"); }
+
     const m2 = CONFIG.findMedia(data.output);
     if(m2){
       displayVideoInPlayer(2, m2);
@@ -206,6 +245,12 @@ CONFIG.onNodeExecuted = function(data){
     }
   }
   if((nid === String(N.SAVE_VID_FINAL) || nid === "43") && data.output){
+    if(stageTimers.ivFinal){ clearInterval(stageTimers.ivFinal); stageTimers.ivFinal = null; }
+    stageTimers.endFinal = Date.now();
+    const totalMs = stageTimers.endFinal - (stageTimers.startPrompt || Date.now());
+    const elFinal = $("timeFinal");
+    if(elFinal){ elFinal.textContent = `⏱ ${fmtMs(totalMs)}`; elFinal.classList.remove("live"); }
+
     const mf = CONFIG.findMedia(data.output);
     if(mf){
       displayVideoInPlayer(3, mf);
@@ -374,9 +419,15 @@ CONFIG.onPreview = function(url, meta){
     const targetFin = isVideoUrl && pvFin ? pvFin : pFin;
     const otherFin = isVideoUrl ? pFin : pvFin;
     if(targetFin){
+      // Limpiar el preview anterior para evitar que dos videos compitan por recursos
+      if(targetFin.tagName === "VIDEO" && targetFin.src){
+        targetFin.pause();
+        targetFin.removeAttribute("src");
+        targetFin.load();
+      }
       targetFin.src = url;
       targetFin.style.display = "block";
-      if(otherFin) otherFin.style.display = "none";
+      if(otherFin){ otherFin.style.display = "none"; otherFin.removeAttribute("src"); }
       if(wFin) wFin.style.display = "block";
       if(eFin) eFin.style.display = "none";
       if(isVideoUrl && targetFin.play) targetFin.play().catch(()=>{});
@@ -488,6 +539,17 @@ CONFIG.addToVariantGallery = function(mediaOrUrl, seed, varIdx, promptText){
 
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings){
   let found = false;
+  if(stageTimers.ivFinal){ clearInterval(stageTimers.ivFinal); stageTimers.ivFinal = null; }
+  if(stageTimers.ivSeg1){ clearInterval(stageTimers.ivSeg1); stageTimers.ivSeg1 = null; }
+  if(stageTimers.ivSeg2){ clearInterval(stageTimers.ivSeg2); stageTimers.ivSeg2 = null; }
+
+  const totalTimeStr = tTotal || fmtMs(Date.now() - (stageTimers.startPrompt || Date.now()));
+  const elF = $("timeFinal");
+  if(elF){
+    elF.textContent = `⏱ ${totalTimeStr}`;
+    elF.classList.remove("live");
+  }
+
   try {
     if(entry?.outputs?.[N.SAVE_VID_1]){
       const m1 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_1]);
@@ -809,8 +871,8 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
   currentMedia[slotIndex] = media;
 
   if(empty) empty.style.display = "none";
-  if(pImg) pImg.style.display = "none";
-  if(pVid){ pVid.pause(); pVid.style.display = "none"; }
+  if(pImg){ pImg.style.display = "none"; pImg.removeAttribute("src"); }
+  if(pVid){ pVid.pause(); pVid.style.display = "none"; pVid.removeAttribute("src"); pVid.load(); }
   const wrap = $("previewWrap" + suffix);
   const step = $("previewStep" + suffix);
   if(wrap) wrap.style.display = "none";
@@ -837,9 +899,9 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
       if(vw && vh){
         function gcd(a, b){ return b ? gcd(b, a % b) : a; }
         const d = gcd(vw, vh) || 1;
-        if(resTag) resTag.textContent = `${vw}×${vh} · ${vw/d}:${vh/d}`;
+        const durStr = video.duration ? ` · ${video.duration.toFixed(1)}s` : "";
+        if(resTag) resTag.textContent = `${vw}×${vh} · ${vw/d}:${vh/d}${durStr}`;
       }
-      if(timeTag && video.duration) timeTag.textContent = `${video.duration.toFixed(1)}s`;
       video.removeEventListener("loadedmetadata", onMeta);
     };
     if(video.videoWidth && video.videoHeight){
@@ -1235,8 +1297,20 @@ function attachAutoSaveListeners(){
     }
   });
 
-  $("segRandom")?.addEventListener("click", scheduleSaveSettings);
-  $("segFixed")?.addEventListener("click", scheduleSaveSettings);
+  $("segRandom")?.addEventListener("click", () => {
+    seedMode = "random";
+    $("segRandom")?.classList.add("on");
+    $("segFixed")?.classList.remove("on");
+    if($("seedVal")) $("seedVal").disabled = true;
+    scheduleSaveSettings();
+  });
+  $("segFixed")?.addEventListener("click", () => {
+    seedMode = "fixed";
+    $("segFixed")?.classList.add("on");
+    $("segRandom")?.classList.remove("on");
+    if($("seedVal")) $("seedVal").disabled = false;
+    scheduleSaveSettings();
+  });
   window.addEventListener("beforeunload", saveSettings);
 }
 
@@ -1528,7 +1602,14 @@ function buildGraph(j){
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
   if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
-    ["51", "52", "53", "55", "86"].forEach(id => { delete g[id]; });
+    [N.OLLAMA_CONN, "52", N.OLLAMA_CHAT_1, "54", N.OLLAMA_CHAT_2, "86"].forEach(id => { delete g[id]; });
+  } else if(seg2Mode === "ollama" && g[N.OLLAMA_CONN]?.inputs){
+    const ollamaModel = $("enhancerModel")?.value;
+    if(ollamaModel){
+      g[N.OLLAMA_CONN].inputs.model = ollamaModel;
+    } else {
+      log("⚠️ Modo Asistido requiere un modelo en Enhancer/Ollama. Se usa el del workflow.", "l-warn");
+    }
   }
 
   // 2. Duración y Megapíxeles
@@ -1828,6 +1909,25 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
     const data = await r.json();
     if(data.error) throw new Error(JSON.stringify(data.error));
 
+    stageTimers.startPrompt = Date.now();
+    stageTimers.startSeg1 = Date.now();
+    stageTimers.endSeg1 = 0;
+    stageTimers.startSeg2 = 0;
+    stageTimers.endSeg2 = 0;
+    stageTimers.endFinal = 0;
+    if(stageTimers.ivSeg1) clearInterval(stageTimers.ivSeg1);
+    if(stageTimers.ivSeg2) clearInterval(stageTimers.ivSeg2);
+    if(stageTimers.ivFinal) clearInterval(stageTimers.ivFinal);
+
+    const el1 = $("timeSeg1"), el2 = $("timeSeg2");
+    if(el1){ el1.textContent = "⏱ 00:00"; el1.classList.add("live"); }
+    if(el2){ el2.textContent = ""; el2.classList.remove("live"); }
+
+    stageTimers.ivSeg1 = setInterval(() => {
+      const elapsed = Date.now() - stageTimers.startSeg1;
+      if(el1) el1.textContent = `⏱ ${fmtMs(elapsed)}`;
+    }, 500);
+
     pendingSeeds[data.prompt_id] = seedUsed;
     promptVariantMap[data.prompt_id] = varIdx;
     currentPromptId = data.prompt_id;
@@ -1842,12 +1942,22 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
 }
 
 function finishCurrentJob(){
+  if(stageTimers.ivFinal){ clearInterval(stageTimers.ivFinal); stageTimers.ivFinal = null; }
+  if(stageTimers.ivSeg1){ clearInterval(stageTimers.ivSeg1); stageTimers.ivSeg1 = null; }
+  if(stageTimers.ivSeg2){ clearInterval(stageTimers.ivSeg2); stageTimers.ivSeg2 = null; }
+  const elF = $("timeFinal"), el1 = $("timeSeg1"), el2 = $("timeSeg2");
+  if(elF) elF.classList.remove("live");
+  if(el1) el1.classList.remove("live");
+  if(el2) el2.classList.remove("live");
+
   activeJob = null;
   currentPromptId = null;
   updateQueueUI();
   if(jobQueue.length > 0){
     const nextJob = jobQueue.shift();
     startJob(nextJob);
+  } else {
+    enableStopButtons(false);
   }
 }
 
@@ -1891,7 +2001,7 @@ async function loadVideoHistory(){
 
         card.innerHTML = `
           <span class="variant-badge">${typeBadge}</span>
-          <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
+          <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="none" playsinline data-lazy-video="true"></video>
           <div class="variant-info">
             <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
             <span class="variant-icons">
@@ -1908,6 +2018,16 @@ async function loadVideoHistory(){
 
         const videoEl = card.querySelector("video");
         if(videoEl){
+          // El video empieza con preload="none" para no saturar la red al abrir
+          // el historial. Cargamos metadatos bajo demanda al interactuar.
+          const loadMetadata = () => {
+            if(videoEl.preload === "none"){
+              videoEl.preload = "metadata";
+              videoEl.load();
+            }
+          };
+          videoEl.addEventListener("mouseenter", loadMetadata, { once: true });
+          videoEl.addEventListener("click", loadMetadata, { once: true });
           videoEl.addEventListener("loadedmetadata", () => {
             if(videoEl.currentTime === 0){
               videoEl.currentTime = 0.001;
@@ -1919,6 +2039,12 @@ async function loadVideoHistory(){
           if(e.target.closest("video")) return;
           if(e.target.closest("button") || e.target.closest(".variant-icons")) return;
           const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
+          // Activar la vista adecuada para que el reproductor destino sea visible.
+          const desiredView = (targetSlot === 1) ? "seg1" : (targetSlot === 2 ? "seg2" : "final");
+          if(currentViewMode !== "all" && currentViewMode !== desiredView){
+            const tab = document.querySelector(`.vid-view-tab[data-view="${desiredView}"]`);
+            if(tab) tab.click();
+          }
           displayVideoInPlayer(targetSlot, media, { autoplay: true });
           log("▶ Reproduciendo en reproductor: " + item.filename, "l-ok");
         });
