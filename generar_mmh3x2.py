@@ -18,7 +18,7 @@ def main():
         'json_file': JSON_FILE,
         'output_html': OUTPUT_HTML,
         'title': 'MMH3X2 · Panel Pro',
-        'enhancer_title': 'Mejorar prompt con IA',
+        'enhancer_title': 'Mejorar prompt con IA (MiniMax H3 / Ollama)',
         'ui_html': 'mmh3x2_html.html',
         'ui_css': 'mmh3x2.css',
         'ui_js': 'mmh3x2.js',

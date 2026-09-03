@@ -4,7 +4,7 @@
 const CONFIG = {
   PROMPTS_KEY: 'mmh3x2_prompts',
   LORA_STATE_KEY: 'mmh3x2_loras_state',
-  ENHANCER_SYSKEY: 'mmh3x2_enhancer_sysprompts',
+  ENHANCER_SYSKEY: 'mmh3x2_enhancer_sysprompts_v2',
   SERVERURL_KEY: 'mmh3x2_serverUrl',
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "mmh3x2",
@@ -78,11 +78,70 @@ const CONFIG = {
   ],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
-      A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for MiniMaxH3 video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. Respond in English with ONLY the enhanced prompt." },
-      B: { name: "Estilo B (continuación de acción)", prompt: "You are an assistant specialized in visual continuity and scene escalation. Describe the direct, logical evolution of the ongoing action for the next video segment. Respond in English with ONLY the enhanced continuation prompt." }
+      A: { name: "Estilo A (cinematográfico H3)", prompt: "You are an expert in prompts for MiniMaxH3 video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
+      B: { name: "Estilo B (narrativo)", prompt: "You are a creative assistant specialized in visual storytelling. Take the user's idea and turn it into an evocative prompt that captures the essence of the scene. Use descriptive, poetic language. Focus on atmosphere, emotions, and the story the image tells. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      C: { name: "T2VA (guía oficial MiniMax H3)", prompt: `You are an expert prompt writer for the MiniMax H3 video model (text-to-video-audio, T2VA). Rewrite the user's idea into a single MiniMax H3 final prompt following the official format strictly.
+
+RULES:
+1. The final prompt has NO image-alignment instruction (it is T2VA, no reference image). Begin directly with the three core fields.
+2. Use exactly this structure, preserving the field labels verbatim:
+
+integrated_multimodal_description: [Shot 1] <style and initial composition>. <camera motion + amplitude + speed as natural English actions>. <subject appearance, IDs, actions, dialogue, diegetic sound>. [Shot 2] At 00:SS.SSS, the camera cuts to <new information>. ...
+
+overall_soundscape: <1-4 sentences: ambient sound, physical action sounds, non-verbal human sounds across the full video>. Do NOT repeat dialogue or diegetic music here. Use N/A only if the user requests complete silence.
+
+non_diegetic_music: <1-3 sentences: instrumentation, tempo, rhythm, dynamic changes only>. Use N/A if there is no non-diegetic music.
+
+3. At the start of [Shot 1] state the overall style (Cinematic, live-action, 2D-animated, 3D CG, claymation, watercolor, vintage film, etc.) and the initial composition.
+4. Do NOT add a timestamp to [Shot 1]. Later shots use sequential numbers and a strictly increasing cut time within the video duration, introduced with "the camera cuts to", "the shot cuts to", "the shot transitions to", "the shot changes to", or "the shot switches to".
+5. Camera motion: combine motion type (Zoom In/Out, Push In/Pull Out, Pan Left/Right, Truck Left/Right, Tilt Up/Down, Pedestal Up/Down, Arc Shot, Tracking Shot, Static Shot, Shake Slightly/Strongly, POV, Roll Clockwise/Counterclockwise) + amplitude (with small/large amplitude) + speed (at slow/fast speed). Write it as a natural English action within the shot, not as stacked labels.
+6. The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 prompt, no explanations or prefaces.` },
+      D: { name: "Continuación Seg 2 (evolución de acción)", prompt: `You are an expert prompt writer for the MiniMax H3 2-segment continuation pipeline. You are generating the prompt for Segment 2, which directly continues the action from Segment 1.
+
+RULES:
+1. Maintain strict continuity of character identity, clothing, environment, lighting, and camera perspective from Segment 1.
+2. Clearly describe the subsequent action, movement, or escalation that takes place right after the conclusion of Segment 1.
+3. Include natural camera movement and auditory progression (soundscape).
+4. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced continuation prompt, no explanations or prefaces.` }
     },
     vision: {
-      A: { name: "Estilo A (descriptivo)", prompt: "Analyze the provided reference image and describe composition, subjects, lighting, colors, and motion for a video segment. Respond in English with ONLY the enhanced prompt." }
+      A: { name: "Estilo A (descriptivo H3)", prompt: "You are an expert at describing images for MiniMax H3 video generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, motion, and atmosphere. The prompt must be suitable for a text-to-video model. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      B: { name: "Estilo B (cinematográfico H3)", prompt: "You are a digital cinematographer for MiniMax H3. Look at the image and turn it into a cinematic description. Describe how the camera would move, how lighting would evolve, what action would unfold, and how the scene would change over time. Think in terms of footage, not a still photo. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      C: { name: "I2VA (guía oficial - Primer frame)", prompt: `You are an expert prompt writer for the MiniMax H3 video model (image-to-video-audio, I2VA). You are given ONE reference image: it is the exact first frame of the target video at 0.00 seconds and belongs to [Shot 1]. Optionally the user provides a text hint. Rewrite the user's idea into a single MiniMax H3 final prompt following the official format strictly.
+
+RULES:
+1. The final prompt MUST start with this exact instruction line (no leading blank line, nothing before it):
+For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.
+2. Leave exactly ONE blank line after that instruction, then the three core fields with these exact labels:
+
+integrated_multimodal_description: [Shot 1] <derive overall style from the image>. <establish the subjects, composition, clothing, colors, key objects and spatial relationships exactly as in <Picture 1>>. <first-frame anchor → action onset → continuous development → result or reaction>. <camera motion as natural English: motion type + amplitude + speed>.
+
+overall_soundscape: <1-4 sentences: ambient + physical-action + non-verbal human sounds across the full video; no dialogue/diegetic music here; N/A only if user requests silence>.
+
+non_diegetic_music: <1-3 sentences: instrumentation, tempo, rhythm, dynamics only; N/A if none>.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 prompt, no explanations or prefaces.` },
+      D: { name: "FL2VA (guía oficial - Primer y Último frame)", prompt: `You are an expert prompt writer for the MiniMax H3 video model (first-last-frame-to-video-audio, FL2VA). You are given TWO reference images: the FIRST image is the opening frame (Picture 1, 0.00 seconds, [Shot 1]) and the SECOND image is the closing frame (Picture 2, end of the video, final [Shot N]). Optionally the user provides a text hint. Rewrite the user's idea into a single MiniMax H3 final prompt following the official format strictly.
+
+RULES:
+1. The final prompt MUST start with this exact instruction line:
+How the reference pictures align with the target video — Picture 1 (from Shot 1) aligns with the 0.00-second mark of the target video; Picture 2 (from Shot N) aligns with the end mark of the target video.
+2. Leave exactly ONE blank line after that instruction, then the three core fields:
+
+integrated_multimodal_description: [Shot 1] <derive overall style from the images>. <first-frame state matching Picture 1: subjects, poses, composition, lighting, colors, key objects>. <observable intermediate changes: how the subject moves, poses change, objects are manipulated, composition/lighting evolve>. <progressively narrowing differences>. <last-frame state matching Picture 2 at the end of the shot>. <camera motion as natural English: motion type + amplitude + speed>.
+
+overall_soundscape: <1-4 sentences: ambient + physical-action + non-verbal human sounds across the full video>.
+
+non_diegetic_music: <1-3 sentences: instrumentation, tempo, rhythm, dynamics only; N/A if none>.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 prompt, no explanations or prefaces.` },
+      E: { name: "R2VA (guía oficial - Multi-imagen)", prompt: `You are an expert prompt writer for the MiniMax H3 video model in FULL-REFERENCE mode. You are given reference images (<Picture N>). Rewrite the user's idea into a single MiniMax H3 final prompt using the full-reference format.
+
+RULES:
+1. Output exactly SIX sections, in order: subject_definitions, summary, retention_analysis, detailed_description, overall_soundscape, non_diegetic_music.
+2. Detailed description: 350-500 English words, shot by shot in playback order with [Shot 1] (no timestamp) then [Shot N]. Write camera motion as natural English.
+3. The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 full-reference prompt, no explanations or prefaces.` },
+      F: { name: "Continuación Seg 2 con imagen (Slot 3/4)", prompt: `You are an expert prompt writer for MiniMax H3 2-segment video continuation. You are provided with reference image(s) for the next segment (Segment 2). Describe how the character and scene transition seamlessly from Segment 1 into the new action, position, or pose shown in the image. Maintain full visual and auditory consistency. Respond in English with ONLY the enhanced prompt.` }
     }
   }
 };
@@ -1708,6 +1767,138 @@ window.addEventListener("DOMContentLoaded", () => {
     const img1 = $("previewSlotImg1");
     if(img1 && img1.naturalWidth) updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
     else updateCalculatedResolution(1280, 720);
+  });
+
+  // Configurar panel Enhancer exclusivamente para MiniMax H3 (Ollama)
+  (function setupH3EnhancerUI(){
+    const chain = $("enhancerChainMode");
+    if(chain){
+      chain.innerHTML = `
+        <option value="off">Desactivado</option>
+        <option value="ollama" selected>Ollama (H3 Vision / Text)</option>
+      `;
+      chain.value = "ollama";
+    }
+    const ltx2Controls = ["ltx2Temperature", "ltx2Seed", "ltx2PreviewText"];
+    for(const id of ltx2Controls){
+      const el = $(id);
+      const row = el?.closest(".enhancer-row");
+      if(row) row.style.display = "none";
+    }
+    const ltx2Labels = document.querySelectorAll(".enhancer-row label");
+    for(const lbl of ltx2Labels){
+      if(lbl.textContent.includes("LTX2")){
+        const row = lbl.closest(".enhancer-row");
+        if(row) row.style.display = "none";
+      }
+    }
+  })();
+
+  $("btnEnhance")?.addEventListener("click", async () => {
+    const chainMode = $("enhancerChainMode")?.value || "ollama";
+    if(chainMode === "off"){
+      log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' para usar el botón.", "l-warn");
+      return;
+    }
+    const model = $("enhancerModel")?.value;
+    if(!model){ log("⚠️ Selecciona un modelo de Ollama en el selector", "l-err"); return; }
+    const mode = $("enhancerMode")?.value || "text";
+    const styleKey = $("enhancerStyle")?.value || "A";
+    const data = loadSysPrompts();
+    const system = getCurrentSysPrompt(data, mode, styleKey);
+    const userPrompt = $("prompt")?.value?.trim() || "";
+    if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt base primero en Prompt 1", "l-warn"); return; }
+
+    const payload = { model, system, prompt: userPrompt || "Describe this image for video generation.", stream: false, options: { num_ctx: 8192 } };
+
+    if(mode === "vision"){
+      const availableSlots = [];
+      for(let i = 1; i <= 4; i++){
+        if(mediaSlots[i].file || mediaSlots[i].dataUrl) availableSlots.push(i);
+      }
+      if(availableSlots.length === 0){
+        log("⚠️ Carga al menos una imagen en los slots de entrada para usar el modo Visión", "l-err");
+        return;
+      }
+
+      try {
+        payload.images = [];
+        const readSlotBase64 = async (slotIdx) => {
+          const slot = mediaSlots[slotIdx];
+          if(!slot) return null;
+          if(slot.file){
+            return await resizeFileToBase64(slot.file, 768);
+          } else if(slot.dataUrl){
+            if(slot.dataUrl.startsWith("data:")){
+              const blob = dataUrlToBlob(slot.dataUrl);
+              return await resizeFileToBase64(blob, 768);
+            } else {
+              return await imageToResizedBase64(slot.dataUrl, 768);
+            }
+          }
+          return null;
+        };
+
+        if(styleKey === "D" && availableSlots.length >= 2){
+          // FL2VA: Primer frame y Último frame
+          const firstB64 = await readSlotBase64(1) || await readSlotBase64(availableSlots[0]);
+          const secondSlot = (mediaSlots[2].file || mediaSlots[2].dataUrl) ? 2 : availableSlots[availableSlots.length - 1];
+          const lastB64 = await readSlotBase64(secondSlot);
+          if(firstB64 && lastB64){
+            payload.images = [firstB64, lastB64];
+            payload.prompt = userPrompt
+              ? `FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above. User hint: ${userPrompt}`
+              : "FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above.";
+          }
+        } else if(styleKey === "F" && (mediaSlots[3].file || mediaSlots[3].dataUrl || mediaSlots[4].file || mediaSlots[4].dataUrl)){
+          // Continuación Seg 2 con imagen
+          const s3B64 = await readSlotBase64(3) || await readSlotBase64(4);
+          if(s3B64){
+            payload.images = [s3B64];
+            payload.prompt = userPrompt
+              ? `REFERENCE IMAGE FOR SEGMENT 2: see above. Existing context / Segment 1 action: ${userPrompt}`
+              : "REFERENCE IMAGE FOR SEGMENT 2: see above. Describe the continued action evolving into this scene.";
+          }
+        } else if(styleKey === "E" && availableSlots.length > 1){
+          // R2VA: hasta 3 imágenes
+          for(const idx of availableSlots.slice(0, 3)){
+            const b64 = await readSlotBase64(idx);
+            if(b64) payload.images.push(b64);
+          }
+          payload.prompt = userPrompt
+            ? `REFERENCE IMAGES (in order, <Picture N>): see above. User hint: ${userPrompt}`
+            : "REFERENCE IMAGES (in order, <Picture N>): see above.";
+        } else {
+          // I2VA / Descriptivo / Cinematográfico (Slot 1)
+          const b64 = await readSlotBase64(1) || await readSlotBase64(availableSlots[0]);
+          if(b64) payload.images = [b64];
+        }
+
+        if(payload.images.length === 0){
+          log("⚠️ No se pudo procesar la imagen seleccionada para el modelo de visión", "l-err");
+          return;
+        }
+      } catch(e){
+        log(`⚠️ Error leyendo imagen para visión: ${e.message}`, "l-err");
+        return;
+      }
+    }
+
+    const btn = $("btnEnhance");
+    btn.disabled = true;
+    btn.textContent = "Mejorando...";
+    $("enhancerOutput").value = "";
+    try {
+      log(`🧠 Solicitando mejora a Ollama (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
+      await streamOllamaGenerate(payload, $("enhancerOutput"));
+      log(`✅ Prompt mejorado listo en el panel. Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
+    } catch(e){
+      log(`❌ Error al mejorar prompt con Ollama: ${e.message}`, "l-err");
+      $("enhancerOutput").value = "Error: " + e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Mejorar prompt";
+    }
   });
 
   updateDurationFrames();
