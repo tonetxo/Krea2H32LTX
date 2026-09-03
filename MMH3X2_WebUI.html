@@ -622,21 +622,100 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <div>
             <label>Sampler</label>
             <select id="samplerName">
-              <option value="res_multistep" selected>res_multistep</option>
-              <option value="res_multistep_cfg">res_multistep_cfg</option>
+              <option value="res_multistep" selected>res_multistep (recomendado)</option>
+              <option value="res_multistep_cfg_pp">res_multistep_cfg_pp</option>
+              <option value="res_multistep_ancestral">res_multistep_ancestral</option>
+              <option value="res_multistep_ancestral_cfg_pp">res_multistep_ancestral_cfg_pp</option>
+              <option value="res_2m">res_2m</option>
+              <option value="res_2m_ode">res_2m_ode</option>
+              <option value="res_2s">res_2s</option>
+              <option value="res_2s_ode">res_2s_ode</option>
+              <option value="res_3m">res_3m</option>
+              <option value="res_3m_ode">res_3m_ode</option>
+              <option value="res_3s">res_3s</option>
+              <option value="res_3s_ode">res_3s_ode</option>
+              <option value="res_5s">res_5s</option>
+              <option value="res_5s_ode">res_5s_ode</option>
+              <option value="res_6s">res_6s</option>
+              <option value="res_6s_ode">res_6s_ode</option>
               <option value="euler">euler</option>
+              <option value="euler_cfg_pp">euler_cfg_pp</option>
               <option value="euler_ancestral">euler_ancestral</option>
+              <option value="euler_ancestral_cfg_pp">euler_ancestral_cfg_pp</option>
+              <option value="heun">heun</option>
+              <option value="heunpp2">heunpp2</option>
+              <option value="exp_heun_2_x0">exp_heun_2_x0</option>
+              <option value="exp_heun_2_x0_sde">exp_heun_2_x0_sde</option>
+              <option value="dpm_2">dpm_2</option>
+              <option value="dpm_2_ancestral">dpm_2_ancestral</option>
+              <option value="lms">lms</option>
+              <option value="dpm_fast">dpm_fast</option>
+              <option value="dpm_adaptive">dpm_adaptive</option>
+              <option value="dpmpp_2s_ancestral">dpmpp_2s_ancestral</option>
+              <option value="dpmpp_2s_ancestral_cfg_pp">dpmpp_2s_ancestral_cfg_pp</option>
+              <option value="dpmpp_sde">dpmpp_sde</option>
+              <option value="dpmpp_sde_gpu">dpmpp_sde_gpu</option>
               <option value="dpmpp_2m">dpmpp_2m</option>
+              <option value="dpmpp_2m_cfg_pp">dpmpp_2m_cfg_pp</option>
+              <option value="dpmpp_2m_sde">dpmpp_2m_sde</option>
+              <option value="dpmpp_2m_sde_gpu">dpmpp_2m_sde_gpu</option>
+              <option value="dpmpp_2m_sde_heun">dpmpp_2m_sde_heun</option>
+              <option value="dpmpp_2m_sde_heun_gpu">dpmpp_2m_sde_heun_gpu</option>
+              <option value="dpmpp_3m_sde">dpmpp_3m_sde</option>
+              <option value="dpmpp_3m_sde_gpu">dpmpp_3m_sde_gpu</option>
+              <option value="ddpm">ddpm</option>
+              <option value="lcm">lcm</option>
+              <option value="ipndm">ipndm</option>
+              <option value="ipndm_v">ipndm_v</option>
+              <option value="deis">deis</option>
+              <option value="deis_2m">deis_2m</option>
+              <option value="deis_2m_ode">deis_2m_ode</option>
+              <option value="deis_3m">deis_3m</option>
+              <option value="deis_3m_ode">deis_3m_ode</option>
+              <option value="cfgpp_ud10_ab">cfgpp_ud10_ab</option>
+              <option value="gradient_estimation">gradient_estimation</option>
+              <option value="gradient_estimation_cfg_pp">gradient_estimation_cfg_pp</option>
+              <option value="er_sde">er_sde</option>
+              <option value="seeds_2">seeds_2</option>
+              <option value="seeds_3">seeds_3</option>
+              <option value="sa_solver">sa_solver</option>
+              <option value="sa_solver_pece">sa_solver_pece</option>
+              <option value="ddim">ddim</option>
+              <option value="uni_pc">uni_pc</option>
+              <option value="uni_pc_bh2">uni_pc_bh2</option>
+              <option value="legacy_rk">legacy_rk</option>
+              <option value="rk">rk</option>
+              <option value="rk_beta">rk_beta</option>
             </select>
           </div>
           <div>
             <label>Scheduler</label>
             <select id="schedulerName">
-              <option value="simple" selected>simple</option>
+              <option value="simple" selected>simple (recomendado)</option>
               <option value="sgm_uniform">sgm_uniform</option>
-              <option value="normal">normal</option>
+              <option value="karras">karras</option>
+              <option value="exponential">exponential</option>
               <option value="ddim_uniform">ddim_uniform</option>
               <option value="beta">beta</option>
+              <option value="normal">normal</option>
+              <option value="linear_quadratic">linear_quadratic</option>
+              <option value="kl_optimal">kl_optimal</option>
+              <option value="capitanZiT">capitanZiT</option>
+              <option value="bong_tangent">bong_tangent</option>
+              <option value="beta57">beta57</option>
+              <option value="beta_33">beta_33</option>
+              <option value="beta_44">beta_44</option>
+              <option value="beta_53">beta_53</option>
+              <option value="beta_54">beta_54</option>
+              <option value="beta_57">beta_57</option>
+              <option value="beta_32">beta_32</option>
+              <option value="beta_43">beta_43</option>
+              <option value="beta_42">beta_42</option>
+              <option value="power_shift">power_shift</option>
+              <option value="radiance_shift">radiance_shift</option>
+              <option value="sigma_curve_from_points">sigma_curve_from_points</option>
+              <option value="sigma_curve_pchip">sigma_curve_pchip</option>
+              <option value="sigmoid_offset">sigmoid_offset</option>
             </select>
           </div>
         </div>
@@ -4304,9 +4383,15 @@ CONFIG.onPreview = function(url, meta){
     const targetFin = isVideoUrl && pvFin ? pvFin : pFin;
     const otherFin = isVideoUrl ? pFin : pvFin;
     if(targetFin){
+      // Limpiar el preview anterior para evitar que dos videos compitan por recursos
+      if(targetFin.tagName === "VIDEO" && targetFin.src){
+        targetFin.pause();
+        targetFin.removeAttribute("src");
+        targetFin.load();
+      }
       targetFin.src = url;
       targetFin.style.display = "block";
-      if(otherFin) otherFin.style.display = "none";
+      if(otherFin){ otherFin.style.display = "none"; otherFin.removeAttribute("src"); }
       if(wFin) wFin.style.display = "block";
       if(eFin) eFin.style.display = "none";
       if(isVideoUrl && targetFin.play) targetFin.play().catch(()=>{});
@@ -4739,8 +4824,8 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
   currentMedia[slotIndex] = media;
 
   if(empty) empty.style.display = "none";
-  if(pImg) pImg.style.display = "none";
-  if(pVid){ pVid.pause(); pVid.style.display = "none"; }
+  if(pImg){ pImg.style.display = "none"; pImg.removeAttribute("src"); }
+  if(pVid){ pVid.pause(); pVid.style.display = "none"; pVid.removeAttribute("src"); pVid.load(); }
   const wrap = $("previewWrap" + suffix);
   const step = $("previewStep" + suffix);
   if(wrap) wrap.style.display = "none";
@@ -5165,8 +5250,20 @@ function attachAutoSaveListeners(){
     }
   });
 
-  $("segRandom")?.addEventListener("click", scheduleSaveSettings);
-  $("segFixed")?.addEventListener("click", scheduleSaveSettings);
+  $("segRandom")?.addEventListener("click", () => {
+    seedMode = "random";
+    $("segRandom")?.classList.add("on");
+    $("segFixed")?.classList.remove("on");
+    if($("seedVal")) $("seedVal").disabled = true;
+    scheduleSaveSettings();
+  });
+  $("segFixed")?.addEventListener("click", () => {
+    seedMode = "fixed";
+    $("segFixed")?.classList.add("on");
+    $("segRandom")?.classList.remove("on");
+    if($("seedVal")) $("seedVal").disabled = false;
+    scheduleSaveSettings();
+  });
   window.addEventListener("beforeunload", saveSettings);
 }
 
@@ -5458,7 +5555,14 @@ function buildGraph(j){
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
   if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
-    ["51", "52", "53", "55", "86"].forEach(id => { delete g[id]; });
+    [N.OLLAMA_CONN, "52", N.OLLAMA_CHAT_1, "54", N.OLLAMA_CHAT_2, "86"].forEach(id => { delete g[id]; });
+  } else if(seg2Mode === "ollama" && g[N.OLLAMA_CONN]?.inputs){
+    const ollamaModel = $("enhancerModel")?.value;
+    if(ollamaModel){
+      g[N.OLLAMA_CONN].inputs.model = ollamaModel;
+    } else {
+      log("⚠️ Modo Asistido requiere un modelo en Enhancer/Ollama. Se usa el del workflow.", "l-warn");
+    }
   }
 
   // 2. Duración y Megapíxeles
@@ -5821,7 +5925,7 @@ async function loadVideoHistory(){
 
         card.innerHTML = `
           <span class="variant-badge">${typeBadge}</span>
-          <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
+          <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="none" playsinline data-lazy-video="true"></video>
           <div class="variant-info">
             <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
             <span class="variant-icons">
@@ -5838,6 +5942,16 @@ async function loadVideoHistory(){
 
         const videoEl = card.querySelector("video");
         if(videoEl){
+          // El video empieza con preload="none" para no saturar la red al abrir
+          // el historial. Cargamos metadatos bajo demanda al interactuar.
+          const loadMetadata = () => {
+            if(videoEl.preload === "none"){
+              videoEl.preload = "metadata";
+              videoEl.load();
+            }
+          };
+          videoEl.addEventListener("mouseenter", loadMetadata, { once: true });
+          videoEl.addEventListener("click", loadMetadata, { once: true });
           videoEl.addEventListener("loadedmetadata", () => {
             if(videoEl.currentTime === 0){
               videoEl.currentTime = 0.001;
@@ -5849,6 +5963,12 @@ async function loadVideoHistory(){
           if(e.target.closest("video")) return;
           if(e.target.closest("button") || e.target.closest(".variant-icons")) return;
           const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
+          // Activar la vista adecuada para que el reproductor destino sea visible.
+          const desiredView = (targetSlot === 1) ? "seg1" : (targetSlot === 2 ? "seg2" : "final");
+          if(currentViewMode !== "all" && currentViewMode !== desiredView){
+            const tab = document.querySelector(`.vid-view-tab[data-view="${desiredView}"]`);
+            if(tab) tab.click();
+          }
           displayVideoInPlayer(targetSlot, media, { autoplay: true });
           log("▶ Reproduciendo en reproductor: " + item.filename, "l-ok");
         });
