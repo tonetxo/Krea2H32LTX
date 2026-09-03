@@ -414,12 +414,35 @@
             </div>
           </div>
 
-          <!-- Suavizado de empalme temporal -->
+          <!-- Suavizado de empalme temporal (Vídeo) -->
           <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
             <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="blendToggle" checked> <span>Suavizar empalme entre segmentos</span>
+              <input type="checkbox" id="blendToggle" checked> <span>Suavizar empalme de vídeo</span>
             </label>
             <div class="hint" style="font-size:10px;margin-top:2px;">Transición temporal suave (VideoTemporalBlend: 4 frames, fuerza 0.35).</div>
+          </div>
+
+          <!-- Crossfade de Audio regulable -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="audioCrossfadeToggle" checked> <span>Crossfade de audio entre segmentos</span>
+            </label>
+            <div class="row two-col" style="margin-top:6px;">
+              <div>
+                <label style="font-size:10px;">Duración transición: <b id="audioCrossfadeVal">0.40s</b></label>
+                <input type="range" id="audioCrossfadeSlider" min="0.05" max="2.0" step="0.05" value="0.40" style="width:100%;">
+              </div>
+              <div>
+                <label style="font-size:10px;">Curva de mezcla</label>
+                <select id="audioCrossfadeCurve">
+                  <option value="equal_power" selected>Equal Power (Sin caída)</option>
+                  <option value="linear">Lineal</option>
+                  <option value="cosine">Cosénica</option>
+                  <option value="exponential">Exponencial</option>
+                </select>
+              </div>
+            </div>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Elimina saltos bruscos y clics fundiendo suavemente el final de Seg 1 con el inicio de Seg 2.</div>
           </div>
         </div>
       </div>

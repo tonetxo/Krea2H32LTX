@@ -258,11 +258,15 @@ CONFIG.variantMeta = function(){
   else if(audioMode === "passthrough") audioDesc = "Pista Directa Final (BGM limpio)";
   else if(audioMode === "hybrid") audioDesc = "Híbrido (Guía Ritmo + Pista Limpia)";
 
+  const audioCfOn = $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : true;
+  const audioCfSec = parseFloat($("audioCrossfadeSlider")?.value || "0.40").toFixed(2);
+
   const rows = [
     ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
     ["Modo Seg 2", seg2Mode === "guided" ? "Guía Ollama (continuación)" : "Prompt Directo"],
     ["Modo Audio", audioDesc],
+    ["Crossfade Audio", audioCfOn ? `${audioCfSec}s (${$("audioCrossfadeCurve")?.value || 'equal_power'})` : "desactivado"],
     ["Duración Seg 1", `${dur1.toFixed(1)}s (${f1}f)`],
     ["Duración Seg 2", `${dur2.toFixed(1)}s (${f2}f)`],
     ["Duración Total", `${(fTotal / 24).toFixed(1)}s (${fTotal}f)`],
@@ -1286,7 +1290,10 @@ function saveSettings(){
     rifeToggle: $("rifeToggle") ? $("rifeToggle").checked : true,
     rifeMultiplier: $("rifeMultiplier")?.value || "2",
     rifeModel: $("rifeModel")?.value || "rife_v4.26.safetensors",
-    audioMode: $("audioMode")?.value || "none"
+    audioMode: $("audioMode")?.value || "none",
+    audioCrossfadeToggle: $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : true,
+    audioCrossfadeSlider: $("audioCrossfadeSlider")?.value || "0.40",
+    audioCrossfadeCurve: $("audioCrossfadeCurve")?.value || "equal_power"
   };
   try {
     localStorage.setItem(MMH3X2_SETTINGS_KEY, JSON.stringify(s));
@@ -1389,6 +1396,13 @@ function restoreSettings(){
     if(s.rifeModel && $("rifeModel")) $("rifeModel").value = s.rifeModel;
     if(s.audioMode !== undefined && $("audioMode")) $("audioMode").value = s.audioMode;
 
+    if(s.audioCrossfadeToggle !== undefined && $("audioCrossfadeToggle")) $("audioCrossfadeToggle").checked = s.audioCrossfadeToggle;
+    if(s.audioCrossfadeSlider !== undefined && $("audioCrossfadeSlider")){
+      $("audioCrossfadeSlider").value = s.audioCrossfadeSlider;
+      if($("audioCrossfadeVal")) $("audioCrossfadeVal").textContent = parseFloat(s.audioCrossfadeSlider).toFixed(2) + "s";
+    }
+    if(s.audioCrossfadeCurve && $("audioCrossfadeCurve")) $("audioCrossfadeCurve").value = s.audioCrossfadeCurve;
+
     return true;
   } catch(e){
     console.warn("Error restaurando ajustes:", e);
@@ -1439,7 +1453,8 @@ function attachAutoSaveListeners(){
     "unetModel", "clipModel", "h3SparseToggle", "h3BudgetSlider", "h3EarlyLateToggle",
     "h3MemToggle", "h3ShiftVideo", "h3ShiftAudio", "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
-    "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode"
+    "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
+    "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve"
   ];
 
   inputIds.forEach(id => {
@@ -1448,6 +1463,10 @@ function attachAutoSaveListeners(){
       el.addEventListener("input", scheduleSaveSettings);
       el.addEventListener("change", scheduleSaveSettings);
     }
+  });
+
+  $("audioCrossfadeSlider")?.addEventListener("input", (e) => {
+    if($("audioCrossfadeVal")) $("audioCrossfadeVal").textContent = parseFloat(e.target.value).toFixed(2) + "s";
   });
 
   $("segRandom")?.addEventListener("click", () => {
@@ -2005,7 +2024,47 @@ function buildGraph(j){
     }
   }
 
-  // 12. Enrutamiento de Audio (Guía de Ritmo IA & Pista Directa Final)
+  // 12. Enrutamiento y Crossfade de Audio
+  const audioCrossfadeOn = $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : true;
+  const cfSec = parseFloat($("audioCrossfadeSlider")?.value || "0.40");
+  const cfCurve = $("audioCrossfadeCurve")?.value || "equal_power";
+
+  // Ajuste en el corte de Seg 1 y fundido de audio generado por IA (nodos 65, 37 y 41)
+  if(g["65"]?.inputs){
+    const seg1BaseDur = parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
+    g["65"].inputs.start_index = 0.0;
+    if(audioCrossfadeOn && cfSec > 0){
+      g["65"].inputs.duration = parseFloat((seg1BaseDur + cfSec).toFixed(4));
+    } else {
+      g["65"].inputs.duration = seg1BaseDur;
+    }
+  }
+
+  if(g[N.AUDIO_CONCAT]){
+    if(audioCrossfadeOn && cfSec > 0){
+      g[N.AUDIO_CONCAT] = {
+        class_type: "AudioCrossFadeConcat",
+        inputs: {
+          audio1: ["65", 0],
+          audio2: [N.DECODE_AUD_2, 0],
+          crossfade_sec: cfSec,
+          fade_curve: cfCurve
+        },
+        _meta: { title: `Crossfade Audio (${cfSec.toFixed(2)}s)` }
+      };
+    } else {
+      g[N.AUDIO_CONCAT] = {
+        class_type: "AudioConcat",
+        inputs: {
+          direction: "after",
+          audio1: ["65", 0],
+          audio2: [N.DECODE_AUD_2, 0]
+        },
+        _meta: { title: "Merge audio" }
+      };
+    }
+  }
+
   const audioMode = (j ? j.audioMode : $("audioMode")?.value) || "none";
   const a1 = audioSlots[1]?.uploaded?.name || (audioSlots[1]?.file ? audioSlots[1].file.name : null);
   const a2 = audioSlots[2]?.uploaded?.name || (audioSlots[2]?.file ? audioSlots[2].file.name : null);
@@ -2055,11 +2114,13 @@ function buildGraph(j){
         };
         if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
       } else if(a1 && a2){
+        const seg1Dur = parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
+        const seg1Trim = (audioCrossfadeOn && cfSec > 0) ? parseFloat((seg1Dur + cfSec).toFixed(4)) : seg1Dur;
         g["193_trim_audio1"] = {
           inputs: {
             audio: ["190_load_audio1", 0],
             start_index: 0.0,
-            duration: parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4))
+            duration: seg1Trim
           },
           class_type: "TrimAudioDuration",
           _meta: { title: "Audio Seg 1 recortado" }
@@ -2073,15 +2134,28 @@ function buildGraph(j){
           class_type: "TrimAudioDuration",
           _meta: { title: "Audio Seg 2 recortado" }
         };
-        g["195_concat_direct_audio"] = {
-          inputs: {
-            direction: "after",
-            audio1: ["193_trim_audio1", 0],
-            audio2: ["194_trim_audio2", 0]
-          },
-          class_type: "AudioConcat",
-          _meta: { title: "Concatenar Audios Directos" }
-        };
+        if(audioCrossfadeOn && cfSec > 0){
+          g["195_concat_direct_audio"] = {
+            class_type: "AudioCrossFadeConcat",
+            inputs: {
+              audio1: ["193_trim_audio1", 0],
+              audio2: ["194_trim_audio2", 0],
+              crossfade_sec: cfSec,
+              fade_curve: cfCurve
+            },
+            _meta: { title: `Crossfade Audio Directo (${cfSec.toFixed(2)}s)` }
+          };
+        } else {
+          g["195_concat_direct_audio"] = {
+            class_type: "AudioConcat",
+            inputs: {
+              direction: "after",
+              audio1: ["193_trim_audio1", 0],
+              audio2: ["194_trim_audio2", 0]
+            },
+            _meta: { title: "Concatenar Audios Directos" }
+          };
+        }
         if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["195_concat_direct_audio", 0];
       } else if(!a1 && a2){
         g["192_trim_final_audio"] = {
