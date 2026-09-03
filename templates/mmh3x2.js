@@ -1852,130 +1852,140 @@ function finishCurrentJob(){
 }
 
 // ==========================================
+// ==========================================
 // HISTORIAL DE VÍDEOS (/api/mmh3x2_list)
 // ==========================================
-let _allHistoryItems = [];
-let _visibleHistoryCount = 30;
-
 async function loadVideoHistory(){
+  const status = $("videoHistoryStatus");
   const grid = $("videoHistoryGrid");
-  const countBadge = $("historyCountBadge");
   if(!grid) return;
+  if(status) status.textContent = "Cargando...";
+  grid.innerHTML = "";
 
   try {
     const r = await fetch("/api/mmh3x2_list");
-    if(!r.ok) return;
+    if(!r.ok) throw new Error("HTTP " + r.status);
     const data = await r.json();
-    _allHistoryItems = data.items || [];
-    if(countBadge) countBadge.textContent = `(${_allHistoryItems.length})`;
-
-    if(_allHistoryItems.length === 0){
-      grid.innerHTML = '<div class="hint" style="padding:12px;text-align:center;">No hay vídeos generados aún.</div>';
+    if(!data.items || !data.items.length){
+      if(status) status.textContent = "(0)";
+      grid.innerHTML = '<div class="hint" style="padding:12px;text-align:center;">No hay vídeos en el historial.</div>';
       return;
     }
 
-    _visibleHistoryCount = 30;
-    renderHistoryBatch();
-  } catch(e){
-    console.error("Error cargando historial de vídeos:", e);
-  }
-}
+    const allItems = data.items;
+    let visibleCount = Math.min(30, allItems.length);
 
-function renderHistoryBatch(){
-  const grid = $("videoHistoryGrid");
-  if(!grid) return;
-  grid.innerHTML = "";
+    function renderBatch(){
+      grid.innerHTML = "";
+      const items = allItems.slice(0, visibleCount);
+      for(const item of items){
+        const card = document.createElement("div");
+        card.className = "variant-card";
+        const dateStr = new Date((item.mtime || 0) * 1000).toLocaleString("es-ES", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" });
+        const videoUrl = mediaViewUrl(item, { anchor: "#t=0.001" });
 
-  const items = _allHistoryItems.slice(0, _visibleHistoryCount);
+        let typeBadge = "continuo";
+        let targetSlot = 3;
+        if(item.filename.includes("_seg1")){ typeBadge = "seg 1"; targetSlot = 1; }
+        else if(item.filename.includes("_seg2")){ typeBadge = "seg 2"; targetSlot = 2; }
 
-  items.forEach(item => {
-    const url = mediaViewUrl(item, { anchor: "#t=0.001" });
-    const cleanUrl = mediaViewUrl(item);
-    const card = document.createElement("div");
-    card.className = "variant-card";
-    card.dataset.filename = item.filename;
-    card.dataset.subfolder = item.subfolder;
-    card.dataset.type = item.type;
-    card.innerHTML = `
-      <div class="thumb-wrap">
-        <video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline style="width:100%;height:auto;max-height:220px;object-fit:contain;"></video>
-        <span class="variant-badge" style="font-size:9.5px;">${item.filename}</span>
-      </div>
-      <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
-        <button type="button" class="ghost btn-mini btn-play-hist" title="Ver en reproductor">▶ Ver</button>
-        <button type="button" class="ghost btn-mini btn-meta-hist" title="Restaurar workflow">📋</button>
-        <a class="ghost btn-mini" href="${cleanUrl}" download="${item.filename}" title="Descargar">⬇</a>
-        <button type="button" class="ghost btn-mini btn-del-hist" title="Eliminar archivo">✕</button>
-      </div>
-    `;
+        card.innerHTML = `
+          <span class="variant-badge">${typeBadge}</span>
+          <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
+          <div class="variant-info">
+            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
+            <span class="variant-icons">
+              <button type="button" class="variant-meta-btn" title="Copiar workflow" data-action="workflow">📋</button>
+              <button type="button" class="variant-del-btn" title="Eliminar" data-action="delete">×</button>
+            </span>
+          </div>
+          <div style="padding:2px 8px 6px;font-size:9px;color:var(--muted-2);font-family:var(--mono);">${dateStr}</div>
+        `;
+        card.dataset.filename = item.filename;
+        card.dataset.subfolder = item.subfolder;
+        card.dataset.type = item.type;
+        makeCardDraggable(card);
 
-    makeCardDraggable(card);
-
-    const videoEl = card.querySelector("video");
-    if(videoEl){
-      videoEl.addEventListener("loadedmetadata", () => {
-        if(videoEl.currentTime === 0){
-          videoEl.currentTime = 0.001;
+        const videoEl = card.querySelector("video");
+        if(videoEl){
+          videoEl.addEventListener("loadedmetadata", () => {
+            if(videoEl.currentTime === 0){
+              videoEl.currentTime = 0.001;
+            }
+          }, { once: true });
         }
-      }, { once: true });
+
+        card.addEventListener("click", (e) => {
+          if(e.target.closest("video")) return;
+          if(e.target.closest("button") || e.target.closest(".variant-icons")) return;
+          const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
+          displayVideoInPlayer(targetSlot, media, { autoplay: true });
+          log("▶ Reproduciendo en reproductor: " + item.filename, "l-ok");
+        });
+
+        card.querySelector('[data-action="workflow"]').addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          const orig = btn.textContent;
+          btn.textContent = "⏳";
+          try {
+            const rawUrl = mediaViewUrl(item);
+            const wf = await extractWorkflowFromMP4(rawUrl);
+            if(wf){
+              applyWorkflow(wf);
+              log("📋 Workflow restaurado desde " + item.filename, "l-ok");
+            } else {
+              log("ℹ️ " + item.filename + " no contiene metadatos de workflow.", "l-warn");
+            }
+          } catch(err){
+            log("❌ Error leyendo workflow: " + err.message, "l-err");
+          } finally {
+            btn.disabled = false;
+            btn.textContent = orig;
+          }
+        });
+
+        card.querySelector('[data-action="delete"]').addEventListener("click", async (e) => {
+          e.stopPropagation();
+          if(!confirm(`¿Eliminar ${item.filename}?`)) return;
+          try {
+            await fetch("/api/file_delete", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                filename: item.filename,
+                subfolder: item.subfolder,
+                type: item.type || "output"
+              })
+            });
+            card.remove();
+            loadVideoHistory();
+          } catch(err){
+            log("Error eliminando: " + err.message, "l-err");
+          }
+        });
+
+        grid.appendChild(card);
+      }
+
+      if(allItems.length > visibleCount){
+        const moreWrap = document.createElement("div");
+        moreWrap.style.cssText = "grid-column: 1 / -1; text-align: center; padding: 10px;";
+        moreWrap.innerHTML = `<button type="button" class="ghost" style="font-size:11px;">Cargar más vídeos (${visibleCount} de ${allItems.length})...</button>`;
+        moreWrap.querySelector("button").addEventListener("click", () => {
+          visibleCount = Math.min(visibleCount + 30, allItems.length);
+          renderBatch();
+        });
+        grid.appendChild(moreWrap);
+      }
     }
 
-    card.querySelector(".btn-play-hist").addEventListener("click", () => {
-      displayVideoInPlayer(3, item, { autoplay: true });
-      log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
-    });
-    card.querySelector(".btn-meta-hist").addEventListener("click", async (e) => {
-      e.stopPropagation();
-      const btn = e.currentTarget;
-      btn.disabled = true;
-      const orig = btn.textContent;
-      btn.textContent = "⏳";
-      try {
-        const wf = await extractWorkflowFromMP4(cleanUrl);
-        if(wf){
-          applyWorkflow(wf);
-          log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
-        } else {
-          log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
-        }
-      } catch(err){
-        log("❌ Error leyendo workflow: " + err.message, "l-err");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = orig;
-      }
-    });
-    card.querySelector(".btn-del-hist").addEventListener("click", async () => {
-      if(!confirm(`¿Eliminar ${item.filename}?`)) return;
-      try {
-        await fetch("/api/file_delete", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename: item.filename,
-            subfolder: item.subfolder,
-            type: item.type || "output"
-          })
-        });
-        card.remove();
-        loadVideoHistory();
-      } catch(err){
-        log(`Error eliminando archivo: ${err.message}`, "l-err");
-      }
-    });
-
-    grid.appendChild(card);
-  });
-
-  if(_allHistoryItems.length > _visibleHistoryCount){
-    const moreWrap = document.createElement("div");
-    moreWrap.style.cssText = "grid-column: 1 / -1; text-align: center; padding: 10px;";
-    moreWrap.innerHTML = `<button type="button" class="ghost" style="font-size:11px;">Cargar más vídeos (${_visibleHistoryCount} de ${_allHistoryItems.length})...</button>`;
-    moreWrap.querySelector("button").addEventListener("click", () => {
-      _visibleHistoryCount += 30;
-      renderHistoryBatch();
-    });
-    grid.appendChild(moreWrap);
+    renderBatch();
+    if(status) status.textContent = `(${allItems.length})`;
+  } catch(err){
+    if(status) status.textContent = "(error)";
+    console.error("Error cargando historial de vídeos:", err);
   }
 }
 

@@ -420,12 +420,12 @@
         <div class="collapsible-header" id="videoHistoryToggle">
           <span class="arrow">▶</span>
           <span style="display:inline-flex;align-items:center;gap:6px;">
-            Historial de Vídeos <span id="historyCountBadge" style="color:var(--accent);font-size:10px;">(0)</span>
+            Historial de Vídeos <span id="videoHistoryStatus" style="color:var(--accent);font-size:10px;"></span>
           </span>
           <button class="vid-action-btn" id="btnRefreshHistory" title="Refrescar historial" style="margin-left:auto;" onclick="event.stopPropagation();">↻ Refrescar</button>
         </div>
         <div class="collapsible-body" id="videoHistoryBody">
-          <div class="hint" id="historyHint" style="font-size:10px;margin:8px 0 6px;">Vídeos generados recientemente. Haz clic en un vídeo para cargarlo en el reproductor principal.</div>
+          <div class="hint" id="historyHint" style="font-size:10px;margin:8px 0 6px;">Vídeos generados recientemente en el servidor. Haz clic en una tarjeta para cargar el vídeo en el reproductor.</div>
           <div class="variant-grid" id="videoHistoryGrid"></div>
         </div>
       </div>
