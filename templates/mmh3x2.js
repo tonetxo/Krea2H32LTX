@@ -1595,6 +1595,7 @@ function setupMediaSlots(){
 
     if(delBtn){
       delBtn.addEventListener("click", (e) => {
+        e.preventDefault();
         e.stopPropagation();
         clearAudioSlot(i);
       });
@@ -1623,6 +1624,7 @@ function handleAudioFile(slotIdx, file, shouldSave = true){
   const a = $(`previewAudio${slotIdx}`);
   const ph = $(`phAudio${slotIdx}`);
   const info = $(`infoAudio${slotIdx}`);
+  const delBtn = $(`btnDelAudio${slotIdx}`);
 
   if(a){
     a.src = url;
@@ -1630,6 +1632,7 @@ function handleAudioFile(slotIdx, file, shouldSave = true){
   }
   if(ph) ph.style.display = "none";
   if(info) info.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+  if(delBtn) delBtn.style.display = "inline-flex";
   if(shouldSave){
     dbSaveSlot("slot_audio_" + slotIdx, { blob: file, name: file.name });
   }
@@ -1641,12 +1644,20 @@ function clearAudioSlot(slotIdx){
   const ph = $(`phAudio${slotIdx}`);
   const info = $(`infoAudio${slotIdx}`);
   const input = $(`fileInputAudio${slotIdx}`);
+  const delBtn = $(`btnDelAudio${slotIdx}`);
 
-  if(a){ a.removeAttribute("src"); a.style.display = "none"; }
+  if(a){
+    try { a.pause(); } catch(_){}
+    a.removeAttribute("src");
+    try { a.load(); } catch(_){}
+    a.style.display = "none";
+  }
   if(ph) ph.style.display = "block";
   if(info) info.textContent = "";
   if(input) input.value = "";
+  if(delBtn) delBtn.style.display = "none";
   dbDeleteSlot("slot_audio_" + slotIdx);
+  log(`🗑️ Audio ${slotIdx} quitado`, "l-info");
 }
 
 function handleImageFile(slotIdx, file){
