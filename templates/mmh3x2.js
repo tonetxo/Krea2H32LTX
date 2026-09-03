@@ -444,7 +444,7 @@ CONFIG.addToVariantGallery = function(mediaOrUrl, seed, varIdx, promptText){
 
   const url = (typeof mediaOrUrl === "string")
     ? mediaOrUrl.split("#")[0]
-    : `${server()}/view?filename=${encodeURIComponent(mediaOrUrl.filename)}&subfolder=${encodeURIComponent(mediaOrUrl.subfolder||"")}&type=${encodeURIComponent(mediaOrUrl.type||"output")}`;
+    : mediaViewUrl(mediaOrUrl);
 
   let card = grid.querySelector(`.variant-card[data-variant-index="${varIdx}"]`);
   if(!card){
@@ -455,7 +455,7 @@ CONFIG.addToVariantGallery = function(mediaOrUrl, seed, varIdx, promptText){
   card.className = "variant-card";
   card.innerHTML = `
     <div class="thumb-wrap">
-      <video src="${url}#t=0.001" preload="metadata" muted playsinline loop style="width:100%;height:auto;max-height:220px;object-fit:contain;cursor:pointer;"></video>
+      <video src="${url}#t=0.001" crossorigin="anonymous" controls muted preload="metadata" playsinline style="width:100%;height:auto;max-height:220px;object-fit:contain;"></video>
       <span class="variant-badge">Var ${varIdx} · Seed ${seed}</span>
     </div>
     <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
@@ -469,16 +469,15 @@ CONFIG.addToVariantGallery = function(mediaOrUrl, seed, varIdx, promptText){
   if(countBadge) countBadge.textContent = `(${totalCards})`;
 
   const videoEl = card.querySelector("video");
-  videoEl.addEventListener("loadeddata", () => {
-    if(videoEl.currentTime === 0){
-      videoEl.currentTime = 0.001;
-    }
-  }, { once: true });
-  videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
-  videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0.001; });
-  videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url, { autoplay: true, filename: `Var ${varIdx}` }); });
+  if(videoEl){
+    videoEl.addEventListener("loadedmetadata", () => {
+      if(videoEl.currentTime === 0){
+        videoEl.currentTime = 0.001;
+      }
+    }, { once: true });
+  }
 
-  card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, url, { autoplay: true, filename: `Var ${varIdx}` }); });
+  card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, mediaOrUrl, { autoplay: true, filename: `Var ${varIdx}` }); });
   card.querySelector(".btn-del-card").addEventListener("click", () => {
     card.remove();
     const remaining = grid.querySelectorAll(".variant-card").length;
@@ -1894,9 +1893,12 @@ function renderHistoryBatch(){
     const cleanUrl = mediaViewUrl(item);
     const card = document.createElement("div");
     card.className = "variant-card";
+    card.dataset.filename = item.filename;
+    card.dataset.subfolder = item.subfolder;
+    card.dataset.type = item.type;
     card.innerHTML = `
       <div class="thumb-wrap">
-        <video src="${url}" crossorigin="anonymous" preload="metadata" muted playsinline loop style="width:100%;height:auto;max-height:220px;object-fit:contain;cursor:pointer;"></video>
+        <video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline style="width:100%;height:auto;max-height:220px;object-fit:contain;"></video>
         <span class="variant-badge" style="font-size:9.5px;">${item.filename}</span>
       </div>
       <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
@@ -1907,18 +1909,16 @@ function renderHistoryBatch(){
       </div>
     `;
 
+    makeCardDraggable(card);
+
     const videoEl = card.querySelector("video");
-    videoEl.addEventListener("loadeddata", () => {
-      if(videoEl.currentTime === 0){
-        videoEl.currentTime = 0.001;
-      }
-    }, { once: true });
-    videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
-    videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0.001; });
-    videoEl.addEventListener("click", () => {
-      displayVideoInPlayer(3, item, { autoplay: true });
-      log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
-    });
+    if(videoEl){
+      videoEl.addEventListener("loadedmetadata", () => {
+        if(videoEl.currentTime === 0){
+          videoEl.currentTime = 0.001;
+        }
+      }, { once: true });
+    }
 
     card.querySelector(".btn-play-hist").addEventListener("click", () => {
       displayVideoInPlayer(3, item, { autoplay: true });
