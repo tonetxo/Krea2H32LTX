@@ -575,6 +575,11 @@ function updateQueueUI(){
       activeJob = null;
       currentPromptId = null;
       enableStopButtons(false);
+      if(jobQueue.length > 0){
+        const nextJob = jobQueue.shift();
+        log(`⏭️ Iniciando tarea en cola (${jobQueue.length} restantes)...`, "l-info");
+        startJob(nextJob);
+      }
       return;
     }
   } else {
@@ -1193,10 +1198,14 @@ function buildGraph(j){
   if(g[N.PROMPT_1]?.inputs) g[N.PROMPT_1].inputs.value = p1;
   if(g[N.PROMPT_2]?.inputs) g[N.PROMPT_2].inputs.value = p2;
 
+  // Eliminar siempre nodos de interfaz ShowText (84 y 85) para evitar KeyError: 'nodes' en ComfyUI API
+  delete g["84"];
+  delete g["85"];
+
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
   if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
-    ["51", "53", "55", "84", "85", "86"].forEach(id => { delete g[id]; });
+    ["51", "53", "55", "86"].forEach(id => { delete g[id]; });
   }
 
   // 2. Duración y Megapíxeles
