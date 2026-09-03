@@ -934,7 +934,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
                 self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
                 self.send_header("Vary", "Origin")
-                self.send_header("Connection", "keep-alive")
+                self.send_header("Connection", "close")
+                self.close_connection = True
                 self.end_headers()
 
                 if method == "HEAD":
@@ -949,6 +950,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                             break
                         self.wfile.write(chunk)
                         remaining -= len(chunk)
+                try:
+                    self.wfile.flush()
+                except Exception:
+                    pass
             except (ConnectionResetError, BrokenPipeError):
                 return
             except OSError:
@@ -966,7 +971,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
             self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
             self.send_header("Vary", "Origin")
-            self.send_header("Connection", "keep-alive")
+            self.send_header("Connection", "close")
+            self.close_connection = True
             self.end_headers()
 
             if method == "HEAD":
@@ -978,6 +984,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     while chunk:
                         self.wfile.write(chunk)
                         chunk = f.read(65536)
+                try:
+                    self.wfile.flush()
+                except Exception:
+                    pass
             except (ConnectionResetError, BrokenPipeError):
                 return
             except OSError:
@@ -1190,12 +1200,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 kl = k.lower()
                 if kl not in ("transfer-encoding", "connection", "content-encoding") and not kl.startswith("access-control-"):
                     self.send_header(k, v)
-            is_view = self.path.split("?")[0].startswith("/view")
-            if not is_view:
-                self.send_header("Connection", "close")
-                self.close_connection = True
-            else:
-                self.send_header("Connection", "keep-alive")
+            self.send_header("Connection", "close")
+            self.close_connection = True
             
             if client_origin:
                 self.send_header("Access-Control-Allow-Origin", client_origin)

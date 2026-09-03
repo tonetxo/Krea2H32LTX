@@ -173,24 +173,16 @@ CONFIG.findMedia = function(output){
   if(!output) return null;
   const vids = output.videos || output.gifs || output.images;
   if(Array.isArray(vids) && vids.length > 0){
-    const item = vids[0];
-    const fn = item.filename || item;
-    const sub = item.subfolder || "";
-    const type = item.type || "output";
-    return server() + `/view?filename=${encodeURIComponent(fn)}&subfolder=${encodeURIComponent(sub)}&type=${encodeURIComponent(type)}`;
+    const item = vids[vids.length - 1];
+    if(typeof item === "string") return { filename: item, subfolder: "video", type: "output" };
+    return item;
   }
   return null;
 };
 
-CONFIG.showMedia = function(url, meta){
+CONFIG.showMedia = function(media, meta){
   const targetPlayer = meta?.targetSlot || 3;
-  if(targetPlayer === 1){
-    displayVideoInPlayer(1, url);
-  } else if(targetPlayer === 2){
-    displayVideoInPlayer(2, url);
-  } else {
-    displayVideoInPlayer(3, url);
-  }
+  displayVideoInPlayer(targetPlayer, media);
 };
 
 CONFIG.onNodeExecuted = function(data){
@@ -444,11 +436,15 @@ function createGeneratingCard(varIdx, seedUsed){
   }
 }
 
-CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
+CONFIG.addToVariantGallery = function(mediaOrUrl, seed, varIdx, promptText){
   const gallery = $("variantGalleryBox");
   const grid = $("variantGrid");
   if(!gallery || !grid) return;
   gallery.style.display = "block";
+
+  const url = (typeof mediaOrUrl === "string")
+    ? mediaOrUrl.split("#")[0]
+    : `${server()}/view?filename=${encodeURIComponent(mediaOrUrl.filename)}&subfolder=${encodeURIComponent(mediaOrUrl.subfolder||"")}&type=${encodeURIComponent(mediaOrUrl.type||"output")}`;
 
   let card = grid.querySelector(`.variant-card[data-variant-index="${varIdx}"]`);
   if(!card){
@@ -798,7 +794,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
   let media = null;
   let videoUrl = "";
   if(typeof mediaOrUrl === "string"){
-    videoUrl = mediaOrUrl.includes("#") ? mediaOrUrl : (mediaOrUrl + "#t=0.001");
+    videoUrl = mediaOrUrl.split("#")[0];
     media = options.media || {
       filename: options.filename || "",
       subfolder: options.subfolder || "video",
@@ -809,7 +805,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
     const f = encodeURIComponent(media.filename || "");
     const s = encodeURIComponent(media.subfolder || "");
     const t = encodeURIComponent(media.type || "output");
-    videoUrl = `${server()}/view?filename=${f}&subfolder=${s}&type=${t}#t=0.001`;
+    videoUrl = `${server()}/view?filename=${f}&subfolder=${s}&type=${t}`;
   }
   currentMedia[slotIndex] = media;
 
@@ -829,10 +825,13 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
 
   if(video){
     video.crossOrigin = "anonymous";
-    video.src = videoUrl;
+    if(video.src !== videoUrl){
+      video.src = videoUrl;
+      video.load();
+    }
     video.style.display = "block";
     if(options.autoplay !== false){
-      video.play().catch(err => console.log("Autoplay bloqueado:", err));
+      video.play().catch(err => console.log("Autoplay:", err));
     }
     const onMeta = () => {
       const vw = video.videoWidth || 0, vh = video.videoHeight || 0;
