@@ -99,7 +99,7 @@ let mediaSlots = {
 };
 let videoSlot = { file: null, dataUrl: null, uploaded: null, name: "" };
 
-// Jobs y Cola (NOTA: variables globales compartidas con common.js se usan directamente sin redeclarar con let)
+let isInitializing = true;
 let jobQueue = [];
 let activeJob = null;
 let promptVariantMap = {};
@@ -351,7 +351,9 @@ function updateQueueUI(){
     if(queueIdleCount >= 2){
       queueIdleCount = 0;
       console.warn("Liberando activeJob huérfano (ComfyUI está en reposo)");
-      finishCurrentJob();
+      activeJob = null;
+      currentPromptId = null;
+      enableStopButtons(false);
       return;
     }
   } else {
@@ -1162,6 +1164,10 @@ function buildGraph(j){
 // EJECUCIÓN Y COLAS
 // ==========================================
 async function queueJob(runMode){
+  if(isInitializing){
+    console.warn("queueJob bloqueado durante la inicialización de la página");
+    return;
+  }
   const p1 = $("prompt")?.value?.trim();
   if(!p1){
     log("⚠️ Por favor escribe al menos el Prompt 1 (Segmento 1)", "l-warn");
@@ -1346,9 +1352,9 @@ async function loadVideoHistory(){
 window.addEventListener("DOMContentLoaded", () => {
   setupMediaSlots();
 
-  if($("btnFull")) $("btnFull").addEventListener("click", () => { queueJob("full"); });
-  if($("btnSeg1")) $("btnSeg1").addEventListener("click", () => { queueJob("seg1_only"); });
-  if($("btnSeg2")) $("btnSeg2").addEventListener("click", () => { queueJob("seg2_only"); });
+  if($("btnFull")) $("btnFull").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("full"); });
+  if($("btnSeg1")) $("btnSeg1").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("seg1_only"); });
+  if($("btnSeg2")) $("btnSeg2").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("seg2_only"); });
 
   if($("btnStopVideo")) $("btnStopVideo").addEventListener("click", () => { CONFIG.onStopCurrent(); });
   if($("btnStopAll")) $("btnStopAll").addEventListener("click", () => { CONFIG.onStopAll(); });
@@ -1534,4 +1540,5 @@ window.addEventListener("DOMContentLoaded", () => {
   updateDurationFrames();
   loadVideoHistory();
   updateQueueUI();
+  setTimeout(() => { isInitializing = false; }, 800);
 });
