@@ -454,6 +454,252 @@ function extractCurrentFrame(videoEl, fromSlot){
 }
 
 // ==========================================
+// PERSISTENCIA DE SESIÓN (AJUSTES & MEDIOS)
+// ==========================================
+const MMH3X2_SETTINGS_KEY = "mmh3x2_ui_settings_v1";
+const MMH3X2_DB_NAME = "mmh3x2_media_db";
+const MMH3X2_STORE_NAME = "slots";
+
+function openMediaDB(){
+  return new Promise((resolve, reject) => {
+    if(!window.indexedDB){ reject(new Error("IndexedDB no disponible")); return; }
+    const req = indexedDB.open(MMH3X2_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if(!db.objectStoreNames.contains(MMH3X2_STORE_NAME)){
+        db.createObjectStore(MMH3X2_STORE_NAME, { keyPath: "key" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function dbSaveSlot(key, data){
+  try {
+    const db = await openMediaDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(MMH3X2_STORE_NAME, "readwrite");
+      tx.objectStore(MMH3X2_STORE_NAME).put({ key, ...data });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch(e){ console.warn("Error guardando en IndexedDB:", e); }
+}
+
+async function dbDeleteSlot(key){
+  try {
+    const db = await openMediaDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(MMH3X2_STORE_NAME, "readwrite");
+      tx.objectStore(MMH3X2_STORE_NAME).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch(e){ console.warn("Error borrando en IndexedDB:", e); }
+}
+
+async function dbGetAllSlots(){
+  try {
+    const db = await openMediaDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(MMH3X2_STORE_NAME, "readonly");
+      const req = tx.objectStore(MMH3X2_STORE_NAME).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch(e){ console.warn("Error leyendo IndexedDB:", e); return []; }
+}
+
+function saveSettings(){
+  const s = {
+    prompt: $("prompt")?.value || "",
+    prompt2: $("prompt2")?.value || "",
+    seg2PromptMode: $("seg2PromptMode")?.value || "direct",
+    seedMode: $("segRandom")?.classList.contains("on") ? "random" : "fixed",
+    seedVal: $("seedVal")?.value || "12345",
+    duration: $("durationSlider")?.value || "15.0",
+    megapixels: $("mpSlider")?.value || "0.70",
+    batchSize: $("batchSize")?.value || "1",
+    filenamePrefix: $("filenamePrefix")?.value || "video/MiniMax_H3",
+    steps: $("stepsSlider")?.value || "20",
+    sampler: $("samplerName")?.value || "res_multistep",
+    scheduler: $("schedulerName")?.value || "simple",
+    unetModel: $("unetModel")?.value || "",
+    clipModel: $("clipModel")?.value || "",
+    h3Sparse: $("h3SparseToggle") ? $("h3SparseToggle").checked : true,
+    h3Budget: $("h3BudgetSlider")?.value || "0.30",
+    h3EarlyLate: $("h3EarlyLateToggle") ? $("h3EarlyLateToggle").checked : true,
+    h3Mem: $("h3MemToggle") ? $("h3MemToggle").checked : true,
+    h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
+    h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
+    lora1Toggle: $("lora1Toggle") ? $("lora1Toggle").checked : false,
+    lora1Select: $("lora1Select")?.value || "",
+    lora1Strength: $("lora1Strength")?.value || "1.0",
+    lora2Toggle: $("lora2Toggle") ? $("lora2Toggle").checked : false,
+    lora2Select: $("lora2Select")?.value || "",
+    lora2Strength: $("lora2Strength")?.value || "1.0",
+    blendToggle: $("blendToggle") ? $("blendToggle").checked : true,
+    rtxToggle: $("rtxToggle") ? $("rtxToggle").checked : true,
+    rifeToggle: $("rifeToggle") ? $("rifeToggle").checked : true,
+    rifeMultiplier: $("rifeMultiplier")?.value || "2",
+    rifeModel: $("rifeModel")?.value || "rife_v4.26.safetensors"
+  };
+  try {
+    localStorage.setItem(MMH3X2_SETTINGS_KEY, JSON.stringify(s));
+  } catch(e){
+    console.warn("Error guardando ajustes en localStorage:", e);
+  }
+}
+
+let saveTimer = null;
+function scheduleSaveSettings(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveSettings, 350);
+}
+
+function restoreSettings(){
+  const raw = localStorage.getItem(MMH3X2_SETTINGS_KEY);
+  if(!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    if(!s || typeof s !== "object") return false;
+
+    if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
+    if(s.prompt2 !== undefined && $("prompt2")) $("prompt2").value = s.prompt2;
+    if(s.seg2PromptMode !== undefined && $("seg2PromptMode")) $("seg2PromptMode").value = s.seg2PromptMode;
+
+    if(s.seedMode === "random"){
+      $("segRandom")?.classList.add("on");
+      $("segFixed")?.classList.remove("on");
+      if($("seedVal")) $("seedVal").disabled = true;
+    } else if(s.seedMode === "fixed"){
+      $("segFixed")?.classList.add("on");
+      $("segRandom")?.classList.remove("on");
+      if($("seedVal")) $("seedVal").disabled = false;
+    }
+    if(s.seedVal !== undefined && $("seedVal")) $("seedVal").value = s.seedVal;
+
+    if(s.duration !== undefined && $("durationSlider")){
+      $("durationSlider").value = s.duration;
+      if($("durationVal")) $("durationVal").textContent = parseFloat(s.duration).toFixed(1) + "s";
+      updateDurationFrames();
+    }
+    if(s.megapixels !== undefined && $("mpSlider")){
+      $("mpSlider").value = s.megapixels;
+      if($("mpVal")) $("mpVal").textContent = parseFloat(s.megapixels).toFixed(2);
+    }
+    if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
+    if(s.filenamePrefix !== undefined && $("filenamePrefix")) $("filenamePrefix").value = s.filenamePrefix;
+
+    if(s.steps !== undefined && $("stepsSlider")){
+      $("stepsSlider").value = s.steps;
+      if($("stepsVal")) $("stepsVal").textContent = s.steps;
+    }
+    if(s.sampler !== undefined && $("samplerName")) $("samplerName").value = s.sampler;
+    if(s.scheduler !== undefined && $("schedulerName")) $("schedulerName").value = s.scheduler;
+
+    if(s.unetModel && $("unetModel")) $("unetModel").value = s.unetModel;
+    if(s.clipModel && $("clipModel")) $("clipModel").value = s.clipModel;
+
+    if(s.h3Sparse !== undefined && $("h3SparseToggle")) $("h3SparseToggle").checked = s.h3Sparse;
+    if(s.h3Budget !== undefined && $("h3BudgetSlider")){
+      $("h3BudgetSlider").value = s.h3Budget;
+      if($("h3BudgetVal")) $("h3BudgetVal").textContent = parseFloat(s.h3Budget).toFixed(2);
+    }
+    if(s.h3EarlyLate !== undefined && $("h3EarlyLateToggle")) $("h3EarlyLateToggle").checked = s.h3EarlyLate;
+    if(s.h3Mem !== undefined && $("h3MemToggle")) $("h3MemToggle").checked = s.h3Mem;
+
+    if(s.h3ShiftVideo !== undefined && $("h3ShiftVideo")){
+      $("h3ShiftVideo").value = s.h3ShiftVideo;
+      if($("h3ShiftVideoVal")) $("h3ShiftVideoVal").textContent = parseFloat(s.h3ShiftVideo).toFixed(1);
+    }
+    if(s.h3ShiftAudio !== undefined && $("h3ShiftAudio")){
+      $("h3ShiftAudio").value = s.h3ShiftAudio;
+      if($("h3ShiftAudioVal")) $("h3ShiftAudioVal").textContent = parseFloat(s.h3ShiftAudio).toFixed(1);
+    }
+
+    if(s.lora1Toggle !== undefined && $("lora1Toggle")) $("lora1Toggle").checked = s.lora1Toggle;
+    if(s.lora1Select && $("lora1Select")) $("lora1Select").value = s.lora1Select;
+    if(s.lora1Strength !== undefined && $("lora1Strength")){
+      $("lora1Strength").value = s.lora1Strength;
+      if($("lora1StrengthVal")) $("lora1StrengthVal").textContent = parseFloat(s.lora1Strength).toFixed(2);
+    }
+
+    if(s.lora2Toggle !== undefined && $("lora2Toggle")) $("lora2Toggle").checked = s.lora2Toggle;
+    if(s.lora2Select && $("lora2Select")) $("lora2Select").value = s.lora2Select;
+    if(s.lora2Strength !== undefined && $("lora2Strength")){
+      $("lora2Strength").value = s.lora2Strength;
+      if($("lora2StrengthVal")) $("lora2StrengthVal").textContent = parseFloat(s.lora2Strength).toFixed(2);
+    }
+
+    if(s.blendToggle !== undefined && $("blendToggle")) $("blendToggle").checked = s.blendToggle;
+    if(s.rtxToggle !== undefined && $("rtxToggle")) $("rtxToggle").checked = s.rtxToggle;
+    if(s.rifeToggle !== undefined && $("rifeToggle")) $("rifeToggle").checked = s.rifeToggle;
+    if(s.rifeMultiplier !== undefined && $("rifeMultiplier")) $("rifeMultiplier").value = s.rifeMultiplier;
+    if(s.rifeModel && $("rifeModel")) $("rifeModel").value = s.rifeModel;
+
+    return true;
+  } catch(e){
+    console.warn("Error restaurando ajustes:", e);
+    return false;
+  }
+}
+
+async function restoreSavedMedia(){
+  const records = await dbGetAllSlots();
+  if(!records || records.length === 0) return false;
+
+  let restoredAny = false;
+  for(const rec of records){
+    if(rec.key && rec.key.startsWith("slot_") && rec.key !== "slot_vid"){
+      const slotIdx = parseInt(rec.key.replace("slot_", ""), 10);
+      if(slotIdx >= 1 && slotIdx <= 4 && rec.dataUrl){
+        setMediaSlotData(slotIdx, null, rec.dataUrl, rec.name || `slot_${slotIdx}.png`, false);
+        if(rec.uploaded) mediaSlots[slotIdx].uploaded = rec.uploaded;
+        restoredAny = true;
+      }
+    } else if(rec.key === "slot_vid" && rec.blob){
+      const url = URL.createObjectURL(rec.blob);
+      videoSlot = { file: rec.blob, dataUrl: url, uploaded: null, name: rec.name || "video_ref.mp4" };
+      const v = $("previewSlotVid");
+      const ph = $("phVid");
+      const info = $("infoVid");
+      const btnDel = $("btnDelVid");
+      if(v){ v.src = url; v.style.display = "block"; }
+      if(ph) ph.style.display = "none";
+      if(info) info.textContent = `${rec.name || 'video'} (${(rec.blob.size / 1024 / 1024).toFixed(1)} MB)`;
+      if(btnDel) btnDel.style.display = "inline-flex";
+      restoredAny = true;
+    }
+  }
+  return restoredAny;
+}
+
+function attachAutoSaveListeners(){
+  const inputIds = [
+    "prompt", "prompt2", "seg2PromptMode", "durationSlider", "mpSlider", "stepsSlider",
+    "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
+    "unetModel", "clipModel", "h3SparseToggle", "h3BudgetSlider", "h3EarlyLateToggle",
+    "h3MemToggle", "h3ShiftVideo", "h3ShiftAudio", "lora1Toggle", "lora1Select",
+    "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
+    "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel"
+  ];
+
+  inputIds.forEach(id => {
+    const el = $(id);
+    if(el){
+      el.addEventListener("input", scheduleSaveSettings);
+      el.addEventListener("change", scheduleSaveSettings);
+    }
+  });
+
+  $("segRandom")?.addEventListener("click", scheduleSaveSettings);
+  $("segFixed")?.addEventListener("click", scheduleSaveSettings);
+  window.addEventListener("beforeunload", saveSettings);
+}
+
+// ==========================================
 // GESTIÓN DE MEDIOS (4 IMÁGENES + 1 VÍDEO)
 // ==========================================
 function setupMediaSlots(){
@@ -558,7 +804,7 @@ function handleImageUrl(slotIdx, url){
   setMediaSlotData(slotIdx, null, url, url.split("/").pop().split("?")[0]);
 }
 
-function setMediaSlotData(slotIdx, file, dataUrl, name){
+function setMediaSlotData(slotIdx, file, dataUrl, name, shouldSave = true){
   mediaSlots[slotIdx] = { file, dataUrl, uploaded: null, name };
   const img = $(`previewSlotImg${slotIdx}`);
   const ph = $(`phImg${slotIdx}`);
@@ -573,6 +819,9 @@ function setMediaSlotData(slotIdx, file, dataUrl, name){
     };
   }
   if(ph) ph.style.display = "none";
+  if(shouldSave && dataUrl){
+    dbSaveSlot("slot_" + slotIdx, { dataUrl, name });
+  }
 }
 
 function clearMediaSlot(slotIdx){
@@ -586,9 +835,10 @@ function clearMediaSlot(slotIdx){
   if(ph) ph.style.display = "block";
   if(info) info.textContent = "";
   if(fileInput) fileInput.value = "";
+  dbDeleteSlot("slot_" + slotIdx);
 }
 
-function handleVideoFile(file){
+function handleVideoFile(file, shouldSave = true){
   const url = URL.createObjectURL(file);
   videoSlot = { file, dataUrl: url, uploaded: null, name: file.name };
   const v = $("previewSlotVid");
@@ -603,6 +853,9 @@ function handleVideoFile(file){
   if(ph) ph.style.display = "none";
   if(info) info.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
   if(btnDel) btnDel.style.display = "inline-flex";
+  if(shouldSave){
+    dbSaveSlot("slot_vid", { blob: file, name: file.name });
+  }
 }
 
 function clearVideoSlot(){
@@ -618,6 +871,7 @@ function clearVideoSlot(){
   if(info) info.textContent = "";
   if(btnDel) btnDel.style.display = "none";
   if(input) input.value = "";
+  dbDeleteSlot("slot_vid");
 }
 
 async function ensureAllMediaUploaded(){
@@ -625,9 +879,15 @@ async function ensureAllMediaUploaded(){
     const slot = mediaSlots[i];
     if(slot.file && !slot.uploaded){
       slot.uploaded = await uploadSingleFile(slot.file, `mmh3x2_slot_${i}.png`);
-    } else if(slot.dataUrl && !slot.uploaded && slot.dataUrl.startsWith("data:")){
-      const blob = dataUrlToBlob(slot.dataUrl);
-      slot.uploaded = await uploadSingleFile(blob, `mmh3x2_slot_${i}.png`);
+    } else if(slot.dataUrl && !slot.uploaded){
+      if(slot.dataUrl.startsWith("data:")){
+        const blob = dataUrlToBlob(slot.dataUrl);
+        slot.uploaded = await uploadSingleFile(blob, `mmh3x2_slot_${i}.png`);
+      } else {
+        const urlParams = new URL(slot.dataUrl, window.location.origin).searchParams;
+        const fn = urlParams.get("filename") || slot.name || `mmh3x2_slot_${i}.png`;
+        slot.uploaded = { name: fn, subfolder: urlParams.get("subfolder") || "", type: urlParams.get("type") || "input" };
+      }
     }
   }
 
@@ -1222,6 +1482,10 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Restaurar ajustes guardados previamente
+  restoreSettings();
+  attachAutoSaveListeners();
+
   // Poblar prompts por defecto si están vacíos
   if($("prompt") && !$("prompt").value.trim() && BASE_GRAPH[N.PROMPT_1]?.inputs?.value){
     $("prompt").value = BASE_GRAPH[N.PROMPT_1].inputs.value;
@@ -1230,35 +1494,43 @@ window.addEventListener("DOMContentLoaded", () => {
     $("prompt2").value = BASE_GRAPH[N.PROMPT_2].inputs.value;
   }
 
-  // Poblar imágenes por defecto del grafo en los slots
-  const defaultImgs = [
-    BASE_GRAPH[N.IMG1]?.inputs?.image,
-    BASE_GRAPH[N.IMG2]?.inputs?.image,
-    BASE_GRAPH[N.IMG3]?.inputs?.image,
-    BASE_GRAPH[N.IMG4]?.inputs?.image
-  ];
-  defaultImgs.forEach((fn, idx) => {
-    const slotIdx = idx + 1;
-    if(fn && !mediaSlots[slotIdx].file && !mediaSlots[slotIdx].dataUrl){
-      mediaSlots[slotIdx].uploaded = { name: fn, subfolder: "", type: "input" };
-      mediaSlots[slotIdx].name = fn;
-      const url = server() + `/view?filename=${encodeURIComponent(fn)}&type=input`;
-      const img = $(`previewSlotImg${slotIdx}`);
-      const ph = $(`phImg${slotIdx}`);
-      const info = $(`infoImg${slotIdx}`);
-      if(img){
-        img.src = url;
-        img.style.display = "block";
-        img.onload = () => {
-          if(slotIdx === 1) updateCalculatedResolution(img.naturalWidth, img.naturalHeight);
-          if(info) info.textContent = `${img.naturalWidth}x${img.naturalHeight} · ${fn.slice(0, 25)}…`;
-        };
-      }
-      if(ph) ph.style.display = "none";
+  // Restaurar medios guardados en IndexedDB con fallback al grafo por defecto
+  restoreSavedMedia().then(hasSavedMedia => {
+    if(!hasSavedMedia){
+      const defaultImgs = [
+        BASE_GRAPH[N.IMG1]?.inputs?.image,
+        BASE_GRAPH[N.IMG2]?.inputs?.image,
+        BASE_GRAPH[N.IMG3]?.inputs?.image,
+        BASE_GRAPH[N.IMG4]?.inputs?.image
+      ];
+      defaultImgs.forEach((fn, idx) => {
+        const slotIdx = idx + 1;
+        if(fn && !mediaSlots[slotIdx].file && !mediaSlots[slotIdx].dataUrl){
+          mediaSlots[slotIdx].uploaded = { name: fn, subfolder: "", type: "input" };
+          mediaSlots[slotIdx].name = fn;
+          const url = server() + `/view?filename=${encodeURIComponent(fn)}&type=input`;
+          const img = $(`previewSlotImg${slotIdx}`);
+          const ph = $(`phImg${slotIdx}`);
+          const info = $(`infoImg${slotIdx}`);
+          if(img){
+            img.src = url;
+            img.style.display = "block";
+            img.onload = () => {
+              if(slotIdx === 1) updateCalculatedResolution(img.naturalWidth, img.naturalHeight);
+              if(info) info.textContent = `${img.naturalWidth}x${img.naturalHeight} · ${fn.slice(0, 25)}…`;
+            };
+          }
+          if(ph) ph.style.display = "none";
+        }
+      });
+    } else {
+      log("💾 Sesión anterior restaurada (ajustes y medios guardados)", "l-ok");
     }
+    const img1 = $("previewSlotImg1");
+    if(img1 && img1.naturalWidth) updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
+    else updateCalculatedResolution(1280, 720);
   });
 
-  updateCalculatedResolution(1280, 720);
   updateDurationFrames();
   loadVideoHistory();
   updateQueueUI();
