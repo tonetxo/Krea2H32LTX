@@ -475,9 +475,9 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
   const videoEl = card.querySelector("video");
   videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
   videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0; });
-  videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url); });
+  videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url, { autoplay: true, filename: `Var ${varIdx}` }); });
 
-  card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, url); });
+  card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, url, { autoplay: true, filename: `Var ${varIdx}` }); });
   card.querySelector(".btn-del-card").addEventListener("click", () => {
     card.remove();
     const remaining = grid.querySelectorAll(".variant-card").length;
@@ -639,7 +639,7 @@ function updateQueueUI(){
 // ==========================================
 // RENDER Y GESTIÓN DE REPRODUCTORES
 // ==========================================
-function displayVideoInPlayer(slotIndex, url){
+function displayVideoInPlayer(slotIndex, url, options = {}){
   const suffix = (slotIndex === 1) ? "Seg1" : (slotIndex === 2 ? "Seg2" : "Final");
   const video = $("video" + suffix);
   const empty = $("empty" + suffix);
@@ -650,6 +650,7 @@ function displayVideoInPlayer(slotIndex, url){
   const btnMeta = $("btnLoadMeta" + suffix);
   const timeTag = $("time" + suffix);
   const resTag = $("res" + suffix);
+  const badge = $("badge" + suffix);
 
   if(empty) empty.style.display = "none";
   if(pImg) pImg.style.display = "none";
@@ -665,10 +666,18 @@ function displayVideoInPlayer(slotIndex, url){
     if(stepFin) stepFin.style.display = "none";
   }
 
+  if(badge && options.filename){
+    badge.textContent = options.filename;
+    badge.style.display = "inline-block";
+  }
+
   if(video){
-    video.src = url;
+    const videoUrl = url.includes("#") ? url : (url + "#t=0.001");
+    video.src = videoUrl;
     video.style.display = "block";
-    video.load();
+    if(options.autoplay){
+      video.play().catch(()=>{});
+    }
     video.onloadedmetadata = () => {
       if(timeTag) timeTag.textContent = `${video.duration.toFixed(1)}s`;
       if(resTag) resTag.textContent = `${video.videoWidth}x${video.videoHeight}`;
@@ -1609,9 +1618,15 @@ async function loadVideoHistory(){
       const videoEl = card.querySelector("video");
       videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
       videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0; });
-      videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url); });
+      videoEl.addEventListener("click", () => {
+        displayVideoInPlayer(3, url, { autoplay: true, filename: item.filename });
+        log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
+      });
 
-      card.querySelector(".btn-play-hist").addEventListener("click", () => { displayVideoInPlayer(3, url); });
+      card.querySelector(".btn-play-hist").addEventListener("click", () => {
+        displayVideoInPlayer(3, url, { autoplay: true, filename: item.filename });
+        log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
+      });
       card.querySelector(".btn-del-hist").addEventListener("click", async () => {
         if(!confirm(`¿Eliminar ${item.filename}?`)) return;
         try {

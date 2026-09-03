@@ -792,7 +792,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <video class="preview-img" id="previewVideoFinal" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
         </div>
         <span class="video-badge" id="badgeFinal"></span>
-        <video id="videoFinal" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <video id="videoFinal" controls allowfullscreen playsinline style="display:none" draggable="true"></video>
         <div class="vid-footer">
           <span class="time-tag" id="timeFinal"></span>
           <span class="res-tag" id="resFinal"></span>
@@ -816,7 +816,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <video class="preview-img" id="previewVideoSeg1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
         </div>
         <span class="video-badge" id="badgeSeg1"></span>
-        <video id="videoSeg1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <video id="videoSeg1" controls allowfullscreen playsinline style="display:none" draggable="true"></video>
         <div class="vid-footer">
           <span class="time-tag" id="timeSeg1"></span>
           <span class="res-tag" id="resSeg1"></span>
@@ -840,7 +840,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <video class="preview-img" id="previewVideoSeg2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
         </div>
         <span class="video-badge" id="badgeSeg2"></span>
-        <video id="videoSeg2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <video id="videoSeg2" controls allowfullscreen playsinline style="display:none" draggable="true"></video>
         <div class="vid-footer">
           <span class="time-tag" id="timeSeg2"></span>
           <span class="res-tag" id="resSeg2"></span>
@@ -4396,9 +4396,9 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
   const videoEl = card.querySelector("video");
   videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
   videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0; });
-  videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url); });
+  videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url, { autoplay: true, filename: `Var ${varIdx}` }); });
 
-  card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, url); });
+  card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, url, { autoplay: true, filename: `Var ${varIdx}` }); });
   card.querySelector(".btn-del-card").addEventListener("click", () => {
     card.remove();
     const remaining = grid.querySelectorAll(".variant-card").length;
@@ -4560,7 +4560,7 @@ function updateQueueUI(){
 // ==========================================
 // RENDER Y GESTIÓN DE REPRODUCTORES
 // ==========================================
-function displayVideoInPlayer(slotIndex, url){
+function displayVideoInPlayer(slotIndex, url, options = {}){
   const suffix = (slotIndex === 1) ? "Seg1" : (slotIndex === 2 ? "Seg2" : "Final");
   const video = $("video" + suffix);
   const empty = $("empty" + suffix);
@@ -4571,6 +4571,7 @@ function displayVideoInPlayer(slotIndex, url){
   const btnMeta = $("btnLoadMeta" + suffix);
   const timeTag = $("time" + suffix);
   const resTag = $("res" + suffix);
+  const badge = $("badge" + suffix);
 
   if(empty) empty.style.display = "none";
   if(pImg) pImg.style.display = "none";
@@ -4586,10 +4587,18 @@ function displayVideoInPlayer(slotIndex, url){
     if(stepFin) stepFin.style.display = "none";
   }
 
+  if(badge && options.filename){
+    badge.textContent = options.filename;
+    badge.style.display = "inline-block";
+  }
+
   if(video){
-    video.src = url;
+    const videoUrl = url.includes("#") ? url : (url + "#t=0.001");
+    video.src = videoUrl;
     video.style.display = "block";
-    video.load();
+    if(options.autoplay){
+      video.play().catch(()=>{});
+    }
     video.onloadedmetadata = () => {
       if(timeTag) timeTag.textContent = `${video.duration.toFixed(1)}s`;
       if(resTag) resTag.textContent = `${video.videoWidth}x${video.videoHeight}`;
@@ -5530,9 +5539,15 @@ async function loadVideoHistory(){
       const videoEl = card.querySelector("video");
       videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
       videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0; });
-      videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url); });
+      videoEl.addEventListener("click", () => {
+        displayVideoInPlayer(3, url, { autoplay: true, filename: item.filename });
+        log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
+      });
 
-      card.querySelector(".btn-play-hist").addEventListener("click", () => { displayVideoInPlayer(3, url); });
+      card.querySelector(".btn-play-hist").addEventListener("click", () => {
+        displayVideoInPlayer(3, url, { autoplay: true, filename: item.filename });
+        log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
+      });
       card.querySelector(".btn-del-hist").addEventListener("click", async () => {
         if(!confirm(`¿Eliminar ${item.filename}?`)) return;
         try {

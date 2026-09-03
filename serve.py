@@ -1007,14 +1007,20 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 try:
                     self.send_response(e.code)
                     for k, v in e.headers.items():
-                        if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
+                        kl = k.lower()
+                        if kl not in ("transfer-encoding", "connection", "content-encoding") and not kl.startswith("access-control-"):
                             self.send_header(k, v)
                     if not self.path.split("?")[0].startswith("/view"):
                         self.send_header("Connection", "close")
                         self.close_connection = True
                     if client_origin:
                         self.send_header("Access-Control-Allow-Origin", client_origin)
-                        self.send_header("Vary", "Origin")
+                        self.send_header("Access-Control-Allow-Credentials", "true")
+                    else:
+                        self.send_header("Access-Control-Allow-Origin", "*")
+                    self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
+                    self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
+                    self.send_header("Vary", "Origin")
                     self.end_headers()
                     chunk = e.read(65536)
                     while chunk:
@@ -1042,9 +1048,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
         try:
             self.send_response(resp.status)
-            # Copy response headers (except transfer-encoding / connection)
+            # Copy response headers (except transfer-encoding / connection / access-control)
             for k, v in resp.headers.items():
-                if k.lower() not in ("transfer-encoding", "connection", "content-encoding", "access-control-allow-origin"):
+                kl = k.lower()
+                if kl not in ("transfer-encoding", "connection", "content-encoding") and not kl.startswith("access-control-"):
                     self.send_header(k, v)
             is_view = self.path.split("?")[0].startswith("/view")
             if not is_view:
@@ -1053,8 +1060,11 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 self.send_header("Connection", "keep-alive")
             
-            allowed = client_origin or "*"
-            self.send_header("Access-Control-Allow-Origin", allowed)
+            if client_origin:
+                self.send_header("Access-Control-Allow-Origin", client_origin)
+                self.send_header("Access-Control-Allow-Credentials", "true")
+            else:
+                self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
             self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
             self.send_header("Vary", "Origin")
