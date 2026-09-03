@@ -1287,7 +1287,7 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = [];
-const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MiniMax-H3-Ref2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
+const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MiniMax-H3-Ref2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MysticXXX_MMH3-V4.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
 const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors", "taeltx_2.safetensors"];
 const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_w4a8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
@@ -1471,9 +1471,17 @@ function getFriendlyRatio(w, h){
   return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
 }
 
-function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function log(msg, cls){
+  const el = $("log");
+  if(!el){ console.log(`[log] ${msg}`); return; }
+  const line = document.createElement("div");
+  if(cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
 function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
-function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+function setRun(s,t){const d=$("runDot");if(d)d.className="dot"+(s?" "+s:"");const txt=$("runText");if(txt)txt.textContent=t;}
 
 function updateServerHint(){
   const hint = $("serverHint");
@@ -1615,6 +1623,9 @@ function connectSocket() {
               return;
           }
           if(msg.type === 'progress') handleStepProgress(msg.data);
+          if(msg.type === 'executing' && CONFIG.onNodeExecuting){
+            try { CONFIG.onNodeExecuting(msg.data); } catch(e){ console.warn("onNodeExecuting error:", e); }
+          }
           if(msg.type === 'kj_preview_override'){
             if(msg.data && msg.data.image){
               const mime = msg.data.mime || "image/jpeg";
@@ -2125,6 +2136,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   if(!bodyPayload.options) bodyPayload.options = {};
   if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
   if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
+  bodyPayload.keep_alive = 0;
 
   const origPlaceholder = outputEl ? outputEl.placeholder : "";
   if(outputEl){

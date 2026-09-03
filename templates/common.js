@@ -840,6 +840,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   if(!bodyPayload.options) bodyPayload.options = {};
   if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
   if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
+  bodyPayload.keep_alive = 0;
 
   const origPlaceholder = outputEl ? outputEl.placeholder : "";
   if(outputEl){

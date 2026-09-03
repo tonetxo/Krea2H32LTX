@@ -1969,9 +1969,17 @@ function getFriendlyRatio(w, h){
   return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
 }
 
-function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function log(msg, cls){
+  const el = $("log");
+  if(!el){ console.log(`[log] ${msg}`); return; }
+  const line = document.createElement("div");
+  if(cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
 function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
-function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+function setRun(s,t){const d=$("runDot");if(d)d.className="dot"+(s?" "+s:"");const txt=$("runText");if(txt)txt.textContent=t;}
 
 function updateServerHint(){
   const hint = $("serverHint");
@@ -2113,6 +2121,9 @@ function connectSocket() {
               return;
           }
           if(msg.type === 'progress') handleStepProgress(msg.data);
+          if(msg.type === 'executing' && CONFIG.onNodeExecuting){
+            try { CONFIG.onNodeExecuting(msg.data); } catch(e){ console.warn("onNodeExecuting error:", e); }
+          }
           if(msg.type === 'kj_preview_override'){
             if(msg.data && msg.data.image){
               const mime = msg.data.mime || "image/jpeg";
@@ -2623,6 +2634,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   if(!bodyPayload.options) bodyPayload.options = {};
   if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
   if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
+  bodyPayload.keep_alive = 0;
 
   const origPlaceholder = outputEl ? outputEl.placeholder : "";
   if(outputEl){

@@ -900,7 +900,7 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b.safetensors", "jibMixKrea2_v40Habanero.safetensors", "krea2_turbo_fp8_scaled.safetensors"];
+const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "Pussy4nus_Epoch80.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b.safetensors", "jibMixKrea2_v40Habanero.safetensors", "krea2_turbo_fp8_scaled.safetensors", "polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors"];
 const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "GalKrea.safetensors", "GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
 const AVAILABLE_VAES = [];
 const AVAILABLE_UNETS = [];
@@ -1085,9 +1085,17 @@ function getFriendlyRatio(w, h){
   return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
 }
 
-function log(msg, cls){const el=$("log"),line=document.createElement("div");if(cls)line.className=cls;line.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(line);el.scrollTop=el.scrollHeight;}
+function log(msg, cls){
+  const el = $("log");
+  if(!el){ console.log(`[log] ${msg}`); return; }
+  const line = document.createElement("div");
+  if(cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
 function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
-function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+function setRun(s,t){const d=$("runDot");if(d)d.className="dot"+(s?" "+s:"");const txt=$("runText");if(txt)txt.textContent=t;}
 
 function updateServerHint(){
   const hint = $("serverHint");
@@ -1229,6 +1237,9 @@ function connectSocket() {
               return;
           }
           if(msg.type === 'progress') handleStepProgress(msg.data);
+          if(msg.type === 'executing' && CONFIG.onNodeExecuting){
+            try { CONFIG.onNodeExecuting(msg.data); } catch(e){ console.warn("onNodeExecuting error:", e); }
+          }
           if(msg.type === 'kj_preview_override'){
             if(msg.data && msg.data.image){
               const mime = msg.data.mime || "image/jpeg";
@@ -1739,6 +1750,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   if(!bodyPayload.options) bodyPayload.options = {};
   if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
   if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
+  bodyPayload.keep_alive = 0;
 
   const origPlaceholder = outputEl ? outputEl.placeholder : "";
   if(outputEl){
