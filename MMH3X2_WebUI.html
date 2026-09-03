@@ -5155,10 +5155,17 @@ function updateCalculatedResolution(origW, origH){
   if($("arDetectHint")) $("arDetectHint").textContent = `(${ar.toFixed(2)}:1 · ${w}x${h})`;
 }
 
+function calcFramesForDuration(dur){
+  let f = Math.max(5, Math.round(dur * 24));
+  while(f % 17 !== 5){
+    f++;
+  }
+  return f;
+}
+
 function updateDurationFrames(){
   const dur = parseFloat($("durationSlider")?.value || "15.0");
-  const baseFrames = Math.max(5, Math.round(dur * 24));
-  const framesPerSeg = baseFrames + ((5 - (baseFrames % 17)) % 17);
+  const framesPerSeg = calcFramesForDuration(dur);
   const totalFrames = framesPerSeg * 2;
   const totalSecs = (totalFrames / 24).toFixed(1);
 
@@ -5195,9 +5202,8 @@ function buildGraph(j){
   const dur = parseFloat((j ? j.duration : $("durationSlider")?.value) || "15.0");
   if(g[N.DURATION]?.inputs) g[N.DURATION].inputs.value = dur;
 
-  // Cálculo dinámico exacto de frames para corte y empalme (resuelve IndexError en nodo 61)
-  const baseFrames = Math.max(5, Math.round(dur * 24));
-  const framesPerSeg = baseFrames + ((5 - (baseFrames % 17)) % 17);
+  // Cálculo dinámico exacto de frames para corte y empalme (resuelve salto de frames en nodo 61)
+  const framesPerSeg = calcFramesForDuration(dur);
   if(g["61"]?.inputs){
     g["61"].inputs.indexes = Array.from({ length: framesPerSeg - 1 }, (_, i) => i).join(", ");
   }
