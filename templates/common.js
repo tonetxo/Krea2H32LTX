@@ -185,7 +185,7 @@ function log(msg, cls){
   el.scrollTop = el.scrollHeight;
 }
 function setConn(s,t){$("connDot").className="dot"+(s?" "+s:"");$("connText").textContent=t;}
-function setRun(s,t){$("runDot").className="dot"+(s?" "+s:"");$("runText").textContent=t;}
+function setRun(s,t){const d=$("runDot");if(d)d.className="dot"+(s?" "+s:"");const txt=$("runText");if(txt)txt.textContent=t;}
 
 function updateServerHint(){
   const hint = $("serverHint");

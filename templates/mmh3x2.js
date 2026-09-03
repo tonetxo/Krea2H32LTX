@@ -158,7 +158,6 @@ let mediaSlots = {
 };
 let videoSlot = { file: null, dataUrl: null, uploaded: null, name: "" };
 
-let isInitializing = true;
 let jobQueue = [];
 let activeJob = null;
 let promptVariantMap = {};
@@ -1137,14 +1136,27 @@ function clearVideoSlot(){
 }
 
 async function ensureAllMediaUploaded(){
+  let needUpload = 0;
+  for(let i = 1; i <= 4; i++){
+    const slot = mediaSlots[i];
+    if((slot.file || slot.dataUrl) && !slot.uploaded) needUpload++;
+  }
+  if(videoSlot.file && !videoSlot.uploaded) needUpload++;
+
+  if(needUpload > 0){
+    log(`📤 Subiendo ${needUpload} archivo(s) de medios a ComfyUI...`, "l-busy");
+  }
+
   for(let i = 1; i <= 4; i++){
     const slot = mediaSlots[i];
     if(slot.file && !slot.uploaded){
       slot.uploaded = await uploadSingleFile(slot.file, `mmh3x2_slot_${i}.png`);
+      dbSaveSlot("slot_" + i, { dataUrl: slot.dataUrl, name: slot.name, uploaded: slot.uploaded });
     } else if(slot.dataUrl && !slot.uploaded){
       if(slot.dataUrl.startsWith("data:")){
         const blob = dataUrlToBlob(slot.dataUrl);
         slot.uploaded = await uploadSingleFile(blob, `mmh3x2_slot_${i}.png`);
+        dbSaveSlot("slot_" + i, { dataUrl: slot.dataUrl, name: slot.name, uploaded: slot.uploaded });
       } else {
         const urlParams = new URL(slot.dataUrl, window.location.origin).searchParams;
         const fn = urlParams.get("filename") || slot.name || `mmh3x2_slot_${i}.png`;
@@ -1428,10 +1440,6 @@ function buildGraph(j){
 // EJECUCIÓN Y COLAS
 // ==========================================
 async function queueJob(runMode){
-  if(isInitializing){
-    console.warn("queueJob bloqueado durante la inicialización de la página");
-    return;
-  }
   const p1 = $("prompt")?.value?.trim();
   if(!p1){
     log("⚠️ Por favor escribe al menos el Prompt 1 (Segmento 1)", "l-warn");
@@ -1464,12 +1472,19 @@ async function queueJob(runMode){
     batchSize
   };
 
-  // Si activeJob estaba retenido pero ComfyUI no tiene ninguna tarea activa, liberar el bloqueo
-  const comfyIdle = (typeof serverQueueState !== "undefined") && serverQueueState.running === 0 && serverQueueState.pending === 0;
-  if(activeJob && (!currentPromptId || comfyIdle)){
-    console.warn("Liberando activeJob huérfano (ComfyUI está libre)");
-    activeJob = null;
-    currentPromptId = null;
+  // Consultar en vivo el estado real de ComfyUI antes de decidir encolar
+  if(activeJob){
+    try {
+      const qr = await fetch(server() + "/queue");
+      if(qr.ok){
+        const qdata = await qr.json();
+        const runningCount = Array.isArray(qdata.queue_running) ? qdata.queue_running.length : 0;
+        if(runningCount === 0){
+          activeJob = null;
+          currentPromptId = null;
+        }
+      }
+    } catch(_){}
   }
 
   if(!activeJob){
@@ -1937,5 +1952,4 @@ window.addEventListener("DOMContentLoaded", () => {
   updateDurationFrames();
   loadVideoHistory();
   updateQueueUI();
-  setTimeout(() => { isInitializing = false; }, 800);
 });
