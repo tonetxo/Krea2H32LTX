@@ -164,15 +164,111 @@ CONFIG.onNodeExecuted = function(data){
   }
 };
 
+CONFIG.onProgress = function(value, max, prompt_id, node){
+  if(!max || max <= 0) return;
+  const pct = Math.round((value / max) * 100);
+
+  // Determinar etapa actual según el nodo de ejecución o el muestreador activo
+  let activeSlot = (currentActiveSamplerSlot === 2) ? "Seg2" : "Seg1";
+  let label = (activeSlot === "Seg1") ? "Seg 1" : "Seg 2";
+
+  if(node === N.SAMPLE_1 || node === "19"){
+    activeSlot = "Seg1";
+    currentActiveSamplerSlot = 1;
+    label = "Seg 1";
+  } else if(node === N.SAMPLE_2 || node === "35"){
+    activeSlot = "Seg2";
+    currentActiveSamplerSlot = 2;
+    label = "Seg 2";
+  } else if(node === N.RIFE || node === "72"){
+    label = "RIFE";
+  }
+
+  // 1. Actualizar badge del reproductor del segmento activo
+  const b = $("previewStep" + activeSlot);
+  const t = $("previewStepText" + activeSlot);
+  const w = $("previewWrap" + activeSlot);
+  const e = $("empty" + activeSlot);
+  if(b && t){
+    t.textContent = `${label}: Paso ${value}/${max} · ${pct}%`;
+    if(w) w.style.display = "block";
+    if(e) e.style.display = "none";
+    b.style.display = "inline-flex";
+  }
+
+  // 2. Actualizar badge del reproductor final continuo
+  const bFin = $("previewStepFinal");
+  const tFin = $("previewStepTextFinal");
+  const wFin = $("previewWrapFinal");
+  const eFin = $("emptyFinal");
+  if(bFin && tFin){
+    tFin.textContent = `${label}: Paso ${value}/${max} · ${pct}%`;
+    if(wFin) wFin.style.display = "block";
+    if(eFin) eFin.style.display = "none";
+    bFin.style.display = "inline-flex";
+  }
+
+  // 3. Actualizar badge de progreso en la tarjeta de variante activa (si existe)
+  const pid = prompt_id || currentPromptId;
+  if(pid && promptVariantMap[pid]){
+    const varIdx = promptVariantMap[pid];
+    const cardBadge = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-progress-badge`);
+    if(cardBadge){
+      cardBadge.textContent = `${label}: ${value}/${max} (${pct}%)`;
+      cardBadge.style.display = "block";
+    }
+  }
+
+  // 4. Log en tiempo real
+  const logEl = $("log");
+  if(logEl){
+    logEl.textContent = `⏳ ${label}: Paso ${value}/${max} (${pct}%)`;
+    logEl.className = "log l-busy";
+  }
+};
+
+CONFIG.onNodeExecuting = function(data){
+  if(!data) return;
+  const node = typeof data === "object" ? data.node : data;
+  if(!node) return;
+
+  if(node === N.SAMPLE_1 || node === "19"){
+    currentActiveSamplerSlot = 1;
+    log("🧠 Muestreando Segmento 1...", "l-busy");
+  } else if(node === N.DECODE_VID_1 || node === "20"){
+    log("🎬 Decodificando vídeo Segmento 1...", "l-busy");
+  } else if(node === N.CREATE_VID_1 || node === "22" || node === N.SAVE_VID_1 || node === "23"){
+    log("💾 Guardando vídeo Segmento 1...", "l-busy");
+  } else if(node === N.SCALE_2S || node === "54" || node === N.INJECT_LATENT || node === "68"){
+    log("🔗 Preparando contexto y anclaje para Segmento 2...", "l-busy");
+  } else if(node === N.SAMPLE_2 || node === "35"){
+    currentActiveSamplerSlot = 2;
+    log("🧠 Muestreando Segmento 2...", "l-busy");
+  } else if(node === N.DECODE_VID_2 || node === "36"){
+    log("🎬 Decodificando vídeo Segmento 2...", "l-busy");
+  } else if(node === N.CREATE_VID_2 || node === "38" || node === N.SAVE_VID_2 || node === "39"){
+    log("💾 Guardando vídeo Segmento 2...", "l-busy");
+  } else if(node === N.BLEND || node === "66" || node === N.IMAGE_BATCH || node === "40"){
+    log("✨ Suavizando y uniendo Segmentos 1 y 2...", "l-busy");
+  } else if(node === N.RTX || node === "71"){
+    log("🚀 Aplicando RTX Video Super Resolution...", "l-busy");
+  } else if(node === N.RIFE || node === "72"){
+    log("🎞️ Interpolando frames con RIFE...", "l-busy");
+  } else if(node === N.CREATE_VID_FINAL || node === "42" || node === N.SAVE_VID_FINAL || node === "43"){
+    log("📼 Ensamblando y codificando Vídeo Final Continuo...", "l-busy");
+  }
+};
+
 CONFIG.onPreview = function(url, meta){
   const slot = (currentActiveSamplerSlot === 2) ? "Seg2" : "Seg1";
   const p = $("previewImg" + slot);
   const pv = $("previewVideo" + slot);
   const e = $("empty" + slot);
   const v = $("video" + slot);
+  const w = $("previewWrap" + slot);
   if(!p && !pv) return;
 
-  // Si Seg 1 ya terminó y tiene vídeo cargado, jamás pisarlo con previsualizaciones
+  // Si Seg 1 ya terminó y tiene vídeo cargado, no pisarlo
   if(slot === "Seg1" && v && v.src && v.style.display === "block"){
     return;
   }
@@ -184,20 +280,83 @@ CONFIG.onPreview = function(url, meta){
   target.src = url;
   target.style.display = "block";
   if(other) other.style.display = "none";
+  if(w) w.style.display = "block";
   if(e) e.style.display = "none";
   if(v && !v.src) v.style.display = "none";
   if(isVideoUrl && pv && pv.autoplay !== true){ pv.autoplay = true; pv.muted = true; pv.loop = true; }
   if(isVideoUrl && target.play) target.play().catch(()=>{});
+
+  // Actualizar también en el reproductor final si no hay vídeo terminado cargado
+  const vFin = $("videoFinal");
+  if(!vFin || !vFin.src || vFin.style.display !== "block"){
+    const pFin = $("previewImgFinal");
+    const pvFin = $("previewVideoFinal");
+    const wFin = $("previewWrapFinal");
+    const eFin = $("emptyFinal");
+    const targetFin = isVideoUrl && pvFin ? pvFin : pFin;
+    const otherFin = isVideoUrl ? pFin : pvFin;
+    if(targetFin){
+      targetFin.src = url;
+      targetFin.style.display = "block";
+      if(otherFin) otherFin.style.display = "none";
+      if(wFin) wFin.style.display = "block";
+      if(eFin) eFin.style.display = "none";
+      if(isVideoUrl && targetFin.play) targetFin.play().catch(()=>{});
+    }
+  }
+
+  // Actualizar miniatura en vivo en la tarjeta de variante activa
+  const pid = meta?.promptId || currentPromptId;
+  if(pid && promptVariantMap[pid]){
+    const varIdx = promptVariantMap[pid];
+    const liveThumb = document.querySelector(`.variant-card[data-variant-index="${varIdx}"] .variant-live-thumb`);
+    if(liveThumb && !isVideoUrl){
+      liveThumb.src = url;
+      liveThumb.style.opacity = "1";
+    }
+  }
 };
 
 CONFIG.onClearPreview = function(){
-  ["Seg1", "Seg2"].forEach(slot => {
+  ["Final", "Seg1", "Seg2"].forEach(slot => {
     const p = $("previewImg" + slot);
     const pv = $("previewVideo" + slot);
+    const w = $("previewWrap" + slot);
+    const b = $("previewStep" + slot);
     if(p){ p.style.display = "none"; p.removeAttribute("src"); }
     if(pv){ pv.pause(); pv.style.display = "none"; pv.removeAttribute("src"); pv.load(); }
+    if(w) w.style.display = "none";
+    if(b) b.style.display = "none";
   });
 };
+
+function createGeneratingCard(varIdx, seedUsed){
+  const box = $("variantGalleryBox");
+  const grid = $("variantGrid");
+  if(!box || !grid) return;
+  box.style.display = "block";
+
+  let card = grid.querySelector(`.variant-card[data-variant-index="${varIdx}"]`);
+  if(!card){
+    card = document.createElement("div");
+    card.className = "variant-card variant-card-generating";
+    card.dataset.variantIndex = String(varIdx);
+    card.innerHTML = `
+      <span class="variant-badge">Var ${varIdx} · procesando...</span>
+      <span class="variant-progress-badge" style="display:none;"></span>
+      <div class="thumb-wrap" style="position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;">
+        <img class="variant-live-thumb" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:0.4;transition:opacity 0.2s;">
+      </div>
+      <div class="variant-info" style="padding:6px;background:var(--panel);">
+        <span class="variant-seed-display" title="Semilla" style="font-size:10px;font-family:var(--mono);color:var(--muted);">Seed: ${seedUsed}</span>
+        <span class="variant-time" style="font-size:10px;color:var(--accent);margin-left:auto;">⏳ En curso...</span>
+      </div>
+    `;
+    grid.insertBefore(card, grid.firstChild);
+    const remaining = grid.querySelectorAll(".variant-card").length;
+    if($("variantCount")) $("variantCount").textContent = `(${remaining})`;
+  }
+}
 
 CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
   const gallery = $("variantGalleryBox");
@@ -205,11 +364,12 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
   if(!gallery || !grid) return;
   gallery.style.display = "block";
 
-  const countBadge = $("variantCount");
-  const totalCards = grid.querySelectorAll(".variant-card").length + 1;
-  if(countBadge) countBadge.textContent = `(${totalCards})`;
-
-  const card = document.createElement("div");
+  let card = grid.querySelector(`.variant-card[data-variant-index="${varIdx}"]`);
+  if(!card){
+    card = document.createElement("div");
+    card.dataset.variantIndex = String(varIdx);
+    grid.insertBefore(card, grid.firstChild);
+  }
   card.className = "variant-card";
   card.innerHTML = `
     <div class="thumb-wrap">
@@ -217,10 +377,14 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
       <span class="variant-badge">Var ${varIdx} · Seed ${seed}</span>
     </div>
     <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
-      <button class="ghost btn-mini btn-load-card" title="Cargar en reproductor principal">▶ Cargar</button>
-      <button class="ghost btn-mini btn-del-card" title="Quitar de galería">✕</button>
+      <button type="button" class="ghost btn-mini btn-load-card" title="Cargar en reproductor principal">▶ Cargar</button>
+      <button type="button" class="ghost btn-mini btn-del-card" title="Quitar de galería">✕</button>
     </div>
   `;
+
+  const countBadge = $("variantCount");
+  const totalCards = grid.querySelectorAll(".variant-card").length;
+  if(countBadge) countBadge.textContent = `(${totalCards})`;
 
   const videoEl = card.querySelector("video");
   videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
@@ -234,8 +398,6 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
     if(countBadge) countBadge.textContent = remaining > 0 ? `(${remaining})` : "";
     if(remaining === 0) gallery.style.display = "none";
   });
-
-  grid.insertBefore(card, grid.firstChild);
 };
 
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings){
@@ -401,6 +563,16 @@ function displayVideoInPlayer(slotIndex, url){
   if(empty) empty.style.display = "none";
   if(pImg) pImg.style.display = "none";
   if(pVid){ pVid.pause(); pVid.style.display = "none"; }
+  const wrap = $("previewWrap" + suffix);
+  const step = $("previewStep" + suffix);
+  if(wrap) wrap.style.display = "none";
+  if(step) step.style.display = "none";
+  if(slotIndex === 3){
+    const wrapFin = $("previewWrapFinal");
+    const stepFin = $("previewStepFinal");
+    if(wrapFin) wrapFin.style.display = "none";
+    if(stepFin) stepFin.style.display = "none";
+  }
 
   if(video){
     video.src = url;
@@ -1267,6 +1439,7 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
     promptVariantMap[data.prompt_id] = varIdx;
     currentPromptId = data.prompt_id;
     promptSteps[data.prompt_id] = "1";
+    createGeneratingCard(varIdx, seedUsed);
     startTimer(data.prompt_id, "Final");
     pollFallback(data.prompt_id);
   } catch(e){
