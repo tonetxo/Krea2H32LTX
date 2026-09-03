@@ -4394,8 +4394,13 @@ CONFIG.addToVariantGallery = function(url, seed, varIdx, promptText){
   if(countBadge) countBadge.textContent = `(${totalCards})`;
 
   const videoEl = card.querySelector("video");
+  videoEl.addEventListener("loadeddata", () => {
+    if(videoEl.currentTime === 0){
+      videoEl.currentTime = 0.001;
+    }
+  }, { once: true });
   videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
-  videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0; });
+  videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0.001; });
   videoEl.addEventListener("click", () => { displayVideoInPlayer(3, url, { autoplay: true, filename: `Var ${varIdx}` }); });
 
   card.querySelector(".btn-load-card").addEventListener("click", () => { displayVideoInPlayer(3, url, { autoplay: true, filename: `Var ${varIdx}` }); });
@@ -5537,8 +5542,13 @@ async function loadVideoHistory(){
       `;
 
       const videoEl = card.querySelector("video");
+      videoEl.addEventListener("loadeddata", () => {
+        if(videoEl.currentTime === 0){
+          videoEl.currentTime = 0.001;
+        }
+      }, { once: true });
       videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
-      videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0; });
+      videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0.001; });
       videoEl.addEventListener("click", () => {
         displayVideoInPlayer(3, url, { autoplay: true, filename: item.filename });
         log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");

@@ -53,7 +53,7 @@ BACKEND = get_backend()
 OLLAMA = "http://127.0.0.1:11434"
 
 # Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/mmh3x2_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess", "/api/prompts")
+CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/mmh3x2_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess", "/api/prompts", "/view")
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
@@ -104,7 +104,7 @@ ALLOWED_DELETE_DIRS = (
 )
 
 # Routes that should be proxied to the backend instead of served as files.
-PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/view", "/upload/image", "/queue", "/interrupt")
+PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt")
 OLLAMA_PREFIXES = ("/api",)
 WS_PREFIX = "/ws"
 
@@ -322,6 +322,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def do_HEAD(self):
         if self._is_ws():
             self._ws_proxy()
+        elif self._is_view_route():
+            self._do_view("HEAD")
         elif self._is_ollama_route():
             self._proxy("HEAD", OLLAMA)
         elif self._is_proxy_route():
@@ -330,6 +332,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             super().do_HEAD()
 
     # ---- helpers ----
+    def _is_view_route(self):
+        path = self.path.split("?")[0]
+        return path == "/view"
+
     def _is_proxy_route(self):
         path = self.path.split("?")[0]
         return any(path.startswith(p) for p in PROXY_PREFIXES)
@@ -637,6 +643,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         if self._is_ws():
             self._ws_proxy()
+        elif self._is_view_route():
+            self._do_view("GET")
         elif self._is_krea2_list():
             self._do_krea2_list()
         elif self._is_ltxv_list():
@@ -845,6 +853,135 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             "count": len(items),
             "items": items,
         }
+
+    def _do_view(self, method="GET"):
+        """Serve media files directly from ComfyUI output/temp/input directories with Range support,
+        falling back to proxying to ComfyUI if not found on local disk."""
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        filename = qs.get("filename", [""])[0]
+        subfolder = qs.get("subfolder", [""])[0]
+        ftype = qs.get("type", ["output"])[0]
+
+        if not filename or ".." in filename or "/" in filename or "\\" in filename:
+            self._proxy(method, get_backend())
+            return
+        if ".." in subfolder:
+            self._proxy(method, get_backend())
+            return
+        if ftype not in ("output", "temp", "input"):
+            self._proxy(method, get_backend())
+            return
+
+        base = os.path.join(COMFYUI_ROOT, ftype)
+        if subfolder:
+            base = os.path.join(base, subfolder)
+        target = os.path.realpath(os.path.join(base, filename))
+
+        comfy_root_real = os.path.realpath(COMFYUI_ROOT)
+        if not (target.startswith(comfy_root_real + os.sep) or target == comfy_root_real) or not os.path.isfile(target):
+            self._proxy(method, get_backend())
+            return
+
+        try:
+            total_size = os.path.getsize(target)
+        except OSError:
+            self._proxy(method, get_backend())
+            return
+
+        ext = os.path.splitext(target)[1].lower()
+        content_types = {
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+            ".mkv": "video/x-matroska",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+            ".gif": "image/gif",
+            ".json": "application/json",
+            ".wav": "audio/wav",
+            ".mp3": "audio/mpeg",
+        }
+        content_type = content_types.get(ext, "application/octet-stream")
+
+        client_origin = self._allowed_origin()
+        range_header = self.headers.get("Range")
+
+        if range_header and range_header.startswith("bytes="):
+            try:
+                ranges = range_header[6:].split("-")
+                start = int(ranges[0]) if ranges[0] else 0
+                end = int(ranges[1]) if len(ranges) > 1 and ranges[1] else total_size - 1
+                if start >= total_size:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{total_size}")
+                    self.end_headers()
+                    return
+                end = min(end, total_size - 1)
+                length = end - start + 1
+
+                self.send_response(206)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Range", f"bytes {start}-{end}/{total_size}")
+                self.send_header("Content-Length", str(length))
+                self.send_header("Accept-Ranges", "bytes")
+                if client_origin:
+                    self.send_header("Access-Control-Allow-Origin", client_origin)
+                    self.send_header("Access-Control-Allow-Credentials", "true")
+                else:
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
+                self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
+                self.send_header("Vary", "Origin")
+                self.send_header("Connection", "keep-alive")
+                self.end_headers()
+
+                if method == "HEAD":
+                    return
+
+                with open(target, "rb") as f:
+                    f.seek(start)
+                    remaining = length
+                    while remaining > 0:
+                        chunk = f.read(min(remaining, 65536))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        remaining -= len(chunk)
+            except (ConnectionResetError, BrokenPipeError):
+                return
+            except OSError:
+                return
+        else:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(total_size))
+            self.send_header("Accept-Ranges", "bytes")
+            if client_origin:
+                self.send_header("Access-Control-Allow-Origin", client_origin)
+                self.send_header("Access-Control-Allow-Credentials", "true")
+            else:
+                self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
+            self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
+            self.send_header("Vary", "Origin")
+            self.send_header("Connection", "keep-alive")
+            self.end_headers()
+
+            if method == "HEAD":
+                return
+
+            try:
+                with open(target, "rb") as f:
+                    chunk = f.read(65536)
+                    while chunk:
+                        self.wfile.write(chunk)
+                        chunk = f.read(65536)
+            except (ConnectionResetError, BrokenPipeError):
+                return
+            except OSError:
+                return
 
     def _do_file_delete(self):
         """Delete a file inside ComfyUI's output/ or temp/. Validates path and origin."""
