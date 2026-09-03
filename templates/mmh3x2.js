@@ -1740,7 +1740,7 @@ function buildGraph(j){
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
   if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
-    [N.OLLAMA_CONN, "52", N.OLLAMA_CHAT_1, "54", N.OLLAMA_CHAT_2, "86"].forEach(id => { delete g[id]; });
+    [N.OLLAMA_CONN, "52", N.OLLAMA_CHAT_1, N.OLLAMA_CHAT_2, "57", "59", "86"].forEach(id => { delete g[id]; });
   } else if(seg2Mode === "ollama" && g[N.OLLAMA_CONN]?.inputs){
     const ollamaModel = $("enhancerModel")?.value;
     if(ollamaModel){
