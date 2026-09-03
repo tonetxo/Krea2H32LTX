@@ -3123,12 +3123,12 @@ async function imageToResizedBase64(srcUrl, maxSide){
 }
 
 function mediaViewUrl(media, extra){
-  const ts = extra && extra.ts != null ? extra.ts : Date.now();
+  if(!media) return "";
   const anchor = extra && extra.anchor ? extra.anchor : "";
   const f = encodeURIComponent(media.filename || "");
   const s = encodeURIComponent(media.subfolder || "");
   const t = encodeURIComponent(media.type || "output");
-  return `${server()}/view?filename=${f}&subfolder=${s}&type=${t}&t=${ts}${anchor}`;
+  return `/view?filename=${f}&subfolder=${s}&type=${t}${anchor}`;
 }
 
 async function copySeedToClipboard(seedSpan, seedValue){

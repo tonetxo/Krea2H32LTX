@@ -3357,12 +3357,12 @@ async function imageToResizedBase64(srcUrl, maxSide){
 }
 
 function mediaViewUrl(media, extra){
-  const ts = extra && extra.ts != null ? extra.ts : Date.now();
+  if(!media) return "";
   const anchor = extra && extra.anchor ? extra.anchor : "";
   const f = encodeURIComponent(media.filename || "");
   const s = encodeURIComponent(media.subfolder || "");
   const t = encodeURIComponent(media.type || "output");
-  return `${server()}/view?filename=${f}&subfolder=${s}&type=${t}&t=${ts}${anchor}`;
+  return `/view?filename=${f}&subfolder=${s}&type=${t}${anchor}`;
 }
 
 async function copySeedToClipboard(seedSpan, seedValue){
@@ -5785,6 +5785,9 @@ function finishCurrentJob(){
 // ==========================================
 // HISTORIAL DE VÍDEOS (/api/mmh3x2_list)
 // ==========================================
+let _allHistoryItems = [];
+let _visibleHistoryCount = 30;
+
 async function loadVideoHistory(){
   const grid = $("videoHistoryGrid");
   const countBadge = $("historyCountBadge");
@@ -5794,94 +5797,115 @@ async function loadVideoHistory(){
     const r = await fetch("/api/mmh3x2_list");
     if(!r.ok) return;
     const data = await r.json();
-    const items = data.items || [];
-    if(countBadge) countBadge.textContent = `(${items.length})`;
-    grid.innerHTML = "";
+    _allHistoryItems = data.items || [];
+    if(countBadge) countBadge.textContent = `(${_allHistoryItems.length})`;
 
-    if(items.length === 0){
+    if(_allHistoryItems.length === 0){
       grid.innerHTML = '<div class="hint" style="padding:12px;text-align:center;">No hay vídeos generados aún.</div>';
       return;
     }
 
-    items.forEach(item => {
-      const url = mediaViewUrl(item, { anchor: "#t=0.001" });
-      const cleanUrl = mediaViewUrl(item);
-      const card = document.createElement("div");
-      card.className = "variant-card";
-      card.innerHTML = `
-        <div class="thumb-wrap">
-          <video src="${url}" preload="metadata" muted playsinline loop style="width:100%;height:auto;max-height:220px;object-fit:contain;cursor:pointer;"></video>
-          <span class="variant-badge" style="font-size:9.5px;">${item.filename}</span>
-        </div>
-        <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
-          <button type="button" class="ghost btn-mini btn-play-hist" title="Ver en reproductor">▶ Ver</button>
-          <button type="button" class="ghost btn-mini btn-meta-hist" title="Restaurar workflow">📋</button>
-          <a class="ghost btn-mini" href="${cleanUrl}" download="${item.filename}" title="Descargar">⬇</a>
-          <button type="button" class="ghost btn-mini btn-del-hist" title="Eliminar archivo">✕</button>
-        </div>
-      `;
-
-      const videoEl = card.querySelector("video");
-      videoEl.addEventListener("loadeddata", () => {
-        if(videoEl.currentTime === 0){
-          videoEl.currentTime = 0.001;
-        }
-      }, { once: true });
-      videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
-      videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0.001; });
-      videoEl.addEventListener("click", () => {
-        displayVideoInPlayer(3, item, { autoplay: true });
-        log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
-      });
-
-      card.querySelector(".btn-play-hist").addEventListener("click", () => {
-        displayVideoInPlayer(3, item, { autoplay: true });
-        log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
-      });
-      card.querySelector(".btn-meta-hist").addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const btn = e.currentTarget;
-        btn.disabled = true;
-        const orig = btn.textContent;
-        btn.textContent = "⏳";
-        try {
-          const wf = await extractWorkflowFromMP4(cleanUrl);
-          if(wf){
-            applyWorkflow(wf);
-            log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
-          } else {
-            log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
-          }
-        } catch(err){
-          log("❌ Error leyendo workflow: " + err.message, "l-err");
-        } finally {
-          btn.disabled = false;
-          btn.textContent = orig;
-        }
-      });
-      card.querySelector(".btn-del-hist").addEventListener("click", async () => {
-        if(!confirm(`¿Eliminar ${item.filename}?`)) return;
-        try {
-          await fetch("/api/file_delete", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              filename: item.filename,
-              subfolder: item.subfolder,
-              type: item.type || "output"
-            })
-          });
-          card.remove();
-          loadVideoHistory();
-        } catch(err){
-          log(`Error eliminando archivo: ${err.message}`, "l-err");
-        }
-      });
-
-      grid.appendChild(card);
-    });
+    _visibleHistoryCount = 30;
+    renderHistoryBatch();
   } catch(e){
     console.error("Error cargando historial de vídeos:", e);
+  }
+}
+
+function renderHistoryBatch(){
+  const grid = $("videoHistoryGrid");
+  if(!grid) return;
+  grid.innerHTML = "";
+
+  const items = _allHistoryItems.slice(0, _visibleHistoryCount);
+
+  items.forEach(item => {
+    const url = mediaViewUrl(item, { anchor: "#t=0.001" });
+    const cleanUrl = mediaViewUrl(item);
+    const card = document.createElement("div");
+    card.className = "variant-card";
+    card.innerHTML = `
+      <div class="thumb-wrap">
+        <video src="${url}" crossorigin="anonymous" preload="metadata" muted playsinline loop style="width:100%;height:auto;max-height:220px;object-fit:contain;cursor:pointer;"></video>
+        <span class="variant-badge" style="font-size:9.5px;">${item.filename}</span>
+      </div>
+      <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
+        <button type="button" class="ghost btn-mini btn-play-hist" title="Ver en reproductor">▶ Ver</button>
+        <button type="button" class="ghost btn-mini btn-meta-hist" title="Restaurar workflow">📋</button>
+        <a class="ghost btn-mini" href="${cleanUrl}" download="${item.filename}" title="Descargar">⬇</a>
+        <button type="button" class="ghost btn-mini btn-del-hist" title="Eliminar archivo">✕</button>
+      </div>
+    `;
+
+    const videoEl = card.querySelector("video");
+    videoEl.addEventListener("loadeddata", () => {
+      if(videoEl.currentTime === 0){
+        videoEl.currentTime = 0.001;
+      }
+    }, { once: true });
+    videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
+    videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0.001; });
+    videoEl.addEventListener("click", () => {
+      displayVideoInPlayer(3, item, { autoplay: true });
+      log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
+    });
+
+    card.querySelector(".btn-play-hist").addEventListener("click", () => {
+      displayVideoInPlayer(3, item, { autoplay: true });
+      log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
+    });
+    card.querySelector(".btn-meta-hist").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = "⏳";
+      try {
+        const wf = await extractWorkflowFromMP4(cleanUrl);
+        if(wf){
+          applyWorkflow(wf);
+          log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
+        } else {
+          log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
+        }
+      } catch(err){
+        log("❌ Error leyendo workflow: " + err.message, "l-err");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+      }
+    });
+    card.querySelector(".btn-del-hist").addEventListener("click", async () => {
+      if(!confirm(`¿Eliminar ${item.filename}?`)) return;
+      try {
+        await fetch("/api/file_delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename: item.filename,
+            subfolder: item.subfolder,
+            type: item.type || "output"
+          })
+        });
+        card.remove();
+        loadVideoHistory();
+      } catch(err){
+        log(`Error eliminando archivo: ${err.message}`, "l-err");
+      }
+    });
+
+    grid.appendChild(card);
+  });
+
+  if(_allHistoryItems.length > _visibleHistoryCount){
+    const moreWrap = document.createElement("div");
+    moreWrap.style.cssText = "grid-column: 1 / -1; text-align: center; padding: 10px;";
+    moreWrap.innerHTML = `<button type="button" class="ghost" style="font-size:11px;">Cargar más vídeos (${_visibleHistoryCount} de ${_allHistoryItems.length})...</button>`;
+    moreWrap.querySelector("button").addEventListener("click", () => {
+      _visibleHistoryCount += 30;
+      renderHistoryBatch();
+    });
+    grid.appendChild(moreWrap);
   }
 }
 
