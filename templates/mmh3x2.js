@@ -1861,7 +1861,7 @@ async function loadVideoHistory(){
   if(!grid) return;
 
   try {
-    const r = await fetch(server() + "/api/mmh3x2_list");
+    const r = await fetch("/api/mmh3x2_list");
     if(!r.ok) return;
     const data = await r.json();
     const items = data.items || [];
@@ -1874,19 +1874,20 @@ async function loadVideoHistory(){
     }
 
     items.forEach(item => {
-      const url = server() + `/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
+      const url = mediaViewUrl(item, { anchor: "#t=0.001" });
+      const cleanUrl = mediaViewUrl(item);
       const card = document.createElement("div");
       card.className = "variant-card";
       card.innerHTML = `
         <div class="thumb-wrap">
-          <video src="${url}#t=0.001" preload="metadata" muted playsinline loop style="width:100%;height:auto;max-height:220px;object-fit:contain;cursor:pointer;"></video>
+          <video src="${url}" preload="metadata" muted playsinline loop style="width:100%;height:auto;max-height:220px;object-fit:contain;cursor:pointer;"></video>
           <span class="variant-badge" style="font-size:9.5px;">${item.filename}</span>
         </div>
         <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
-          <button class="ghost btn-mini btn-play-hist" title="Ver en reproductor">▶ Ver</button>
-          <button class="ghost btn-mini btn-meta-hist" title="Restaurar workflow">📋</button>
-          <a class="ghost btn-mini" href="${url}" download="${item.filename}" title="Descargar">⬇</a>
-          <button class="ghost btn-mini btn-del-hist" title="Eliminar archivo">✕</button>
+          <button type="button" class="ghost btn-mini btn-play-hist" title="Ver en reproductor">▶ Ver</button>
+          <button type="button" class="ghost btn-mini btn-meta-hist" title="Restaurar workflow">📋</button>
+          <a class="ghost btn-mini" href="${cleanUrl}" download="${item.filename}" title="Descargar">⬇</a>
+          <button type="button" class="ghost btn-mini btn-del-hist" title="Eliminar archivo">✕</button>
         </div>
       `;
 
@@ -1899,12 +1900,12 @@ async function loadVideoHistory(){
       videoEl.addEventListener("mouseenter", () => { videoEl.play().catch(()=>{}); });
       videoEl.addEventListener("mouseleave", () => { videoEl.pause(); videoEl.currentTime = 0.001; });
       videoEl.addEventListener("click", () => {
-        displayVideoInPlayer(3, url, { autoplay: true, filename: item.filename });
+        displayVideoInPlayer(3, item, { autoplay: true });
         log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
       });
 
       card.querySelector(".btn-play-hist").addEventListener("click", () => {
-        displayVideoInPlayer(3, url, { autoplay: true, filename: item.filename });
+        displayVideoInPlayer(3, item, { autoplay: true });
         log("▶ Reproduciendo en reproductor final: " + item.filename, "l-ok");
       });
       card.querySelector(".btn-meta-hist").addEventListener("click", async (e) => {
@@ -1914,7 +1915,7 @@ async function loadVideoHistory(){
         const orig = btn.textContent;
         btn.textContent = "⏳";
         try {
-          const wf = await extractWorkflowFromMP4(url);
+          const wf = await extractWorkflowFromMP4(cleanUrl);
           if(wf){
             applyWorkflow(wf);
             log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
@@ -1931,7 +1932,15 @@ async function loadVideoHistory(){
       card.querySelector(".btn-del-hist").addEventListener("click", async () => {
         if(!confirm(`¿Eliminar ${item.filename}?`)) return;
         try {
-          await fetch(server() + `/api/file_delete?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`, { method: "POST" });
+          await fetch("/api/file_delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              filename: item.filename,
+              subfolder: item.subfolder,
+              type: item.type || "output"
+            })
+          });
           card.remove();
           loadVideoHistory();
         } catch(err){
@@ -1942,7 +1951,7 @@ async function loadVideoHistory(){
       grid.appendChild(card);
     });
   } catch(e){
-    // Silencioso si falla la carga
+    console.error("Error cargando historial de vídeos:", e);
   }
 }
 
@@ -2063,7 +2072,12 @@ window.addEventListener("DOMContentLoaded", () => {
       el.addEventListener("click", () => {
         const body = $(id.replace("Toggle", "Body"));
         el.classList.toggle("open");
-        if(body) body.classList.toggle("open");
+        if(body){
+          body.classList.toggle("open");
+          if(id === "videoHistoryToggle" && body.classList.contains("open")){
+            loadVideoHistory();
+          }
+        }
       });
     }
   });
