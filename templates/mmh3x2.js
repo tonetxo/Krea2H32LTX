@@ -194,52 +194,53 @@ CONFIG.showMedia = function(url, meta){
   }
 };
 
-CONFIG.onNodeExecuting = function(data){
-  if(!data) return;
-  const nid = String(data.node);
-  // Conmutar a slot Seg 2 tan pronto como empiece la inferencia del Segmento 2
-  if(nid === N.SAMPLE_2 || nid === N.REF2V_SEG2 || nid === N.DECODE_VID_2 || nid === N.CREATE_VID_2){
-    currentActiveSamplerSlot = 2;
-  }
-};
-
 CONFIG.onNodeExecuted = function(data){
   if(!data) return;
   const nid = String(data.node);
-  if(nid === N.SAMPLE_1 || nid === N.SAVE_VID_1){
+  if(nid === String(N.SAMPLE_1) || nid === String(N.SAVE_VID_1) || nid === "19" || nid === "23"){
     currentActiveSamplerSlot = 2;
   }
-  if(nid === N.SAVE_VID_1 && data.output){
+  if((nid === String(N.SAVE_VID_1) || nid === "23") && data.output){
     const m1 = CONFIG.findMedia(data.output);
-    if(m1) displayVideoInPlayer(1, m1);
+    if(m1){
+      displayVideoInPlayer(1, m1);
+      log("✅ Vídeo Segmento 1 generado y cargado en reproductor 1", "l-ok");
+    }
   }
-  if(nid === N.SAVE_VID_2 && data.output){
+  if((nid === String(N.SAVE_VID_2) || nid === "39") && data.output){
     const m2 = CONFIG.findMedia(data.output);
-    if(m2) displayVideoInPlayer(2, m2);
+    if(m2){
+      displayVideoInPlayer(2, m2);
+      log("✅ Vídeo Segmento 2 generado y cargado en reproductor 2", "l-ok");
+    }
   }
-  if(nid === N.SAVE_VID_FINAL && data.output){
+  if((nid === String(N.SAVE_VID_FINAL) || nid === "43") && data.output){
     const mf = CONFIG.findMedia(data.output);
-    if(mf) displayVideoInPlayer(3, mf);
+    if(mf){
+      displayVideoInPlayer(3, mf);
+      log("✅ Vídeo Final Continuo listo y cargado en reproductor principal", "l-ok");
+    }
   }
 };
 
 CONFIG.onProgress = function(value, max, prompt_id, node){
   if(!max || max <= 0) return;
   const pct = Math.round((value / max) * 100);
+  const nid = node ? String(node) : "";
 
   // Determinar etapa actual según el nodo de ejecución o el muestreador activo
   let activeSlot = (currentActiveSamplerSlot === 2) ? "Seg2" : "Seg1";
   let label = (activeSlot === "Seg1") ? "Seg 1" : "Seg 2";
 
-  if(node === N.SAMPLE_1 || node === "19"){
+  if(nid === String(N.SAMPLE_1) || nid === "19"){
     activeSlot = "Seg1";
     currentActiveSamplerSlot = 1;
     label = "Seg 1";
-  } else if(node === N.SAMPLE_2 || node === "35"){
+  } else if(nid === String(N.SAMPLE_2) || nid === "35"){
     activeSlot = "Seg2";
     currentActiveSamplerSlot = 2;
     label = "Seg 2";
-  } else if(node === N.RIFE || node === "72"){
+  } else if(nid === String(N.RIFE) || nid === "72"){
     label = "RIFE";
   }
 
@@ -288,33 +289,56 @@ CONFIG.onProgress = function(value, max, prompt_id, node){
 
 CONFIG.onNodeExecuting = function(data){
   if(!data) return;
-  const node = typeof data === "object" ? data.node : data;
+  const node = typeof data === "object" ? String(data.node || "") : String(data);
   if(!node) return;
 
-  if(node === N.SAMPLE_1 || node === "19"){
+  if(node === String(N.SAMPLE_1) || node === "19"){
     currentActiveSamplerSlot = 1;
     log("🧠 Muestreando Segmento 1...", "l-busy");
-  } else if(node === N.DECODE_VID_1 || node === "20"){
+  } else if(node === String(N.DECODE_VID_1) || node === "20"){
     log("🎬 Decodificando vídeo Segmento 1...", "l-busy");
-  } else if(node === N.CREATE_VID_1 || node === "22" || node === N.SAVE_VID_1 || node === "23"){
+  } else if(node === String(N.CREATE_VID_1) || node === "22" || node === String(N.SAVE_VID_1) || node === "23"){
     log("💾 Guardando vídeo Segmento 1...", "l-busy");
-  } else if(node === N.SCALE_2S || node === "54" || node === N.INJECT_LATENT || node === "68"){
-    log("🔗 Preparando contexto y anclaje para Segmento 2...", "l-busy");
-  } else if(node === N.SAMPLE_2 || node === "35"){
+  } else if(node === "25" || node === "26" || node === "28" || node === "29"){
+    log("🎞️ Extrayendo fotogramas de anclaje de Seg 1...", "l-busy");
+  } else if(node === "54" || node === "57"){
+    log("🔍 Muestreando fotogramas para visión...", "l-busy");
+  } else if(node === "51" || node === "53" || node === "55" || node === "59"){
+    log("🤖 Ollama: Analizando visión y redactando continuidad para Seg 2...", "l-busy");
+    const t2 = $("previewStepTextSeg2");
+    const b2 = $("previewStepSeg2");
+    const w2 = $("previewWrapSeg2");
+    if(t2 && b2 && w2){
+      t2.textContent = "Seg 2: Ollama (visión + fusión)...";
+      w2.style.display = "block";
+      b2.style.display = "inline-flex";
+    }
+    const tFin = $("previewStepTextFinal");
+    if(tFin) tFin.textContent = "Ollama: procesando continuidad...";
+  } else if(node === String(N.REF2V_SEG2) || node === "30" || node === String(N.INJECT_LATENT) || node === "68" || node === String(N.ADD_GUIDE) || node === "70" || node === "32"){
+    currentActiveSamplerSlot = 2;
+    log("🔗 Inicializando Segmento 2 (anclando último frame)...", "l-busy");
+    const t2 = $("previewStepTextSeg2");
+    if(t2) t2.textContent = "Seg 2: Inicializando...";
+  } else if(node === String(N.SAMPLE_2) || node === "35"){
     currentActiveSamplerSlot = 2;
     log("🧠 Muestreando Segmento 2...", "l-busy");
-  } else if(node === N.DECODE_VID_2 || node === "36"){
+  } else if(node === String(N.DECODE_VID_2) || node === "36"){
     log("🎬 Decodificando vídeo Segmento 2...", "l-busy");
-  } else if(node === N.CREATE_VID_2 || node === "38" || node === N.SAVE_VID_2 || node === "39"){
+  } else if(node === String(N.CREATE_VID_2) || node === "38" || node === String(N.SAVE_VID_2) || node === "39"){
     log("💾 Guardando vídeo Segmento 2...", "l-busy");
-  } else if(node === N.BLEND || node === "66" || node === N.IMAGE_BATCH || node === "40"){
-    log("✨ Suavizando y uniendo Segmentos 1 y 2...", "l-busy");
-  } else if(node === N.RTX || node === "71"){
-    log("🚀 Aplicando RTX Video Super Resolution...", "l-busy");
-  } else if(node === N.RIFE || node === "72"){
-    log("🎞️ Interpolando frames con RIFE...", "l-busy");
-  } else if(node === N.CREATE_VID_FINAL || node === "42" || node === N.SAVE_VID_FINAL || node === "43"){
-    log("📼 Ensamblando y codificando Vídeo Final Continuo...", "l-busy");
+  } else if(node === String(N.BLEND) || node === "66" || node === String(N.IMAGE_BATCH) || node === "40"){
+    log("✨ Suavizando empalme y uniendo Segmentos 1 y 2...", "l-busy");
+  } else if(node === String(N.RTX) || node === "71"){
+    log("🚀 Aplicando RTX Video Super Resolution (2x)...", "l-busy");
+    const tFin = $("previewStepTextFinal");
+    if(tFin) tFin.textContent = "RTX Super Resolution...";
+  } else if(node === String(N.RIFE) || node === "72"){
+    log("⚡ Interpolando fotogramas con RIFE...", "l-busy");
+    const tFin = $("previewStepTextFinal");
+    if(tFin) tFin.textContent = "RIFE: Interpolando...";
+  } else if(node === String(N.CREATE_VID_FINAL) || node === "42" || node === String(N.SAVE_VID_FINAL) || node === "43"){
+    log("💾 Ensamblando y codificando Vídeo Final Continuo...", "l-busy");
   }
 };
 
