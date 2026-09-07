@@ -466,7 +466,6 @@ async function handlePromptDone(promptId) {
     handledPrompts.add(promptId);
     processingPrompts.delete(promptId);
     delete pendingSeeds[promptId];
-    variantCounter++;
     currentBatchIndex++;
     processNextBatch();
 }

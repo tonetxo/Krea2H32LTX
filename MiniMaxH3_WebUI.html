@@ -1842,7 +1842,6 @@ async function handlePromptDone(promptId) {
     handledPrompts.add(promptId);
     processingPrompts.delete(promptId);
     delete pendingSeeds[promptId];
-    variantCounter++;
     currentBatchIndex++;
     processNextBatch();
 }
@@ -4290,7 +4289,7 @@ CONFIG.onStopAll = function(){
 
 // --- displayResult: un solo save node ---
 // Delegamos el control de batches a common.js (processNextBatch/onBatchComplete).
-// Solo mostramos el resultado y devolvemos true para que common.js siga.
+// Solo mostramos el resultado y devolvemos false para que common.js avance el batch.
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings){
   const media = entry.outputs[N.SAVE] ? CONFIG.findMedia(entry.outputs[N.SAVE]) : null;
   const t1 = timings && timings.t1;
@@ -4315,7 +4314,7 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
   handledPrompts.add(promptId);
 
   // No tocar currentBatchIndex ni llamar a runSingleGeneration aquí.
-  // Devolvemos false para que common.js avance el batch (processNextBatch).
+  // false indica a common.js que debe avanzar el batch (processNextBatch).
   return false;
 };
 
@@ -6765,6 +6764,7 @@ async function startJob(job){
     await ensureJobImagesUploaded(job);
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;
+    variantCounter = 0;
     batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
     window.currentBatchMode = false;
     job.currentVariantIndex = null;
@@ -6856,7 +6856,7 @@ $("btnEnhance").addEventListener("click", async () => {
   if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
   const payload = { model, system, prompt: userPrompt || "Describe this image.", stream: false, options: { num_ctx: 8192 } };
-  if(mode === "vision"){
+    if(mode === "vision"){
     // Modo r2v: enviamos hasta 6 imágenes de referencia
     if(currentMode === "r2v"){
       const imgs = refImages.filter(r => r.local).slice(0, 6).map(r => r.local);
@@ -6867,14 +6867,15 @@ $("btnEnhance").addEventListener("click", async () => {
       try {
         payload.images = [];
         for(const src of imgs){
-          let f;
-          if(typeof src === "string" && src.startsWith("data:")){
-            const r = await fetch(src); const blob = await r.blob();
-            f = new File([blob], "ref.png", {type: blob.type || "image/png"});
-          } else if(src instanceof Blob){
-            f = new File([src], src.name || "ref.png", {type: src.type || "image/png"});
-          } else continue;
-          payload.images.push(await resizeFileToBase64(f, 768));
+          try {
+            payload.images.push(await refImageToResizedBase64(src, 768));
+          } catch(e){
+            log(`⚠️ No se pudo leer la imagen de referencia: ${e.message || e}`, "l-err");
+          }
+        }
+        if(payload.images.length === 0){
+          log("⚠️ Ninguna imagen de referencia se pudo procesar.", "l-err");
+          return;
         }
         payload.prompt = userPrompt
           ? `REFERENCE IMAGES (up to 6, in order, <Picture N>): see above. User hint: ${userPrompt}`
@@ -6936,6 +6937,42 @@ $("btnEnhance").addEventListener("click", async () => {
     $("btnEnhance").textContent = "Mejorar prompt";
   }
 });
+
+// Helper robusto para convertir cualquier referencia de imagen (dataURL, File, Blob) a base64 JPEG redimensionado.
+async function refImageToResizedBase64(src, maxSide = 768){
+  let file;
+  if(typeof src === "string"){
+    if(src.startsWith("data:")){
+      const r = await fetch(src);
+      const blob = await r.blob();
+      file = new File([blob], "ref.png", {type: blob.type || "image/png"});
+    } else {
+      // URL remota (no debería ocurrir con las referencias locales)
+      const r = await fetch(src);
+      const blob = await r.blob();
+      file = new File([blob], "ref.png", {type: blob.type || "image/png"});
+    }
+  } else if(src instanceof File || src instanceof Blob){
+    file = (src instanceof File) ? src : new File([src], "ref.png", {type: src.type || "image/png"});
+  } else {
+    throw new Error("Formato de referencia no soportado");
+  }
+  try {
+    return await resizeFileToBase64(file, maxSide);
+  } catch(e){
+    // Fallback: intentar convertir cualquier blob a PNG vía canvas
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+    const c = document.createElement("canvas");
+    const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+    c.width = Math.max(1, Math.round(img.width * scale));
+    c.height = Math.max(1, Math.round(img.height * scale));
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+  }
+}
 
 // --- EVOLVE / TRANSMUTAR PROMPT ---
 const EVOLVE_VOCAB = [
