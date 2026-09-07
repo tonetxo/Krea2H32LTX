@@ -80,24 +80,27 @@ Opening via `file://` will not work — always go through the local server.
 The generators assemble a self-contained HTML file from template fragments:
 
 ```
-generar_ltxv.py / generar_krea2.py / generar_minimaxh3.py   ← config only (~30-55 lines each)
+generar_ltxv.py / generar_krea2.py / generar_minimaxh3.py / generar_mmh3x2.py   ← config only (~30-55 lines each)
         ↓ calls
-generar_common.py                    ← shared assembly logic (~210 lines)
+generar_common.py                    ← shared assembly logic (~230 lines)
         ↓ reads
 templates/
   base.css         ← shared CSS
   ltxv.css         ← LTXV-specific CSS
   krea2.css        ← Krea2-specific CSS
   minimaxh3.css    ← MiniMaxH3-specific CSS
+  mmh3x2.css       ← MMH3X2-specific CSS
   common.js        ← shared JS (uses CONFIG object set by UI-specific JS)
   ltxv.js          ← LTXV-specific JS (defines CONFIG, N, callbacks, UI functions)
   krea2.js         ← Krea2-specific JS (defines CONFIG, N, callbacks, UI functions)
   minimaxh3.js     ← MiniMaxH3-specific JS (defines CONFIG, N, callbacks, UI functions)
+  mmh3x2.js        ← MMH3X2-specific JS (defines CONFIG, N, callbacks, UI functions)
   common_head.html ← shared <head>
   common_html.html ← shared HTML panels
   ltxv_html.html   ← LTXV-specific HTML
   krea2_html.html  ← Krea2-specific HTML
   minimaxh3_html.html ← MiniMaxH3-specific HTML
+  mmh3x2_html.html ← MMH3X2-specific HTML
 ```
 
 The generated HTML is self-contained (inline CSS + JS, no external requests).
@@ -112,7 +115,7 @@ Templates are **not served** to the browser — they are build-time sources only
 5. `const AVAILABLE_UNETS = __UNET_LIST__;` (placeholder, MiniMaxH3 only)
 6. `const AVAILABLE_CLIPS = __CLIP_LIST__;` (placeholder, MiniMaxH3 only)
 7. Shared JS (`common.js`) — uses `CONFIG`, defines shared functions
-8. UI-specific JS (`ltxv.js` / `krea2.js` / `minimaxh3.js`) — defines `CONFIG`, `N`, callbacks, UI functions
+8. UI-specific JS (`ltxv.js` / `krea2.js` / `minimaxh3.js` / `mmh3x2.js`) — defines `CONFIG`, `N`, callbacks, UI functions
 
 ### CONFIG object
 
@@ -135,22 +138,22 @@ Each UI sets a `CONFIG` global before `common.js` runs. Required fields:
 
 ## Backend connection
 
-- Default backend port is `7821` for all three UIs.
+- Default backend port is `7821` for all four UIs.
 - `serve.py` proxies API routes to ComfyUI (`:7821`) and `/api/*` to Ollama (`:11434`).
 - WebSocket (`/ws`) is rejected with 426; `pollFallback` handles it via polling every 4s.
 - The user can type a custom backend URL to bypass the proxy.
 
 ## LAN access (móvil / otro PC)
 
-`lanzar_ltxv.sh`, `lanzar_krea2.sh` and `lanzar_minimaxh3.sh` launch `serve.py` with `HOST=0.0.0.0`,
+`lanzar_ltxv.sh`, `lanzar_krea2.sh`, `lanzar_minimaxh3.sh` and `lanzar_mmh3x2.sh` launch `serve.py` with `HOST=0.0.0.0`,
 so the UI is reachable on the LAN at `http://<IP_LAN>:8000/LTXV_WebUI.html`,
-`:8001/Krea2_WebUI.html`, or `:8002/MiniMaxH3_WebUI.html`.
+`:8001/Krea2_WebUI.html`, `:8002/MiniMaxH3_WebUI.html`, or `:8003/MMH3X2_WebUI.html`.
 If you run `serve.py` manually, set `HOST=0.0.0.0` to
 allow LAN access; otherwise it defaults to `127.0.0.1`.
 
 **ComfyUI binds to `127.0.0.1:<port>` by default** — launch it with
 `--listen 0.0.0.0` to make the backend accessible from other devices.
-All three launch scripts check `ss` and warn when
+All four launch scripts check `ss` and warn when
 the backend is on a loopback address.
 
 ## MiniMaxH3 specifics

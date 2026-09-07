@@ -848,6 +848,8 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
     outputEl.placeholder = "Generando prompt...";
   }
 
+  const startTime = Date.now();
+
   const r = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -900,12 +902,13 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
     } catch(e){}
   }
 
+  const elapsedMs = Date.now() - startTime;
   const finalClean = cleanOllamaResponse(accumulated);
   if(outputEl){
     outputEl.value = finalClean;
     outputEl.placeholder = origPlaceholder;
   }
-  return finalClean;
+  return { text: finalClean, elapsedMs };
 }
 
 function makeCollapsible(toggleId, bodyId, onOpen){

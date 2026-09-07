@@ -2911,8 +2911,10 @@ window.addEventListener("DOMContentLoaded", () => {
     $("enhancerOutput").value = "";
     try {
       log(`🧠 Solicitando mejora a Ollama (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
-      await streamOllamaGenerate(payload, $("enhancerOutput"));
-      log(`✅ Prompt mejorado listo en el panel. Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
+      const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+      const timeStr = fmtMs(elapsedMs);
+      $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+      log(`✅ Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
     } catch(e){
       log(`❌ Error al mejorar prompt con Ollama: ${e.message}`, "l-err");
       $("enhancerOutput").value = "Error: " + e.message;

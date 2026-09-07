@@ -2449,8 +2449,10 @@ $("btnEnhance").addEventListener("click", async () => {
   $("btnEnhance").textContent = "Mejorando...";
   $("enhancerOutput").value = "";
   try {
-    await streamOllamaGenerate(payload, $("enhancerOutput"));
-    log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
+    const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const timeStr = fmtMs(elapsedMs);
+    $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+    log(`Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Pulsa 'Usar como prompt' para aplicarlo.`, "l-ok");
   } catch(e) {
     log("Error al mejorar: "+e.message, "l-err");
     $("enhancerOutput").value = "Error: "+e.message;

@@ -1277,8 +1277,10 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
     $("btnEnhance").textContent = "Mejorando...";
     $("enhancerOutput").value = "";
     try {
-      const text = await streamOllamaGenerate(payload, $("enhancerOutput"));
-      log("Prompt mejorado listo en el panel ("+model+", "+mode+", "+styleKey+"). Pulsa 'Usar como prompt' para aplicarlo.", "l-ok");
+      const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+      const timeStr = fmtMs(elapsedMs);
+      $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+      log(`Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Pulsa 'Usar como prompt' para aplicarlo.`, "l-ok");
     } catch(e) {
       log("Error al mejorar: "+e.message, "l-err");
       $("enhancerOutput").value = "Error: "+e.message;
@@ -1314,12 +1316,14 @@ $("btnCaption").addEventListener("click", async () => {
       model, system, prompt: captionPrompt, images: [b64],
       options: { num_ctx: 4096, temperature: 0.4 }
     };
-    const text = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const timeStr = fmtMs(elapsedMs);
     if(!text){
       log("Respuesta vacia.", "l-err");
       $("enhancerOutput").value = "El modelo no devolvio texto.";
     } else {
-      log("Caption Ollama generado ("+model+", "+mode+"/"+styleKey+", "+text.length+" chars).", "l-ok");
+      $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+      log(`Caption Ollama generado en ${timeStr} (${model}, ${mode}/${styleKey}, ${text.length} chars).`, "l-ok");
       log("Pulsa 'Usar como prompt' para aplicarlo, o pulsa 'Generar' si ya esta activo.", "l-info");
     }
   } catch(e) {

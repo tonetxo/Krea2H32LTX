@@ -2,7 +2,7 @@
 
 High-performance, self-contained single-page web interfaces for video and image generation with ComfyUI and SwarmUI backends.
 
-The project provides three standalone, zero-dependency web applications designed to maximize local GPU utilization and enable full control from both desktop workstations and mobile devices across local networks (LAN).
+The project provides four standalone, zero-dependency web applications designed to maximize local GPU utilization and enable full control from both desktop workstations and mobile devices across local networks (LAN).
 
 ---
 
@@ -13,6 +13,7 @@ The project provides three standalone, zero-dependency web applications designed
 | **MiniMaxH3** | `MiniMaxH3_WebUI.html` | `:8002` | **MiniMax H3** | **i2v** (image-to-video), **flf2v** (first-and-last frame), **r2v** (multi-reference: up to 6 images, 3 videos, 3 audio tracks) |
 | **LTXV** | `LTXV_WebUI.html` | `:8000` | **LTX-Video / LTX-2.5** | **First Pass**, **Full Pass** (two-pass pipeline with dedicated video/audio VAEs, SageAttention, DMD LoRA) |
 | **Krea2** | `Krea2_WebUI.html` | `:8001` | **Krea2 / Flux2** | Text-to-image, RGB variance control, Projector presets, direct handoff to LTXV video |
+| **MMH3X2** | `MMH3X2_WebUI.html` | `:8003` | **MiniMax H3 2-segment** | 4-image + 1-video continuation pipeline with RTX Super Resolution and RIFE frame interpolation |
 
 ---
 
@@ -54,19 +55,19 @@ The project provides three standalone, zero-dependency web applications designed
 The build system utilizes a Python generator that compiles self-contained HTML files from modular template components:
 
 ```text
-generar_ltxv.py / generar_krea2.py / generar_minimaxh3.py   (Config & model directory scanner)
+generar_ltxv.py / generar_krea2.py / generar_minimaxh3.py / generar_mmh3x2.py   (Config & model directory scanner)
         ↓
-generar_common.py                                          (Shared template assembly logic)
+generar_common.py                                                               (Shared template assembly logic)
         ↓
 templates/
   ├── base.css            (Dark theme, control panels, two-column layout, queue monitor)
-  ├── ltxv.css / krea2.css / minimaxh3.css
+  ├── ltxv.css / krea2.css / minimaxh3.css / mmh3x2.css
   ├── common.js           (WebSockets, /queue monitor, synced prompt library, timers)
-  ├── ltxv.js / krea2.js / minimaxh3.js
+  ├── ltxv.js / krea2.js / minimaxh3.js / mmh3x2.js
   ├── common_head.html / common_html.html
-  └── ltxv_html.html / krea2_html.html / minimaxh3_html.html
+  └── ltxv_html.html / krea2_html.html / minimaxh3_html.html / mmh3x2_html.html
         ↓ Generates:
-LTXV_WebUI.html / Krea2_WebUI.html / MiniMaxH3_WebUI.html (Self-contained standalone HTMLs)
+LTXV_WebUI.html / Krea2_WebUI.html / MiniMaxH3_WebUI.html / MMH3X2_WebUI.html (Self-contained standalone HTMLs)
 ```
 
 ### Static File Server and Proxy (`serve.py`)
@@ -104,6 +105,7 @@ To index local model, LoRA, and VAE directories:
 python3 generar_minimaxh3.py
 python3 generar_ltxv.py
 python3 generar_krea2.py
+python3 generar_mmh3x2.py
 ```
 
 ### 3. Launch the Servers
@@ -117,6 +119,9 @@ python3 generar_krea2.py
 
 # Krea2 (Image generation: Flux2 / Krea2) - Port 8001
 ./lanzar_krea2.sh
+
+# MMH3X2 (Video continuation: 2 segments, 4 images + 1 video) - Port 8003
+./lanzar_mmh3x2.sh
 ```
 
 ---
@@ -128,7 +133,7 @@ For users wishing to run workflows directly within the standard ComfyUI interfac
 - **`MiniMaxH3_I2V.json`** — **Universal / Vanilla Official Workflow**:
   - Implemented using 100% native ComfyUI core nodes (`MiniMaxH3ImageToVideo`, `UNETLoader`, `CLIPLoader`, `VAELoader`, `CreateVideo`).
   - Guaranteed out-of-the-box compatibility without any custom node requirements.
-- **`MiniMaxH3_Pro_Accelerated.json`** — **High-Performance Pro Pipeline**:
+- **`MiniMaxH3_Pro_Accelerated.json`** — **High-Performance Pro Pipeline** *(available separately; not included in this repository)*:
   - Accelerated with `H3-Optimizations` (Sparse Attention), `SpectrumApplyMiniMaxH3`, `RTXVideoSuperResolution` (2x 1080p), and `FrameInterpolate` (RIFE 48fps).
 - **`Krea2_OK.json`** — **Frame Zero Image Generation**:
   - High-detail text-to-image pipeline for Flux2 / Krea2 with RGB variance control.

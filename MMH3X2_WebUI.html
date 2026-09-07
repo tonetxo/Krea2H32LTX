@@ -2174,9 +2174,9 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = [];
-const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MiniMax-H3-Ref2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MysticXXX_MMH3-V4.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
+const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MiniMax-H3-Ref2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MysticXXX_MMH3-V4.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
 const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors", "taeltx_2.safetensors"];
-const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
+const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
 const LTXV_UI_PORT = "8000";
@@ -3031,6 +3031,8 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
     outputEl.placeholder = "Generando prompt...";
   }
 
+  const startTime = Date.now();
+
   const r = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -3083,12 +3085,13 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
     } catch(e){}
   }
 
+  const elapsedMs = Date.now() - startTime;
   const finalClean = cleanOllamaResponse(accumulated);
   if(outputEl){
     outputEl.value = finalClean;
     outputEl.placeholder = origPlaceholder;
   }
-  return finalClean;
+  return { text: finalClean, elapsedMs };
 }
 
 function makeCollapsible(toggleId, bodyId, onOpen){
@@ -6996,8 +6999,10 @@ window.addEventListener("DOMContentLoaded", () => {
     $("enhancerOutput").value = "";
     try {
       log(`🧠 Solicitando mejora a Ollama (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
-      await streamOllamaGenerate(payload, $("enhancerOutput"));
-      log(`✅ Prompt mejorado listo en el panel. Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
+      const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+      const timeStr = fmtMs(elapsedMs);
+      $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+      log(`✅ Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
     } catch(e){
       log(`❌ Error al mejorar prompt con Ollama: ${e.message}`, "l-err");
       $("enhancerOutput").value = "Error: " + e.message;

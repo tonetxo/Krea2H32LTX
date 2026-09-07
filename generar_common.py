@@ -44,6 +44,12 @@ def get_file_list(directory, ext='.safetensors', fallback=None):
 
 
 def get_lora_list(directory, fallback="ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors"):
+    """Legacy path: used when the caller passes a single `lora_dir` string.
+
+    New callers should prefer `lora_dirs` (list of (dir, prefix) tuples) and
+    use the shared `get_file_list()` logic. This helper is kept for backward
+    compatibility with `generar_ltxv.py` and `generar_krea2.py`.
+    """
     loras = []
     if not directory or not os.path.exists(directory):
         return [fallback] if fallback else []

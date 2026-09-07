@@ -103,6 +103,47 @@ ALLOWED_DELETE_DIRS = (
     os.path.realpath(os.path.join(COMFYUI_ROOT, "temp")),
 )
 
+
+def _parse_time_arg(value):
+    """Valida y normaliza un argumento de tiempo para ffmpeg.
+
+    Acepta:
+      - Segundos (int o float): 5, 5.5, "12.34"
+      - Formato sexagesimal: HH:MM:SS[.mmm], MM:SS[.mmm], H:MM:SS[.mmm]
+
+    Devuelve (normalized_string, error_message). Si value está vacío,
+    devuelve ("", None). En caso de error, normalized_string es "".
+    """
+    if not value:
+        return "", None
+    value = value.strip()
+    # Formato numérico puro (segundos)
+    try:
+        f = float(value)
+        if f < 0:
+            return "", "el tiempo no puede ser negativo"
+        return str(f), None
+    except ValueError:
+        pass
+    # Formato sexagesimal: HH:MM:SS[.mmm] o variantes
+    m = re.fullmatch(r"(\d+):(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?", value)
+    if m:
+        h, mn, s, ms = m.groups()
+        h, mn, s = int(h), int(mn), int(s)
+        if mn >= 60 or s >= 60:
+            return "", "minutos/segundos fuera de rango"
+        return value, None
+    # Formato MM:SS[.mmm]
+    m = re.fullmatch(r"(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?", value)
+    if m:
+        mn, s, ms = m.groups()
+        mn, s = int(mn), int(s)
+        if mn >= 60 or s >= 60:
+            return "", "minutos/segundos fuera de rango"
+        return value, None
+    return "", "formato no reconocido (usa segundos o HH:MM:SS.mmm)"
+
+
 # Routes that should be proxied to the backend instead of served as files.
 PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt")
 OLLAMA_PREFIXES = ("/api",)
@@ -381,7 +422,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         m = re.search(r'boundary=([^;]+)', ctype)
         if not m:
             return None
-        boundary = m.group(1).strip().strip('"')
+        boundary = m.group(1).strip().strip('"').strip("'")
         length = int(self.headers.get("Content-Length", 0))
         if length <= 0:
             return None
@@ -507,8 +548,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
         scale = field("scale", "1") or "1"
         ar_lock = field("ar_lock", "true").lower() in ("true", "1", "on")
-        trim_start = field("trim_start", "")
-        trim_end = field("trim_end", "")
+        trim_start_raw = field("trim_start", "")
+        trim_end_raw = field("trim_end", "")
         skip_frames = field("skip_frames", "1")
         use_audio = field("use_audio", "false").lower() in ("true", "1", "on")
         volume = field("volume", "1")
@@ -526,6 +567,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             vol = float(volume)
         except ValueError:
             vol = 1.0
+
+        trim_start, trim_start_error = _parse_time_arg(trim_start_raw)
+        trim_end, trim_end_error = _parse_time_arg(trim_end_raw)
+        if trim_start_error:
+            self._send_json(400, {"error": f"trim_start inválido: {trim_start_error}"})
+            return
+        if trim_end_error:
+            self._send_json(400, {"error": f"trim_end inválido: {trim_end_error}"})
+            return
 
         input_dir = os.path.join(COMFYUI_ROOT, "input", "reference")
         os.makedirs(input_dir, exist_ok=True)
@@ -649,8 +699,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_krea2_list()
         elif self._is_ltxv_list():
             self._do_ltxv_list()
-        elif self._is_minimaxh3_list() or self._is_mmh3x2_list():
+        elif self._is_minimaxh3_list():
             self._do_minimaxh3_list()
+        elif self._is_mmh3x2_list():
+            self._do_mmh3x2_list()
         elif self._is_prompts_route():
             self._do_prompts_get()
         elif self._is_ollama_route():
@@ -667,7 +719,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_ltxv_list():
             self._send_json(405, {"error": "method not allowed"})
-        elif self._is_minimaxh3_list() or self._is_mmh3x2_list():
+        elif self._is_minimaxh3_list():
+            self._send_json(405, {"error": "method not allowed"})
+        elif self._is_mmh3x2_list():
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_prompts_route():
             self._do_prompts_post()
@@ -848,6 +902,60 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     continue
         except OSError as e:
             sys.stderr.write(f"[serve] minimaxh3_list error: {e}\n")
+        return {
+            "dir": output_dir,
+            "count": len(items),
+            "items": items,
+        }
+
+    def _do_mmh3x2_list(self):
+        """List MMH3X2 MP4s under output/video/ (MiniMax_H3_* prefixes), newest first, max 100."""
+        cached = _LIST_CACHE.get("mmh3x2")
+        if cached and cached[0] > time.time():
+            self._send_json(200, cached[1])
+            return
+        result = self._build_mmh3x2_list()
+        _LIST_CACHE["mmh3x2"] = (time.time() + LIST_CACHE_TTL, result)
+        self._send_json(200, result)
+
+    def _build_mmh3x2_list(self):
+        items = []
+        output_dir = os.path.join(COMFYUI_ROOT, "output")
+        video_dir = os.path.join(output_dir, "video")
+        try:
+            search_root = video_dir if os.path.isdir(video_dir) else output_dir
+            paths = glob.glob(os.path.join(search_root, "**", "*.mp4"), recursive=True)
+            paths_with_time = []
+            for p in paths:
+                # Only keep files whose path looks like MMH3X2 output.
+                rel = os.path.relpath(p, output_dir)
+                if "MiniMax_H3_" not in rel:
+                    continue
+                try:
+                    paths_with_time.append((os.path.getmtime(p), p))
+                except OSError:
+                    continue
+            paths_with_time.sort(key=lambda x: x[0], reverse=True)
+            paths = [p for _, p in paths_with_time][:100]
+
+            for p in paths:
+                try:
+                    st = os.stat(p)
+                    rel = os.path.relpath(p, output_dir)
+                    parts = rel.split(os.sep)
+                    filename = parts[-1]
+                    subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
+                    items.append({
+                        "filename": filename,
+                        "subfolder": subfolder,
+                        "type": "output",
+                        "mtime": int(st.st_mtime),
+                        "size": st.st_size,
+                    })
+                except OSError:
+                    continue
+        except OSError as e:
+            sys.stderr.write(f"[serve] mmh3x2_list error: {e}\n")
         return {
             "dir": output_dir,
             "count": len(items),
@@ -1134,8 +1242,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         # que Ollama pueda haber reseteado por carga/descarga de modelos.
         req.add_header("Connection", "close")
 
-        # Si reenviamos a Ollama, le mentimos sobre el Origin: Ollama solo
-        # permite CORS desde localhost/127.0.0.1. Ponemos uno que sí acepte.
+        # Si reenviamos a Ollama, reescribimos el Origin: Ollama solo permite
+        # CORS desde localhost/127.0.0.1, por lo que un cliente LAN sería
+        # bloqueado. Este rewrite afecta ÚNICAMENTE al tráfico proxy hacia
+        # Ollama; los endpoints locales siguen protegidos por _allowed_origin().
         if base == OLLAMA:
             req.add_header("Origin", "http://127.0.0.1:11434")
 

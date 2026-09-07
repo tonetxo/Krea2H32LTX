@@ -1,0 +1,38 @@
+--- setup.py	2026-09-06 00:00:00.000000000 +0000
++++ setup.py	2026-09-06 00:00:00.000000000 +0000
+@@ -28,6 +28,7 @@
+ HAS_SM90 = False
++HAS_SM120 = False
+ SAGE2PP_ENABLED = True
+ 
+ def run_instantiations(src_dir: str):
+@@ -51,7 +52,7 @@
+ # Supported NVIDIA GPU architectures.
+-SUPPORTED_ARCHS = {"8.0", "8.6", "8.7", "8.9", "9.0"}
++SUPPORTED_ARCHS = {"8.0", "8.6", "8.7", "8.9", "9.0", "12.0"}
+ 
+ # Compiler flags.
+ CXX_FLAGS = ["-g", "-O3", "-fopenmp", "-lgomp", "-std=c++17", "-DENABLE_BF16"]
+@@ -153,6 +154,9 @@
+     if num == '90':
+         num = '90a'
+         HAS_SM90 = True
+         CXX_FLAGS += ["-DHAS_SM90"]
++    if num == '120':
++        HAS_SM120 = True
++        CXX_FLAGS += ["-DHAS_SM120"]
+     if num == '80' or num == '86' or num == '87':
+         SAGE2PP_ENABLED = False
+@@ -176,6 +182,11 @@
+ if HAS_SM90:
+     sources += ["csrc/qattn/qk_int_sv_f8_cuda_sm90.cu", ]
+     sources += get_instantiations("csrc/qattn/instantiations_sm90")
++
++if HAS_SM120:
++    # Experimental fallback: reuse SM90 kernels on SM120.
++    # Native SM120 kernels do not exist in this SpargeAttn version.
++    sources += ["csrc/qattn/qk_int_sv_f8_cuda_sm90.cu"]
++    sources += get_instantiations("csrc/qattn/instantiations_sm90")
+ 
+ qattn_extension = CUDAExtension(
+     name="spas_sage_attn._qattn",
