@@ -222,7 +222,10 @@ function setSeedMode(mode){
 function recalcResolution(){
   if($("mpVal") && $("mpSlider")) $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
   const img1 = $("previewSlotImg1");
-  updateCalculatedResolution(img1?.naturalWidth || 1280, img1?.naturalHeight || 720);
+  if(img1?.naturalWidth && img1?.naturalHeight){
+    updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
+  }
+  // Si Slot 1 aún no ha cargado, no forzamos 16:9; esperamos al onload/decode.
 }
 
 CONFIG.variantMeta = function(){
@@ -917,8 +920,8 @@ function applyWorkflow(workflow){
   // 4. Megapíxeles
   if(workflow["77"]?.inputs?.megapixels && $("mpSlider")){
     $("mpSlider").value = workflow["77"].inputs.megapixels;
-    recalcResolution();
   }
+  recalcResolution(); // recalcula si Slot 1 ya cargó; si no, el onload lo hará
 
   // 5. Steps
   if(workflow["79"]?.inputs?.value && $("stepsSlider")){
@@ -1679,12 +1682,12 @@ function setMediaSlotData(slotIdx, file, dataUrl, name, shouldSave = true){
   const info = $(`infoImg${slotIdx}`);
 
   if(img){
-    img.src = dataUrl;
     img.style.display = "block";
     img.onload = () => {
       if(slotIdx === 1) updateCalculatedResolution(img.naturalWidth, img.naturalHeight);
       if(info) info.textContent = `${img.naturalWidth}x${img.naturalHeight} · ${name || 'img'}`;
     };
+    img.src = dataUrl;
   }
   if(ph) ph.style.display = "none";
   if(shouldSave && dataUrl){
@@ -2772,12 +2775,12 @@ window.addEventListener("DOMContentLoaded", () => {
           const ph = $(`phImg${slotIdx}`);
           const info = $(`infoImg${slotIdx}`);
           if(img){
-            img.src = url;
             img.style.display = "block";
             img.onload = () => {
               if(slotIdx === 1) updateCalculatedResolution(img.naturalWidth, img.naturalHeight);
               if(info) info.textContent = `${img.naturalWidth}x${img.naturalHeight} · ${fn.slice(0, 25)}…`;
             };
+            img.src = url;
           }
           if(ph) ph.style.display = "none";
         }
@@ -2786,8 +2789,10 @@ window.addEventListener("DOMContentLoaded", () => {
       log("💾 Sesión anterior restaurada (ajustes y medios guardados)", "l-ok");
     }
     const img1 = $("previewSlotImg1");
-    if(img1 && img1.naturalWidth) updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
-    else updateCalculatedResolution(1280, 720);
+    if(img1 && img1.complete && img1.naturalWidth){
+      updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
+    }
+    // Si aún no cargó, el listener img.onload ya actualizará al terminar.
   });
 
   // Configurar panel Enhancer exclusivamente para MiniMax H3 (Ollama)
