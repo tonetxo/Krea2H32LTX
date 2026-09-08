@@ -412,7 +412,7 @@ function saveH3Settings(){
   const s = {
     prompt: $("prompt")?.value || "",
     seedMode,
-    seedValue: parseInt($("seedVal")?.value || "12345", 10),
+    seedValue: seedMode === "random" ? -1 : parseInt($("seedVal")?.value || "12345", 10),
     width: $("width")?.value || "1152",
     height: $("height")?.value || "640",
     duration: $("duration")?.value || "10",
@@ -450,7 +450,7 @@ function restoreH3Settings(){
     if(!s || typeof s !== "object") return false;
     if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
     if(s.seedMode){ seedMode = s.seedMode; if(seedMode === "random"){ $("segRandom")?.classList.add("on"); $("segFixed")?.classList.remove("on"); $("seedVal").disabled = true; } else { $("segFixed")?.classList.add("on"); $("segRandom")?.classList.remove("on"); $("seedVal").disabled = false; } }
-    if(s.seedValue !== undefined && $("seedVal")) $("seedVal").value = s.seedValue;
+    if(s.seedValue !== undefined && s.seedValue >= 0 && $("seedVal")) $("seedVal").value = s.seedValue;
     if(s.width !== undefined && $("width")) $("width").value = s.width;
     if(s.height !== undefined && $("height")) $("height").value = s.height;
     if(s.duration !== undefined && $("duration")){ $("duration").value = s.duration; updateDurationHints(); }
@@ -1206,6 +1206,10 @@ CONFIG.onStopAll = function(){
   activeJob = null;
   enableStopButtons(false);
   $("btnGenerate").disabled=false;
+  // Reset del batch para evitar que processNextBatch resucite variantes tras stop.
+  currentBatchIndex = 0;
+  totalBatchSize = 1;
+  batchSeedMode = "random";
 };
 
 // --- displayResult: un solo save node ---
@@ -1495,6 +1499,7 @@ function updateSeedUI(seedValue) {
         $("segRandom").classList.remove("on");
         $("seedVal").disabled = false;
     }
+    scheduleSaveH3Settings();
 }
 
 // --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS MP4 ---
@@ -2729,8 +2734,9 @@ function buildGraph(job){
   }
 
   // Seed (RandomNoise node 129)
+  // Para seed fijo, usamos el seed del job activo o el valor actual del input.
   const sMode = j ? j.seedMode : seedMode;
-  const sVal = j ? j.seedValue : parseInt($("seedVal").value, 10);
+  const sVal = j ? j.seedValue : parseInt($("seedVal")?.value || "12345", 10);
   g[N.NOISE].inputs.noise_seed = (sMode === "random") ? -1 : sVal;
 
   // Resolution & Megapixels
@@ -3401,7 +3407,9 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
         log("▶ Vídeo cargado: "+card.dataset.filename, "l-ok");
     });
 
-    $("variantCount").textContent = `(${variantCounter + 1})`;
+    // El contador refleja el número real de tarjetas en la galería, no variantCounter.
+    const remaining = grid.querySelectorAll(".variant-card").length;
+    $("variantCount").textContent = `(${remaining})`;
 }
 
 // --- VIDEO HISTORY ---
