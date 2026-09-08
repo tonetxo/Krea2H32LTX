@@ -7140,8 +7140,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if($("btnSeg1")) $("btnSeg1").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("seg1_only"); });
   if($("btnSeg2")) $("btnSeg2").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("seg2_only"); });
 
-  if($("btnStopVideo")) $("btnStopVideo").addEventListener("click", () => { CONFIG.onStopCurrent(); });
-  if($("btnStopAll")) $("btnStopAll").addEventListener("click", () => { CONFIG.onStopAll(); });
+  if($("btnStopVideo")) $("btnStopVideo").addEventListener("click", () => { stopCurrentVideo(); });
+  if($("btnStopAll")) $("btnStopAll").addEventListener("click", () => { stopAll(); });
   if($("btnClearQueue")) $("btnClearQueue").addEventListener("click", () => {
     jobQueue = [];
     activeJob = null;
