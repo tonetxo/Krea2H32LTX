@@ -175,7 +175,22 @@ const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
 const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "none" };
 const H3OPT_DEFAULTS = { sparseBackend: "auto", videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true };
 const AIMDO_DEFAULTS = { residency: "0 blocks" };
-const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0 };
+  // Valores legibles en UI -> valores internos de ComfyUI BlockSparseAttention
+  const BLOCK_SPARSE_MODES = {
+    "Sol-Attn (adaptive tau)": "sol-attn",
+    "top-k (SLA)": "sla",
+    "VSA (FastVideo)": "vsa"
+  };
+  const BLOCK_SPARSE_MODES_REVERSE = {
+    "sol-attn": "Sol-Attn (adaptive tau)",
+    "sla": "top-k (SLA)",
+    "vsa": "VSA (FastVideo)"
+  };
+  function mapBlockSparseSelection(sel){
+    return BLOCK_SPARSE_MODES[sel] || BLOCK_SPARSE_MODES_REVERSE[sel] || sel;
+  }
+  const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0 };
+
 
 function loadAttentionBackend(){
   try { return Object.assign({}, ATTENTION_BACKEND_DEFAULTS, JSON.parse(localStorage.getItem(ATTENTION_BACKEND_KEY) || "{}")); }
@@ -1738,13 +1753,19 @@ async function applyWorkflow(workflow, opts={}){
     saveAttentionOptimizer({ mode: "block-sparse" });
     const bs = { ...BLOCK_SPARSE_DEFAULTS };
     const sel = blockSparseNode.inputs && blockSparseNode.inputs.selection;
-    if(sel && Array.isArray(sel) && sel.length >= 2){
-      bs.selection = sel[0] || bs.selection;
+    // Nuevo formato ComfyUI: selection es un objeto {selection: "sol-attn", tau?: number, keep_percent?: number}
+    if(sel && typeof sel === "object" && !Array.isArray(sel) && sel.selection){
+      bs.selection = mapBlockSparseSelection(sel.selection);
+      if(sel.tau != null) bs.tau = sel.tau;
+      if(sel.keep_percent != null) bs.tau = 1.3;
+    } else if(sel && Array.isArray(sel) && sel.length >= 2){
+      // Formato antiguo (por compatibilidad)
+      bs.selection = mapBlockSparseSelection(sel[0]) || bs.selection;
       const sub = sel[1] || {};
       if(typeof sub.tau === "number") bs.tau = sub.tau;
       if(typeof sub.keep_percent === "number") bs.tau = 1.3;
     } else if(sel && typeof sel === "string"){
-      bs.selection = sel || bs.selection;
+      bs.selection = mapBlockSparseSelection(sel) || bs.selection;
       if(typeof blockSparseNode.inputs["selection.tau"] === "number") bs.tau = blockSparseNode.inputs["selection.tau"];
     }
     if(blockSparseNode.inputs){
@@ -2706,22 +2727,26 @@ function buildGraph(job){
 
   } else if(optimizerState.mode === "block-sparse"){
     const bs = j ? j.blockSparse : getBlockSparseState();
-    const isSolAttn = bs.selection === "Sol-Attn (adaptive tau)";
+    const mode = BLOCK_SPARSE_MODES[bs.selection] || "sol-attn";
+    const isSolAttn = mode === "sol-attn";
+    const isVsa = mode === "vsa";
+    // Formato plano V3: la key del DynamicCombo es el modo interno; los sub-inputs se envían con punto.
+    const blockSparseInputs = {
+      model: [currentModelNode, 0],
+      selection: mode,
+      start_percent: bs.startPercent,
+      end_percent: bs.endPercent,
+      dense_blocks: "",
+      min_tokens: 12288,
+      extra_tokens: isVsa ? 0 : 256,
+      sink_conditioning: "exact_kv_and_rows",
+      verbose: false
+    };
+    if(isSolAttn) blockSparseInputs["selection.tau"] = bs.tau ?? 1.3;
+    else blockSparseInputs["selection.keep_percent"] = 10.0;
     g[N.BLOCK_SPARSE] = {
       class_type: "BlockSparseAttention",
-      inputs: {
-        model: [currentModelNode, 0],
-        selection: bs.selection,
-        "selection.tau": isSolAttn ? bs.tau : 1.3,
-        "selection.keep_percent": isSolAttn ? 10.0 : 10.0,
-        start_percent: bs.startPercent,
-        end_percent: bs.endPercent,
-        dense_blocks: "",
-        min_tokens: 12288,
-        extra_tokens: 256,
-        sink_conditioning: "exact_kv_and_rows",
-        verbose: false
-      },
+      inputs: blockSparseInputs,
       _meta: { title: "Block Sparse Attention" }
     };
     currentModelNode = N.BLOCK_SPARSE;
