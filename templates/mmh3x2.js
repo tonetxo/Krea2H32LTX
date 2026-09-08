@@ -2225,20 +2225,22 @@ function buildGraph(j){
     if(g[N.BLOCK_SPARSE]) delete g[N.BLOCK_SPARSE];
     if(g[N.AIMDO]) delete g[N.AIMDO];
 
-    if(optimizerState.mode === "h3-optimizations"){
-      const backend = h3opt.sparseBackend || "auto";
-      g[N.SPARSE_ATTN] = {
-        class_type: "H3SparseAttentionAdvanced",
-        inputs: {
-          model: [N.ATTN, 0],
-          video_budget: h3opt.videoBudget,
-          denser_early_late_steps: h3opt.denserEarlyLate,
-          backend: backend
-        },
-        _meta: { title: "H3 Sparse Attention Advanced" }
-      };
-      currentModelNode = N.SPARSE_ATTN;
+    // Nodo sparse base siempre presente en BlockATT (incluso en modo "none")
+    // para no dejar hueco entre ModelAttentionBackend y SigmaShift.
+    const backend = h3opt.sparseBackend || "auto";
+    g[N.SPARSE_ATTN] = {
+      class_type: "H3SparseAttentionAdvanced",
+      inputs: {
+        model: [N.ATTN, 0],
+        video_budget: h3opt.videoBudget,
+        denser_early_late_steps: h3opt.denserEarlyLate,
+        backend: backend
+      },
+      _meta: { title: "H3 Sparse Attention Advanced" }
+    };
+    currentModelNode = N.SPARSE_ATTN;
 
+    if(optimizerState.mode === "h3-optimizations"){
       if(aimdoState.residency !== "stock"){
         g[N.AIMDO] = {
           class_type: "H3AIMDOResidencyLimiter",
