@@ -695,8 +695,11 @@ CONFIG.onPreview = function(url, meta){
   const w = $("previewWrap" + slot);
   if(!p && !pv) return;
 
-  // Si Seg 1 ya terminó y tiene vídeo cargado, no pisarlo
-  if(slot === "Seg1" && v && v.src && v.style.display === "block"){
+  // Si Seg 1 ya terminó y tiene vídeo cargado, no pisarlo; sin embargo,
+  // si el preview llega para una variante distinta a la activa (slot de preview
+  // final vacío o con otro prompt_id), permitir actualizar para reflejar progreso.
+  const currentFinalVideo = $("videoFinal");
+  if(slot === "Seg1" && v && v.src && v.style.display === "block" && currentFinalVideo?.src && currentFinalVideo.style.display === "block"){
     return;
   }
 
@@ -899,6 +902,11 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
   }
   return true;
 };
+
+// Nota: no borramos pendingSeeds/promptVariantMap aquí porque
+// common.js::handlePromptDone() ya se encarga de limpiar tras recibir true
+// (skipFinalize), y borrarlos antes haría que pollFallback no reconozca
+// la variante y reintente innecesariamente.
 
 CONFIG.onSeedUpdate = function(newSeed){
   const sv = $("seedVal");

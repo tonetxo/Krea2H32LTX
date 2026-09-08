@@ -1366,9 +1366,12 @@ async function handlePromptDone(promptId) {
         return;
     }
 
+    // Si el UI-specific gestionó el batch (LTXV, MMH3X2), marcamos como procesado
+    // pero no tocamos currentBatchIndex ni llamamos processNextBatch aquí.
     if(skipFinalize) {
-        // LTXV paso 1->2 ya gestionó sus estados; liberamos el lock para ese prompt_id.
+        handledPrompts.add(promptId);
         processingPrompts.delete(promptId);
+        delete pendingSeeds[promptId];
         return;
     }
 
