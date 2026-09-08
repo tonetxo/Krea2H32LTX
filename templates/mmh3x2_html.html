@@ -177,10 +177,6 @@
           <label>Batch Size (Variantes)</label>
           <input type="number" id="batchSize" value="1" min="1" max="8">
         </div>
-        <div class="row" style="margin-top:6px;">
-          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
-          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
-        </div>
       </div>
 
       <!-- MUESTREO (SAMPLER & STEPS) -->
@@ -343,25 +339,33 @@
           <span class="arrow">▶</span> Optimizaciones H3 (Transformer &amp; Memoria)
         </div>
         <div class="collapsible-body" id="h3OptBody">
+          <!-- Backend denso -->
           <div class="row">
-            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="h3SparseToggle" checked> <span>H3 Sparse Attention</span>
-            </label>
-            <div class="slider-row" style="margin-top:6px;">
-              <label style="font-size:10px;">Video Budget</label>
-              <input type="range" id="h3BudgetSlider" min="0.1" max="1.0" step="0.05" value="0.30">
-              <div class="slider-val" id="h3BudgetVal">0.30</div>
-            </div>
-            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px;font-size:11px;">
-              <input type="checkbox" id="h3EarlyLateToggle" checked> <span>Denser Early / Late Steps</span>
-            </label>
+            <label>Backend denso</label>
+            <select id="attentionBackend" style="margin-top:4px;">
+              <option value="comfy kitchen attention" selected>comfy kitchen attention</option>
+              <option value="pytorch attention">pytorch attention</option>
+            </select>
           </div>
 
-          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="h3MemToggle" checked> <span>H3 Memory Optimization</span>
-            </label>
-            <div class="hint" style="font-size:10px;margin-top:2px;">Fused QKV, QKV Streaming, Chunk rows y protección de precisión de pesos.</div>
+          <div class="row slider-row" style="margin-top:8px;">
+            <label>Video attention budget <span class="hint">(30% por defecto)</span></label>
+            <input type="range" id="h3VideoBudget" min="0.05" max="1.0" step="0.01" value="0.30">
+            <div class="slider-val" id="h3VideoBudgetVal">30%</div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Denser early ramp</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segDenserOn" data-value="true">Sí</div>
+              <div class="seg" id="segDenserOff" data-value="false">No</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Memory optimization</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segMemOptOn" data-value="true">Sí</div>
+              <div class="seg" id="segMemOptOff" data-value="false">No</div>
+            </div>
           </div>
 
           <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
@@ -539,6 +543,10 @@
       <!-- PANEL DE EJECUCIÓN Y COLAS -->
       <div class="panel" style="margin-bottom:0;">
         <h2>Ejecución</h2>
+        <div class="row" style="margin-bottom:8px;">
+          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
+          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
+        </div>
         <div class="btn-row">
           <button type="button" id="btnFull" class="primary" style="flex:2;">⚡ Generar Completo (Seg 1 + Seg 2 + Final)</button>
           <button type="button" id="btnSeg1" style="flex:1;">Solo Seg 1</button>

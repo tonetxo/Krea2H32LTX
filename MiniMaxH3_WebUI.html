@@ -738,7 +738,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         <div class="row" style="margin-top:6px;"><label>Duración (s) <span class="hint" id="durHint">(10s)</span></label><input type="number" id="duration" value="10" step="1" min="1" max="60"></div>
         <div class="row"><label>Frames <span class="hint" id="framesHint">(243 / 24fps = 10.12s)</span></label><input type="number" id="frames" value="243" step="17" min="17" class="ro" readonly></div>
         <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div>
-        <div class="row" style="margin-top:6px;"><label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3)</span></label><input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3"></div>
       </div>
     </div>
     <div class="results-col">
@@ -775,6 +774,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       <!-- PANEL DE EJECUCIÓN Y COLAS -->
       <div class="panel" style="margin-bottom:0;">
         <h2>Ejecución</h2>
+        <div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3)</span></label><input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3"></div>
         <div class="btn-row"><button id="btnGenerate" class="primary">Generar vídeo</button></div>
         <div class="btn-row" style="margin-top:6px">
           <button id="btnStopVideo" disabled>Parar vídeo</button>
@@ -1369,7 +1369,7 @@ const BASE_GRAPH = {
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MiniMax-H3-Ref2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MysticXXX_MMH3-V4.safetensors", "Ligaz\u00f3n para Lora/h3/SexGod_NaughtyTimes_v3_rank64_unpruned.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
 const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors", "taeltx_2.safetensors"];
-const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
+const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
 const LTXV_UI_PORT = "8002";

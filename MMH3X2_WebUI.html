@@ -657,10 +657,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <label>Batch Size (Variantes)</label>
           <input type="number" id="batchSize" value="1" min="1" max="8">
         </div>
-        <div class="row" style="margin-top:6px;">
-          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
-          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
-        </div>
       </div>
 
       <!-- MUESTREO (SAMPLER & STEPS) -->
@@ -823,25 +819,33 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <span class="arrow">▶</span> Optimizaciones H3 (Transformer &amp; Memoria)
         </div>
         <div class="collapsible-body" id="h3OptBody">
+          <!-- Backend denso -->
           <div class="row">
-            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="h3SparseToggle" checked> <span>H3 Sparse Attention</span>
-            </label>
-            <div class="slider-row" style="margin-top:6px;">
-              <label style="font-size:10px;">Video Budget</label>
-              <input type="range" id="h3BudgetSlider" min="0.1" max="1.0" step="0.05" value="0.30">
-              <div class="slider-val" id="h3BudgetVal">0.30</div>
-            </div>
-            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:6px;font-size:11px;">
-              <input type="checkbox" id="h3EarlyLateToggle" checked> <span>Denser Early / Late Steps</span>
-            </label>
+            <label>Backend denso</label>
+            <select id="attentionBackend" style="margin-top:4px;">
+              <option value="comfy kitchen attention" selected>comfy kitchen attention</option>
+              <option value="pytorch attention">pytorch attention</option>
+            </select>
           </div>
 
-          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="h3MemToggle" checked> <span>H3 Memory Optimization</span>
-            </label>
-            <div class="hint" style="font-size:10px;margin-top:2px;">Fused QKV, QKV Streaming, Chunk rows y protección de precisión de pesos.</div>
+          <div class="row slider-row" style="margin-top:8px;">
+            <label>Video attention budget <span class="hint">(30% por defecto)</span></label>
+            <input type="range" id="h3VideoBudget" min="0.05" max="1.0" step="0.01" value="0.30">
+            <div class="slider-val" id="h3VideoBudgetVal">30%</div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Denser early ramp</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segDenserOn" data-value="true">Sí</div>
+              <div class="seg" id="segDenserOff" data-value="false">No</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Memory optimization</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segMemOptOn" data-value="true">Sí</div>
+              <div class="seg" id="segMemOptOff" data-value="false">No</div>
+            </div>
           </div>
 
           <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
@@ -1019,6 +1023,10 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
       <!-- PANEL DE EJECUCIÓN Y COLAS -->
       <div class="panel" style="margin-bottom:0;">
         <h2>Ejecución</h2>
+        <div class="row" style="margin-bottom:8px;">
+          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
+          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
+        </div>
         <div class="btn-row">
           <button type="button" id="btnFull" class="primary" style="flex:2;">⚡ Generar Completo (Seg 1 + Seg 2 + Final)</button>
           <button type="button" id="btnSeg1" style="flex:1;">Solo Seg 1</button>
@@ -2176,7 +2184,7 @@ const BASE_GRAPH = {
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/MiniMax-H3-FL2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MiniMax-H3-Ref2VA-Acc-8Step.safetensors", "Ligaz\u00f3n para Lora/h3/MysticXXX_MMH3-V4.safetensors", "Ligaz\u00f3n para Lora/h3/SexGod_NaughtyTimes_v3_rank64_unpruned.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors"];
 const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors", "taeltx_2.safetensors"];
-const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
+const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta4_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
 const LTXV_UI_PORT = "8000";
@@ -4157,7 +4165,10 @@ const CONFIG = {
     IMG2: "81",
     IMG3: "82",
     IMG4: "83",
-    PURGE: "87"
+    ATTN: "2",
+    SPARSE: "4",
+    SIGMA_SHIFT: "5",
+    MEM_OPT: "6"
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -4236,6 +4247,58 @@ RULES:
 const N = CONFIG.N;
 initCommon();
 
+// --- ATTENTION OPTIMIZATIONS (backend + sparse optimizer) ---
+// MMH3X2 usa el workflow base fijo: UNet -> ModelAttentionBackend -> H3SparseAttention -> SigmaShift -> H3MemoryOptimization.
+  // Solo exponemos: backend denso, video budget, denser early/late y mem opt.
+const ATTENTION_BACKEND_KEY = "mmh3x2_attention_backend";
+const H3OPT_KEY = "mmh3x2_h3opt";
+
+const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
+const H3OPT_DEFAULTS = { videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true };
+
+function loadAttentionBackend(){
+  try { return Object.assign({}, ATTENTION_BACKEND_DEFAULTS, JSON.parse(localStorage.getItem(ATTENTION_BACKEND_KEY) || "{}")); }
+  catch(_) { return {...ATTENTION_BACKEND_DEFAULTS}; }
+}
+function saveAttentionBackend(s){ try { localStorage.setItem(ATTENTION_BACKEND_KEY, JSON.stringify(s)); } catch(_){} }
+function getAttentionBackendState(){
+  return { backend: $("attentionBackend")?.value || ATTENTION_BACKEND_DEFAULTS.backend };
+}
+function setAttentionBackendUI(s){
+  if($("attentionBackend")) $("attentionBackend").value = s.backend;
+}
+
+function loadH3Opt(){
+  try { return Object.assign({}, H3OPT_DEFAULTS, JSON.parse(localStorage.getItem(H3OPT_KEY) || "{}")); }
+  catch(_) { return {...H3OPT_DEFAULTS}; }
+}
+function saveH3Opt(state){ try { localStorage.setItem(H3OPT_KEY, JSON.stringify(state)); } catch(_){} }
+function getH3OptState(){
+  return {
+    videoBudget: parseFloat($("h3VideoBudget")?.value || "0.30"),
+    denserEarlyLate: $("segDenserOn")?.classList.contains("on") ?? true,
+    memOptEnabled: $("segMemOptOn")?.classList.contains("on") ?? true,
+  };
+}
+function setH3OptUI(state){
+  if($("h3VideoBudget")){
+    $("h3VideoBudget").value = state.videoBudget;
+    const pct = Math.round(state.videoBudget * 100);
+    if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${pct}%`;
+  }
+  const dOn = $("segDenserOn"), dOff = $("segDenserOff");
+  if(state.denserEarlyLate){ dOn?.classList.add("on"); dOff?.classList.remove("on"); }
+  else { dOff?.classList.add("on"); dOn?.classList.remove("on"); }
+  const mOn = $("segMemOptOn"), mOff = $("segMemOptOff");
+  if(state.memOptEnabled){ mOn?.classList.add("on"); mOff?.classList.remove("on"); }
+  else { mOff?.classList.add("on"); mOn?.classList.remove("on"); }
+}
+
+const _attentionBackendState = loadAttentionBackend();
+const _h3OptState = loadH3Opt();
+setAttentionBackendUI(_attentionBackendState);
+setH3OptUI(_h3OptState);
+
 // Estado de imágenes, vídeo y audio
 let mediaSlots = {
   1: { file: null, dataUrl: null, uploaded: null, name: "" },
@@ -4272,6 +4335,22 @@ let stageTimers = {
 
 // UI Tabs
 let currentViewMode = "all";
+
+// Listeners de optimizaciones (se adjuntan tras DOMContentLoaded)
+function attachAttentionOptimizerListeners(){
+  $("attentionBackend")?.addEventListener("change", () => { saveAttentionBackend(getAttentionBackendState()); scheduleSaveSettings(); });
+  $("h3VideoBudget")?.addEventListener("input", (e) => {
+    const val = parseFloat(e.target.value);
+    const pct = Math.round(val * 100);
+    if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${pct}%`;
+    saveH3Opt(getH3OptState());
+    scheduleSaveSettings();
+  });
+  $("segDenserOn")?.addEventListener("click", () => { const s = getH3OptState(); s.denserEarlyLate = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("segDenserOff")?.addEventListener("click", () => { const s = getH3OptState(); s.denserEarlyLate = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+}
 
 // Callbacks CONFIG requeridos por common.js
 CONFIG.findMedia = function(output){
@@ -4367,6 +4446,10 @@ CONFIG.variantMeta = function(){
     ["UNet", unet],
     ["CLIP", clip],
     ["LoRAs", lorasActive.length ? lorasActive.join(", ") : "ninguno"],
+    ["Backend denso", $("attentionBackend")?.value || "comfy kitchen attention"],
+    ["Video budget", `${Math.round((parseFloat($("h3VideoBudget")?.value || "0.30")) * 100)}%`],
+    ["Denser early/late", $("segDenserOn")?.classList.contains("on") ? "Sí" : "No"],
+    ["Memory opt", $("segMemOptOn")?.classList.contains("on") ? "Sí" : "No"],
     ["RIFE", `${rMode}x`]
   ];
 
@@ -5056,7 +5139,26 @@ function applyWorkflow(workflow){
     $("clipModel").value = clipNode.inputs.clip_name;
   }
 
-  // 10. Toggles postprocesado y RIFE
+  // 10. Optimizaciones de atención MMH3X2 (backend + H3SparseAttention + MemoryOptimization)
+  const attnBackendNode = findByClass("ModelAttentionBackend");
+  if(attnBackendNode?.inputs?.attention){
+    setAttentionBackendUI({ backend: attnBackendNode.inputs.attention });
+    saveAttentionBackend({ backend: attnBackendNode.inputs.attention });
+  }
+
+  const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
+  const memOptNode = findByClass("H3MemoryOptimization");
+  if(sparseNode?.inputs){
+    const h3State = loadH3Opt();
+    if(typeof sparseNode.inputs.video_budget === "number") h3State.videoBudget = sparseNode.inputs.video_budget;
+    if(typeof sparseNode.inputs.denser_early_late_steps === "boolean") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps;
+    else if(typeof sparseNode.inputs.denser_early_late_steps === "string") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps === "true";
+    h3State.memOptEnabled = !!memOptNode;
+    setH3OptUI(h3State);
+    saveH3Opt(h3State);
+  }
+
+  // 11. Toggles postprocesado y RIFE
   const rifeNode = workflow["72"] || findByClass("FrameInterpolate");
   if($("rifeToggle")) $("rifeToggle").checked = !!rifeNode;
   if(rifeNode?.inputs?.multiplier && $("rifeMultiplier")){
@@ -5363,10 +5465,8 @@ function saveSettings(){
     scheduler: $("schedulerName")?.value || "simple",
     unetModel: $("unetModel")?.value || "",
     clipModel: $("clipModel")?.value || "",
-    h3Sparse: $("h3SparseToggle") ? $("h3SparseToggle").checked : true,
-    h3Budget: $("h3BudgetSlider")?.value || "0.30",
-    h3EarlyLate: $("h3EarlyLateToggle") ? $("h3EarlyLateToggle").checked : true,
-    h3Mem: $("h3MemToggle") ? $("h3MemToggle").checked : true,
+    attentionBackend: getAttentionBackendState(),
+    h3opt: getH3OptState(),
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     lora1Toggle: $("lora1Toggle") ? $("lora1Toggle").checked : false,
@@ -5448,13 +5548,8 @@ function restoreSettings(){
     if(s.unetModel && $("unetModel")) $("unetModel").value = s.unetModel;
     if(s.clipModel && $("clipModel")) $("clipModel").value = s.clipModel;
 
-    if(s.h3Sparse !== undefined && $("h3SparseToggle")) $("h3SparseToggle").checked = s.h3Sparse;
-    if(s.h3Budget !== undefined && $("h3BudgetSlider")){
-      $("h3BudgetSlider").value = s.h3Budget;
-      if($("h3BudgetVal")) $("h3BudgetVal").textContent = parseFloat(s.h3Budget).toFixed(2);
-    }
-    if(s.h3EarlyLate !== undefined && $("h3EarlyLateToggle")) $("h3EarlyLateToggle").checked = s.h3EarlyLate;
-    if(s.h3Mem !== undefined && $("h3MemToggle")) $("h3MemToggle").checked = s.h3Mem;
+    if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
+    if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
 
     if(s.h3ShiftVideo !== undefined && $("h3ShiftVideo")){
       $("h3ShiftVideo").value = s.h3ShiftVideo;
@@ -5540,8 +5635,8 @@ function attachAutoSaveListeners(){
   const inputIds = [
     "prompt", "prompt2", "seg2PromptMode", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
-    "unetModel", "clipModel", "h3SparseToggle", "h3BudgetSlider", "h3EarlyLateToggle",
-    "h3MemToggle", "h3ShiftVideo", "h3ShiftAudio", "lora1Toggle", "lora1Select",
+    "unetModel", "clipModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
+    "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve"
@@ -6033,30 +6128,63 @@ function buildGraph(j){
   if(clip && g[N.CLIP]?.inputs) g[N.CLIP].inputs.clip_name = clip;
 
   // 7. Pipeline de Modelo Base & Optimizaciones H3
-  let currentModelNode = N.MEM_OPT;
+  // MMH3X2 usa el orden fijo del workflow base:
+  // UNet → ModelAttentionBackend → H3SparseAttention → SigmaShift → H3MemoryOptimization
+  const backendState = j?.attentionBackend || getAttentionBackendState();
+  const h3opt = j?.h3opt || getH3OptState();
 
-  // Sparse Attention
-  const sparseOn = $("h3SparseToggle") ? $("h3SparseToggle").checked : true;
-  if(sparseOn && g[N.SPARSE]?.inputs){
-    g[N.SPARSE].inputs.video_budget = parseFloat($("h3BudgetSlider")?.value || "0.30");
-    g[N.SPARSE].inputs.denser_early_late_steps = $("h3EarlyLateToggle") ? $("h3EarlyLateToggle").checked : true;
-  } else if(!sparseOn && g[N.SPARSE]){
-    if(g[N.SIGMA_SHIFT]?.inputs) g[N.SIGMA_SHIFT].inputs.model = [N.ATTN, 0];
-    delete g[N.SPARSE];
+  // El nodo SPARSE original del grafo base se mantiene; solo ajustamos sus parámetros.
+  if(g[N.SPARSE]?.inputs){
+    g[N.SPARSE].inputs.video_budget = h3opt.videoBudget;
+    g[N.SPARSE].inputs.denser_early_late_steps = h3opt.denserEarlyLate;
   }
 
-  // Memory Optimization
-  const memOn = $("h3MemToggle") ? $("h3MemToggle").checked : true;
-  if(!memOn && g[N.MEM_OPT]){
+  // Backend denso (ModelAttentionBackend) - primero en la cadena, como en el workflow original
+  if(g[N.ATTN]?.inputs){
+    g[N.ATTN].inputs.attention = backendState.backend;
+  }
+  let currentModelNode = N.ATTN;
+
+  // H3 Sparse Attention: en el workflow base recibe model desde ATTN
+  if(g[N.SPARSE]){
+    g[N.SPARSE].inputs.model = [N.ATTN, 0];
+    currentModelNode = N.SPARSE;
+  }
+
+  // Sigma Shift (MiniMaxH3SigmaShift)
+  if(g[N.SIGMA_SHIFT]?.inputs){
+    g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
+    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat((j ? j.h3ShiftVideo : $("h3ShiftVideo")?.value) || "12.0");
+    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat((j ? j.h3ShiftAudio : $("h3ShiftAudio")?.value) || "3.0");
     currentModelNode = N.SIGMA_SHIFT;
+  }
+
+  // Memory Optimization (después de SigmaShift, como en el workflow original)
+  if(h3opt.memOptEnabled){
+    if(!g[N.MEM_OPT]){
+      g[N.MEM_OPT] = {
+        class_type: "H3MemoryOptimization",
+        inputs: {
+          fused_qkv: "auto", mlp_memory: "auto", chunk_rows: 4096,
+          preserve_precision: true, precision_mode: "Auto",
+          qkv_streaming_mode: "Auto", embedding_memory_mode: "Auto",
+          kitchen_v_memory_mode: "Standard",
+          model: [currentModelNode, 0]
+        },
+        _meta: { title: "H3 Memory Optimization" }
+      };
+    } else if(g[N.MEM_OPT].inputs){
+      g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+    }
+    currentModelNode = N.MEM_OPT;
+  } else if(g[N.MEM_OPT]){
     delete g[N.MEM_OPT];
   }
 
-  // Sigma Shift (valores estándar MiniMax H3: 12.0 vídeo, 3.0 audio)
-  if(g[N.SIGMA_SHIFT]?.inputs){
-    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat($("h3ShiftVideo")?.value || "12.0");
-    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat($("h3ShiftAudio")?.value || "3.0");
-  }
+  // Limpiar nodos de optimizadores avanzados no usados en este workflow
+  if(g[N.SPARSE_ATTN]) delete g[N.SPARSE_ATTN];
+  if(g[N.BLOCK_SPARSE]) delete g[N.BLOCK_SPARSE];
+  if(g[N.AIMDO]) delete g[N.AIMDO];
 
   // 8. Inyección dinámica de LoRAs
   if($("lora1Toggle")?.checked && $("lora1Select")?.value){
@@ -6365,7 +6493,11 @@ async function queueJob(runMode){
     audioMode: $("audioMode")?.value || "none",
     seedMode,
     seed: baseSeed,
-    batchSize
+    batchSize,
+    attentionBackend: getAttentionBackendState(),
+    h3opt: getH3OptState(),
+    h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
+    h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0"
   };
 
   // Consultar en vivo el estado real de ComfyUI antes de decidir encolar
@@ -6740,9 +6872,10 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if($("h3BudgetSlider")){
-    $("h3BudgetSlider").addEventListener("input", (e) => {
-      $("h3BudgetVal").textContent = parseFloat(e.target.value).toFixed(2);
+  if($("h3VideoBudget")){
+    $("h3VideoBudget").addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${Math.round(val * 100)}%`;
     });
   }
 
@@ -6756,6 +6889,8 @@ window.addEventListener("DOMContentLoaded", () => {
       $("h3ShiftAudioVal").textContent = parseFloat(e.target.value).toFixed(1);
     });
   }
+
+  attachAttentionOptimizerListeners();
 
   if($("lora1Strength")){
     $("lora1Strength").addEventListener("input", (e) => {

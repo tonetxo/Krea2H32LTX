@@ -70,7 +70,10 @@ const CONFIG = {
     IMG2: "81",
     IMG3: "82",
     IMG4: "83",
-    PURGE: "87"
+    ATTN: "2",
+    SPARSE: "4",
+    SIGMA_SHIFT: "5",
+    MEM_OPT: "6"
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -149,6 +152,58 @@ RULES:
 const N = CONFIG.N;
 initCommon();
 
+// --- ATTENTION OPTIMIZATIONS (backend + sparse optimizer) ---
+// MMH3X2 usa el workflow base fijo: UNet -> ModelAttentionBackend -> H3SparseAttention -> SigmaShift -> H3MemoryOptimization.
+  // Solo exponemos: backend denso, video budget, denser early/late y mem opt.
+const ATTENTION_BACKEND_KEY = "mmh3x2_attention_backend";
+const H3OPT_KEY = "mmh3x2_h3opt";
+
+const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
+const H3OPT_DEFAULTS = { videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true };
+
+function loadAttentionBackend(){
+  try { return Object.assign({}, ATTENTION_BACKEND_DEFAULTS, JSON.parse(localStorage.getItem(ATTENTION_BACKEND_KEY) || "{}")); }
+  catch(_) { return {...ATTENTION_BACKEND_DEFAULTS}; }
+}
+function saveAttentionBackend(s){ try { localStorage.setItem(ATTENTION_BACKEND_KEY, JSON.stringify(s)); } catch(_){} }
+function getAttentionBackendState(){
+  return { backend: $("attentionBackend")?.value || ATTENTION_BACKEND_DEFAULTS.backend };
+}
+function setAttentionBackendUI(s){
+  if($("attentionBackend")) $("attentionBackend").value = s.backend;
+}
+
+function loadH3Opt(){
+  try { return Object.assign({}, H3OPT_DEFAULTS, JSON.parse(localStorage.getItem(H3OPT_KEY) || "{}")); }
+  catch(_) { return {...H3OPT_DEFAULTS}; }
+}
+function saveH3Opt(state){ try { localStorage.setItem(H3OPT_KEY, JSON.stringify(state)); } catch(_){} }
+function getH3OptState(){
+  return {
+    videoBudget: parseFloat($("h3VideoBudget")?.value || "0.30"),
+    denserEarlyLate: $("segDenserOn")?.classList.contains("on") ?? true,
+    memOptEnabled: $("segMemOptOn")?.classList.contains("on") ?? true,
+  };
+}
+function setH3OptUI(state){
+  if($("h3VideoBudget")){
+    $("h3VideoBudget").value = state.videoBudget;
+    const pct = Math.round(state.videoBudget * 100);
+    if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${pct}%`;
+  }
+  const dOn = $("segDenserOn"), dOff = $("segDenserOff");
+  if(state.denserEarlyLate){ dOn?.classList.add("on"); dOff?.classList.remove("on"); }
+  else { dOff?.classList.add("on"); dOn?.classList.remove("on"); }
+  const mOn = $("segMemOptOn"), mOff = $("segMemOptOff");
+  if(state.memOptEnabled){ mOn?.classList.add("on"); mOff?.classList.remove("on"); }
+  else { mOff?.classList.add("on"); mOn?.classList.remove("on"); }
+}
+
+const _attentionBackendState = loadAttentionBackend();
+const _h3OptState = loadH3Opt();
+setAttentionBackendUI(_attentionBackendState);
+setH3OptUI(_h3OptState);
+
 // Estado de imágenes, vídeo y audio
 let mediaSlots = {
   1: { file: null, dataUrl: null, uploaded: null, name: "" },
@@ -185,6 +240,22 @@ let stageTimers = {
 
 // UI Tabs
 let currentViewMode = "all";
+
+// Listeners de optimizaciones (se adjuntan tras DOMContentLoaded)
+function attachAttentionOptimizerListeners(){
+  $("attentionBackend")?.addEventListener("change", () => { saveAttentionBackend(getAttentionBackendState()); scheduleSaveSettings(); });
+  $("h3VideoBudget")?.addEventListener("input", (e) => {
+    const val = parseFloat(e.target.value);
+    const pct = Math.round(val * 100);
+    if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${pct}%`;
+    saveH3Opt(getH3OptState());
+    scheduleSaveSettings();
+  });
+  $("segDenserOn")?.addEventListener("click", () => { const s = getH3OptState(); s.denserEarlyLate = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("segDenserOff")?.addEventListener("click", () => { const s = getH3OptState(); s.denserEarlyLate = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+}
 
 // Callbacks CONFIG requeridos por common.js
 CONFIG.findMedia = function(output){
@@ -280,6 +351,10 @@ CONFIG.variantMeta = function(){
     ["UNet", unet],
     ["CLIP", clip],
     ["LoRAs", lorasActive.length ? lorasActive.join(", ") : "ninguno"],
+    ["Backend denso", $("attentionBackend")?.value || "comfy kitchen attention"],
+    ["Video budget", `${Math.round((parseFloat($("h3VideoBudget")?.value || "0.30")) * 100)}%`],
+    ["Denser early/late", $("segDenserOn")?.classList.contains("on") ? "Sí" : "No"],
+    ["Memory opt", $("segMemOptOn")?.classList.contains("on") ? "Sí" : "No"],
     ["RIFE", `${rMode}x`]
   ];
 
@@ -969,7 +1044,26 @@ function applyWorkflow(workflow){
     $("clipModel").value = clipNode.inputs.clip_name;
   }
 
-  // 10. Toggles postprocesado y RIFE
+  // 10. Optimizaciones de atención MMH3X2 (backend + H3SparseAttention + MemoryOptimization)
+  const attnBackendNode = findByClass("ModelAttentionBackend");
+  if(attnBackendNode?.inputs?.attention){
+    setAttentionBackendUI({ backend: attnBackendNode.inputs.attention });
+    saveAttentionBackend({ backend: attnBackendNode.inputs.attention });
+  }
+
+  const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
+  const memOptNode = findByClass("H3MemoryOptimization");
+  if(sparseNode?.inputs){
+    const h3State = loadH3Opt();
+    if(typeof sparseNode.inputs.video_budget === "number") h3State.videoBudget = sparseNode.inputs.video_budget;
+    if(typeof sparseNode.inputs.denser_early_late_steps === "boolean") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps;
+    else if(typeof sparseNode.inputs.denser_early_late_steps === "string") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps === "true";
+    h3State.memOptEnabled = !!memOptNode;
+    setH3OptUI(h3State);
+    saveH3Opt(h3State);
+  }
+
+  // 11. Toggles postprocesado y RIFE
   const rifeNode = workflow["72"] || findByClass("FrameInterpolate");
   if($("rifeToggle")) $("rifeToggle").checked = !!rifeNode;
   if(rifeNode?.inputs?.multiplier && $("rifeMultiplier")){
@@ -1276,10 +1370,8 @@ function saveSettings(){
     scheduler: $("schedulerName")?.value || "simple",
     unetModel: $("unetModel")?.value || "",
     clipModel: $("clipModel")?.value || "",
-    h3Sparse: $("h3SparseToggle") ? $("h3SparseToggle").checked : true,
-    h3Budget: $("h3BudgetSlider")?.value || "0.30",
-    h3EarlyLate: $("h3EarlyLateToggle") ? $("h3EarlyLateToggle").checked : true,
-    h3Mem: $("h3MemToggle") ? $("h3MemToggle").checked : true,
+    attentionBackend: getAttentionBackendState(),
+    h3opt: getH3OptState(),
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     lora1Toggle: $("lora1Toggle") ? $("lora1Toggle").checked : false,
@@ -1361,13 +1453,8 @@ function restoreSettings(){
     if(s.unetModel && $("unetModel")) $("unetModel").value = s.unetModel;
     if(s.clipModel && $("clipModel")) $("clipModel").value = s.clipModel;
 
-    if(s.h3Sparse !== undefined && $("h3SparseToggle")) $("h3SparseToggle").checked = s.h3Sparse;
-    if(s.h3Budget !== undefined && $("h3BudgetSlider")){
-      $("h3BudgetSlider").value = s.h3Budget;
-      if($("h3BudgetVal")) $("h3BudgetVal").textContent = parseFloat(s.h3Budget).toFixed(2);
-    }
-    if(s.h3EarlyLate !== undefined && $("h3EarlyLateToggle")) $("h3EarlyLateToggle").checked = s.h3EarlyLate;
-    if(s.h3Mem !== undefined && $("h3MemToggle")) $("h3MemToggle").checked = s.h3Mem;
+    if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
+    if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
 
     if(s.h3ShiftVideo !== undefined && $("h3ShiftVideo")){
       $("h3ShiftVideo").value = s.h3ShiftVideo;
@@ -1453,8 +1540,8 @@ function attachAutoSaveListeners(){
   const inputIds = [
     "prompt", "prompt2", "seg2PromptMode", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
-    "unetModel", "clipModel", "h3SparseToggle", "h3BudgetSlider", "h3EarlyLateToggle",
-    "h3MemToggle", "h3ShiftVideo", "h3ShiftAudio", "lora1Toggle", "lora1Select",
+    "unetModel", "clipModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
+    "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve"
@@ -1946,30 +2033,63 @@ function buildGraph(j){
   if(clip && g[N.CLIP]?.inputs) g[N.CLIP].inputs.clip_name = clip;
 
   // 7. Pipeline de Modelo Base & Optimizaciones H3
-  let currentModelNode = N.MEM_OPT;
+  // MMH3X2 usa el orden fijo del workflow base:
+  // UNet → ModelAttentionBackend → H3SparseAttention → SigmaShift → H3MemoryOptimization
+  const backendState = j?.attentionBackend || getAttentionBackendState();
+  const h3opt = j?.h3opt || getH3OptState();
 
-  // Sparse Attention
-  const sparseOn = $("h3SparseToggle") ? $("h3SparseToggle").checked : true;
-  if(sparseOn && g[N.SPARSE]?.inputs){
-    g[N.SPARSE].inputs.video_budget = parseFloat($("h3BudgetSlider")?.value || "0.30");
-    g[N.SPARSE].inputs.denser_early_late_steps = $("h3EarlyLateToggle") ? $("h3EarlyLateToggle").checked : true;
-  } else if(!sparseOn && g[N.SPARSE]){
-    if(g[N.SIGMA_SHIFT]?.inputs) g[N.SIGMA_SHIFT].inputs.model = [N.ATTN, 0];
-    delete g[N.SPARSE];
+  // El nodo SPARSE original del grafo base se mantiene; solo ajustamos sus parámetros.
+  if(g[N.SPARSE]?.inputs){
+    g[N.SPARSE].inputs.video_budget = h3opt.videoBudget;
+    g[N.SPARSE].inputs.denser_early_late_steps = h3opt.denserEarlyLate;
   }
 
-  // Memory Optimization
-  const memOn = $("h3MemToggle") ? $("h3MemToggle").checked : true;
-  if(!memOn && g[N.MEM_OPT]){
+  // Backend denso (ModelAttentionBackend) - primero en la cadena, como en el workflow original
+  if(g[N.ATTN]?.inputs){
+    g[N.ATTN].inputs.attention = backendState.backend;
+  }
+  let currentModelNode = N.ATTN;
+
+  // H3 Sparse Attention: en el workflow base recibe model desde ATTN
+  if(g[N.SPARSE]){
+    g[N.SPARSE].inputs.model = [N.ATTN, 0];
+    currentModelNode = N.SPARSE;
+  }
+
+  // Sigma Shift (MiniMaxH3SigmaShift)
+  if(g[N.SIGMA_SHIFT]?.inputs){
+    g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
+    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat((j ? j.h3ShiftVideo : $("h3ShiftVideo")?.value) || "12.0");
+    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat((j ? j.h3ShiftAudio : $("h3ShiftAudio")?.value) || "3.0");
     currentModelNode = N.SIGMA_SHIFT;
+  }
+
+  // Memory Optimization (después de SigmaShift, como en el workflow original)
+  if(h3opt.memOptEnabled){
+    if(!g[N.MEM_OPT]){
+      g[N.MEM_OPT] = {
+        class_type: "H3MemoryOptimization",
+        inputs: {
+          fused_qkv: "auto", mlp_memory: "auto", chunk_rows: 4096,
+          preserve_precision: true, precision_mode: "Auto",
+          qkv_streaming_mode: "Auto", embedding_memory_mode: "Auto",
+          kitchen_v_memory_mode: "Standard",
+          model: [currentModelNode, 0]
+        },
+        _meta: { title: "H3 Memory Optimization" }
+      };
+    } else if(g[N.MEM_OPT].inputs){
+      g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+    }
+    currentModelNode = N.MEM_OPT;
+  } else if(g[N.MEM_OPT]){
     delete g[N.MEM_OPT];
   }
 
-  // Sigma Shift (valores estándar MiniMax H3: 12.0 vídeo, 3.0 audio)
-  if(g[N.SIGMA_SHIFT]?.inputs){
-    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat($("h3ShiftVideo")?.value || "12.0");
-    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat($("h3ShiftAudio")?.value || "3.0");
-  }
+  // Limpiar nodos de optimizadores avanzados no usados en este workflow
+  if(g[N.SPARSE_ATTN]) delete g[N.SPARSE_ATTN];
+  if(g[N.BLOCK_SPARSE]) delete g[N.BLOCK_SPARSE];
+  if(g[N.AIMDO]) delete g[N.AIMDO];
 
   // 8. Inyección dinámica de LoRAs
   if($("lora1Toggle")?.checked && $("lora1Select")?.value){
@@ -2278,7 +2398,11 @@ async function queueJob(runMode){
     audioMode: $("audioMode")?.value || "none",
     seedMode,
     seed: baseSeed,
-    batchSize
+    batchSize,
+    attentionBackend: getAttentionBackendState(),
+    h3opt: getH3OptState(),
+    h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
+    h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0"
   };
 
   // Consultar en vivo el estado real de ComfyUI antes de decidir encolar
@@ -2653,9 +2777,10 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if($("h3BudgetSlider")){
-    $("h3BudgetSlider").addEventListener("input", (e) => {
-      $("h3BudgetVal").textContent = parseFloat(e.target.value).toFixed(2);
+  if($("h3VideoBudget")){
+    $("h3VideoBudget").addEventListener("input", (e) => {
+      const val = parseFloat(e.target.value);
+      if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${Math.round(val * 100)}%`;
     });
   }
 
@@ -2669,6 +2794,8 @@ window.addEventListener("DOMContentLoaded", () => {
       $("h3ShiftAudioVal").textContent = parseFloat(e.target.value).toFixed(1);
     });
   }
+
+  attachAttentionOptimizerListeners();
 
   if($("lora1Strength")){
     $("lora1Strength").addEventListener("input", (e) => {
