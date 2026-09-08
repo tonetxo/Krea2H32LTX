@@ -3787,6 +3787,27 @@ function _r2vInputFile(id, accept, onFile){
 }
 
 // --- RENDER de la malla de imágenes de referencia ---
+function updateR2VAspectFromFirstRef(){
+  // En modo r2v, el aspect ratio se deriva de la primera imagen de referencia disponible.
+  if(currentMode !== "r2v") return;
+  const first = refImages.find(r => r.local);
+  if(!first || !first.local) return;
+  const img = new Image();
+  img.onload = () => {
+    rawInputImageWidth = img.naturalWidth;
+    rawInputImageHeight = img.naturalHeight;
+    imageNativeAspectRatio = img.naturalWidth / img.naturalHeight;
+    if(arMode !== "16:9"){
+      // Mantenemos auto pero recalculamos resolución con el nuevo aspecto nativo.
+      recalcResolution();
+      updateArLabel(rawInputImageWidth, rawInputImageHeight);
+    } else {
+      updateArLabel(rawInputImageWidth, rawInputImageHeight);
+    }
+  };
+  img.src = first.local;
+}
+
 function renderRefImages(){
   const grid = $("refImgGrid");
   if(!grid) return;
@@ -3804,6 +3825,7 @@ function renderRefImages(){
       e.stopPropagation();
       ref.local = null; ref.uploaded = null;
       renderRefImages();
+      updateR2VAspectFromFirstRef();
     });
     const idx = document.createElement("span");
     idx.className = "ref-idx";
@@ -3844,6 +3866,7 @@ function renderRefImages(){
           refImages[i].local = ev.target.result;
           refImages[i].uploaded = null;
           renderRefImages();
+          updateR2VAspectFromFirstRef();
           log(`🖼️ Imagen de referencia ${i+1}: ${file.name}`, "l-ok");
         };
         reader.readAsDataURL(file);
@@ -3854,6 +3877,7 @@ function renderRefImages(){
       if(!isNaN(from) && from !== i){
         const tmp = refImages[from]; refImages[from] = refImages[i]; refImages[i] = tmp;
         renderRefImages();
+        updateR2VAspectFromFirstRef();
       }
     });
     grid.appendChild(slot);
@@ -3882,6 +3906,7 @@ r2vImgInput.addEventListener("change", () => {
     refImages[target].local = e.target.result;
     refImages[target].uploaded = null;
     renderRefImages();
+    updateR2VAspectFromFirstRef();
     log(`🖼️ Imagen de referencia ${target+1}: ${f.name}`, "l-ok");
   };
   reader.readAsDataURL(f);
