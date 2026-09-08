@@ -70,10 +70,9 @@ const CONFIG = {
     IMG2: "81",
     IMG3: "82",
     IMG4: "83",
-    ATTN: "2",
-    SPARSE: "4",
-    SIGMA_SHIFT: "5",
-    MEM_OPT: "6"
+    SPARSE_ATTN: "4",
+    BLOCK_SPARSE: "4",
+    AIMDO: "91"
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -150,16 +149,60 @@ RULES:
 };
 
 const N = CONFIG.N;
+
+// --- MODO DE WORKFLOW (base / blockatt) ---
+const WORKFLOW_MODE_KEY = "mmh3x2_workflow_mode";
+const IS_BLOCKATT = (() => {
+  // Detección automática: el HTML BlockATT trae un nodo 4 de tipo H3SparseAttentionAdvanced o BlockSparseAttention,
+  // mientras que el HTML base trae H3SparseAttention (no Advanced).
+  const n4 = BASE_GRAPH?.["4"]?.class_type || "";
+  const hasAdvanced = n4 === "H3SparseAttentionAdvanced";
+  const hasBlockSparse = n4 === "BlockSparseAttention";
+  const explicit = (localStorage.getItem(WORKFLOW_MODE_KEY) || "").trim();
+  if (explicit === "blockatt") return true;
+  if (explicit === "base") return false;
+  return hasAdvanced || hasBlockSparse;
+})();
+
 initCommon();
 
-// --- ATTENTION OPTIMIZATIONS (backend + sparse optimizer) ---
-// MMH3X2 usa el workflow base fijo: UNet -> ModelAttentionBackend -> H3SparseAttention -> SigmaShift -> H3MemoryOptimization.
-  // Solo exponemos: backend denso, video budget, denser early/late y mem opt.
+// --- MODO WORKFLOW: selector UI ---
+function setWorkflowModeUI(){
+  const sel = $("workflowMode");
+  if(!sel) return;
+  sel.value = IS_BLOCKATT ? "blockatt" : "base";
+}
+function saveWorkflowMode(mode){
+  try { localStorage.setItem(WORKFLOW_MODE_KEY, mode); } catch(_){}
+}
+
+// --- ATTENTION OPTIMIZATIONS ---
+// Modo base: cadena fija UNet -> ModelAttentionBackend -> H3SparseAttention -> SigmaShift -> H3MemoryOptimization.
+// Modo blockatt: cadena flexible UNet -> ModelAttentionBackend -> (H3SparseAdvanced / BlockSparse / nada) -> AIMDO? -> SigmaShift -> MemOpt?.
 const ATTENTION_BACKEND_KEY = "mmh3x2_attention_backend";
+const ATTENTION_OPTIMIZER_KEY = "mmh3x2_attention_optimizer";
 const H3OPT_KEY = "mmh3x2_h3opt";
+const AIMDO_KEY = "mmh3x2_aimdo";
+const BLOCK_SPARSE_KEY = "mmh3x2_block_sparse";
 
 const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
-const H3OPT_DEFAULTS = { videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true };
+const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "none" };
+const H3OPT_DEFAULTS = { sparseBackend: "auto", videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true };
+const AIMDO_DEFAULTS = { residency: "0 blocks" };
+const BLOCK_SPARSE_MODES = {
+  "Sol-Attn (adaptive tau)": "sol-attn",
+  "top-k (SLA)": "sla",
+  "VSA (FastVideo)": "vsa"
+};
+const BLOCK_SPARSE_MODES_REVERSE = {
+  "sol-attn": "Sol-Attn (adaptive tau)",
+  "sla": "top-k (SLA)",
+  "vsa": "VSA (FastVideo)"
+};
+function mapBlockSparseSelection(sel){
+  return BLOCK_SPARSE_MODES[sel] || BLOCK_SPARSE_MODES_REVERSE[sel] || sel;
+}
+const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0 };
 
 function loadAttentionBackend(){
   try { return Object.assign({}, ATTENTION_BACKEND_DEFAULTS, JSON.parse(localStorage.getItem(ATTENTION_BACKEND_KEY) || "{}")); }
@@ -173,6 +216,27 @@ function setAttentionBackendUI(s){
   if($("attentionBackend")) $("attentionBackend").value = s.backend;
 }
 
+function loadAttentionOptimizer(){
+  try { return Object.assign({}, ATTENTION_OPTIMIZER_DEFAULTS, JSON.parse(localStorage.getItem(ATTENTION_OPTIMIZER_KEY) || "{}")); }
+  catch(_) { return {...ATTENTION_OPTIMIZER_DEFAULTS}; }
+}
+function saveAttentionOptimizer(s){ try { localStorage.setItem(ATTENTION_OPTIMIZER_KEY, JSON.stringify(s)); } catch(_){} }
+function getAttentionOptimizerState(){
+  const none = $("segAttnNone"), h3 = $("segAttnH3"), bs = $("segAttnBlockSparse");
+  if(h3?.classList.contains("on")) return { mode: "h3-optimizations" };
+  if(bs?.classList.contains("on")) return { mode: "block-sparse" };
+  return { mode: "none" };
+}
+function setAttentionOptimizerUI(mode){
+  const none = $("segAttnNone"), h3 = $("segAttnH3"), bs = $("segAttnBlockSparse");
+  none?.classList.toggle("on", mode === "none");
+  h3?.classList.toggle("on", mode === "h3-optimizations");
+  bs?.classList.toggle("on", mode === "block-sparse");
+  const h3Panel = $("h3OptPanel"), bsPanel = $("blockSparsePanel");
+  if(h3Panel) h3Panel.style.display = mode === "h3-optimizations" ? "" : "none";
+  if(bsPanel) bsPanel.style.display = mode === "block-sparse" ? "" : "none";
+}
+
 function loadH3Opt(){
   try { return Object.assign({}, H3OPT_DEFAULTS, JSON.parse(localStorage.getItem(H3OPT_KEY) || "{}")); }
   catch(_) { return {...H3OPT_DEFAULTS}; }
@@ -180,12 +244,14 @@ function loadH3Opt(){
 function saveH3Opt(state){ try { localStorage.setItem(H3OPT_KEY, JSON.stringify(state)); } catch(_){} }
 function getH3OptState(){
   return {
+    sparseBackend: $("h3SparseBackend")?.value || "auto",
     videoBudget: parseFloat($("h3VideoBudget")?.value || "0.30"),
     denserEarlyLate: $("segDenserOn")?.classList.contains("on") ?? true,
     memOptEnabled: $("segMemOptOn")?.classList.contains("on") ?? true,
   };
 }
 function setH3OptUI(state){
+  if($("h3SparseBackend")) $("h3SparseBackend").value = state.sparseBackend || "auto";
   if($("h3VideoBudget")){
     $("h3VideoBudget").value = state.videoBudget;
     const pct = Math.round(state.videoBudget * 100);
@@ -199,10 +265,49 @@ function setH3OptUI(state){
   else { mOff?.classList.add("on"); mOn?.classList.remove("on"); }
 }
 
+function loadAimdo(){
+  try { return Object.assign({}, AIMDO_DEFAULTS, JSON.parse(localStorage.getItem(AIMDO_KEY) || "{}")); }
+  catch(_) { return {...AIMDO_DEFAULTS}; }
+}
+function saveAimdo(s){ try { localStorage.setItem(AIMDO_KEY, JSON.stringify(s)); } catch(_){} }
+function getAimdoState(){ return { residency: $("aimdoResidency")?.value || AIMDO_DEFAULTS.residency }; }
+function setAimdoUI(s){ if($("aimdoResidency")) $("aimdoResidency").value = s.residency; }
+
+function loadBlockSparse(){
+  try { return Object.assign({}, BLOCK_SPARSE_DEFAULTS, JSON.parse(localStorage.getItem(BLOCK_SPARSE_KEY) || "{}")); }
+  catch(_) { return {...BLOCK_SPARSE_DEFAULTS}; }
+}
+function saveBlockSparse(s){ try { localStorage.setItem(BLOCK_SPARSE_KEY, JSON.stringify(s)); } catch(_){} }
+function getBlockSparseState(){
+  return {
+    selection: $("blockSparseSelection")?.value || BLOCK_SPARSE_DEFAULTS.selection,
+    tau: parseFloat($("blockSparseTau")?.value ?? "1.3"),
+    startPercent: parseFloat($("blockSparseStart")?.value ?? "0.2"),
+    endPercent: parseFloat($("blockSparseEnd")?.value ?? "1.0"),
+  };
+}
+function setBlockSparseUI(s){
+  if($("blockSparseSelection")) $("blockSparseSelection").value = s.selection;
+  if($("blockSparseTau")){ $("blockSparseTau").value = s.tau; $("blockSparseTauVal").textContent = parseFloat(s.tau).toFixed(2); }
+  if($("blockSparseStart")){ $("blockSparseStart").value = s.startPercent; $("blockSparseStartVal").textContent = parseFloat(s.startPercent).toFixed(2); }
+  if($("blockSparseEnd")){ $("blockSparseEnd").value = s.endPercent; $("blockSparseEndVal").textContent = parseFloat(s.endPercent).toFixed(2); }
+}
+
 const _attentionBackendState = loadAttentionBackend();
+const _attentionOptimizerState = loadAttentionOptimizer();
 const _h3OptState = loadH3Opt();
+const _aimdoState = loadAimdo();
+const _blockSparseState = loadBlockSparse();
+setWorkflowModeUI();
 setAttentionBackendUI(_attentionBackendState);
-setH3OptUI(_h3OptState);
+if(IS_BLOCKATT){
+  setAttentionOptimizerUI(_attentionOptimizerState.mode);
+  setH3OptUI(_h3OptState);
+  setAimdoUI(_aimdoState);
+  setBlockSparseUI(_blockSparseState);
+} else {
+  setH3OptUI(_h3OptState);
+}
 
 // Estado de imágenes, vídeo y audio
 let mediaSlots = {
@@ -243,7 +348,18 @@ let currentViewMode = "all";
 
 // Listeners de optimizaciones (se adjuntan tras DOMContentLoaded)
 function attachAttentionOptimizerListeners(){
+  $("workflowMode")?.addEventListener("change", (e) => {
+    const mode = e.target.value;
+    saveWorkflowMode(mode);
+    const target = mode === "blockatt" ? "MMH3X2_WebUI_BlockATT.html" : "MMH3X2_WebUI.html";
+    window.location.href = target;
+  });
+
   $("attentionBackend")?.addEventListener("change", () => { saveAttentionBackend(getAttentionBackendState()); scheduleSaveSettings(); });
+  $("segAttnNone")?.addEventListener("click", () => { setAttentionOptimizerUI("none"); saveAttentionOptimizer({mode:"none"}); scheduleSaveSettings(); });
+  $("segAttnH3")?.addEventListener("click", () => { setAttentionOptimizerUI("h3-optimizations"); saveAttentionOptimizer({mode:"h3-optimizations"}); scheduleSaveSettings(); });
+  $("segAttnBlockSparse")?.addEventListener("click", () => { setAttentionOptimizerUI("block-sparse"); saveAttentionOptimizer({mode:"block-sparse"}); scheduleSaveSettings(); });
+  $("h3SparseBackend")?.addEventListener("change", () => { saveH3Opt(getH3OptState()); scheduleSaveSettings(); });
   $("h3VideoBudget")?.addEventListener("input", (e) => {
     const val = parseFloat(e.target.value);
     const pct = Math.round(val * 100);
@@ -255,6 +371,11 @@ function attachAttentionOptimizerListeners(){
   $("segDenserOff")?.addEventListener("click", () => { const s = getH3OptState(); s.denserEarlyLate = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("aimdoResidency")?.addEventListener("change", () => { saveAimdo(getAimdoState()); scheduleSaveSettings(); });
+  $("blockSparseSelection")?.addEventListener("change", () => { saveBlockSparse(getBlockSparseState()); scheduleSaveSettings(); });
+  $("blockSparseTau")?.addEventListener("input", (e) => { $("blockSparseTauVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveSettings(); });
+  $("blockSparseStart")?.addEventListener("input", (e) => { $("blockSparseStartVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveSettings(); });
+  $("blockSparseEnd")?.addEventListener("input", (e) => { $("blockSparseEndVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveSettings(); });
 }
 
 // Callbacks CONFIG requeridos por common.js
@@ -355,8 +476,10 @@ CONFIG.variantMeta = function(){
     ["Video budget", `${Math.round((parseFloat($("h3VideoBudget")?.value || "0.30")) * 100)}%`],
     ["Denser early/late", $("segDenserOn")?.classList.contains("on") ? "Sí" : "No"],
     ["Memory opt", $("segMemOptOn")?.classList.contains("on") ? "Sí" : "No"],
+    IS_BLOCKATT ? ["Optimizador", getAttentionOptimizerState().mode] : null,
+    IS_BLOCKATT && getAttentionOptimizerState().mode === "block-sparse" ? ["BlockSparse", $("blockSparseSelection")?.value] : null,
     ["RIFE", `${rMode}x`]
-  ];
+  ].filter(Boolean);
 
   return { title: "Parámetros MMH3X2", rows, loras: lorasActive };
 };
@@ -1044,7 +1167,7 @@ function applyWorkflow(workflow){
     $("clipModel").value = clipNode.inputs.clip_name;
   }
 
-  // 10. Optimizaciones de atención MMH3X2 (backend + H3SparseAttention + MemoryOptimization)
+  // 10. Optimizaciones de atención MMH3X2
   const attnBackendNode = findByClass("ModelAttentionBackend");
   if(attnBackendNode?.inputs?.attention){
     setAttentionBackendUI({ backend: attnBackendNode.inputs.attention });
@@ -1052,8 +1175,39 @@ function applyWorkflow(workflow){
   }
 
   const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
+  const sparseAdvancedNode = findByClass("H3SparseAttentionAdvanced");
+  const blockSparseNode = findByClass("BlockSparseAttention");
+  const aimdoNode = findByClass("H3AIMDOResidencyLimiter");
   const memOptNode = findByClass("H3MemoryOptimization");
-  if(sparseNode?.inputs){
+
+  if(blockSparseNode?.inputs){
+    const bs = { ...BLOCK_SPARSE_DEFAULTS };
+    const sel = blockSparseNode.inputs.selection;
+    bs.selection = mapBlockSparseSelection(sel) || bs.selection;
+    if(blockSparseNode.inputs["selection.tau"] != null) bs.tau = blockSparseNode.inputs["selection.tau"];
+    if(blockSparseNode.inputs.start_percent != null) bs.startPercent = blockSparseNode.inputs.start_percent;
+    if(blockSparseNode.inputs.end_percent != null) bs.endPercent = blockSparseNode.inputs.end_percent;
+    setBlockSparseUI(bs);
+    saveBlockSparse(bs);
+    setAttentionOptimizerUI("block-sparse");
+    saveAttentionOptimizer({ mode: "block-sparse" });
+  } else if(sparseAdvancedNode?.inputs || sparseNode?.class_type === "H3SparseAttentionAdvanced"){
+    const h3State = loadH3Opt();
+    if(typeof sparseNode.inputs.video_budget === "number") h3State.videoBudget = sparseNode.inputs.video_budget;
+    if(typeof sparseNode.inputs.denser_early_late_steps === "boolean") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps;
+    else if(typeof sparseNode.inputs.denser_early_late_steps === "string") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps === "true";
+    if(typeof sparseNode.inputs.backend === "string") h3State.sparseBackend = sparseNode.inputs.backend;
+    h3State.memOptEnabled = !!memOptNode;
+    setH3OptUI(h3State);
+    saveH3Opt(h3State);
+    if(aimdoNode?.inputs?.residency_limit){
+      const aimdoState = { residency: aimdoNode.inputs.residency_limit };
+      setAimdoUI(aimdoState);
+      saveAimdo(aimdoState);
+    }
+    setAttentionOptimizerUI("h3-optimizations");
+    saveAttentionOptimizer({ mode: "h3-optimizations" });
+  } else if(sparseNode?.inputs){
     const h3State = loadH3Opt();
     if(typeof sparseNode.inputs.video_budget === "number") h3State.videoBudget = sparseNode.inputs.video_budget;
     if(typeof sparseNode.inputs.denser_early_late_steps === "boolean") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps;
@@ -1061,6 +1215,8 @@ function applyWorkflow(workflow){
     h3State.memOptEnabled = !!memOptNode;
     setH3OptUI(h3State);
     saveH3Opt(h3State);
+    setAttentionOptimizerUI("none");
+    saveAttentionOptimizer({ mode: "none" });
   }
 
   // 11. Toggles postprocesado y RIFE
@@ -1371,7 +1527,10 @@ function saveSettings(){
     unetModel: $("unetModel")?.value || "",
     clipModel: $("clipModel")?.value || "",
     attentionBackend: getAttentionBackendState(),
+    attentionOptimizer: IS_BLOCKATT ? getAttentionOptimizerState() : null,
     h3opt: getH3OptState(),
+    aimdo: IS_BLOCKATT ? getAimdoState() : null,
+    blockSparse: IS_BLOCKATT ? getBlockSparseState() : null,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     lora1Toggle: $("lora1Toggle") ? $("lora1Toggle").checked : false,
@@ -1454,7 +1613,14 @@ function restoreSettings(){
     if(s.clipModel && $("clipModel")) $("clipModel").value = s.clipModel;
 
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
-    if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
+    if(IS_BLOCKATT){
+      if(s.attentionOptimizer){ setAttentionOptimizerUI(s.attentionOptimizer.mode); saveAttentionOptimizer(s.attentionOptimizer); }
+      if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
+      if(s.aimdo){ setAimdoUI(s.aimdo); saveAimdo(s.aimdo); }
+      if(s.blockSparse){ setBlockSparseUI(s.blockSparse); saveBlockSparse(s.blockSparse); }
+    } else {
+      if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
+    }
 
     if(s.h3ShiftVideo !== undefined && $("h3ShiftVideo")){
       $("h3ShiftVideo").value = s.h3ShiftVideo;
@@ -1537,7 +1703,7 @@ async function restoreSavedMedia(){
 }
 
 function attachAutoSaveListeners(){
-  const inputIds = [
+  const baseIds = [
     "prompt", "prompt2", "seg2PromptMode", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
     "unetModel", "clipModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
@@ -1546,6 +1712,11 @@ function attachAutoSaveListeners(){
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve"
   ];
+  const blockattIds = IS_BLOCKATT ? [
+    "h3SparseBackend", "aimdoResidency", "blockSparseSelection", "blockSparseTau",
+    "blockSparseStart", "blockSparseEnd"
+  ] : [];
+  const inputIds = baseIds.concat(blockattIds);
 
   inputIds.forEach(id => {
     const el = $(id);
@@ -2033,63 +2204,144 @@ function buildGraph(j){
   if(clip && g[N.CLIP]?.inputs) g[N.CLIP].inputs.clip_name = clip;
 
   // 7. Pipeline de Modelo Base & Optimizaciones H3
-  // MMH3X2 usa el orden fijo del workflow base:
-  // UNet → ModelAttentionBackend → H3SparseAttention → SigmaShift → H3MemoryOptimization
   const backendState = j?.attentionBackend || getAttentionBackendState();
   const h3opt = j?.h3opt || getH3OptState();
 
-  // El nodo SPARSE original del grafo base se mantiene; solo ajustamos sus parámetros.
-  if(g[N.SPARSE]?.inputs){
-    g[N.SPARSE].inputs.video_budget = h3opt.videoBudget;
-    g[N.SPARSE].inputs.denser_early_late_steps = h3opt.denserEarlyLate;
-  }
-
-  // Backend denso (ModelAttentionBackend) - primero en la cadena, como en el workflow original
+  // Backend denso (ModelAttentionBackend) - primero en la cadena
   if(g[N.ATTN]?.inputs){
     g[N.ATTN].inputs.attention = backendState.backend;
   }
   let currentModelNode = N.ATTN;
 
-  // H3 Sparse Attention: en el workflow base recibe model desde ATTN
-  if(g[N.SPARSE]){
-    g[N.SPARSE].inputs.model = [N.ATTN, 0];
-    currentModelNode = N.SPARSE;
-  }
+  if(IS_BLOCKATT){
+    // Modo BlockATT: cadena flexible UNet -> ModelAttentionBackend -> (optimizador) -> SigmaShift -> MemOpt?
+    const optimizerState = j?.attentionOptimizer || getAttentionOptimizerState();
+    const aimdoState = j?.aimdo || getAimdoState();
+    const bs = j?.blockSparse || getBlockSparseState();
 
-  // Sigma Shift (MiniMaxH3SigmaShift)
-  if(g[N.SIGMA_SHIFT]?.inputs){
-    g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
-    g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat((j ? j.h3ShiftVideo : $("h3ShiftVideo")?.value) || "12.0");
-    g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat((j ? j.h3ShiftAudio : $("h3ShiftAudio")?.value) || "3.0");
-    currentModelNode = N.SIGMA_SHIFT;
-  }
+    // Limpiar nodos alternativos previos
+    if(g[N.SPARSE]) delete g[N.SPARSE];
+    if(g[N.SPARSE_ATTN]) delete g[N.SPARSE_ATTN];
+    if(g[N.BLOCK_SPARSE]) delete g[N.BLOCK_SPARSE];
+    if(g[N.AIMDO]) delete g[N.AIMDO];
 
-  // Memory Optimization (después de SigmaShift, como en el workflow original)
-  if(h3opt.memOptEnabled){
-    if(!g[N.MEM_OPT]){
-      g[N.MEM_OPT] = {
-        class_type: "H3MemoryOptimization",
+    if(optimizerState.mode === "h3-optimizations"){
+      const backend = h3opt.sparseBackend || "auto";
+      g[N.SPARSE_ATTN] = {
+        class_type: "H3SparseAttentionAdvanced",
         inputs: {
-          fused_qkv: "auto", mlp_memory: "auto", chunk_rows: 4096,
-          preserve_precision: true, precision_mode: "Auto",
-          qkv_streaming_mode: "Auto", embedding_memory_mode: "Auto",
-          kitchen_v_memory_mode: "Standard",
-          model: [currentModelNode, 0]
+          model: [N.ATTN, 0],
+          video_budget: h3opt.videoBudget,
+          denser_early_late_steps: h3opt.denserEarlyLate,
+          backend: backend
         },
-        _meta: { title: "H3 Memory Optimization" }
+        _meta: { title: "H3 Sparse Attention Advanced" }
       };
-    } else if(g[N.MEM_OPT].inputs){
-      g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
-    }
-    currentModelNode = N.MEM_OPT;
-  } else if(g[N.MEM_OPT]){
-    delete g[N.MEM_OPT];
-  }
+      currentModelNode = N.SPARSE_ATTN;
 
-  // Limpiar nodos de optimizadores avanzados no usados en este workflow
-  if(g[N.SPARSE_ATTN]) delete g[N.SPARSE_ATTN];
-  if(g[N.BLOCK_SPARSE]) delete g[N.BLOCK_SPARSE];
-  if(g[N.AIMDO]) delete g[N.AIMDO];
+      if(aimdoState.residency !== "stock"){
+        g[N.AIMDO] = {
+          class_type: "H3AIMDOResidencyLimiter",
+          inputs: { model: [currentModelNode, 0], residency: aimdoState.residency },
+          _meta: { title: "H3 AIMDO Residency Limiter" }
+        };
+        currentModelNode = N.AIMDO;
+      }
+    } else if(optimizerState.mode === "block-sparse"){
+      const sel = mapBlockSparseSelection(bs.selection);
+      const isVsa = sel === "vsa";
+      const bsInputs = {
+        model: [N.ATTN, 0],
+        selection: sel,
+        start_percent: bs.startPercent,
+        end_percent: bs.endPercent,
+        dense_blocks: "",
+        min_tokens: 12288,
+        extra_tokens: isVsa ? 0 : 256,
+        sink_conditioning: "exact_kv_and_rows",
+        verbose: false
+      };
+      if(sel === "sol-attn") bsInputs["selection.tau"] = bs.tau;
+      g[N.BLOCK_SPARSE] = {
+        class_type: "BlockSparseAttention",
+        inputs: bsInputs,
+        _meta: { title: "Block Sparse Attention" }
+      };
+      currentModelNode = N.BLOCK_SPARSE;
+    }
+
+    // Sigma Shift
+    if(g[N.SIGMA_SHIFT]?.inputs){
+      g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
+      g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat((j ? j.h3ShiftVideo : $("h3ShiftVideo")?.value) || "12.0");
+      g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat((j ? j.h3ShiftAudio : $("h3ShiftAudio")?.value) || "3.0");
+      currentModelNode = N.SIGMA_SHIFT;
+    }
+
+    // Memory Optimization (toggleable)
+    if(h3opt.memOptEnabled){
+      if(!g[N.MEM_OPT]){
+        g[N.MEM_OPT] = {
+          class_type: "H3MemoryOptimization",
+          inputs: {
+            fused_qkv: "auto", mlp_memory: "auto", chunk_rows: 4096,
+            preserve_precision: true, precision_mode: "Auto",
+            qkv_streaming_mode: "Auto", embedding_memory_mode: "Auto",
+            kitchen_v_memory_mode: "Standard",
+            model: [currentModelNode, 0]
+          },
+          _meta: { title: "H3 Memory Optimization" }
+        };
+      } else if(g[N.MEM_OPT].inputs){
+        g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+      }
+      currentModelNode = N.MEM_OPT;
+    } else if(g[N.MEM_OPT]){
+      delete g[N.MEM_OPT];
+    }
+  } else {
+    // Modo base: cadena fija del workflow original
+    // UNet -> ModelAttentionBackend -> H3SparseAttention -> SigmaShift -> H3MemoryOptimization
+    if(g[N.SPARSE]?.inputs){
+      g[N.SPARSE].inputs.video_budget = h3opt.videoBudget;
+      g[N.SPARSE].inputs.denser_early_late_steps = h3opt.denserEarlyLate;
+    }
+    if(g[N.SPARSE]){
+      g[N.SPARSE].inputs.model = [N.ATTN, 0];
+      currentModelNode = N.SPARSE;
+    }
+    if(g[N.SIGMA_SHIFT]?.inputs){
+      g[N.SIGMA_SHIFT].inputs.model = [currentModelNode, 0];
+      g[N.SIGMA_SHIFT].inputs.shift_video = parseFloat((j ? j.h3ShiftVideo : $("h3ShiftVideo")?.value) || "12.0");
+      g[N.SIGMA_SHIFT].inputs.shift_audio = parseFloat((j ? j.h3ShiftAudio : $("h3ShiftAudio")?.value) || "3.0");
+      currentModelNode = N.SIGMA_SHIFT;
+    }
+    if(h3opt.memOptEnabled){
+      if(!g[N.MEM_OPT]){
+        g[N.MEM_OPT] = {
+          class_type: "H3MemoryOptimization",
+          inputs: {
+            fused_qkv: "auto", mlp_memory: "auto", chunk_rows: 4096,
+            preserve_precision: true, precision_mode: "Auto",
+            qkv_streaming_mode: "Auto", embedding_memory_mode: "Auto",
+            kitchen_v_memory_mode: "Standard",
+            model: [currentModelNode, 0]
+          },
+          _meta: { title: "H3 Memory Optimization" }
+        };
+      } else if(g[N.MEM_OPT].inputs){
+        g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+      }
+      currentModelNode = N.MEM_OPT;
+    } else if(g[N.MEM_OPT]){
+      delete g[N.MEM_OPT];
+    }
+
+    // Limpiar nodos de optimizadores avanzados no usados en modo base
+    if(g[N.SPARSE_ATTN]) delete g[N.SPARSE_ATTN];
+    if(g[N.BLOCK_SPARSE]) delete g[N.BLOCK_SPARSE];
+    if(g[N.AIMDO]) delete g[N.AIMDO];
+  }
 
   // 8. Inyección dinámica de LoRAs
   if($("lora1Toggle")?.checked && $("lora1Select")?.value){
@@ -2401,6 +2653,9 @@ async function queueJob(runMode){
     batchSize,
     attentionBackend: getAttentionBackendState(),
     h3opt: getH3OptState(),
+    attentionOptimizer: IS_BLOCKATT ? getAttentionOptimizerState() : null,
+    aimdo: IS_BLOCKATT ? getAimdoState() : null,
+    blockSparse: IS_BLOCKATT ? getBlockSparseState() : null,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0"
   };
@@ -2782,6 +3037,14 @@ window.addEventListener("DOMContentLoaded", () => {
       const val = parseFloat(e.target.value);
       if($("h3VideoBudgetVal")) $("h3VideoBudgetVal").textContent = `${Math.round(val * 100)}%`;
     });
+  }
+
+  // Mostrar/ocultar controles específicos de BlockATT según el modo actual
+  if(IS_BLOCKATT){
+    const rowOpt = $("rowOptimizer");
+    if(rowOpt) rowOpt.style.display = "";
+    const mode = getAttentionOptimizerState().mode;
+    setAttentionOptimizerUI(mode);
   }
 
   if($("h3ShiftVideo")){

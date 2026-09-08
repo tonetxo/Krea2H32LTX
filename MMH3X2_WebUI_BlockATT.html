@@ -414,7 +414,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
 </head>
 <body>
 <div class="wrap">
-  <div class="head"><h1>MMH3X2 <span>//</span> panel pro</h1><div class="sub">grafo: MMH3X2_4IMG</div></div>
+  <div class="head"><h1>MMH3X2 <span>//</span> panel pro</h1><div class="sub">grafo: MMH3X2_4IMG_BLOCKATT</div></div>
   <div class="chain" id="chain">
     <div class="node" data-n="img">4 imgs + 1 vid</div><div class="arrow">→</div>
     <div class="node" data-n="seg1">seg 1</div><div class="arrow">→</div>
@@ -1170,16 +1170,17 @@ const BASE_GRAPH = {
   },
   "4": {
     "inputs": {
-      "video_budget": 0.3,
-      "denser_early_late_steps": false,
       "model": [
         "2",
         0
-      ]
+      ],
+      "video_budget": 0.3,
+      "denser_early_late_steps": true,
+      "backend": "auto"
     },
-    "class_type": "H3SparseAttention",
+    "class_type": "H3SparseAttentionAdvanced",
     "_meta": {
-      "title": "Sparse Attention 0.3"
+      "title": "H3 Sparse Attention Advanced"
     }
   },
   "5": {
@@ -2205,7 +2206,6 @@ const BASE_GRAPH = {
       "title": "Load Image"
     }
   },
-
   "86": {
     "inputs": {
       "enable_mirostat": false,

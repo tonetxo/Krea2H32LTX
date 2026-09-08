@@ -13,10 +13,10 @@ INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbac
 MMH3X2_UI_PORT = os.environ.get("MMH3X2_UI_PORT", "8003")
 # ---------------------
 
-def main():
-    generate_html({
-        'json_file': JSON_FILE,
-        'output_html': OUTPUT_HTML,
+def build_config(json_file, output_html, header_sub):
+    return {
+        'json_file': json_file,
+        'output_html': output_html,
         'title': 'MMH3X2 · Panel Pro',
         'enhancer_title': 'Mejorar prompt con IA (MiniMax H3 / Ollama)',
         'ui_html': 'mmh3x2_html.html',
@@ -39,16 +39,30 @@ def main():
         'clip_dirs': [(CLIP_DIR, '')],
         'clip_fallback': 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',
         'clip_exclude': ('AceStep', 'ViT-L-14', 'byt5', 'clip_g', 'clip_l',
-                         'gemma', 'gpt_oss', 'ltx-2.3', 'ltx2/', 'ministral',
-                         'mistral', 'qwen3.5', 'qwen3vl_4b', 'qwen3vl_8b',
-                         'qwen_0.6b', 'qwen_1.7b', 'qwen_2.5', 'qwen_3_06',
-                         'qwen_3_4b', 'qwen_3_600', 'qwen_3_8b', 'sulphur',
-                         't5gemma', 't5xxl'),
+                          'gemma', 'gpt_oss', 'ltx-2.3', 'ltx2/', 'ministral',
+                          'mistral', 'qwen3.5', 'qwen3vl_4b', 'qwen3vl_8b',
+                          'qwen_0.6b', 'qwen_1.7b', 'qwen_2.5', 'qwen_3_06',
+                          'qwen_3_4b', 'qwen_3_600', 'qwen_3_8b', 'sulphur',
+                          't5gemma', 't5xxl'),
         'header_title': 'MMH3X2',
-        'header_sub': 'grafo: MMH3X2_4IMG',
+        'header_sub': header_sub,
         'model_count_label': '',
         'mmh3x2_ui_port': MMH3X2_UI_PORT,
-    })
+    }
+
+def main():
+    # Variante Base: cadena fija del workflow original
+    generate_html(build_config(
+        JSON_FILE,
+        OUTPUT_HTML,
+        'grafo: MMH3X2_4IMG'
+    ))
+    # Variante BlockATT: cadena flexible con BlockSparse / H3-Optimizations
+    generate_html(build_config(
+        'MMH3X2_4IMG_BLOCKATT.json',
+        'MMH3X2_WebUI_BlockATT.html',
+        'grafo: MMH3X2_4IMG_BLOCKATT'
+    ))
 
 if __name__ == '__main__':
     main()
