@@ -506,8 +506,8 @@ function applyWorkflow(workflow){
     const mp = g[N.RES_SELECTOR].inputs.megapixels;
     if(mp != null){
       $("mpSlider").value = Math.min(Math.max(mp, 0.1), 4.0);
-      $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
     }
+    if($("mpSlider") && $("mpVal")) $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
   }
 
   if(g[N.PROJECTOR]){

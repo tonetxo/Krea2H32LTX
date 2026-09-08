@@ -1015,7 +1015,7 @@ function applyWorkflow(workflow, opts={}){
     const mp = (w * h) / 1_000_000;
     const clamped = Math.min(Math.max(mp, parseFloat($("mpSlider").min)||0.3), parseFloat($("mpSlider").max)||2.0);
     $("mpSlider").value = clamped.toFixed(2);
-    $("mpVal").textContent = $("mpSlider").value;
+    recalcResolution();
   }
 
   const mxSlidersAll = findAllByClass("mxSlider");
