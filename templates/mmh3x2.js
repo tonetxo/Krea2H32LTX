@@ -70,8 +70,8 @@ const CONFIG = {
     IMG2: "81",
     IMG3: "82",
     IMG4: "83",
-    SPARSE_ATTN: "4",
-    BLOCK_SPARSE: "4",
+    SPARSE_ATTN: "88",
+    BLOCK_SPARSE: "90",
     AIMDO: "91"
   },
   loras: [
