@@ -189,6 +189,10 @@ const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
 const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "none" };
 const H3OPT_DEFAULTS = { sparseBackend: "auto", videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true };
 const AIMDO_DEFAULTS = { residency: "0 blocks" };
+// Nota: BlockSparseAttention está desactivado en MMH3X2 porque produce:
+// make_forward.<locals>.forward() got an unexpected keyword argument 'attention'
+// en el transformer de MiniMax H3. Se conservan las funciones por compatibilidad
+// de workflow antiguos, pero la UI no ofrece el modo.
 const BLOCK_SPARSE_MODES = {
   "Sol-Attn (adaptive tau)": "sol-attn",
   "top-k (SLA)": "sla",
@@ -222,19 +226,18 @@ function loadAttentionOptimizer(){
 }
 function saveAttentionOptimizer(s){ try { localStorage.setItem(ATTENTION_OPTIMIZER_KEY, JSON.stringify(s)); } catch(_){} }
 function getAttentionOptimizerState(){
-  const none = $("segAttnNone"), h3 = $("segAttnH3"), bs = $("segAttnBlockSparse");
+  const none = $("segAttnNone"), h3 = $("segAttnH3");
   if(h3?.classList.contains("on")) return { mode: "h3-optimizations" };
-  if(bs?.classList.contains("on")) return { mode: "block-sparse" };
   return { mode: "none" };
 }
 function setAttentionOptimizerUI(mode){
-  const none = $("segAttnNone"), h3 = $("segAttnH3"), bs = $("segAttnBlockSparse");
-  none?.classList.toggle("on", mode === "none");
-  h3?.classList.toggle("on", mode === "h3-optimizations");
-  bs?.classList.toggle("on", mode === "block-sparse");
-  const h3Panel = $("h3OptPanel"), bsPanel = $("blockSparsePanel");
-  if(h3Panel) h3Panel.style.display = mode === "h3-optimizations" ? "" : "none";
-  if(bsPanel) bsPanel.style.display = mode === "block-sparse" ? "" : "none";
+  const none = $("segAttnNone"), h3 = $("segAttnH3");
+  // Block Sparse ya no es seleccionable: normalizar a "none" o "h3-optimizations"
+  const safeMode = mode === "block-sparse" ? "none" : (mode || "none");
+  none?.classList.toggle("on", safeMode === "none");
+  h3?.classList.toggle("on", safeMode === "h3-optimizations");
+  const h3Panel = $("h3OptPanel");
+  if(h3Panel) h3Panel.style.display = safeMode === "h3-optimizations" ? "" : "none";
 }
 
 function loadH3Opt(){
@@ -358,7 +361,6 @@ function attachAttentionOptimizerListeners(){
   $("attentionBackend")?.addEventListener("change", () => { saveAttentionBackend(getAttentionBackendState()); scheduleSaveSettings(); });
   $("segAttnNone")?.addEventListener("click", () => { setAttentionOptimizerUI("none"); saveAttentionOptimizer({mode:"none"}); scheduleSaveSettings(); });
   $("segAttnH3")?.addEventListener("click", () => { setAttentionOptimizerUI("h3-optimizations"); saveAttentionOptimizer({mode:"h3-optimizations"}); scheduleSaveSettings(); });
-  $("segAttnBlockSparse")?.addEventListener("click", () => { setAttentionOptimizerUI("block-sparse"); saveAttentionOptimizer({mode:"block-sparse"}); scheduleSaveSettings(); });
   $("h3SparseBackend")?.addEventListener("change", () => { saveH3Opt(getH3OptState()); scheduleSaveSettings(); });
   $("h3VideoBudget")?.addEventListener("input", (e) => {
     const val = parseFloat(e.target.value);
@@ -372,10 +374,6 @@ function attachAttentionOptimizerListeners(){
   $("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("aimdoResidency")?.addEventListener("change", () => { saveAimdo(getAimdoState()); scheduleSaveSettings(); });
-  $("blockSparseSelection")?.addEventListener("change", () => { saveBlockSparse(getBlockSparseState()); scheduleSaveSettings(); });
-  $("blockSparseTau")?.addEventListener("input", (e) => { $("blockSparseTauVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveSettings(); });
-  $("blockSparseStart")?.addEventListener("input", (e) => { $("blockSparseStartVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveSettings(); });
-  $("blockSparseEnd")?.addEventListener("input", (e) => { $("blockSparseEndVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveSettings(); });
 }
 
 // Callbacks CONFIG requeridos por common.js
@@ -477,7 +475,6 @@ CONFIG.variantMeta = function(){
     ["Denser early/late", $("segDenserOn")?.classList.contains("on") ? "Sí" : "No"],
     ["Memory opt", $("segMemOptOn")?.classList.contains("on") ? "Sí" : "No"],
     IS_BLOCKATT ? ["Optimizador", getAttentionOptimizerState().mode] : null,
-    IS_BLOCKATT && getAttentionOptimizerState().mode === "block-sparse" ? ["BlockSparse", $("blockSparseSelection")?.value] : null,
     ["RIFE", `${rMode}x`]
   ].filter(Boolean);
 
@@ -1712,10 +1709,9 @@ function attachAutoSaveListeners(){
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve"
   ];
-  const blockattIds = IS_BLOCKATT ? [
-    "h3SparseBackend", "aimdoResidency", "blockSparseSelection", "blockSparseTau",
-    "blockSparseStart", "blockSparseEnd"
-  ] : [];
+    const blockattIds = IS_BLOCKATT ? [
+      "h3SparseBackend", "aimdoResidency"
+    ] : [];
   const inputIds = baseIds.concat(blockattIds);
 
   inputIds.forEach(id => {
@@ -2249,28 +2245,9 @@ function buildGraph(j){
         };
         currentModelNode = N.AIMDO;
       }
-    } else if(optimizerState.mode === "block-sparse"){
-      const sel = mapBlockSparseSelection(bs.selection);
-      const isVsa = sel === "vsa";
-      const bsInputs = {
-        model: [N.ATTN, 0],
-        selection: sel,
-        start_percent: bs.startPercent,
-        end_percent: bs.endPercent,
-        dense_blocks: "",
-        min_tokens: 12288,
-        extra_tokens: isVsa ? 0 : 256,
-        sink_conditioning: "exact_kv_and_rows",
-        verbose: false
-      };
-      if(sel === "sol-attn") bsInputs["selection.tau"] = bs.tau;
-      g[N.BLOCK_SPARSE] = {
-        class_type: "BlockSparseAttention",
-        inputs: bsInputs,
-        _meta: { title: "Block Sparse Attention" }
-      };
-      currentModelNode = N.BLOCK_SPARSE;
     }
+    // BlockSparseAttention está desactivado en MMH3X2 (fallo con MiniMax H3).
+    // Si un workflow antiguo pide "block-sparse", se ignora y se usa H3SparseAttentionAdvanced.
 
     // Sigma Shift
     if(g[N.SIGMA_SHIFT]?.inputs){

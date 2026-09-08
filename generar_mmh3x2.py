@@ -57,7 +57,9 @@ def main():
         OUTPUT_HTML,
         'grafo: MMH3X2_4IMG'
     ))
-    # Variante BlockATT: cadena flexible con BlockSparse / H3-Optimizations
+    # Variante BlockATT: cadena flexible con H3SparseAttentionAdvanced + AIMDO.
+    # BlockSparseAttention está oculto porque falla en MiniMax H3 en MMH3X2
+    # (make_forward.<locals>.forward() got an unexpected keyword argument 'attention').
     generate_html(build_config(
         'MMH3X2_4IMG_BLOCKATT.json',
         'MMH3X2_WebUI_BlockATT.html',
