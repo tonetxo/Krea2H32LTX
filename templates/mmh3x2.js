@@ -695,14 +695,6 @@ CONFIG.onPreview = function(url, meta){
   const w = $("previewWrap" + slot);
   if(!p && !pv) return;
 
-  // Si Seg 1 ya terminó y tiene vídeo cargado, no pisarlo; sin embargo,
-  // si el preview llega para una variante distinta a la activa (slot de preview
-  // final vacío o con otro prompt_id), permitir actualizar para reflejar progreso.
-  const currentFinalVideo = $("videoFinal");
-  if(slot === "Seg1" && v && v.src && v.style.display === "block" && currentFinalVideo?.src && currentFinalVideo.style.display === "block"){
-    return;
-  }
-
   const isVideoUrl = typeof url === "string" && (url.startsWith("data:video/mp4") || url.startsWith("data:video/webm"));
   const target = isVideoUrl && pv ? pv : p;
   const other = isVideoUrl ? p : pv;
@@ -765,6 +757,26 @@ CONFIG.onClearPreview = function(){
     if(b) b.style.display = "none";
   });
 };
+
+// Reset de los 3 paneles de preview al empezar una nueva variante: sin esto,
+// Seg1/Final muestran el preview (o resultado) de la generación anterior hasta
+// que llega el preview nuevo. Limpia los elementos de preview en vivo (img/video
+// de preview) y las cajas de "vacío", pero NO los reproductores de resultados
+// (videoSeg1/videoSeg2/videoFinal), que solo se tocan al cargar un resultado.
+function resetPreviewPanes(){
+  ["Final", "Seg1", "Seg2"].forEach(slot => {
+    const p = $("previewImg" + slot);
+    const pv = $("previewVideo" + slot);
+    const w = $("previewWrap" + slot);
+    const b = $("previewStep" + slot);
+    const e = $("empty" + slot);
+    if(p){ p.style.display = "none"; p.removeAttribute("src"); }
+    if(pv){ pv.pause(); pv.style.display = "none"; pv.removeAttribute("src"); pv.load(); }
+    if(w) w.style.display = "none";
+    if(b) b.style.display = "none";
+    if(e) e.style.display = "";
+  });
+}
 
 function createGeneratingCard(varIdx, seedUsed){
   const box = $("variantGalleryBox");
@@ -2729,6 +2741,11 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
     CONFIG.onSeedUpdate(seedUsed);
     currentActiveSamplerSlot = 1;
     const graph = buildGraph({ ...job, seed: seedUsed });
+
+    // Nueva variante: los 3 paneles de preview vuelven a "sin generar" para que
+    // se vea la animación completa (Seg1 → Seg2 → Final) y no se arrastre el
+    // preview de la variante anterior.
+    resetPreviewPanes();
 
     log(`🚀 Procesando ${job.runMode === 'seg1_only' ? 'Solo Seg 1' : 'Vídeo MMH3X2'} · Var ${varIdx} (seed ${seedUsed})...`);
     const r = await fetch(server() + "/prompt", {
