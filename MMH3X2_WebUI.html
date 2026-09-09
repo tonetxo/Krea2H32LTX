@@ -6329,13 +6329,16 @@ async function ensureAllMediaUploaded(){
     const aSlot = audioSlots[i];
     if(aSlot.file && !aSlot.uploaded){
       // Mitigación OOM de la VAE de audio: si el audio se usa como ref_audio
-      // (modo guide/hybrid), recortarlo a la duración del segmento con ffmpeg
-      // antes de subirlo. Menos muestras = menos VRAM por encode.
+      // (modo guide/hybrid), recortarlo con ffmpeg antes de subirlo.
+      // Menos muestras = menos VRAM por encode.
+      // - Audio 1 en modo guide: recorta a dur1+dur2 (puede alimentar la
+      //   pista de Seg 2 como continuación).
+      // - Audio 2: a dur2.
       const audioMode = ($("audioMode")?.value || "none");
       const usedAsRef = (audioMode === "guide" || audioMode === "hybrid");
-      const dur = usedAsRef ? parseFloat(i === 1
-        ? ($("durationSlider1")?.value || "15.0")
-        : ($("durationSlider2")?.value || "15.0")) : 0;
+      const d1 = parseFloat($("durationSlider1")?.value || "15.0");
+      const d2 = parseFloat($("durationSlider2")?.value || "15.0");
+      const dur = usedAsRef ? (i === 1 ? d1 + d2 : d2) : 0;
       if(usedAsRef && dur > 0){
         const fd = new FormData();
         fd.append("image", aSlot.file, aSlot.file.name || ("mmh3x2_audio_"+i));
@@ -6853,7 +6856,8 @@ function buildGraph(j){
         g[N.CREATE_VID_1].inputs.audio = ["196_trim_guide_audio1", 0];
       }
       // Pista Seg 2: audio 2 si existe; si no, el mismo audio 1 recortado
-      // desde el final de Seg 1 (continuidad).
+      // desde el final de Seg 1 (continuidad). El audio recortado por ffmpeg
+      // cubre dur1+dur2 (o más), así que hay material tras Seg 1.
       if(g[N.CREATE_VID_2]?.inputs){
         if(a2){
           g["197_trim_guide_audio2"] = {
@@ -6863,12 +6867,17 @@ function buildGraph(j){
           };
           g[N.CREATE_VID_2].inputs.audio = ["197_trim_guide_audio2", 0];
         } else if(a1){
+          // Si el audio 1 no llega al punto de continuación (dur1+crossfade),
+          // reiniciamos desde el principio en vez de fallar.
+          const hasContinuation = (seg1TrimG + 0.01) < (dur1 + dur2);
+          const startIdx = hasContinuation ? seg1TrimG : 0.0;
           g["197_trim_guide_audio2"] = {
-            inputs: { audio: ["190_load_audio1", 0], start_index: seg1TrimG, duration: seg2Dur },
+            inputs: { audio: ["190_load_audio1", 0], start_index: startIdx, duration: seg2Dur },
             class_type: "TrimAudioDuration",
-            _meta: { title: "Guía: Audio Seg 2 (continuación)" }
+            _meta: { title: hasContinuation ? "Guía: Audio Seg 2 (continuación)" : "Guía: Audio Seg 2 (reinicia audio 1)" }
           };
           g[N.CREATE_VID_2].inputs.audio = ["197_trim_guide_audio2", 0];
+          if(!hasContinuation) log("⚠️ El audio 1 no cubre dur1+dur2; Seg 2 reinicia el audio desde 0s.", "l-warn");
         }
       }
     }
