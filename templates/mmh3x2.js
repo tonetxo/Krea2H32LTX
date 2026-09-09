@@ -2631,6 +2631,13 @@ function buildGraph(j){
   if(g[N.SAVE_VID_2]?.inputs) g[N.SAVE_VID_2].inputs.filename_prefix = prefix + "_seg2";
   if(g[N.SAVE_VID_FINAL]?.inputs) g[N.SAVE_VID_FINAL].inputs.filename_prefix = prefix + "_cont";
 
+  // Los SaveImage auxiliares (último frame + grid de referencias) son solo
+  // diagnóstico: los eliminamos del grafo para no llenar output/video/ de PNGs
+  // que luego contaminan "Imágenes Krea2 recientes" (el listado escanea todo
+  // output/ de forma recursiva).
+  if(g[N.SAVE_LAST_FRAME]) delete g[N.SAVE_LAST_FRAME];
+  if(g[N.SAVE_REF_GRID]) delete g[N.SAVE_REF_GRID];
+
   // 15. Modo de Ejecución (Completo vs Solo Seg 1 vs Solo Seg 2)
   const runMode = j?.runMode || "full";
   if(runMode === "seg1_only"){

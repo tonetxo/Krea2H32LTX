@@ -767,6 +767,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def _build_krea2_list(self):
         items = []
         output_dir = os.path.join(COMFYUI_ROOT, "output")
+        # Imágenes auxiliares de diagnóstico (last frame / refgrid de MMH3X2, etc.)
+        # que no son salidas de Krea2: se excluyen del listado.
+        excluded_substrings = ("_lastframe", "_refgrid")
         try:
             paths = []
             for pattern in ("**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"):
@@ -790,6 +793,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
             for p in paths:
                 try:
+                    if any(s in p for s in excluded_substrings):
+                        continue
                     st = os.stat(p)
                     rel = os.path.relpath(p, output_dir)
                     parts = rel.split(os.sep)
