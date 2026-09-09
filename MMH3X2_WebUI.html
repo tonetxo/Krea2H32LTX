@@ -6623,8 +6623,15 @@ function buildGraph(j){
   }
 
   const audioMode = (j ? j.audioMode : $("audioMode")?.value) || "none";
-  const a1 = audioSlots[1]?.uploaded?.name || (audioSlots[1]?.file ? audioSlots[1].file.name : null);
-  const a2 = audioSlots[2]?.uploaded?.name || (audioSlots[2]?.file ? audioSlots[2].file.name : null);
+  // LoadAudio resuelve el filename relativo a input/ (soporta "sub/name");
+  // los audios de /api/video_preprocess se guardan en input/reference/.
+  const audioPath = (slot) => {
+    const up = slot?.uploaded;
+    if(up && up.subfolder) return `${up.subfolder}/${up.name}`;
+    return up?.name || (slot?.file ? slot.file.name : null);
+  };
+  const a1 = audioPath(audioSlots[1]);
+  const a2 = audioPath(audioSlots[2]);
   const totalDurExact = parseFloat((((calcFramesForDuration(dur1) - 1) + calcFramesForDuration(dur2)) / 24).toFixed(4));
 
   if(audioMode !== "none" && (a1 || a2)){
