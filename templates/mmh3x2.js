@@ -2837,6 +2837,10 @@ function buildGraph(j){
     }
 
     // C. Pista Directa en el Vídeo Final (sustituye el audio sintetizado en CreateVideo nodo 42)
+    // En hybrid este bloque SOLO construye las pistas de usuario (192/193/194/195)
+    // que la mezcla del bloque anterior referencia; la asignación de 42.audio la
+    // hace la mezcla. Sobrescribirla aquí dejaría el final solo con la pista
+    // del usuario y sin el audio IA.
     if(audioMode === "passthrough" || audioMode === "hybrid"){
       if(a1 && !a2){
         g["192_trim_final_audio"] = {
@@ -2848,7 +2852,7 @@ function buildGraph(j){
           class_type: "TrimAudioDuration",
           _meta: { title: "Audio Global recortado" }
         };
-        if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
+        if(audioMode === "passthrough" && g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
       } else if(a1 && a2){
         const seg1Dur = parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
         const seg1Trim = (audioCrossfadeOn && cfSec > 0) ? parseFloat((seg1Dur + cfSec).toFixed(4)) : seg1Dur;
@@ -2892,7 +2896,7 @@ function buildGraph(j){
             _meta: { title: "Concatenar Audios Directos" }
           };
         }
-        if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["195_concat_direct_audio", 0];
+        if(audioMode === "passthrough" && g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["195_concat_direct_audio", 0];
       } else if(!a1 && a2){
         g["192_trim_final_audio"] = {
           inputs: {
@@ -2903,7 +2907,21 @@ function buildGraph(j){
           class_type: "TrimAudioDuration",
           _meta: { title: "Audio Seg 2 recortado" }
         };
-        if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
+        if(audioMode === "passthrough" && g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
+        // Híbrido con solo Audio 2: mezclar esa pista global con el concat IA.
+        if(audioMode === "hybrid" && g[N.CREATE_VID_FINAL]?.inputs && g[N.AUDIO_CONCAT] && g[N.AUDIO_CONCAT] in g){
+          g["199_ia_vol_final"] = {
+            inputs: { audio: [N.AUDIO_CONCAT, 0], volume: guideGainDb },
+            class_type: "AudioAdjustVolume",
+            _meta: { title: `Híbrido: IA global a ${guideGainDb} dB` }
+          };
+          g["199_merge_final"] = {
+            inputs: { audio1: ["192_trim_final_audio", 0], audio2: ["199_ia_vol_final", 0], merge_method: "add" },
+            class_type: "AudioMerge",
+            _meta: { title: "Híbrido: mezcla IA + pista (Final)" }
+          };
+          g[N.CREATE_VID_FINAL].inputs.audio = ["199_merge_final", 0];
+        }
       }
     }
   }
