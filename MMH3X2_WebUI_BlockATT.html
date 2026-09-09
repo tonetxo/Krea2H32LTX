@@ -2538,6 +2538,9 @@ function handleStepProgress(data) {
   if (!data) return;
   const { value, max, prompt_id, node } = data;
   if (value != null && max != null && max > 0) {
+    // Un progress tardío de un prompt ya finalizado no debe revivir el
+    // estado "muestreando" después de "Batch finalizado"/"en reposo".
+    if(prompt_id && handledPrompts.has(prompt_id)) return;
     const pct = Math.round((value / max) * 100);
     setRun("busy", `Muestreando (${value}/${max} · ${pct}%)`);
     if (CONFIG.onProgress) {
@@ -2718,11 +2721,13 @@ async function handlePromptDone(promptId) {
         return;
     }
 
-    log(`✅ Variante ${currentBatchIndex + 1}/${totalBatchSize} completada.`, "l-ok");
+    // En el último prompt del batch, marcar handled ANTES de processNextBatch
+    // para que un progress WS tardío (100%) no reviva el estado "muestreando".
     handledPrompts.add(promptId);
     processingPrompts.delete(promptId);
     delete pendingSeeds[promptId];
     currentBatchIndex++;
+    if(currentBatchIndex >= totalBatchSize) setRun("ok", "Batch finalizado");
     processNextBatch();
 }
 
