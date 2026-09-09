@@ -747,9 +747,48 @@ function renderRefImages(){
         reader.readAsDataURL(file);
         return;
       }
-      // Reordenar entre slots
-      const from = parseInt(e.dataTransfer.getData("text/plain"), 10);
-      if(!isNaN(from) && from !== i){
+      // Imagen arrastrada desde "Krea2 recientes" u otra UI (URL/dataset, sin File).
+      const custom = e.dataTransfer.getData(LTXV_MEDIA_MIME);
+      const plain = e.dataTransfer.getData("text/plain");
+      if(custom || (plain && plain !== String(i))){
+        let media = null;
+        if(custom){ try { media = JSON.parse(custom); } catch(_){ media = null; } }
+        // Descargar la imagen del backend y asignarla al slot.
+        const url = (media && !String(media.filename||"").startsWith("data:"))
+          ? mediaViewUrl(media, { anchor: "" })
+          : (plain && plain.startsWith("http")) ? plain : null;
+        if(url){
+          fetch(url).then(async r => {
+            if(!r.ok) throw new Error("HTTP "+r.status);
+            const blob = await r.blob();
+            const filename = (media && media.filename) || url.split("/").pop().split("?")[0] || "krea2.png";
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              refImages[i].local = ev.target.result;
+              refImages[i].uploaded = null;
+              dbSaveMedia(`refImg_${i}`, { kind: "dataUrl", name: filename, data: ev.target.result });
+              renderRefImages();
+              updateR2VAspectFromFirstRef();
+              log(`🖼️ Imagen de referencia ${i+1} (Krea2): ${filename}`, "l-ok");
+            };
+            reader.readAsDataURL(blob);
+          }).catch(err => log(`❌ No se pudo cargar la imagen arrastrada: ${err.message}`, "l-err"));
+          return;
+        }
+        // dataURL embebido (historial IndexedDB de Krea2)
+        if(media && media._dataUrl && media._dataUrl.startsWith("data:")){
+          refImages[i].local = media._dataUrl;
+          refImages[i].uploaded = null;
+          dbSaveMedia(`refImg_${i}`, { kind: "dataUrl", name: media.filename || "", data: media._dataUrl });
+          renderRefImages();
+          updateR2VAspectFromFirstRef();
+          log(`🖼️ Imagen de referencia ${i+1} (Krea2)`, "l-ok");
+          return;
+        }
+      }
+      // Reordenar entre slots (text/plain = índice del slot origen)
+      const from = parseInt(plain, 10);
+      if(!isNaN(from) && from !== i && plain === String(from)){
         const tmp = refImages[from]; refImages[from] = refImages[i]; refImages[i] = tmp;
         renderRefImages();
         updateR2VAspectFromFirstRef();
@@ -1602,6 +1641,15 @@ async function loadKrea2Recent(){
         const items = Array.from(grid.querySelectorAll(".gallery-item"));
         krea2RecentIndex = items.indexOf(div);
         loadKrea2ImageAsInput(url, it.filename);
+      });
+      // Drag: la tarjeta envía la URL vía MIME custom + uri-list.
+      div.draggable = true;
+      div.addEventListener("dragstart", (e) => {
+        const media = { filename: it.filename, subfolder: it.subfolder || "", type: it.type || "output" };
+        e.dataTransfer.effectAllowed = "copy";
+        e.dataTransfer.setData("text/uri-list", url);
+        e.dataTransfer.setData("text/plain", url);
+        e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
       });
       grid.appendChild(div);
     }

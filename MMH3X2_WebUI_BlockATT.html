@@ -618,6 +618,18 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
         </div>
       </div>
 
+      <!-- IMÁGENES KREA2 RECIENTES -->
+      <div class="panel">
+        <div class="collapsible-header" id="krea2RecentToggle">
+          <span class="arrow">▶</span> Imágenes Krea2 recientes
+        </div>
+        <div class="collapsible-body" id="krea2RecentBody">
+          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="gallery-grid" id="krea2RecentGrid"></div>
+          <div class="hint" style="margin-top:6px;">Clic: primer slot libre · Arrastrar: al slot que quieras.</div>
+        </div>
+      </div>
+
       <!-- SEMILLA -->
       <div class="panel">
         <h2>Semilla</h2>
@@ -7094,6 +7106,122 @@ async function loadVideoHistory(){
 // ==========================================
 // INICIALIZACIÓN
 // ==========================================
+// --- IMÁGENES KREA2 RECIENTES (clic → primer slot libre; drag → slot destino) ---
+async function loadKrea2Recent(){
+  const grid = $("krea2RecentGrid");
+  const status = $("krea2RecentStatus");
+  if(!grid || !status) return;
+  status.textContent = "Cargando...";
+  try {
+    const r = await fetch("/api/krea2_list");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    const items = data.items || [];
+    grid.innerHTML = "";
+    if(items.length === 0){
+      status.textContent = "Sin imágenes en "+data.dir+". Genera alguna en Krea2 primero.";
+      return;
+    }
+    status.textContent = `${items.length} imagen(es) (${data.dir}):`;
+    for(const it of items){
+      const url = `${server()}/view?filename=${encodeURIComponent(it.filename)}&subfolder=${encodeURIComponent(it.subfolder)}&type=${encodeURIComponent(it.type)}&t=${it.mtime}`;
+      const ts = new Date(it.mtime*1000).toLocaleString();
+      const sizeKB = Math.round(it.size/1024);
+      const div = document.createElement("div");
+      div.className = "gallery-item";
+      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${ts} · ${sizeKB}KB</div>`;
+      div.addEventListener("click", () => {
+        // Primer slot libre (1..4)
+        let target = -1;
+        for(let s = 1; s <= 4; s++){
+          if(!mediaSlots[s].dataUrl && !mediaSlots[s].file){ target = s; break; }
+        }
+        if(target < 0){ log("⚠️ Los 4 slots de imagen están ocupados. Quita alguna imagen primero.", "l-warn"); return; }
+        fetch(url).then(r2 => r2.blob()).then(blob => {
+          const file = new File([blob], it.filename, { type: blob.type || "image/png" });
+          handleImageFile(target, file);
+          log(`✅ Imagen Krea2 → slot ${target}: ${it.filename}`, "l-ok");
+        }).catch(e => log("❌ No se pudo cargar la imagen Krea2: "+e.message, "l-err"));
+      });
+      // Drag: la tarjeta envía la URL vía MIME custom + uri-list.
+      div.draggable = true;
+      div.addEventListener("dragstart", (e) => {
+        const media = { filename: it.filename, subfolder: it.subfolder || "", type: it.type || "output" };
+        e.dataTransfer.effectAllowed = "copy";
+        e.dataTransfer.setData("text/uri-list", url);
+        e.dataTransfer.setData("text/plain", url);
+        e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+      });
+      grid.appendChild(div);
+    }
+    grid.dataset.loaded = "1";
+  } catch(e){
+    status.textContent = "Error cargando: "+e.message;
+  }
+}
+
+$("krea2RecentToggle")?.addEventListener("click", () => {
+  const h = $("krea2RecentToggle");
+  const b = $("krea2RecentBody");
+  const isOpen = h.classList.toggle("open");
+  b.classList.toggle("open", isOpen);
+  const arrow = h.querySelector(".arrow");
+  if(arrow) arrow.textContent = isOpen ? "▼" : "▶";
+  if(isOpen && !$("krea2RecentGrid").dataset.loaded) loadKrea2Recent();
+});
+
+// Drop de imágenes Krea2 recientes sobre los slots 1..4.
+// El drop nativo de archivos del SO ya está en setupMediaSlots; aquí añadimos
+// el caso "URL arrastrada" (desde esta u otra UI).
+function enableKrea2RecentSlotDrop(){
+  for(let i = 1; i <= 4; i++){
+    const slotEl = $(`slotImg${i}`);
+    if(!slotEl) continue;
+    slotEl.addEventListener("dragover", (e) => {
+      if(!e.dataTransfer.types.includes("Files")){
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        slotEl.classList.add("drag");
+      }
+    });
+    slotEl.addEventListener("drop", async (e) => {
+      if(e.dataTransfer.files && e.dataTransfer.files.length > 0) return; // archivo OS: listener nativo
+      const custom = e.dataTransfer.getData(LTXV_MEDIA_MIME);
+      const uri = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+      if(!uri && !custom) return;
+      e.preventDefault();
+      e.stopPropagation();
+      slotEl.classList.remove("drag");
+      let media = null;
+      if(custom){ try { media = JSON.parse(custom); } catch(_){ media = null; } }
+      const url = (media && !String(media.filename||"").startsWith("data:"))
+        ? mediaViewUrl(media, { anchor: "" })
+        : (uri && !uri.startsWith("data:")) ? uri : null;
+      if(!url){
+        // dataURL embebido (historial IndexedDB de Krea2)
+        if(media && media._dataUrl && media._dataUrl.startsWith("data:")){
+          try {
+            const blob = await (await fetch(media._dataUrl)).blob();
+            handleImageFile(i, new File([blob], media.filename || "krea2.png", { type: blob.type || "image/png" }));
+            log(`✅ Imagen Krea2 → slot ${i}`, "l-ok");
+          } catch(err){ log("❌ No se pudo cargar la imagen arrastrada: "+err.message, "l-err"); }
+        }
+        return;
+      }
+      try {
+        const r = await fetch(url);
+        if(!r.ok) throw new Error("HTTP "+r.status);
+        const blob = await r.blob();
+        const filename = (media && media.filename) || url.split("/").pop().split("?")[0] || "krea2.png";
+        handleImageFile(i, new File([blob], filename, { type: blob.type || "image/png" }));
+        log(`✅ Imagen Krea2 → slot ${i}: ${filename}`, "l-ok");
+      } catch(err){
+        log("❌ No se pudo cargar la imagen arrastrada: "+err.message, "l-err");
+      }
+    });
+  }
+}
+
 // Cargar imagen pasada por query ?ref= (botón "→ MMH3X2" de Krea2) en el slot 1.
 (async function maybeLoadFromQuery(){
   const qs = new URLSearchParams(window.location.search);
@@ -7126,6 +7254,7 @@ async function loadVideoHistory(){
 
 window.addEventListener("DOMContentLoaded", () => {
   setupMediaSlots();
+  enableKrea2RecentSlotDrop();
 
   if($("btnFull")) $("btnFull").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("full"); });
   if($("btnSeg1")) $("btnSeg1").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("seg1_only"); });
