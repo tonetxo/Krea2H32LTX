@@ -2946,6 +2946,36 @@ async function loadVideoHistory(){
 // ==========================================
 // INICIALIZACIÓN
 // ==========================================
+// Cargar imagen pasada por query ?ref= (botón "→ MMH3X2" de Krea2) en el slot 1.
+(async function maybeLoadFromQuery(){
+  const qs = new URLSearchParams(window.location.search);
+  const ref = qs.get("ref");
+  if(!ref) return;
+  const rawName = decodeURIComponent(ref);
+  const filename = rawName.replace(/^.*\//, "");
+  const subfolder = (rawName.includes("/") && rawName.split("/").slice(0,-1).join("/")) || "krea2";
+  const tryLoad = async (sf) => {
+    const url = `/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(sf)}&type=${encodeURIComponent("output")}`;
+    log("⏳ Cargando imagen Krea2 como entrada: "+filename+" (subfolder="+sf+")", "l-info");
+    const r = await fetch(url);
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const blob = await r.blob();
+    if(blob.size === 0) throw new Error("respuesta vacía");
+    const file = new File([blob], filename, { type: blob.type || "image/png" });
+    handleImageFile(1, file);
+    log("✅ Imagen Krea2 cargada en slot 1 (base Seg 1): "+filename, "l-ok");
+  };
+  try {
+    await tryLoad(subfolder);
+  } catch(e1){
+    try {
+      await tryLoad("");
+    } catch(e2){
+      log("⚠️ La imagen '"+filename+"' no se pudo cargar desde Krea2: "+e2.message, "l-err");
+    }
+  }
+})();
+
 window.addEventListener("DOMContentLoaded", () => {
   setupMediaSlots();
 

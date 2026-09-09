@@ -11,6 +11,7 @@ LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/
 LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "Ligazón para Lora/h3")
 INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/frame_interpolation")
 MMH3X2_UI_PORT = os.environ.get("MMH3X2_UI_PORT", "8003")
+LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
 # ---------------------
 
 def build_config(json_file, output_html, header_sub):
@@ -48,6 +49,7 @@ def build_config(json_file, output_html, header_sub):
         'header_sub': header_sub,
         'model_count_label': '',
         'mmh3x2_ui_port': MMH3X2_UI_PORT,
+        'ltxv_ui_port': LTXV_UI_PORT,
     }
 
 def main():

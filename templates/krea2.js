@@ -243,6 +243,22 @@ $("btnSendH3")?.addEventListener("click", () => {
   else log("↗️ Abriendo MiniMax H3 con la imagen: "+filename, "l-ok");
 });
 
+$("btnSendX2")?.addEventListener("click", () => {
+  if(!currentOutputMedia || !currentOutputMedia.filename){
+    log("⚠️ Primero genera una imagen para poder enviarla a MMH3X2.", "l-err");
+    return;
+  }
+  const filename = currentOutputMedia.filename;
+  const ref = encodeURIComponent(filename);
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
+  const url = `${here.protocol}//${targetHost}:${targetPort}/MMH3X2_WebUI.html?ref=${ref}`;
+  const win = window.open(url, "_blank");
+  if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
+  else log("↗️ Abriendo MMH3X2 con la imagen: "+filename, "l-ok");
+});
+
 // Global fullscreen handler removed — setupZoomPan handles enter/exit per wrap.
 
 // --- VARIANT GALLERY (Krea2 image version with IndexedDB) ---
@@ -1431,6 +1447,54 @@ $("btnSendRefH3")?.addEventListener("click", async () => {
     openH3(finalName);
   } catch(e){
     log("❌ No se pudo enviar la imagen a MiniMax H3: "+e.message, "l-err");
+  }
+});
+
+$("btnSendRefX2")?.addEventListener("click", async () => {
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia.", "l-err");
+    return;
+  }
+  const src = refImgEl.src;
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
+  const openX2 = (filename) => {
+    const ref = encodeURIComponent(filename);
+    const url = `${here.protocol}//${targetHost}:${targetPort}/MMH3X2_WebUI.html?ref=${ref}`;
+    const win = window.open(url, "_blank");
+    if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
+    else log("↗️ Abriendo MMH3X2 con la imagen: "+filename, "l-ok");
+  };
+
+  const m = src.match(/[?&]filename=([^&]+)/);
+  if(m){
+    openX2(decodeURIComponent(m[1]));
+    return;
+  }
+
+  if(!src.startsWith("data:")){
+    log("⚠️ Origen de imagen no soportado: "+src.slice(0,40), "l-err");
+    return;
+  }
+  log("⏳ Subiendo imagen de referencia para enviarla a MMH3X2...", "l-info");
+  try {
+    const blob = await (await fetch(src)).blob();
+    const ts = Date.now();
+    const ext = (blob.type && blob.type.split("/")[1]) || "png";
+    const filename = `ref_${ts}.${ext.replace(/[^a-z0-9]/i,"")}`;
+    const fd = new FormData();
+    fd.append("image", new File([blob], filename, { type: blob.type || "image/png" }));
+    const r = await fetch("/api/krea2_upload", { method: "POST", body: fd });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const finalName = (data.name || filename).replace(/^.*\//, "");
+    log("✅ Imagen subida a output/krea2/"+finalName, "l-ok");
+    openX2(finalName);
+  } catch(e){
+    log("❌ No se pudo enviar la imagen a MMH3X2: "+e.message, "l-err");
   }
 });
 

@@ -16,6 +16,8 @@ LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "Ligazón para Lora/h3")
 INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/frame_interpolation")
 # Puerto donde se sirve esta UI (para el botón "enviar a ..." desde otras UIs).
 MINIMAXH3_UI_PORT = os.environ.get("MINIMAXH3_UI_PORT", "8002")
+# Puerto donde se sirve la UI MMH3X2 (para el botón "enviar a X2").
+MMH3X2_UI_PORT = os.environ.get("MMH3X2_UI_PORT", "8003")
 # ---------------------
 
 def main():
@@ -61,6 +63,7 @@ def main():
         'header_sub': 'grafo: MiniMaxH3_I2V',
         'model_count_label': '',
         'ltxv_ui_port': MINIMAXH3_UI_PORT,
+        'mmh3x2_ui_port': MMH3X2_UI_PORT,
     })
 
 if __name__ == '__main__':

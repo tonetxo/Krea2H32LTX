@@ -165,6 +165,7 @@ def generate_html(config):
 
     ltxv_ui_port = config.get('ltxv_ui_port', '8000')
     minimaxh3_ui_port = config.get('minimaxh3_ui_port', '8002')
+    mmh3x2_ui_port = config.get('mmh3x2_ui_port', '8003')
 
     # --- Assemble CSS ---
     css = _read_template('base.css') + '\n' + _read_template(config['ui_css'])
@@ -190,6 +191,7 @@ def generate_html(config):
         "const AVAILABLE_INTERP_MODELS = __INTERP_LIST__;\n"
         "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
         "const MINIMAXH3_UI_PORT = __MINIMAXH3_UI_PORT__;\n"
+        "const MMH3X2_UI_PORT = __MMH3X2_UI_PORT__;\n"
         + common_js + "\n"
         + ui_js
     )
@@ -230,6 +232,7 @@ def generate_html(config):
     html = html.replace('__INTERP_LIST__', interp_js_array)
     html = html.replace('__LTXV_UI_PORT__', json.dumps(ltxv_ui_port))
     html = html.replace('__MINIMAXH3_UI_PORT__', json.dumps(minimaxh3_ui_port))
+    html = html.replace('__MMH3X2_UI_PORT__', json.dumps(mmh3x2_ui_port))
 
     # --- Write output ---
     with open(config['output_html'], 'w', encoding='utf-8') as f:

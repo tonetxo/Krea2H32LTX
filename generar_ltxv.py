@@ -19,6 +19,8 @@ INTERP_DIR = os.environ.get("LTXV_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/
 CLIP_DIR = os.environ.get("LTXV_CLIP_DIR", "/home/tonetxo/SwarmUI/Models/text_encoders")
 # Puerto donde se sirve la UI LTXV (para el botón "enviar a LTXV" de Krea2).
 LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
+# Puerto donde se sirve la UI MMH3X2 (para el botón "enviar a X2").
+MMH3X2_UI_PORT = os.environ.get("MMH3X2_UI_PORT", "8003")
 # ---------------------
 
 def main():
@@ -55,6 +57,7 @@ def main():
         'header_sub': 'grafo: LTXV_DMD_OK',
         'model_count_label': '',  # LTXV only reports LoRAs
         'ltxv_ui_port': LTXV_UI_PORT,
+        'mmh3x2_ui_port': MMH3X2_UI_PORT,
     })
 
 if __name__ == '__main__':
