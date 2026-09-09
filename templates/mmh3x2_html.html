@@ -658,6 +658,19 @@
         <div class="log" id="log">listo.</div>
       </div>
 
+      <!-- PROMPT FINAL ENVIADO AL BACKEND -->
+      <div class="panel">
+        <div class="collapsible-header" id="finalPromptToggle">
+          <span class="arrow">▶</span> Prompt final enviado al backend
+          <button id="btnCopyFinalPrompt" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();" title="Copiar prompt final">📋 Copiar</button>
+        </div>
+        <div class="collapsible-body" id="finalPromptBody">
+          <div class="hint" id="finalPromptHint" style="margin-bottom:6px;">Aún no se ha generado nada. El prompt que el grafo envía al backend (tras Ollama, referencias, etc.) aparecerá aquí tras cada variante.</div>
+          <textarea id="finalPromptSeg1" class="enhancer-output" rows="6" readonly placeholder="Prompt Seg 1 (final)..." style="margin-bottom:6px;"></textarea>
+          <textarea id="finalPromptSeg2" class="enhancer-output" rows="6" readonly placeholder="Prompt Seg 2 (final)..."></textarea>
+        </div>
+      </div>
+
       <!-- HISTORIAL DE VÍDEOS (COLAPSABLE) -->
       <div class="vidbox" id="videoHistoryBox" style="margin-top:12px;">
         <div class="collapsible-header" id="videoHistoryToggle">

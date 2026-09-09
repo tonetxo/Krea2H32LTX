@@ -2249,6 +2249,44 @@ function updateRefNumberingHint(){
   hint.textContent = `Seg 1 ve: ${num(seg1)}  |  Seg 2 ve: ${num(seg2)}`;
 }
 
+// Refleja el prompt final que el grafo envía al backend (tras fusionar
+// Ollama/referencias/direcciones). En modo Directo es exactamente lo que
+// llega al nodo 14/30. En modo Asistido, el texto del Seg 2 que se muestra
+// es el borrador base + dirección (lo que Ollama reescribirá en runtime;
+// el texto reescrito solo existe dentro del backend).
+function updateFinalPromptPanel(graph){
+  const ta1 = $("finalPromptSeg1");
+  const ta2 = $("finalPromptSeg2");
+  const hint = $("finalPromptHint");
+  if(!ta1 || !ta2 || !graph) return;
+  const g = graph;
+  const nodeKey = (arr) => (Array.isArray(arr) ? String(arr[0]) : null);
+  // Seg 1: el nodo 14 consume el texto del nodo 50 (o literal)
+  const p1Node = nodeKey(g[N.REF2V_SEG1]?.inputs?.prompt);
+  const p1Text = (p1Node && g[p1Node]?.inputs?.value) || g[N.REF2V_SEG1]?.inputs?.prompt || "";
+  // Seg 2: directo = texto del nodo 58; asistido = borrador que entra al LLM 1 (59)
+  let p2Text = "";
+  const p2Src = nodeKey(g[N.REF2V_SEG2]?.inputs?.prompt);
+  if(p2Src && g[p2Src]?.inputs?.value){
+    p2Text = g[p2Src].inputs.value;
+  } else if(g["59"]?.inputs){
+    // Modo asistido: reconstruimos el borrador base que Ollama fusionará
+    const baseKey = nodeKey(g["59"].inputs.string_a);
+    const guideKey = nodeKey(g["59"].inputs.string_b);
+    const base = (baseKey && g[baseKey]?.inputs?.value) || "";
+    const guide = (guideKey && g[guideKey]?.inputs?.value) || "";
+    p2Text = `${base}${g["59"].inputs.delimiter || "\n"}${guide}\n\n[+ Ollama en grafo: funde esto con la visión de los últimos 2s de Seg 1]`;
+  }
+  ta1.value = String(p1Text).trim();
+  ta2.value = String(p2Text).trim();
+  if(hint){
+    const mode = $("seg2PromptMode")?.value || "direct";
+    hint.textContent = mode === "ollama"
+      ? "Seg 2 (Asistido): se muestra el borrador con tu dirección; el texto definitivo lo fusiona Ollama dentro del backend con los frames de Seg 1."
+      : "Texto exacto que entra en el condicionamiento de cada segmento.";
+  }
+}
+
 // ==========================================
 // CONSTRUCCIÓN DEL GRAFO (buildGraph)
 // ==========================================
@@ -2929,6 +2967,7 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
     // se vea la animación completa (Seg1 → Seg2 → Final) y no se arrastre el
     // preview de la variante anterior.
     resetPreviewPanes();
+    updateFinalPromptPanel(graph);
 
     log(`🚀 Procesando ${job.runMode === 'seg1_only' ? 'Solo Seg 1' : 'Vídeo MMH3X2'} · Var ${varIdx} (seed ${seedUsed})...`);
     const r = await fetch(server() + "/prompt", {
@@ -3471,7 +3510,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  ["h3OptToggle", "postprocToggle", "videoHistoryToggle"].forEach(id => {
+  ["h3OptToggle", "postprocToggle", "videoHistoryToggle", "finalPromptToggle"].forEach(id => {
     const el = $(id);
     if(el){
       el.addEventListener("click", () => {
@@ -3485,6 +3524,15 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       });
     }
+  });
+
+  $("btnCopyFinalPrompt")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const t1 = $("finalPromptSeg1")?.value || "";
+    const t2 = $("finalPromptSeg2")?.value || "";
+    const text = `=== Seg 1 ===\n${t1}\n\n=== Seg 2 ===\n${t2}`.trim();
+    navigator.clipboard.writeText(text).then(() => log("📋 Prompt final copiado.", "l-ok"))
+      .catch(() => log("❌ No se pudo copiar al portapapeles.", "l-err"));
   });
 
   if(typeof AVAILABLE_UNETS !== "undefined" && $("unetModel")){
