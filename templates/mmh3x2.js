@@ -2048,6 +2048,30 @@ async function ensureAllMediaUploaded(){
   for(let i = 1; i <= 2; i++){
     const aSlot = audioSlots[i];
     if(aSlot.file && !aSlot.uploaded){
+      // Mitigación OOM de la VAE de audio: si el audio se usa como ref_audio
+      // (modo guide/hybrid), recortarlo a la duración del segmento con ffmpeg
+      // antes de subirlo. Menos muestras = menos VRAM por encode.
+      const audioMode = ($("audioMode")?.value || "none");
+      const usedAsRef = (audioMode === "guide" || audioMode === "hybrid");
+      const dur = usedAsRef ? parseFloat(i === 1
+        ? ($("durationSlider1")?.value || "15.0")
+        : ($("durationSlider2")?.value || "15.0")) : 0;
+      if(usedAsRef && dur > 0){
+        const fd = new FormData();
+        fd.append("image", aSlot.file, aSlot.file.name || ("mmh3x2_audio_"+i));
+        fd.append("trim_end", String(dur));
+        const r = await fetch("/api/video_preprocess", { method: "POST", body: fd });
+        if(r.ok){
+          const d = await r.json();
+          if(d.audio){
+            aSlot.uploaded = { name: d.audio.name, subfolder: d.audio.subfolder || "", type: d.audio.type || "input" };
+            log(`🎵 Audio ${i} recortado a ${dur.toFixed(1)}s (ref audio)`, "l-ok");
+            continue;
+          }
+        }
+        // Si ffmpeg falla, caemos a la subida directa.
+        log(`⚠️ No se pudo recortar el audio ${i}; subiendo sin recortar`, "l-warn");
+      }
       const ext = aSlot.name.split('.').pop() || "wav";
       aSlot.uploaded = await uploadSingleFile(aSlot.file, `mmh3x2_audio_${i}.${ext}`);
     }
@@ -2611,6 +2635,10 @@ async function queueJob(runMode){
     log("⚠️ Por favor escribe al menos el Prompt 1 (Segmento 1)", "l-warn");
     return;
   }
+
+  // Mitigación OOM: liberar VRAM del backend antes de encolar (no interrumpe
+  // jobs en curso; aplica cuando el worker itere).
+  try { fetch(server()+"/free", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{\"unload_models\":true}" }).catch(()=>{}); } catch(_){}
 
   try {
     await ensureAllMediaUploaded();
