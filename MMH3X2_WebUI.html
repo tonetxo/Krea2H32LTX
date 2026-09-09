@@ -5570,12 +5570,18 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
 
   if(video){
     video.crossOrigin = "anonymous";
-    if(video.src !== videoUrl){
+    // Comparar contra getAttribute("src") (lo que asignamos) y no contra
+    // video.src (el DOM lo devuelve como URL absoluta, así que la comparación
+    // fallaría siempre y recargaría el vídeo, cortando la reproducción en
+    // curso cada vez que displayResult re-carga el mismo media).
+    const prevUrl = video.getAttribute("src");
+    if(prevUrl !== videoUrl){
       video.src = videoUrl;
       video.load();
     }
     video.style.display = "block";
-    if(options.autoplay !== false){
+    const alreadyPlaying = prevUrl === videoUrl && !video.paused && options.autoplay !== false;
+    if(options.autoplay !== false && !alreadyPlaying){
       video.play().catch(err => console.log("Autoplay:", err));
     }
     const onMeta = () => {
