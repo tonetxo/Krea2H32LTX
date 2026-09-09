@@ -2516,6 +2516,44 @@ function buildGraph(j){
       }
     }
 
+    // A2. En modo "guide" la pista audible de cada segmento también es el audio
+    // externo (además de usarse como guía de ritmo): sustituimos el audio
+    // sintetizado por IA en el CreateVideo de cada segmento, recortado a su
+    // duración y con el mismo crossfade que aplica el audio IA.
+    if(audioMode === "guide"){
+      const seg1Dur = parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
+      const seg2Dur = parseFloat((calcFramesForDuration(dur2) / 24).toFixed(4));
+      const seg1TrimG = (audioCrossfadeOn && cfSec > 0) ? parseFloat((seg1Dur + cfSec).toFixed(4)) : seg1Dur;
+      // Pista Seg 1 (siempre que exista audio 1; si no, sin cambio)
+      if(a1 && g[N.CREATE_VID_1]?.inputs){
+        g["196_trim_guide_audio1"] = {
+          inputs: { audio: ["190_load_audio1", 0], start_index: 0.0, duration: seg1TrimG },
+          class_type: "TrimAudioDuration",
+          _meta: { title: "Guía: Audio Seg 1 recortado" }
+        };
+        g[N.CREATE_VID_1].inputs.audio = ["196_trim_guide_audio1", 0];
+      }
+      // Pista Seg 2: audio 2 si existe; si no, el mismo audio 1 recortado
+      // desde el final de Seg 1 (continuidad).
+      if(g[N.CREATE_VID_2]?.inputs){
+        if(a2){
+          g["197_trim_guide_audio2"] = {
+            inputs: { audio: ["191_load_audio2", 0], start_index: 0.0, duration: seg2Dur },
+            class_type: "TrimAudioDuration",
+            _meta: { title: "Guía: Audio Seg 2 recortado" }
+          };
+          g[N.CREATE_VID_2].inputs.audio = ["197_trim_guide_audio2", 0];
+        } else if(a1){
+          g["197_trim_guide_audio2"] = {
+            inputs: { audio: ["190_load_audio1", 0], start_index: seg1TrimG, duration: seg2Dur },
+            class_type: "TrimAudioDuration",
+            _meta: { title: "Guía: Audio Seg 2 (continuación)" }
+          };
+          g[N.CREATE_VID_2].inputs.audio = ["197_trim_guide_audio2", 0];
+        }
+      }
+    }
+
     // B. Pista Directa en el Vídeo Final (sustituye el audio sintetizado en CreateVideo nodo 42)
     if(audioMode === "passthrough" || audioMode === "hybrid"){
       if(a1 && !a2){
@@ -2647,6 +2685,8 @@ function buildGraph(j){
       N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.RTX, N.RIFE, N.RIFE_LOADER, N.RIFE_MULT
     ];
     nodesToDelete.forEach(id => { delete g[id]; });
+    // La pista de guía de Seg 2 sobra en modo solo-Seg1.
+    delete g["197_trim_guide_audio2"];
   }
 
   return g;
