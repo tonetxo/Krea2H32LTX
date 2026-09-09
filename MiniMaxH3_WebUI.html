@@ -4330,6 +4330,37 @@ async function prepareRefVideo(i){
   }
 }
 
+// --- Preparar audio de referencia (mitigación OOM VAE de audio) ---
+// El encode tiled del backend falla con audios largos (tuple index out of
+// range), así que acortamos el audio a la duración del clip con ffmpeg antes
+// de subirlo. Menos muestras = menos VRAM por encode.
+async function prepareRefAudio(i, force = false){
+  const ref = refAudios[i];
+  if(!ref || !ref.local) return;
+  if(ref.uploaded && !force) return;
+  const duration = parseFloat($("duration")?.value || "0");
+  const fd = new FormData();
+  fd.append("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
+  if(duration > 0) fd.append("trim_end", String(duration));
+  if(ref.volume !== 1.0){
+    fd.append("volume", String(ref.volume));
+    fd.append("use_audio","true");
+  }
+  try {
+    const r = await fetch("/api/video_preprocess", { method: "POST", body: fd });
+    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,150)); }
+    const d = await r.json();
+    ref.uploaded = d.audio || null;
+    if(ref.uploaded){
+      log(`🎵 Audio de referencia ${i+1} recortado a ${duration.toFixed(1)}s: ${ref.uploaded.name}`, "l-ok");
+    } else {
+      throw new Error("ffmpeg no devolvió audio");
+    }
+  } catch(err){
+    log(`❌ Error recortando audio ref ${i+1}: ${err.message}`, "l-err");
+  }
+}
+
 // --- ASPECT RATIO MODE (Auto vs Forzar 16:9) ---
 const AR_MODE_KEY = "minimaxh3_ar_mode";
 let arMode = "auto"; // "auto" | "16:9"
@@ -5902,17 +5933,23 @@ async function ensureImagesUploaded(){
       const ref = refAudios[i];
       if(ref.local && !ref.uploaded){
         try {
-          // Volumen != 1 → procesar con ffmpeg primero (endpoint reutiliza video_preprocess sin vídeo)
-          if(ref.volume !== 1.0){
+          // Siempre vía ffmpeg: recorta el audio a la duración del clip
+          // (mitigación OOM de la VAE de audio) y aplica volumen si != 1.
+          if(true){
             const fd = new FormData();
             fd.append("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
-            fd.append("volume", String(ref.volume));
+            const dur = parseFloat($("duration")?.value || "0");
+            if(dur > 0) fd.append("trim_end", String(dur));
+            if(ref.volume !== 1.0){
+              fd.append("volume", String(ref.volume));
+            }
             fd.append("use_audio","true");
             const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
             if(!r.ok) throw new Error("fallo ffmpeg audio");
             const d = await r.json();
             ref.uploaded = d.audio || null;
             if(!ref.uploaded) throw new Error("ffmpeg no devolvió audio");
+            if(dur > 0) log(`🎵 Audio ref ${i+1} recortado a ${dur.toFixed(1)}s`, "l-ok");
           } else {
             ref.uploaded = await _uploadOneHot("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
           }
@@ -5992,15 +6029,24 @@ async function ensureJobImagesUploaded(job){
       const ref = rAudios[i];
       if(ref.local && !ref.uploaded){
         try{
-          if(ref.volume !== 1.0){
+          // Siempre vía ffmpeg: recorta el audio a la duración del clip
+          // (mitigación OOM de la VAE de audio) y aplica volumen si != 1.
+          if(true){
             const fd = new FormData();
             fd.append("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
-            fd.append("volume", String(ref.volume));
+            const dur = parseFloat($("duration")?.value || "0");
+            if(dur > 0) fd.append("trim_end", String(dur));
+            if(ref.volume !== 1.0){
+              fd.append("volume", String(ref.volume));
+            }
             fd.append("use_audio","true");
             const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
             if(!r.ok) throw new Error("Fallo ffmpeg audio");
             const d = await r.json();
             ref.uploaded = d.audio || null;
+            if(ref.uploaded && dur > 0){
+              log(`🎵 Audio ref ${i+1} recortado a ${dur.toFixed(1)}s`, "l-ok");
+            }
           } else {
             ref.uploaded = await _uploadOneHot("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
           }
@@ -7079,6 +7125,9 @@ function finishCurrentJob(){
 }
 
 async function enqueueGeneration(){
+  // Mitigación OOM: liberar VRAM del backend antes de encolar (no interrumpe
+  // jobs en curso; aplica cuando el worker itere).
+  try { fetch(server()+"/free", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{\"unload_models\":true}" }).catch(()=>{}); } catch(_){}
   const job = snapshotJob();
   if(activeJob){
     jobQueue.push(job);
