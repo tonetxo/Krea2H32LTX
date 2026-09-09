@@ -879,21 +879,33 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
   }
 
   try {
+    // Los reproductores ya muestran estos vídeos (onNodeExecuted los cargó al
+    // guardar cada nodo). Si displayResult los vuelve a cargar, los pausados
+    // (seg1/seg2 ya terminaron durante el postproceso) se relanzan y suenan
+    // todos a la vez segundos después de que el final empezó. Solo cargamos
+    // si el slot NO muestra ya ese mismo medio (ruta pollFallback, WS perdido).
+    const playerAlreadyShows = (slotIndex, media) => {
+      const cur = currentMedia[slotIndex];
+      const suffix = (slotIndex === 1) ? "Seg1" : (slotIndex === 2 ? "Seg2" : "Final");
+      const video = $("video" + suffix);
+      return !!(cur && media && cur.filename === media.filename
+        && video && video.getAttribute("src") && video.style.display === "block");
+    };
     if(entry?.outputs?.[N.SAVE_VID_1]){
       const m1 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_1]);
-      if(m1){ displayVideoInPlayer(1, m1); found = true; }
+      if(m1){ found = true; if(!playerAlreadyShows(1, m1)) displayVideoInPlayer(1, m1); }
     }
     if(entry?.outputs?.[N.SAVE_VID_2]){
       const m2 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_2]);
-      if(m2){ displayVideoInPlayer(2, m2); found = true; }
+      if(m2){ found = true; if(!playerAlreadyShows(2, m2)) displayVideoInPlayer(2, m2); }
     }
     if(entry?.outputs?.[N.SAVE_VID_FINAL]){
       const mf = CONFIG.findMedia(entry.outputs[N.SAVE_VID_FINAL]);
       if(mf){
-        displayVideoInPlayer(3, mf);
+        found = true;
+        if(!playerAlreadyShows(3, mf)) displayVideoInPlayer(3, mf);
         const varIndex = promptVariantMap[promptId] || (variantCounter + 1);
         CONFIG.addToVariantGallery(mf, realSeed, varIndex);
-        found = true;
       }
     }
   } catch(e){
