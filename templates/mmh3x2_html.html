@@ -125,6 +125,7 @@
               <option value="hybrid">Híbrido (Guía Ritmo + Pista Limpia)</option>
             </select>
           </div>
+          <div class="hint" id="audioModeHint" style="font-size:10px;margin-bottom:8px;"></div>
           <div class="audio-grid-2">
             <!-- AUDIO 1 -->
             <div class="audio-slot-wrap media-slot" id="slotAudio1" data-slot="audio1">
@@ -523,6 +524,13 @@
               </div>
             </div>
             <div class="hint" style="font-size:10px;margin-top:2px;">Elimina saltos bruscos y clics fundiendo suavemente el final de Seg 1 con el inicio de Seg 2.</div>
+          </div>
+
+          <!-- Volumen IA en la mezcla (solo híbrido) -->
+          <div class="row" style="margin-top:8px;">
+            <label style="font-size:10px;">Volumen del audio IA en la mezcla (Híbrido): <b id="audioGuideVolumeVal">-10 dB</b></label>
+            <input type="range" id="audioGuideVolume" min="-30" max="0" step="1" value="-10" style="width:100%;">
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo en modo Híbrido: cuánto suena el audio generado por IA bajo tu pista. 0 dB = igual de fuerte; -30 dB ≈ inaudible.</div>
           </div>
         </div>
       </div>
