@@ -302,6 +302,7 @@ $("clipSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("samplerName")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("schedulerName")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("filenamePrefix")?.addEventListener("input", () => scheduleSaveH3Settings());
+$("refImageSize")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("batchSize")?.addEventListener("input", () => scheduleSaveH3Settings());
 $("duration")?.addEventListener("input", () => { updateDurationHints(); scheduleSaveH3Settings(); });
 $("frames")?.addEventListener("input", () => scheduleSaveH3Settings());
@@ -426,6 +427,7 @@ function saveH3Settings(){
     bitDepth: getBitDepth(),
     filenamePrefix: $("filenamePrefix")?.value || "video/MiniMax_H3",
     mode: currentMode,
+    refImageSize: $("refImageSize")?.value || "match",
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
@@ -472,6 +474,7 @@ function restoreH3Settings(){
     if(s.aimdo){ setAimdoUI(s.aimdo); saveAimdo(s.aimdo); }
     if(s.blockSparse){ setBlockSparseUI(s.blockSparse); saveBlockSparse(s.blockSparse); }
     if(s.mode){ setModeUI(s.mode); }
+    if(s.refImageSize && $("refImageSize")) $("refImageSize").value = s.refImageSize;
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
     if(s.arMode){ arMode = s.arMode; saveArMode(arMode); }
     if(s.aspectRatio) currentAspectRatio = s.aspectRatio;
@@ -1469,6 +1472,7 @@ function snapshotJob(){
     bitDepth: getBitDepth(),
     filenamePrefix: $("filenamePrefix")?.value,
     mode: currentMode,
+    refImageSize: $("refImageSize")?.value || "match",
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
@@ -2862,6 +2866,8 @@ function buildGraph(job){
     const rVideos = j ? j.refVideos : refVideos;
     const rAudios = j ? j.refAudios : refAudios;
     if(r2v && r2v.inputs){
+      // Tamaño de referencias (match = rápido; max = máxima identidad, más lento)
+      r2v.inputs.ref_image_size = (j ? (j.refImageSize || "match") : ($("refImageSize")?.value || "match"));
       // Limpiar refs previas del grafo base
       for(let i = 0; i < 9; i++){
         delete r2v.inputs["ref_images.ref_image_"+i];

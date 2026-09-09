@@ -565,6 +565,21 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           </div>
         </div>
 
+        <!-- REFERENCIAS COMPARTIDAS + TAMAÑO -->
+        <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;">
+            <input type="checkbox" id="shareRefsToggle"> <span>Referencias compartidas <span class="hint">(Img 2/3/4 visibles en ambos segmentos)</span></span>
+          </div>
+          <div class="row" style="margin-top:8px;align-items:center;gap:8px;">
+            <label style="font-size:10px;margin:0;">Tamaño de referencias</label>
+            <select id="refImageSize" style="width:auto;padding:3px 6px;font-size:10px;height:24px;">
+              <option value="match" selected>match (rápido)</option>
+              <option value="max">max (máxima identidad, más lento)</option>
+            </select>
+          </div>
+          <div class="hint" id="refMappingHint" style="margin-top:6px;font-size:10px;"></div>
+        </div>
+
         <!-- VÍDEO DE ENTRADA / REFERENCIA -->
         <div style="margin-top:10px;">
           <label style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Vídeo de Referencia para Seg 2 <span class="hint">(Opcional)</span></label>
@@ -4638,6 +4653,8 @@ CONFIG.variantMeta = function(){
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
     ["Modo Seg 2", seg2Mode === "guided" ? "Guía Ollama (continuación)" : "Prompt Directo"],
     ["Modo Audio", audioDesc],
+    ["Refs compartidas", $("shareRefsToggle")?.checked ? "sí (Img 2/3/4 en ambos)" : "no"],
+    ["Ref size", $("refImageSize")?.value || "match"],
     ["Crossfade Audio", audioCfOn ? `${audioCfSec}s (${$("audioCrossfadeCurve")?.value || 'equal_power'})` : "desactivado"],
     ["Duración Seg 1", `${dur1.toFixed(1)}s (${f1}f)`],
     ["Duración Seg 2", `${dur2.toFixed(1)}s (${f2}f)`],
@@ -5806,7 +5823,9 @@ function saveSettings(){
     audioMode: $("audioMode")?.value || "none",
     audioCrossfadeToggle: $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : true,
     audioCrossfadeSlider: $("audioCrossfadeSlider")?.value || "0.40",
-    audioCrossfadeCurve: $("audioCrossfadeCurve")?.value || "equal_power"
+    audioCrossfadeCurve: $("audioCrossfadeCurve")?.value || "equal_power",
+    shareRefsToggle: !!$("shareRefsToggle")?.checked,
+    refImageSize: $("refImageSize")?.value || "match"
   };
   try {
     localStorage.setItem(MMH3X2_SETTINGS_KEY, JSON.stringify(s));
@@ -5918,6 +5937,10 @@ function restoreSettings(){
     }
     if(s.audioCrossfadeCurve && $("audioCrossfadeCurve")) $("audioCrossfadeCurve").value = s.audioCrossfadeCurve;
 
+    if(s.shareRefsToggle !== undefined && $("shareRefsToggle")) $("shareRefsToggle").checked = s.shareRefsToggle;
+    if(s.refImageSize && $("refImageSize")) $("refImageSize").value = s.refImageSize;
+    updateRefNumberingHint();
+
     return true;
   } catch(e){
     console.warn("Error restaurando ajustes:", e);
@@ -5969,7 +5992,8 @@ function attachAutoSaveListeners(){
     "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
-    "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve"
+    "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
+    "shareRefsToggle", "refImageSize"
   ];
     const blockattIds = IS_BLOCKATT ? [
       "h3SparseBackend", "aimdoResidency"
@@ -6209,6 +6233,7 @@ function setMediaSlotData(slotIdx, file, dataUrl, name, shouldSave = true){
   if(shouldSave && dataUrl){
     dbSaveSlot("slot_" + slotIdx, { dataUrl, name });
   }
+  if(typeof updateRefNumberingHint === "function") updateRefNumberingHint();
 }
 
 function clearMediaSlot(slotIdx){
@@ -6223,6 +6248,7 @@ function clearMediaSlot(slotIdx){
   if(info) info.textContent = "";
   if(fileInput) fileInput.value = "";
   dbDeleteSlot("slot_" + slotIdx);
+  if(typeof updateRefNumberingHint === "function") updateRefNumberingHint();
 }
 
 function handleVideoFile(file, shouldSave = true){
@@ -6393,6 +6419,25 @@ function updateDurationFrames(){
   if($("totalFramesHint")){
     $("totalFramesHint").textContent = `Total: Seg 1 (${frames1}f) + Seg 2 (${frames2}f) = ${totalFrames} frames (~${totalSecs}s a 24fps · Máx 30s)`;
   }
+}
+
+// Muestra en vivo la numeración <Picture N> que verá cada segmento según
+// el toggle "Referencias compartidas" y qué slots tienen imagen.
+function updateRefNumberingHint(){
+  const hint = $("refMappingHint");
+  if(!hint) return;
+  const shared = !!$("shareRefsToggle")?.checked;
+  const has = (i) => !!(mediaSlots[i]?.uploaded || mediaSlots[i]?.file || mediaSlots[i]?.dataUrl);
+  let seg1, seg2;
+  if(!shared){
+    seg1 = ["Img1", has(2) ? "Img2" : null].filter(Boolean);
+    seg2 = ["1er frame Seg 1", has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
+  } else {
+    seg1 = ["Img1", has(2) ? "Img2" : null, has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
+    seg2 = ["1er frame Seg 1", has(2) ? "Img2" : null, has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
+  }
+  const num = (arr) => arr.map((n, i) => `P${i + 1}=${n}`).join(" · ");
+  hint.textContent = `Seg 1 ve: ${num(seg1)}  |  Seg 2 ve: ${num(seg2)}`;
 }
 
 // ==========================================
@@ -6662,6 +6707,38 @@ function buildGraph(j){
   if(mediaSlots[2].uploaded && g[N.IMG2]?.inputs) g[N.IMG2].inputs.image = mediaSlots[2].uploaded.name;
   if(mediaSlots[3].uploaded && g[N.IMG3]?.inputs) g[N.IMG3].inputs.image = mediaSlots[3].uploaded.name;
   if(mediaSlots[4].uploaded && g[N.IMG4]?.inputs) g[N.IMG4].inputs.image = mediaSlots[4].uploaded.name;
+
+  // 10b. Referencias compartidas + tamaño de referencias (match/max)
+  const sharedRefs = (j ? (j.sharedRefs !== undefined ? j.sharedRefs : false)
+    : !!$("shareRefsToggle")?.checked);
+  const refSize = (j ? (j.refImageSize || "match") : ($("refImageSize")?.value || "match"));
+  if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs.ref_image_size = refSize;
+  if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs.ref_image_size = refSize;
+  if(sharedRefs){
+    // Seg 1 (nodo 14): base ref_image_0 = Img1, _1 = Img2 (cable base);
+    // añadimos Img3/Img4 como _2/_3 cuando el slot tiene imagen.
+    if(mediaSlots[3].uploaded && g[N.REF2V_SEG1]?.inputs){
+      g[N.REF2V_SEG1].inputs["ref_images.ref_image_2"] = [N.IMG3, 0];
+    }
+    if(mediaSlots[4].uploaded && g[N.REF2V_SEG1]?.inputs){
+      g[N.REF2V_SEG1].inputs["ref_images.ref_image_3"] = [N.IMG4, 0];
+    }
+    // Seg 2 (nodo 30): base ref_image_0 = last frame (26), _1 = Img3 (82),
+    // _2 = Img4 (83). Con compartidas, Img2 entra como _1 y desplazamos.
+    if(mediaSlots[2].uploaded && g[N.REF2V_SEG2]?.inputs){
+      g[N.REF2V_SEG2].inputs["ref_images.ref_image_1"] = [N.IMG2, 0];
+      if(mediaSlots[3].uploaded){
+        g[N.REF2V_SEG2].inputs["ref_images.ref_image_2"] = [N.IMG3, 0];
+      } else {
+        delete g[N.REF2V_SEG2].inputs["ref_images.ref_image_2"];
+      }
+      if(mediaSlots[4].uploaded){
+        g[N.REF2V_SEG2].inputs["ref_images.ref_image_3"] = [N.IMG4, 0];
+      } else {
+        delete g[N.REF2V_SEG2].inputs["ref_images.ref_image_3"];
+      }
+    }
+  }
 
   // 11. Vídeo de Referencia para Seg 2
   if(videoSlot.uploaded && g[N.REF2V_SEG2]?.inputs){
@@ -6971,6 +7048,8 @@ async function queueJob(runMode){
     sampler: $("samplerName")?.value || "res_multistep",
     scheduler: $("schedulerName")?.value || "simple",
     audioMode: $("audioMode")?.value || "none",
+    sharedRefs: !!$("shareRefsToggle")?.checked,
+    refImageSize: $("refImageSize")?.value || "match",
     seedMode,
     seed: baseSeed,
     batchSize,
@@ -7662,6 +7741,7 @@ window.addEventListener("DOMContentLoaded", () => {
       updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
     }
     // Si aún no cargó, el listener img.onload ya actualizará al terminar.
+    updateRefNumberingHint();
   });
 
   // Configurar panel Enhancer exclusivamente para MiniMax H3 (Ollama)

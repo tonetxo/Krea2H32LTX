@@ -85,6 +85,21 @@
           </div>
         </div>
 
+        <!-- REFERENCIAS COMPARTIDAS + TAMAÑO -->
+        <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;">
+            <input type="checkbox" id="shareRefsToggle"> <span>Referencias compartidas <span class="hint">(Img 2/3/4 visibles en ambos segmentos)</span></span>
+          </div>
+          <div class="row" style="margin-top:8px;align-items:center;gap:8px;">
+            <label style="font-size:10px;margin:0;">Tamaño de referencias</label>
+            <select id="refImageSize" style="width:auto;padding:3px 6px;font-size:10px;height:24px;">
+              <option value="match" selected>match (rápido)</option>
+              <option value="max">max (máxima identidad, más lento)</option>
+            </select>
+          </div>
+          <div class="hint" id="refMappingHint" style="margin-top:6px;font-size:10px;"></div>
+        </div>
+
         <!-- VÍDEO DE ENTRADA / REFERENCIA -->
         <div style="margin-top:10px;">
           <label style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Vídeo de Referencia para Seg 2 <span class="hint">(Opcional)</span></label>

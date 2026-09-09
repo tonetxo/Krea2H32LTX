@@ -15,6 +15,13 @@
 
       <div class="panel" id="r2vPanel" style="display:none;"><h2>Referencias</h2>
         <div class="hint" style="font-size:10px;margin-bottom:8px;">Modo referencia completa. Hasta 6 imágenes, 3 vídeos (c/u con su audio) y 3 audios. El prompt se reescribe con la guía full-reference.</div>
+        <div class="row" style="align-items:center;gap:8px;margin-bottom:8px;">
+          <label style="font-size:10px;margin:0;">Tamaño de referencias</label>
+          <select id="refImageSize" style="width:auto;padding:3px 6px;font-size:10px;height:24px;">
+            <option value="match" selected>match (rápido)</option>
+            <option value="max">max (máxima identidad, más lento)</option>
+          </select>
+        </div>
         <div class="r2v-section">
           <div class="collapsible-header open" id="r2vImagesToggle">
             <span class="arrow">▼</span> Imágenes de referencia <span id="r2vImagesCount" class="hint" style="margin-left:auto;"></span>
