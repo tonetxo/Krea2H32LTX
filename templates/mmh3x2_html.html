@@ -619,12 +619,26 @@
           <button type="button" id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
         </div>
         <div class="queue-status-box">
-          <div class="queue-header">
-            <span>COLA DE GENERACIÓN</span>
+          <div class="queue-status-row">
             <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
-            <span id="queueCountBadge" class="queue-badge">0 tareas</span>
+            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
           </div>
-          <div class="queue-items-list" id="queueList"></div>
+          <div class="queue-splits">
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div>
+              <div class="queue-split-main" id="queueWebuiSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueWebuiDetail">En reposo</div>
+            </div>
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div>
+              <div class="queue-split-main" id="queueServerSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div>
+            </div>
+          </div>
+          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
+            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
+            <div class="queue-items-body" id="queueItemsList"></div>
+          </div>
         </div>
         <div class="log" id="log">listo.</div>
       </div>

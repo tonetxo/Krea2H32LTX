@@ -1099,12 +1099,26 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <button type="button" id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
         </div>
         <div class="queue-status-box">
-          <div class="queue-header">
-            <span>COLA DE GENERACIÓN</span>
+          <div class="queue-status-row">
             <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
-            <span id="queueCountBadge" class="queue-badge">0 tareas</span>
+            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
           </div>
-          <div class="queue-items-list" id="queueList"></div>
+          <div class="queue-splits">
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div>
+              <div class="queue-split-main" id="queueWebuiSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueWebuiDetail">En reposo</div>
+            </div>
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div>
+              <div class="queue-split-main" id="queueServerSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div>
+            </div>
+          </div>
+          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
+            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
+            <div class="queue-items-body" id="queueItemsList"></div>
+          </div>
         </div>
         <div class="log" id="log">listo.</div>
       </div>
@@ -5146,8 +5160,6 @@ CONFIG.onStopAll = async function(){
 let queueIdleCount = 0;
 function updateQueueUI(){
   const count = jobQueue.length;
-  const badge = $("queueCountBadge");
-  if(badge) badge.textContent = count > 0 ? `${count} tarea${count > 1 ? 's' : ''}` : "0 tareas";
   const clearBtn = $("btnClearQueue");
   if(clearBtn) clearBtn.disabled = (count === 0 && !activeJob);
 
@@ -5173,26 +5185,91 @@ function updateQueueUI(){
 
   enableStopButtons(!!activeJob);
 
-  const list = $("queueList");
-  if(!list) return;
-  if(!activeJob && count === 0){
-    list.innerHTML = '<div class="hint" style="padding:6px;text-align:center;font-size:10px;">En reposo</div>';
-    return;
+  // Cálculo de variantes/vídeos pendientes (patrón LTXV/MiniMaxH3)
+  const activeRemainingVars = activeJob ? Math.max(1, (totalBatchSize - currentBatchIndex)) : 0;
+  const queueVariants = jobQueue.reduce((acc, j) => acc + (j.batchSize || 1), 0);
+  const totalLocalVideos = (activeJob ? activeRemainingVars : 0) + queueVariants;
+  const serverPending = (typeof serverQueueState !== "undefined" && serverQueueState.pending) ? serverQueueState.pending : 0;
+  const serverRunning = (typeof serverQueueState !== "undefined" && serverQueueState.running) ? serverQueueState.running : 0;
+  const totalPendingGlobal = totalLocalVideos + serverPending;
+
+  // Badge total
+  const totalNumEl = $("queueTotalNum");
+  const totalBadgeEl = $("queueTotalBadge");
+  if(totalNumEl) totalNumEl.textContent = totalPendingGlobal;
+  if(totalBadgeEl){
+    if(totalPendingGlobal > 0) totalBadgeEl.classList.add("active");
+    else totalBadgeEl.classList.remove("active");
   }
-  let html = "";
-  if(activeJob){
-    html += `<div class="queue-item active" style="font-size:10.5px;color:var(--accent);margin-bottom:4px;">
-      ▶ Ejecutando: ${activeJob.runMode || 'Completo'} (Var ${currentBatchIndex + 1}/${totalBatchSize})
-    </div>`;
+
+  // Tarjeta Esta WebUI
+  const webuiSummary = $("queueWebuiSummary");
+  const webuiDetail = $("queueWebuiDetail");
+  if(webuiSummary){
+    if(count === 0 && !activeJob){
+      webuiSummary.textContent = "0 en espera";
+    } else {
+      webuiSummary.textContent = `${count} en cola (${queueVariants} vids)`;
+    }
   }
-  jobQueue.forEach((job, idx) => {
-    html += `<div class="queue-item" style="display:flex;justify-content:space-between;align-items:center;font-size:10px;padding:2px 0;">
-      <span>#${idx+1} · ${job.runMode || 'Completo'} (${job.batchSize || 1} var)</span>
-      <button class="ghost btn-mini" style="font-size:9px;padding:1px 4px;" onclick="jobQueue.splice(${idx},1);updateQueueUI();">✕</button>
-    </div>`;
-  });
-  list.innerHTML = html;
+  if(webuiDetail){
+    if(activeJob){
+      const runLabel = activeJob.runMode === "seg1_only" ? "Solo Seg 1"
+        : (activeJob.runMode === "seg2_only" ? "Seg 2 + Final" : "Completo");
+      webuiDetail.textContent = `▶ ${runLabel} · Var ${currentBatchIndex + 1}/${totalBatchSize}`;
+    } else {
+      webuiDetail.textContent = "En reposo";
+    }
+  }
+
+  // Tarjeta Servidor ComfyUI
+  const srvSummary = $("queueServerSummary");
+  const srvDetail = $("queueServerDetail");
+  if(srvSummary){
+    srvSummary.textContent = `${serverPending} en espera`;
+  }
+  if(srvDetail){
+    srvDetail.textContent = `${serverRunning} en GPU · ${serverPending} en cola ComfyUI`;
+  }
+
+  // Desplegable de trabajos en cola
+  const accordion = $("queueItemsAccordion");
+  const itemsTitle = $("queueItemsTitle");
+  const itemsList = $("queueItemsList");
+  if(itemsTitle) itemsTitle.textContent = `Ver trabajos en cola (${count})`;
+  if(accordion){
+    accordion.style.display = count > 0 ? "block" : "none";
+  }
+  if(itemsList && count > 0){
+    itemsList.innerHTML = "";
+    jobQueue.forEach((job, idx) => {
+      const row = document.createElement("div");
+      row.className = "queue-item-row";
+      const pText = (job.prompt || "sin prompt").trim();
+      const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
+      const runLabel = job.runMode === "seg1_only" ? "Solo Seg 1"
+        : (job.runMode === "seg2_only" ? "Seg 2 + Final" : "completo");
+      row.innerHTML = `
+        <div class="queue-item-left" title="${pText}">
+          <span class="queue-item-id">#${idx + 1}</span>
+          <span class="queue-item-desc">${pShort} · ${job.batchSize || 1} var(s) · ${runLabel}</span>
+        </div>
+        <span class="queue-item-del" title="Eliminar este trabajo de la cola">×</span>
+      `;
+      row.querySelector(".queue-item-del").addEventListener("click", (e) => {
+        e.stopPropagation();
+        jobQueue.splice(idx, 1);
+        updateQueueUI();
+        log(`🗑️ Trabajo #${idx + 1} eliminado de la cola.`, "l-ok");
+      });
+      itemsList.appendChild(row);
+    });
+  }
 }
+
+$("queueItemsToggle")?.addEventListener("click", () => {
+  $("queueItemsAccordion")?.classList.toggle("open");
+});
 
 // ==========================================
 // ==========================================
@@ -7021,6 +7098,10 @@ function finishCurrentJob(){
   if(elF) elF.classList.remove("live");
   if(el1) el1.classList.remove("live");
   if(el2) el2.classList.remove("live");
+
+  // Estado terminal en el indicador de ejecución: sin esto queda el último
+  // "Muestreando (n/n · 100%)" en ámbar tras terminar.
+  setRun("ok", "en reposo");
 
   activeJob = null;
   currentPromptId = null;
