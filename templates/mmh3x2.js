@@ -449,7 +449,7 @@ CONFIG.variantMeta = function(){
   let audioDesc = "sin audio externo";
   if(audioMode === "guide") audioDesc = "Guía Ritmo IA (solo condiciona, IA audible)";
   else if(audioMode === "passthrough") audioDesc = "Pista Directa Final (BGM limpio)";
-  else if(audioMode === "hybrid") audioDesc = `Híbrido (IA ${$("audioGuideVolume")?.value ?? "-10"} dB + pista)`;
+    else if(audioMode === "hybrid") audioDesc = `Híbrido (IA puro seg1/seg2; final: pista ${$("audioUserVolume")?.value ?? "-12"} dB + IA ${$("audioGuideVolume")?.value ?? "-6"} dB)`;
 
   const audioCfOn = $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : true;
   const audioCfSec = parseFloat($("audioCrossfadeSlider")?.value || "0.40").toFixed(2);
@@ -1648,7 +1648,13 @@ function saveSettings(){
     audioCrossfadeToggle: $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : true,
     audioCrossfadeSlider: $("audioCrossfadeSlider")?.value || "0.40",
     audioCrossfadeCurve: $("audioCrossfadeCurve")?.value || "equal_power",
-    audioGuideVolume: parseInt($("audioGuideVolume")?.value ?? "-10", 10),
+    audioGuideVolume: parseInt($("audioGuideVolume")?.value ?? "-6", 10),
+    audioUserVolume: parseInt($("audioUserVolume")?.value ?? "-12", 10),
+    audioNormalizeToggle: $("audioNormalizeToggle") ? $("audioNormalizeToggle").checked : false,
+    enhancerModel: $("enhancerModel")?.value || "",
+    enhancerMode: $("enhancerMode")?.value || "text",
+    enhancerStyle: $("enhancerStyle")?.value || "A",
+    enhancerChainMode: $("enhancerChainMode")?.value || "ollama",
     shareRefsToggle: !!$("shareRefsToggle")?.checked,
     refImageSize: $("refImageSize")?.value || "match"
   };
@@ -1765,6 +1771,15 @@ function restoreSettings(){
       $("audioGuideVolume").value = s.audioGuideVolume;
       if($("audioGuideVolumeVal")) $("audioGuideVolumeVal").textContent = `${s.audioGuideVolume} dB`;
     }
+    if(s.audioUserVolume !== undefined && $("audioUserVolume")){
+      $("audioUserVolume").value = s.audioUserVolume;
+      if($("audioUserVolumeVal")) $("audioUserVolumeVal").textContent = `${s.audioUserVolume} dB`;
+    }
+    if(s.audioNormalizeToggle !== undefined && $("audioNormalizeToggle")) $("audioNormalizeToggle").checked = s.audioNormalizeToggle;
+    if(s.enhancerMode !== undefined && $("enhancerMode")) $("enhancerMode").value = s.enhancerMode;
+    if(s.enhancerStyle !== undefined && $("enhancerStyle")) $("enhancerStyle").value = s.enhancerStyle;
+    if(s.enhancerChainMode !== undefined && $("enhancerChainMode")) $("enhancerChainMode").value = s.enhancerChainMode;
+    // enhancerModel se restaura tras cargar la lista de modelos (loadEnhancerModels).
     if(s.shareRefsToggle !== undefined && $("shareRefsToggle")) $("shareRefsToggle").checked = s.shareRefsToggle;
     if(s.refImageSize && $("refImageSize")) $("refImageSize").value = s.refImageSize;
     updateRefNumberingHint();
@@ -1821,7 +1836,8 @@ function attachAutoSaveListeners(){
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
-    "audioGuideVolume", "shareRefsToggle", "refImageSize"
+    "audioGuideVolume", "audioUserVolume", "audioNormalizeToggle", "shareRefsToggle", "refImageSize",
+    "enhancerModel", "enhancerMode", "enhancerStyle", "enhancerChainMode"
   ];
     const blockattIds = IS_BLOCKATT ? [
       "h3SparseBackend", "aimdoResidency"
@@ -1843,6 +1859,9 @@ function attachAutoSaveListeners(){
   $("audioGuideVolume")?.addEventListener("input", (e) => {
     if($("audioGuideVolumeVal")) $("audioGuideVolumeVal").textContent = `${e.target.value} dB`;
   });
+  $("audioUserVolume")?.addEventListener("input", (e) => {
+    if($("audioUserVolumeVal")) $("audioUserVolumeVal").textContent = `${e.target.value} dB`;
+  });
 
   // Hint dinámico: qué sonará según el modo de audio activo.
   function updateAudioModeHint(){
@@ -1853,10 +1872,10 @@ function attachAutoSaveListeners(){
       none: "Solo suena el audio sintetizado por IA en cada segmento y el final.",
       guide: "Tu pista SOLO condiciona el ritmo (ref_audio): lo audible es el audio IA. Tu audio no se mezcla.",
       passthrough: "Solo suena tu pista (recortada al total) en el vídeo final. Sin guía de ritmo.",
-      hybrid: "Se mezclan el audio IA (bajado N dB) y tu pista en cada segmento y en el final.",
+      hybrid: "Audio IA puro en Seg 1 y Seg 2; en el vídeo final se mezcla con tu pista (niveles independientes).",
     };
     hint.textContent = mode === "hybrid"
-      ? `Híbrido: audio IA a ${$("audioGuideVolume")?.value ?? "-10"} dB + tu pista, mezclados en Seg 1, Seg 2 y Final.`
+      ? `Híbrido: Seg 1/Seg 2 = audio IA ajustado; Final = IA + tu pista a ${$("audioUserVolume")?.value ?? "-12"} dB + IA a ${$("audioGuideVolume")?.value ?? "-6"} dB.`
       : (mode === "guide" ? "Guía de Ritmo IA: lo audible es el audio IA; tu pista solo guía el ritmo (no suena)." : "Sin pista externa: audio IA puro.");
   }
   updateAudioModeHint();
@@ -2194,6 +2213,7 @@ async function ensureAllMediaUploaded(){
         const fd = new FormData();
         fd.append("image", aSlot.file, aSlot.file.name || ("mmh3x2_audio_"+i));
         fd.append("trim_end", String(dur));
+        if($("audioNormalizeToggle")?.checked) fd.append("normalize", "true");
         const r = await fetch("/api/video_preprocess", { method: "POST", body: fd });
         if(r.ok){
           const d = await r.json();
@@ -2733,15 +2753,23 @@ function buildGraph(j){
     //   hybrid       → audio IA MEZCLADO con la pista del usuario (AudioMerge),
     //                  con la IA bajada N dB (slider audioGuideVolume).
     //   passthrough  → solo pista del usuario (recortada al total) en el final.
-    const guideGainDb = parseInt($("audioGuideVolume")?.value ?? "-10", 10);
+    const guideGainDb = parseInt($("audioGuideVolume")?.value ?? "-6", 10);
+    const userGainDb = parseInt($("audioUserVolume")?.value ?? "-12", 10);
     if(audioMode === "hybrid"){
-      // --- Híbrido: IA + pista mezcladas por segmento ---
-      // Seg 1: IA (21) bajada a guideDb + pista (190) → AudioMerge add → 22
+      // --- Híbrido: mezcla global solo en el vídeo final ---
+      // Los segmentos (22/38) llevan audio IA puro ajustado por el slider.
+      // El final (42) mezcla la pista de usuario con el concat IA ya crossfadeado.
+      const IA_BOOST_DB = 6;
       if(a1 && g[N.CREATE_VID_1]?.inputs && g[N.DECODE_AUD_1] && g[N.DECODE_AUD_1] in g){
         const seg1Dur = parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
         const seg1TrimH = (audioCrossfadeOn && cfSec > 0) ? parseFloat((seg1Dur + cfSec).toFixed(4)) : seg1Dur;
+        g["198_ia_boost_seg1"] = {
+          inputs: { audio: [N.DECODE_AUD_1, 0], volume: IA_BOOST_DB },
+          class_type: "AudioAdjustVolume",
+          _meta: { title: "Híbrido: boost IA Seg 1 (+6 dB)" }
+        };
         g["198_ia_vol_seg1"] = {
-          inputs: { audio: [N.DECODE_AUD_1, 0], volume: guideGainDb },
+          inputs: { audio: ["198_ia_boost_seg1", 0], volume: guideGainDb },
           class_type: "AudioAdjustVolume",
           _meta: { title: `Híbrido: IA Seg 1 a ${guideGainDb} dB` }
         };
@@ -2750,69 +2778,51 @@ function buildGraph(j){
           class_type: "TrimAudioDuration",
           _meta: { title: "Híbrido: IA Seg 1 recortada" }
         };
-        g["199_user_trim_seg1"] = {
-          inputs: { audio: ["190_load_audio1", 0], start_index: 0.0, duration: seg1TrimH },
-          class_type: "TrimAudioDuration",
-          _meta: { title: "Híbrido: pista Seg 1 recortada" }
-        };
-        g["199_merge_seg1"] = {
-          inputs: { audio1: ["199_user_trim_seg1", 0], audio2: ["199_ia_trim_seg1", 0], merge_method: "add" },
-          class_type: "AudioMerge",
-          _meta: { title: "Híbrido: mezcla IA + pista (Seg 1)" }
-        };
-        g[N.CREATE_VID_1].inputs.audio = ["199_merge_seg1", 0];
+        // El audio de Seg 1 es IA pura (con ajuste de volumen); la mezcla con la pista se hace en el final.
+        g[N.CREATE_VID_1].inputs.audio = ["199_ia_trim_seg1", 0];
       }
-      // Seg 2: IA (37) + pista usuario → AudioMerge add → 38
       if(g[N.CREATE_VID_2]?.inputs && g[N.DECODE_AUD_2] && g[N.DECODE_AUD_2] in g){
         const seg2Dur = parseFloat((calcFramesForDuration(dur2) / 24).toFixed(4));
-        // Pista usuario para Seg 2: audio 2 si existe; si no, audio 1 continuado
-        // desde el final de Seg 1 (con reinicio de seguridad si no cubre).
-        let userSrc = null;
-        let startIdx = 0.0;
-        if(a2){
-          g["199_user_trim_seg2"] = {
-            inputs: { audio: ["191_load_audio2", 0], start_index: 0.0, duration: seg2Dur },
-            class_type: "TrimAudioDuration",
-            _meta: { title: "Híbrido: pista Seg 2 recortada" }
-          };
-          userSrc = "199_user_trim_seg2";
-        } else if(a1){
-          const seg1DurCont = (audioCrossfadeOn && cfSec > 0) ? parseFloat(((calcFramesForDuration(dur1) - 1) / 24 + cfSec).toFixed(4)) : parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
-          const hasContinuation = (seg1Dur + 0.01) < (dur1 + dur2);
-          startIdx = hasContinuation ? seg1Dur : 0.0;
-          if(!hasContinuation) log("⚠️ El audio 1 no cubre dur1+dur2; Seg 2 reinicia la pista desde 0s.", "l-warn");
-          g["199_user_trim_seg2"] = {
-            inputs: { audio: ["190_load_audio1", 0], start_index: startIdx, duration: seg2Dur },
-            class_type: "TrimAudioDuration",
-            _meta: { title: "Híbrido: pista Seg 2 (continuación)" }
-          };
-          userSrc = "199_user_trim_seg2";
-        }
-        if(userSrc){
-          g["199_ia_vol_seg2"] = {
-            inputs: { audio: [N.DECODE_AUD_2, 0], volume: guideGainDb },
-            class_type: "AudioAdjustVolume",
-            _meta: { title: `Híbrido: IA Seg 2 a ${guideGainDb} dB` }
-          };
-          g["199_merge_seg2"] = {
-            inputs: { audio1: [userSrc, 0], audio2: ["199_ia_vol_seg2", 0], merge_method: "add" },
-            class_type: "AudioMerge",
-            _meta: { title: "Híbrido: mezcla IA + pista (Seg 2)" }
-          };
-          g[N.CREATE_VID_2].inputs.audio = ["199_merge_seg2", 0];
-        }
+        g["199_ia_boost_seg2"] = {
+          inputs: { audio: [N.DECODE_AUD_2, 0], volume: IA_BOOST_DB },
+          class_type: "AudioAdjustVolume",
+          _meta: { title: "Híbrido: boost IA Seg 2 (+6 dB)" }
+        };
+        g["199_ia_vol_seg2"] = {
+          inputs: { audio: ["199_ia_boost_seg2", 0], volume: guideGainDb },
+          class_type: "AudioAdjustVolume",
+          _meta: { title: `Híbrido: IA Seg 2 a ${guideGainDb} dB` }
+        };
+        g["199_ia_trim_seg2"] = {
+          inputs: { audio: ["199_ia_vol_seg2", 0], start_index: 0.0, duration: seg2Dur },
+          class_type: "TrimAudioDuration",
+          _meta: { title: "Híbrido: IA Seg 2 recortada" }
+        };
+        g[N.CREATE_VID_2].inputs.audio = ["199_ia_trim_seg2", 0];
       }
       // Final: concat IA (41, ya con crossfade IA) + pista usuario global (192)
       if(g[N.CREATE_VID_FINAL]?.inputs && g[N.AUDIO_CONCAT] && g[N.AUDIO_CONCAT] in g){
+        const IA_BOOST_DB = 6;
+        g["199_ia_boost_final"] = {
+          inputs: { audio: [N.AUDIO_CONCAT, 0], volume: IA_BOOST_DB },
+          class_type: "AudioAdjustVolume",
+          _meta: { title: "Híbrido: boost IA global (+6 dB)" }
+        };
         if(a1 && !a2){
           // La pista global ya está recortada en 192 (ver bloque C abajo).
+          // Aplicamos el volumen de usuario antes de mezclar.
+          g["199_user_vol_final"] = {
+            inputs: { audio: ["192_trim_final_audio", 0], volume: userGainDb },
+            class_type: "AudioAdjustVolume",
+            _meta: { title: `Híbrido: pista global a ${userGainDb} dB` }
+          };
           g["199_ia_vol_final"] = {
-            inputs: { audio: [N.AUDIO_CONCAT, 0], volume: guideGainDb },
+            inputs: { audio: ["199_ia_boost_final", 0], volume: guideGainDb },
             class_type: "AudioAdjustVolume",
             _meta: { title: `Híbrido: IA global a ${guideGainDb} dB` }
           };
           g["199_merge_final"] = {
-            inputs: { audio1: ["192_trim_final_audio", 0], audio2: ["199_ia_vol_final", 0], merge_method: "add" },
+            inputs: { audio1: ["199_user_vol_final", 0], audio2: ["199_ia_vol_final", 0], merge_method: "add" },
             class_type: "AudioMerge",
             _meta: { title: "Híbrido: mezcla IA + pista (Final)" }
           };
@@ -2821,13 +2831,18 @@ function buildGraph(j){
         // Con audio 2, la pista global de usuario (195_concat_direct_audio) ya
         // cubre todo; mezclamos esa con el concat IA.
         if(a1 && a2){
+          g["199_user_vol_final"] = {
+            inputs: { audio: ["195_concat_direct_audio", 0], volume: userGainDb },
+            class_type: "AudioAdjustVolume",
+            _meta: { title: `Híbrido: pista global a ${userGainDb} dB` }
+          };
           g["199_ia_vol_final"] = {
-            inputs: { audio: [N.AUDIO_CONCAT, 0], volume: guideGainDb },
+            inputs: { audio: ["199_ia_boost_final", 0], volume: guideGainDb },
             class_type: "AudioAdjustVolume",
             _meta: { title: `Híbrido: IA global a ${guideGainDb} dB` }
           };
           g["199_merge_final"] = {
-            inputs: { audio1: ["195_concat_direct_audio", 0], audio2: ["199_ia_vol_final", 0], merge_method: "add" },
+            inputs: { audio1: ["199_user_vol_final", 0], audio2: ["199_ia_vol_final", 0], merge_method: "add" },
             class_type: "AudioMerge",
             _meta: { title: "Híbrido: mezcla IA + pista (Final)" }
           };
@@ -2910,13 +2925,24 @@ function buildGraph(j){
         if(audioMode === "passthrough" && g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
         // Híbrido con solo Audio 2: mezclar esa pista global con el concat IA.
         if(audioMode === "hybrid" && g[N.CREATE_VID_FINAL]?.inputs && g[N.AUDIO_CONCAT] && g[N.AUDIO_CONCAT] in g){
+          const IA_BOOST_DB = 6;
+          g["199_ia_boost_final"] = {
+            inputs: { audio: [N.AUDIO_CONCAT, 0], volume: IA_BOOST_DB },
+            class_type: "AudioAdjustVolume",
+            _meta: { title: "Híbrido: boost IA global (+6 dB)" }
+          };
+          g["199_user_vol_final"] = {
+            inputs: { audio: ["192_trim_final_audio", 0], volume: userGainDb },
+            class_type: "AudioAdjustVolume",
+            _meta: { title: `Híbrido: pista global a ${userGainDb} dB` }
+          };
           g["199_ia_vol_final"] = {
-            inputs: { audio: [N.AUDIO_CONCAT, 0], volume: guideGainDb },
+            inputs: { audio: ["199_ia_boost_final", 0], volume: guideGainDb },
             class_type: "AudioAdjustVolume",
             _meta: { title: `Híbrido: IA global a ${guideGainDb} dB` }
           };
           g["199_merge_final"] = {
-            inputs: { audio1: ["192_trim_final_audio", 0], audio2: ["199_ia_vol_final", 0], merge_method: "add" },
+            inputs: { audio1: ["199_user_vol_final", 0], audio2: ["199_ia_vol_final", 0], merge_method: "add" },
             class_type: "AudioMerge",
             _meta: { title: "Híbrido: mezcla IA + pista (Final)" }
           };
@@ -3031,7 +3057,9 @@ async function queueJob(runMode){
     sampler: $("samplerName")?.value || "res_multistep",
     scheduler: $("schedulerName")?.value || "simple",
     audioMode: $("audioMode")?.value || "none",
-    audioGuideVolume: parseInt($("audioGuideVolume")?.value ?? "-10", 10),
+    audioGuideVolume: parseInt($("audioGuideVolume")?.value ?? "-6", 10),
+    audioUserVolume: parseInt($("audioUserVolume")?.value ?? "-12", 10),
+    audioNormalizeToggle: $("audioNormalizeToggle") ? $("audioNormalizeToggle").checked : false,
     sharedRefs: !!$("shareRefsToggle")?.checked,
     refImageSize: $("refImageSize")?.value || "match",
     seedMode,
@@ -3871,6 +3899,21 @@ window.addEventListener("DOMContentLoaded", () => {
       btn.textContent = "Mejorar prompt";
     }
   });
+
+  // Tras cargar los modelos de Ollama, restaurar el modelo guardado si sigue disponible.
+  (async () => {
+    await loadEnhancerModels();
+    const saved = restoreSettings();
+    if(saved){
+      const s = JSON.parse(localStorage.getItem(MMH3X2_SETTINGS_KEY) || "{}");
+      if(s.enhancerModel && $("enhancerModel")){
+        const sel = $("enhancerModel");
+        const hasModel = Array.from(sel.options).some(o => o.value === s.enhancerModel);
+        if(hasModel) sel.value = s.enhancerModel;
+        else if(sel.options.length > 1) log(`⚠️ Modelo Ollama guardado (${s.enhancerModel}) no disponible ahora.`, "l-warn");
+      }
+    }
+  })();
 
   updateDurationFrames();
   loadVideoHistory();

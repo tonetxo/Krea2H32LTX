@@ -553,6 +553,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         skip_frames = field("skip_frames", "1")
         use_audio = field("use_audio", "false").lower() in ("true", "1", "on")
         volume = field("volume", "1")
+        normalize = field("normalize", "false").lower() in ("true", "1", "on")
 
         try:
             scale = float(scale)
@@ -622,8 +623,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     acmd += ["-ss", trim_start]
                 if trim_end:
                     acmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+                af_parts = []
                 if vol != 1.0:
-                    acmd += ["-af", f"volume={vol}"]
+                    af_parts.append(f"volume={vol}")
+                if normalize:
+                    # EBU R128 a -16 LUFS + limitador de pico -1.5 dBTP para evitar saturación en la mezcla.
+                    af_parts.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+                    af_parts.append("alimiter=limit=0.95:level=disabled")
+                if af_parts:
+                    acmd += ["-af", ",".join(af_parts)]
                 acmd += ["-vn", "-c:a", "aac", "-b:a", "128k", out_audio]
                 subprocess.run(acmd, capture_output=True, timeout=300)
                 if not os.path.exists(out_audio) or os.path.getsize(out_audio) == 0:
@@ -668,8 +676,14 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     acmd += ["-ss", trim_start]
                 if trim_end:
                     acmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+                af_parts = []
                 if vol != 1.0:
-                    acmd += ["-af", f"volume={vol}"]
+                    af_parts.append(f"volume={vol}")
+                if normalize:
+                    af_parts.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+                    af_parts.append("alimiter=limit=0.95:level=disabled")
+                if af_parts:
+                    acmd += ["-af", ",".join(af_parts)]
                 acmd += ["-vn", "-c:a", "aac", "-b:a", "128k", out_audio]
                 subprocess.run(acmd, capture_output=True, timeout=300)
                 if os.path.exists(out_audio) and os.path.getsize(out_audio) > 0:
@@ -932,10 +946,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             paths = glob.glob(os.path.join(search_root, "**", "*.mp4"), recursive=True)
             paths_with_time = []
             for p in paths:
-                # Only keep files whose path looks like MMH3X2 output.
-                rel = os.path.relpath(p, output_dir)
-                if "MiniMax_H3_" not in rel:
-                    continue
+                # Listar todos los MP4 de output/video/ (incluyendo subcarpetas),
+                # no solo los cuyo nombre contenga "MiniMax_H3_". Los vídeos
+                # recientes usan prefijos personalizados (plano1_cont, etc.).
                 try:
                     paths_with_time.append((os.path.getmtime(p), p))
                 except OSError:

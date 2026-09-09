@@ -526,11 +526,27 @@
             <div class="hint" style="font-size:10px;margin-top:2px;">Elimina saltos bruscos y clics fundiendo suavemente el final de Seg 1 con el inicio de Seg 2.</div>
           </div>
 
+          <!-- Normalización de pista subida (solo híbrido/guía) -->
+          <div class="row" style="margin-top:8px;">
+            <label style="font-size:10px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="audioNormalizeToggle" style="margin:0;">
+              <span>Normalizar pista subida (-16 LUFS + limitador)</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo en modo Híbrido/Guía: activa solo si la pista original es muy baja o irregular. Desactivado mantiene la música original intacta.</div>
+          </div>
+
+          <!-- Volumen pista subida en la mezcla (solo híbrido) -->
+          <div class="row" style="margin-top:8px;">
+            <label style="font-size:10px;">Volumen de tu pista en la mezcla (Híbrido): <b id="audioUserVolumeVal">-12 dB</b></label>
+            <input type="range" id="audioUserVolume" min="-30" max="0" step="1" value="-12" style="width:100%;">
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo en modo Híbrido: baja tu pista para dejar espacio al audio IA. 0 dB = pista original; -30 dB ≈ inaudible.</div>
+          </div>
+
           <!-- Volumen IA en la mezcla (solo híbrido) -->
           <div class="row" style="margin-top:8px;">
-            <label style="font-size:10px;">Volumen del audio IA en la mezcla (Híbrido): <b id="audioGuideVolumeVal">-10 dB</b></label>
-            <input type="range" id="audioGuideVolume" min="-30" max="0" step="1" value="-10" style="width:100%;">
-            <div class="hint" style="font-size:10px;margin-top:2px;">Solo en modo Híbrido: cuánto suena el audio generado por IA bajo tu pista. 0 dB = igual de fuerte; -30 dB ≈ inaudible.</div>
+            <label style="font-size:10px;">Volumen del audio IA en la mezcla (Híbrido): <b id="audioGuideVolumeVal">-6 dB</b></label>
+            <input type="range" id="audioGuideVolume" min="-30" max="12" step="1" value="-6" style="width:100%;">
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo en modo Híbrido: cuánto suena el audio generado por IA mezclado con tu pista. 0 dB = IA al nivel de tu pista; +12 dB = IA destacada; -30 dB ≈ inaudible. La IA lleva un boost interno de +6 dB.</div>
           </div>
         </div>
       </div>
