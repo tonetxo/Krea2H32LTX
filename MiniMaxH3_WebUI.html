@@ -488,7 +488,10 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
             <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt de Ollama y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
           </div>
           <div class="enhancer-row">
-            <label>Resultado Ollama</label>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label style="margin-bottom:0;">Resultado Ollama</label>
+              <span id="enhancerMetaInfo" style="font-size:10px; color:var(--accent);"></span>
+            </div>
             <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado de Ollama aparecerá aquí..."></textarea>
           </div>
           <div class="enhancer-actions">
@@ -2999,14 +3002,16 @@ function initCommon(){
   });
 
   $("btnUseAsPrompt").addEventListener("click", () => {
-    const text = $("enhancerOutput").value.trim();
+    let text = $("enhancerOutput").value.trim();
+    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
     $("prompt").value = text;
     log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
   });
 
   $("btnSaveEnhanced").addEventListener("click", () => {
-    const text = $("enhancerOutput").value.trim();
+    let text = $("enhancerOutput").value.trim();
+    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
     const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
     const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);
@@ -7287,10 +7292,12 @@ $("btnEnhance").addEventListener("click", async () => {
   $("btnEnhance").disabled = true;
   $("btnEnhance").textContent = "Mejorando...";
   $("enhancerOutput").value = "";
+  if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
   try {
     const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
     const timeStr = fmtMs(elapsedMs);
-    $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+    $("enhancerOutput").value = text;
+    if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
     log(`Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Pulsa 'Usar como prompt' para aplicarlo.`, "l-ok");
   } catch(e) {
     log("Error al mejorar: "+e.message, "l-err");

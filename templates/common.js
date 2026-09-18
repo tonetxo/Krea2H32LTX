@@ -1615,14 +1615,16 @@ function initCommon(){
   });
 
   $("btnUseAsPrompt").addEventListener("click", () => {
-    const text = $("enhancerOutput").value.trim();
+    let text = $("enhancerOutput").value.trim();
+    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
     $("prompt").value = text;
     log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
   });
 
   $("btnSaveEnhanced").addEventListener("click", () => {
-    const text = $("enhancerOutput").value.trim();
+    let text = $("enhancerOutput").value.trim();
+    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
     const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
     const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);

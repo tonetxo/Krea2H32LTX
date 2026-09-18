@@ -2448,10 +2448,12 @@ $("btnEnhance").addEventListener("click", async () => {
   $("btnEnhance").disabled = true;
   $("btnEnhance").textContent = "Mejorando...";
   $("enhancerOutput").value = "";
+  if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
   try {
     const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
     const timeStr = fmtMs(elapsedMs);
-    $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+    $("enhancerOutput").value = text;
+    if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
     log(`Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Pulsa 'Usar como prompt' para aplicarlo.`, "l-ok");
   } catch(e) {
     log("Error al mejorar: "+e.message, "l-err");

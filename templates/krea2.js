@@ -1370,10 +1370,12 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
     $("btnEnhance").disabled = true;
     $("btnEnhance").textContent = "Mejorando...";
     $("enhancerOutput").value = "";
+    if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
     try {
       const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
       const timeStr = fmtMs(elapsedMs);
-      $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+      $("enhancerOutput").value = text;
+      if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
       log(`Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Pulsa 'Usar como prompt' para aplicarlo.`, "l-ok");
     } catch(e) {
       log("Error al mejorar: "+e.message, "l-err");
@@ -1400,6 +1402,7 @@ $("btnCaption").addEventListener("click", async () => {
   $("btnCaption").disabled = true;
   $("btnCaption").textContent = "Analizando imagen...";
   $("enhancerOutput").value = "";
+  if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
   try {
     const b64 = await getVisibleRegionBase64(refImgEl.src, "refWrap", 768);
     const userPrompt = $("prompt").value.trim();
@@ -1416,7 +1419,8 @@ $("btnCaption").addEventListener("click", async () => {
       log("Respuesta vacia.", "l-err");
       $("enhancerOutput").value = "El modelo no devolvio texto.";
     } else {
-      $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+      $("enhancerOutput").value = text;
+      if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
       log(`Caption Ollama generado en ${timeStr} (${model}, ${mode}/${styleKey}, ${text.length} chars).`, "l-ok");
       log("Pulsa 'Usar como prompt' para aplicarlo, o pulsa 'Generar' si ya esta activo.", "l-info");
     }

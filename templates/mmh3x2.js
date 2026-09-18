@@ -3702,7 +3702,8 @@ window.addEventListener("DOMContentLoaded", () => {
   if($("btnRefreshHistory")) $("btnRefreshHistory").addEventListener("click", () => { loadVideoHistory(); });
 
   if($("btnPrompt2FromEnhancer")) $("btnPrompt2FromEnhancer").addEventListener("click", () => {
-    const text = $("enhancerOutput")?.value;
+    let text = $("enhancerOutput")?.value || "";
+    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
     if(text){
       $("prompt2").value = text;
       log("Prompt de Enhancer copiado a Prompt 2 (Segmento 2)", "l-ok");
@@ -4051,11 +4052,13 @@ window.addEventListener("DOMContentLoaded", () => {
     btn.disabled = true;
     btn.textContent = "Mejorando...";
     $("enhancerOutput").value = "";
+    if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
     try {
       log(`🧠 Solicitando mejora a Ollama (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
       const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
       const timeStr = fmtMs(elapsedMs);
-      $("enhancerOutput").value = text + `\n\n--- Ollama · ${model} · ${mode} · ${styleKey} · ${timeStr} ---`;
+      $("enhancerOutput").value = text;
+      if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
       log(`✅ Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
     } catch(e){
       log(`❌ Error al mejorar prompt con Ollama: ${e.message}`, "l-err");

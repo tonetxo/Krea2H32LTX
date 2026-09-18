@@ -52,7 +52,10 @@
             <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt de Ollama y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
           </div>
           <div class="enhancer-row">
-            <label>Resultado Ollama</label>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label style="margin-bottom:0;">Resultado Ollama</label>
+              <span id="enhancerMetaInfo" style="font-size:10px; color:var(--accent);"></span>
+            </div>
             <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado de Ollama aparecerá aquí..."></textarea>
           </div>
           <div class="enhancer-actions">
