@@ -519,7 +519,7 @@ $("sigmaShiftAudio")?.addEventListener("input", (e) => {
 });
 
 // --- SPECTRUM (MiniMax H3) ---
-const SPECTRUM_DEFAULTS = { enabled: true, blend: 0.5, flex: 0.75, warmup: 5, historyStorage: "system_ram" };
+const SPECTRUM_DEFAULTS = { enabled: true, blend: 0.5, flex: 0.75, warmup: 1, bootstrapFirstForecast: true, historyStorage: "system_ram" };
 function loadSpectrum(){
   try { return Object.assign({}, SPECTRUM_DEFAULTS, JSON.parse(localStorage.getItem(SPECTRUM_KEY) || "{}")); }
   catch(_) { return {...SPECTRUM_DEFAULTS}; }
@@ -532,6 +532,11 @@ function setSpectrumUI(s){
   if($("spectrumBlend")){ $("spectrumBlend").value = s.blend; $("spectrumBlendVal").textContent = parseFloat(s.blend).toFixed(2); }
   if($("spectrumFlex")){ $("spectrumFlex").value = s.flex; $("spectrumFlexVal").textContent = parseFloat(s.flex).toFixed(2); }
   if($("spectrumWarmup")){ $("spectrumWarmup").value = s.warmup; $("spectrumWarmupVal").textContent = s.warmup; }
+  const bootOn = $("segBootstrapOn"), bootOff = $("segBootstrapOff");
+  if(bootOn && bootOff){
+    if(s.bootstrapFirstForecast !== false){ bootOn.classList.add("on"); bootOff.classList.remove("on"); }
+    else { bootOff.classList.add("on"); bootOn.classList.remove("on"); }
+  }
   if($("spectrumHistoryStorage")) $("spectrumHistoryStorage").value = s.historyStorage;
 }
 function getSpectrumState(){
@@ -539,7 +544,8 @@ function getSpectrumState(){
     enabled: $("segSpectrumOn")?.classList.contains("on") ?? true,
     blend: parseFloat($("spectrumBlend")?.value ?? "0.5"),
     flex: parseFloat($("spectrumFlex")?.value ?? "0.75"),
-    warmup: parseInt($("spectrumWarmup")?.value ?? "5", 10),
+    warmup: parseInt($("spectrumWarmup")?.value ?? "1", 10),
+    bootstrapFirstForecast: $("segBootstrapOn")?.classList.contains("on") ?? true,
     historyStorage: $("spectrumHistoryStorage")?.value || "system_ram",
   };
 }
@@ -550,6 +556,8 @@ $("segSpectrumOff")?.addEventListener("click", () => { const s = getSpectrumStat
 $("spectrumBlend")?.addEventListener("input", (e) => { $("spectrumBlendVal").textContent = parseFloat(e.target.value).toFixed(2); const s = getSpectrumState(); s.blend = parseFloat(e.target.value); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("spectrumFlex")?.addEventListener("input", (e) => { $("spectrumFlexVal").textContent = parseFloat(e.target.value).toFixed(2); const s = getSpectrumState(); s.flex = parseFloat(e.target.value); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").textContent = e.target.value; const s = getSpectrumState(); s.warmup = parseInt(e.target.value, 10); saveSpectrum(s); scheduleSaveH3Settings(); });
+$("segBootstrapOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
+$("segBootstrapOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); scheduleSaveH3Settings(); });
 
 // --- FRAME INTERPOLATION (RIFE) ---
@@ -1145,7 +1153,7 @@ CONFIG.variantMeta = function(){
     ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
     ["Sigma Shift", `Vídeo ${ss.shiftVideo.toFixed(1)} / Audio ${ss.shiftAudio.toFixed(1)}`],
-    ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup} · ${s.historyStorage}` : "off"],
+    ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup}${s.bootstrapFirstForecast ? ' · boot' : ''} · ${s.historyStorage}` : "off"],
     ["Interpolación RIFE", r.enabled ? `on · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
@@ -2098,7 +2106,8 @@ async function applyWorkflow(workflow, opts={}){
       enabled: spectrumNode.inputs.enabled !== false,
       blend: typeof spectrumNode.inputs.blend_weight === "number" ? spectrumNode.inputs.blend_weight : 0.5,
       flex: typeof spectrumNode.inputs.flex_window === "number" ? spectrumNode.inputs.flex_window : 0.75,
-      warmup: typeof spectrumNode.inputs.warmup_steps === "number" ? spectrumNode.inputs.warmup_steps : 5,
+      warmup: typeof spectrumNode.inputs.warmup_steps === "number" ? spectrumNode.inputs.warmup_steps : 1,
+      bootstrapFirstForecast: spectrumNode.inputs.bootstrap_first_forecast !== false,
       historyStorage: spectrumNode.inputs.history_storage || "system_ram",
     };
     setSpectrumUI(s);
@@ -2957,9 +2966,18 @@ function buildGraph(job){
 
   let currentModelNode = N.UNET;
 
-  // 2. Optimizador sparse (exclusivo mutuo). Se aplica ANTES de SigmaShift/Spectrum/Backend.
-  const optimizerState = j ? j.attentionOptimizer : getAttentionOptimizerState();
+  // 1. Backend denso de atención (ModelAttentionBackend).
+  // Debe ir inmediatamente después del UNET base para que los optimizadores sparse (Sol-Attn / BlockSparse)
+  // y Spectrum puedan envolver la atención sin que sus closures/overrides sean pisados downstream.
   const backendState = j ? j.attentionBackend : getAttentionBackendState();
+  if(g[N.ATTN_BACKEND]){
+    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
+    g[N.ATTN_BACKEND].inputs.attention = backendState.backend;
+    currentModelNode = N.ATTN_BACKEND;
+  }
+
+  // 2. Optimizador sparse (exclusivo mutuo). Se aplica ANTES de SigmaShift/Spectrum.
+  const optimizerState = j ? j.attentionOptimizer : getAttentionOptimizerState();
   const h3opt = j ? j.h3opt : getH3OptState();
   const aimdo = j ? j.aimdo : getAimdoState();
 
@@ -3096,15 +3114,10 @@ function buildGraph(job){
     g[N.SPECTRUM].inputs.blend_weight = s.blend;
     g[N.SPECTRUM].inputs.flex_window = s.flex;
     g[N.SPECTRUM].inputs.warmup_steps = s.warmup;
+    g[N.SPECTRUM].inputs.bootstrap_first_forecast = s.bootstrapFirstForecast !== false;
     g[N.SPECTRUM].inputs.history_storage = s.historyStorage;
+    g[N.SPECTRUM].inputs.offline_smoothing_replay = false;
     currentModelNode = N.SPECTRUM;
-  }
-
-  // 1. ModelAttentionBackend (backend denso) se aplica DESPUÉS de Spectrum, igual que en el workflow original
-  if(g[N.ATTN_BACKEND]){
-    g[N.ATTN_BACKEND].inputs.model = [currentModelNode, 0];
-    g[N.ATTN_BACKEND].inputs.attention = backendState.backend;
-    currentModelNode = N.ATTN_BACKEND;
   }
 
   // 6. Model Preview Override (preview animado, sin taeh3).

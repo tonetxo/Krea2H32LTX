@@ -29,6 +29,13 @@
             <option value="ollama">Asistido (Ollama en grafo: fusiona visión + texto)</option>
           </select>
         </div>
+        <div class="row" id="rowSeg2OllamaModel" style="margin-top:8px; display:none;">
+          <label>Modelo Ollama para continuidad (multimodal / visión)</label>
+          <select id="seg2OllamaModel">
+            <option value="">-- Mismo que Enhancer / Default --</option>
+          </select>
+          <div class="hint" style="font-size:10px;margin-top:2px;">Se ejecutará dentro de ComfyUI analizando los fotogramas finales del Seg 1. Debe soportar visión.</div>
+        </div>
       </div>
 
       <!-- MEDIOS DE ENTRADA: 4 IMÁGENES + 1 VÍDEO -->
@@ -458,6 +465,45 @@
               <div class="slider-val" id="h3ShiftAudioVal">3.0</div>
             </div>
           </div>
+
+          <!-- Spectrum (MiniMax H3) -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label>Spectrum (MiniMax H3)</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segSpectrumOn" data-value="true">Activo</div>
+              <div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Blend weight <span class="hint">(peso espectral)</span></label>
+              <input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5">
+              <div class="slider-val" id="spectrumBlendVal">0.50</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Flex window <span class="hint">(ajuste intervalo)</span></label>
+              <input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75">
+              <div class="slider-val" id="spectrumFlexVal">0.75</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Warmup steps <span class="hint">(pasos nativos iniciales)</span></label>
+              <input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="1">
+              <div class="slider-val" id="spectrumWarmupVal">1</div>
+            </div>
+            <div class="row" style="margin-top:6px;">
+              <label style="font-size:10px;">Bootstrap primer paso <span class="hint">(pronóstico rápido paso 2)</span></label>
+              <div class="seed-toggle" style="margin-top:4px;">
+                <div class="seg on" id="segBootstrapOn" data-value="true">Sí</div>
+                <div class="seg" id="segBootstrapOff" data-value="false">No</div>
+              </div>
+            </div>
+            <div class="row" style="margin-top:6px;">
+              <label style="font-size:10px;">Historial en <span class="hint">(VRAM más rápido, más memoria)</span></label>
+              <select id="spectrumHistoryStorage" style="margin-top:4px;">
+                <option value="system_ram" selected>RAM sistema</option>
+                <option value="vram">VRAM</option>
+              </select>
+            </div>
+            <div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div>
+          </div>
         </div>
       </div>
 
@@ -690,7 +736,9 @@
         </div>
         <div class="collapsible-body" id="finalPromptBody">
           <div class="hint" id="finalPromptHint" style="margin-bottom:6px;">Aún no se ha generado nada. El prompt que el grafo envía al backend (tras Ollama, referencias, etc.) aparecerá aquí tras cada variante.</div>
+          <label style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:2px;display:block;">Segmento 1 (Prompt final):</label>
           <textarea id="finalPromptSeg1" class="enhancer-output" rows="6" readonly placeholder="Prompt Seg 1 (final)..." style="margin-bottom:6px;"></textarea>
+          <label id="lblFinalPromptSeg2" style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:2px;display:block;">Segmento 2 (Prompt final):</label>
           <textarea id="finalPromptSeg2" class="enhancer-output" rows="6" readonly placeholder="Prompt Seg 2 (final)..."></textarea>
         </div>
       </div>

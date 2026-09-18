@@ -496,6 +496,8 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
       </div>
 
       <div class="panel"><h2>Sampler</h2>
+        <div class="row"><label>Sampler</label><select id="samplerName" style="margin-top:4px;"><option value="none">none</option><optgroup label="multistep/"><option value="multistep/res_2m">multistep/res_2m</option><option value="multistep/res_3m">multistep/res_3m</option><option value="multistep/dpmpp_2m">multistep/dpmpp_2m</option><option value="multistep/dpmpp_3m">multistep/dpmpp_3m</option><option value="multistep/abnorsett_2m">multistep/abnorsett_2m</option><option value="multistep/abnorsett_3m">multistep/abnorsett_3m</option><option value="multistep/abnorsett_4m">multistep/abnorsett_4m</option><option value="multistep/deis_2m">multistep/deis_2m</option><option value="multistep/deis_3m">multistep/deis_3m</option><option value="multistep/deis_4m">multistep/deis_4m</option></optgroup><optgroup label="exponential/"><option value="exponential/res_2s_rkmk2e">exponential/res_2s_rkmk2e</option><option value="exponential/res_2s">exponential/res_2s</option><option value="exponential/res_2s_stable">exponential/res_2s_stable</option><option value="exponential/res_3s">exponential/res_3s</option><option value="exponential/res_3s_non-monotonic">exponential/res_3s_non-monotonic</option><option value="exponential/res_3s_alt">exponential/res_3s_alt</option><option value="exponential/res_3s_cox_matthews">exponential/res_3s_cox_matthews</option><option value="exponential/res_3s_lie">exponential/res_3s_lie</option><option value="exponential/res_3s_sunstar">exponential/res_3s_sunstar</option><option value="exponential/res_3s_strehmel_weiner">exponential/res_3s_strehmel_weiner</option><option value="exponential/res_4s_krogstad">exponential/res_4s_krogstad</option><option value="exponential/res_4s_krogstad_alt">exponential/res_4s_krogstad_alt</option><option value="exponential/res_4s_strehmel_weiner">exponential/res_4s_strehmel_weiner</option><option value="exponential/res_4s_strehmel_weiner_alt">exponential/res_4s_strehmel_weiner_alt</option><option value="exponential/res_4s_cox_matthews">exponential/res_4s_cox_matthews</option><option value="exponential/res_4s_cfree4">exponential/res_4s_cfree4</option><option value="exponential/res_4s_friedli">exponential/res_4s_friedli</option><option value="exponential/res_4s_minchev">exponential/res_4s_minchev</option><option value="exponential/res_4s_munthe-kaas">exponential/res_4s_munthe-kaas</option><option value="exponential/res_5s">exponential/res_5s</option><option value="exponential/res_5s_hochbruck-ostermann">exponential/res_5s_hochbruck-ostermann</option><option value="exponential/res_6s">exponential/res_6s</option><option value="exponential/res_8s">exponential/res_8s</option><option value="exponential/res_8s_alt">exponential/res_8s_alt</option><option value="exponential/res_10s">exponential/res_10s</option><option value="exponential/res_15s">exponential/res_15s</option><option value="exponential/res_16s">exponential/res_16s</option><option value="exponential/etdrk2_2s">exponential/etdrk2_2s</option><option value="exponential/etdrk3_a_3s">exponential/etdrk3_a_3s</option><option value="exponential/etdrk3_b_3s">exponential/etdrk3_b_3s</option><option value="exponential/etdrk4_4s">exponential/etdrk4_4s</option><option value="exponential/etdrk4_4s_alt">exponential/etdrk4_4s_alt</option><option value="exponential/dpmpp_2s">exponential/dpmpp_2s</option><option value="exponential/dpmpp_sde_2s">exponential/dpmpp_sde_2s</option><option value="exponential/dpmpp_3s">exponential/dpmpp_3s</option><option value="exponential/lawson2a_2s">exponential/lawson2a_2s</option><option value="exponential/lawson2b_2s">exponential/lawson2b_2s</option><option value="exponential/lawson4_4s">exponential/lawson4_4s</option><option value="exponential/lawson41-gen_4s">exponential/lawson41-gen_4s</option><option value="exponential/lawson41-gen-mod_4s">exponential/lawson41-gen-mod_4s</option><option value="exponential/ddim" selected>exponential/ddim</option></optgroup><optgroup label="hybrid/"><option value="hybrid/pec423_2h2s">hybrid/pec423_2h2s</option><option value="hybrid/pec433_2h3s">hybrid/pec433_2h3s</option><option value="hybrid/abnorsett2_1h2s">hybrid/abnorsett2_1h2s</option><option value="hybrid/abnorsett3_2h2s">hybrid/abnorsett3_2h2s</option><option value="hybrid/abnorsett4_3h2s">hybrid/abnorsett4_3h2s</option><option value="hybrid/lawson42-gen-mod_1h4s">hybrid/lawson42-gen-mod_1h4s</option><option value="hybrid/lawson43-gen-mod_2h4s">hybrid/lawson43-gen-mod_2h4s</option><option value="hybrid/lawson44-gen-mod_3h4s">hybrid/lawson44-gen-mod_3h4s</option><option value="hybrid/lawson45-gen-mod_4h4s">hybrid/lawson45-gen-mod_4h4s</option></optgroup><optgroup label="linear/"><option value="linear/ralston_2s">linear/ralston_2s</option><option value="linear/ralston_3s">linear/ralston_3s</option><option value="linear/ralston_4s">linear/ralston_4s</option><option value="linear/midpoint_2s">linear/midpoint_2s</option><option value="linear/heun_2s">linear/heun_2s</option><option value="linear/heun_3s">linear/heun_3s</option><option value="linear/houwen-wray_3s">linear/houwen-wray_3s</option><option value="linear/kutta_3s">linear/kutta_3s</option><option value="linear/ssprk3_3s">linear/ssprk3_3s</option><option value="linear/ssprk4_4s">linear/ssprk4_4s</option><option value="linear/rk38_4s">linear/rk38_4s</option><option value="linear/rk4_4s">linear/rk4_4s</option><option value="linear/rk5_7s">linear/rk5_7s</option><option value="linear/rk6_7s">linear/rk6_7s</option><option value="linear/bogacki-shampine_4s">linear/bogacki-shampine_4s</option><option value="linear/bogacki-shampine_7s">linear/bogacki-shampine_7s</option><option value="linear/dormand-prince_6s">linear/dormand-prince_6s</option><option value="linear/dormand-prince_13s">linear/dormand-prince_13s</option><option value="linear/tsi_7s">linear/tsi_7s</option><option value="linear/euler">linear/euler</option></optgroup><optgroup label="diag_implicit/"><option value="diag_implicit/irk_exp_diag_2s">diag_implicit/irk_exp_diag_2s</option><option value="diag_implicit/kraaijevanger_spijker_2s">diag_implicit/kraaijevanger_spijker_2s</option><option value="diag_implicit/qin_zhang_2s">diag_implicit/qin_zhang_2s</option><option value="diag_implicit/pareschi_russo_2s">diag_implicit/pareschi_russo_2s</option><option value="diag_implicit/pareschi_russo_alt_2s">diag_implicit/pareschi_russo_alt_2s</option><option value="diag_implicit/crouzeix_2s">diag_implicit/crouzeix_2s</option><option value="diag_implicit/crouzeix_3s">diag_implicit/crouzeix_3s</option><option value="diag_implicit/crouzeix_3s_alt">diag_implicit/crouzeix_3s_alt</option></optgroup><optgroup label="fully_implicit/"><option value="fully_implicit/gauss-legendre_2s">fully_implicit/gauss-legendre_2s</option><option value="fully_implicit/gauss-legendre_3s">fully_implicit/gauss-legendre_3s</option><option value="fully_implicit/gauss-legendre_4s">fully_implicit/gauss-legendre_4s</option><option value="fully_implicit/gauss-legendre_4s_alternating_a">fully_implicit/gauss-legendre_4s_alternating_a</option><option value="fully_implicit/gauss-legendre_4s_ascending_a">fully_implicit/gauss-legendre_4s_ascending_a</option><option value="fully_implicit/gauss-legendre_4s_alt">fully_implicit/gauss-legendre_4s_alt</option><option value="fully_implicit/gauss-legendre_5s">fully_implicit/gauss-legendre_5s</option><option value="fully_implicit/gauss-legendre_5s_ascending">fully_implicit/gauss-legendre_5s_ascending</option><option value="fully_implicit/radau_ia_2s">fully_implicit/radau_ia_2s</option><option value="fully_implicit/radau_ia_3s">fully_implicit/radau_ia_3s</option><option value="fully_implicit/radau_iia_2s">fully_implicit/radau_iia_2s</option><option value="fully_implicit/radau_iia_3s">fully_implicit/radau_iia_3s</option><option value="fully_implicit/radau_iia_3s_alt">fully_implicit/radau_iia_3s_alt</option><option value="fully_implicit/radau_iia_5s">fully_implicit/radau_iia_5s</option><option value="fully_implicit/radau_iia_7s">fully_implicit/radau_iia_7s</option><option value="fully_implicit/radau_iia_9s">fully_implicit/radau_iia_9s</option><option value="fully_implicit/radau_iia_11s">fully_implicit/radau_iia_11s</option><option value="fully_implicit/lobatto_iiia_2s">fully_implicit/lobatto_iiia_2s</option><option value="fully_implicit/lobatto_iiia_3s">fully_implicit/lobatto_iiia_3s</option><option value="fully_implicit/lobatto_iiia_4s">fully_implicit/lobatto_iiia_4s</option><option value="fully_implicit/lobatto_iiib_2s">fully_implicit/lobatto_iiib_2s</option><option value="fully_implicit/lobatto_iiib_3s">fully_implicit/lobatto_iiib_3s</option><option value="fully_implicit/lobatto_iiib_4s">fully_implicit/lobatto_iiib_4s</option><option value="fully_implicit/lobatto_iiic_2s">fully_implicit/lobatto_iiic_2s</option><option value="fully_implicit/lobatto_iiic_3s">fully_implicit/lobatto_iiic_3s</option><option value="fully_implicit/lobatto_iiic_4s">fully_implicit/lobatto_iiic_4s</option><option value="fully_implicit/lobatto_iiic_star_2s">fully_implicit/lobatto_iiic_star_2s</option><option value="fully_implicit/lobatto_iiic_star_3s">fully_implicit/lobatto_iiic_star_3s</option><option value="fully_implicit/lobatto_iiid_2s">fully_implicit/lobatto_iiid_2s</option><option value="fully_implicit/lobatto_iiid_3s">fully_implicit/lobatto_iiid_3s</option></optgroup></select></div>
+        <div class="row"><label>Scheduler</label><select id="schedulerName" style="margin-top:4px;"><option value="simple">simple</option><option value="sgm_uniform">sgm_uniform</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="ddim_uniform">ddim_uniform</option><option value="beta">beta</option><option value="normal">normal</option><option value="linear_quadratic">linear_quadratic</option><option value="kl_optimal">kl_optimal</option><option value="capitanZiT">capitanZiT</option><option value="bong_tangent">bong_tangent</option><option value="beta57" selected>beta57</option><option value="beta_33">beta_33</option><option value="beta_44">beta_44</option><option value="beta_53">beta_53</option><option value="beta_54">beta_54</option><option value="beta_57">beta_57</option><option value="beta_32">beta_32</option><option value="beta_43">beta_43</option><option value="beta_42">beta_42</option><option value="power_shift">power_shift</option><option value="radiance_shift">radiance_shift</option><option value="sigma_curve_from_points">sigma_curve_from_points</option><option value="sigma_curve_pchip">sigma_curve_pchip</option><option value="sigmoid_offset">sigmoid_offset</option></select></div>
         <div class="row slider-row"><label>Eta</label><input type="range" id="etaSlider" min="0" max="2" step="0.01" value="0.5"><div class="slider-val" id="etaVal">0.50</div></div>
         <div class="row"><label>Steps</label><input type="number" id="steps" value="8" step="1" min="1" max="10000"></div>
         <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segSamplerRandom">Aleatoria</div><div class="seg" id="segSamplerFixed">Fija</div></div><input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled></div>
@@ -903,7 +905,7 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b.safetensors", "jibMixKrea2_v40Habanero.safetensors", "krea2_turbo_fp8_scaled.safetensors"];
-const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "GalKrea.safetensors", "GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_identity_edit_v1_2.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
+const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "GalKrea.safetensors", "GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "VBVR_H3_attn_only.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_identity_edit_v1_2.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2_turbo_sda_v1.0_comfy.safetensors", "krea2_warmpastel.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
 const AVAILABLE_VAES = [];
 const AVAILABLE_UNETS = [];
 const AVAILABLE_CLIPS = [];
@@ -2833,7 +2835,7 @@ const CONFIG = {
   SERVERURL_KEY: 'krea2_serverUrl',
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "krea2",
-  DEFAULT_MODEL: "krea2_turbo_convrot_int4_fast.safetensors",
+  DEFAULT_MODEL: "Krea2_Turbo_convrot_int8mixed.safetensors",
   N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100",SAVE_IMAGE:"100"},
   loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
   ENHANCER_DEFAULT_PROMPTS: {
@@ -2854,6 +2856,23 @@ initCommon();
 
 let currentOutputMedia = null;
 let currentRefVariantIndex = -1;
+
+// Construye el parámetro ?ref= que entienden LTXV/MiniMaxH3/MMH3X2: incluye el
+// subfolder (p.ej. "krea2/afiador") para que /view encuentre la imagen. Sin él,
+// el receptor asume "krea2" y las imágenes en subcarpetas dan 404.
+function buildRefParam(filename, subfolder){
+  const sf = (subfolder || "").replace(/^\/+|\/+$/g, "");
+  return encodeURIComponent((sf ? sf + "/" : "") + filename);
+}
+// Extrae filename+subfolder de una URL /view y devuelve el ?ref= listo.
+function refFromViewSrc(src){
+  const m = src.match(/[?&]filename=([^&]+)/);
+  if(!m) return null;
+  const sm = src.match(/[?&]subfolder=([^&]*)/);
+  const filename = decodeURIComponent(m[1]);
+  const subfolder = sm ? decodeURIComponent(sm[1]) : "";
+  return { filename, subfolder, ref: buildRefParam(filename, subfolder) };
+}
 
 // Krea2 no usa el nodo TextGenerateLTX2Prompt de LTXV, así que la cadena de
 // mejora solo tiene sentido en modo Ollama. Limitamos el selector y ocultamos
@@ -2901,6 +2920,8 @@ CONFIG.variantMeta = function(){
     ["Aspecto", $("aspectRatio")?.value || ""],
     ["Steps", $("steps")?.value || ""],
     ["Eta", parseFloat($("etaSlider")?.value || 0).toFixed(2)],
+    ["Sampler", $("samplerName")?.value || ""],
+    ["Scheduler", $("schedulerName")?.value || ""],
     ["Projector", `${$("projectorPreset")?.value || ""} @ ${parseFloat($("projectorStrength")?.value || 0).toFixed(2)}`],
   ];
   const enhOn = $("enhancerEnabled")?.classList.contains("on");
@@ -3042,7 +3063,7 @@ $("btnSendLtxv").addEventListener("click", () => {
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = encodeURIComponent(filename);
+  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
@@ -3058,7 +3079,7 @@ $("btnSendH3")?.addEventListener("click", () => {
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = encodeURIComponent(filename);
+  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
@@ -3074,7 +3095,7 @@ $("btnSendX2")?.addEventListener("click", () => {
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = encodeURIComponent(filename);
+  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
@@ -3268,6 +3289,24 @@ function applySwarmParams(swarm){
     applied.push("semilla");
   } else { missing.push("semilla"); }
 
+  // Sampler / Scheduler / Steps: los nombres de SwarmUI no siempre coinciden con
+  // los del pack RES4LYF, así que solo se aplican si existen como opción.
+  if(p.sampler && $("samplerName")){
+    const opt = Array.from($("samplerName").options).find(o => o.value === p.sampler);
+    if(opt){ $("samplerName").value = p.sampler; applied.push("sampler"); }
+    else missing.push("sampler");
+  }
+  if(p.scheduler && $("schedulerName")){
+    const opt = Array.from($("schedulerName").options).find(o => o.value === p.scheduler);
+    if(opt){ $("schedulerName").value = p.scheduler; applied.push("scheduler"); }
+    else missing.push("scheduler");
+  }
+  if(p.steps != null && $("steps")){
+    const n = parseInt(p.steps, 10);
+    if(!isNaN(n) && n > 0){ $("steps").value = n; applied.push("steps"); }
+  }
+  saveKrea2Sampler();
+
   if(p.width != null && p.height != null){
     const w = +p.width, h = +p.height;
     const mpSlider = $("mpSlider");
@@ -3408,6 +3447,8 @@ function applyWorkflow(workflow){
   saveLoraState();
 
   if(g[N.SAMPLER]){
+    if(g[N.SAMPLER].inputs.sampler_name && $("samplerName")) $("samplerName").value = g[N.SAMPLER].inputs.sampler_name;
+    if(g[N.SAMPLER].inputs.scheduler && $("schedulerName")) $("schedulerName").value = g[N.SAMPLER].inputs.scheduler;
     if(g[N.SAMPLER].inputs.eta != null){
       $("etaSlider").value = g[N.SAMPLER].inputs.eta;
       $("etaVal").textContent = parseFloat(g[N.SAMPLER].inputs.eta).toFixed(2);
@@ -3420,6 +3461,7 @@ function applyWorkflow(workflow){
       $("segSamplerRandom").classList.remove("on");
       $("samplerSeed").disabled = false;
     }
+    saveKrea2Sampler();
   }
 
   log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
@@ -3744,6 +3786,40 @@ $("segSamplerFixed").addEventListener("click",()=>{$("segSamplerFixed").classLis
 // --- ETA ---
 $("etaSlider").addEventListener("input",()=>{$("etaVal").textContent=parseFloat($("etaSlider").value).toFixed(2);});
 
+// --- SAMPLER / SCHEDULER (parametrización del nodo ClownsharKSampler_Beta) ---
+const KREA2_SAMPLER_KEY = "krea2_sampler_settings";
+const KREA2_SAMPLER_DEFAULTS = { sampler: "exponential/ddim", scheduler: "beta57", eta: 0.5, steps: 8 };
+
+function loadKrea2Sampler(){
+  try { return Object.assign({}, KREA2_SAMPLER_DEFAULTS, JSON.parse(localStorage.getItem(KREA2_SAMPLER_KEY) || "{}")); }
+  catch(_) { return {...KREA2_SAMPLER_DEFAULTS}; }
+}
+function saveKrea2Sampler(){
+  try {
+    localStorage.setItem(KREA2_SAMPLER_KEY, JSON.stringify({
+      sampler: $("samplerName")?.value || KREA2_SAMPLER_DEFAULTS.sampler,
+      scheduler: $("schedulerName")?.value || KREA2_SAMPLER_DEFAULTS.scheduler,
+      eta: parseFloat($("etaSlider")?.value || String(KREA2_SAMPLER_DEFAULTS.eta)),
+      steps: parseInt($("steps")?.value || String(KREA2_SAMPLER_DEFAULTS.steps), 10),
+    }));
+  } catch(_){}
+}
+function setKrea2SamplerUI(s){
+  if($("samplerName") && s.sampler) $("samplerName").value = s.sampler;
+  if($("schedulerName") && s.scheduler) $("schedulerName").value = s.scheduler;
+  if($("etaSlider") && s.eta != null){
+    $("etaSlider").value = s.eta;
+    if($("etaVal")) $("etaVal").textContent = parseFloat(s.eta).toFixed(2);
+  }
+  if($("steps") && s.steps != null) $("steps").value = s.steps;
+}
+const _krea2Sampler = loadKrea2Sampler();
+setKrea2SamplerUI(_krea2Sampler);
+$("samplerName")?.addEventListener("change", saveKrea2Sampler);
+$("schedulerName")?.addEventListener("change", saveKrea2Sampler);
+$("steps")?.addEventListener("input", saveKrea2Sampler);
+$("etaSlider")?.addEventListener("input", saveKrea2Sampler);
+
 const savedKrea2Prefix = localStorage.getItem("krea2_filename_prefix");
 if(savedKrea2Prefix && $("filenamePrefix")) $("filenamePrefix").value = savedKrea2Prefix;
 $("filenamePrefix")?.addEventListener("input", (e) => {
@@ -3859,6 +3935,8 @@ function snapshotJob(){
     varianceSeedValue: parseInt($("varianceSeed")?.value || "315489554057974", 10),
     eta: parseFloat($("etaSlider")?.value || "0.5"),
     steps: parseInt($("steps")?.value || "8", 10),
+    sampler: $("samplerName")?.value || KREA2_SAMPLER_DEFAULTS.sampler,
+    scheduler: $("schedulerName")?.value || KREA2_SAMPLER_DEFAULTS.scheduler,
     samplerSeedMode: $("segSamplerRandom")?.classList.contains("on") ? "random" : "fixed",
     samplerSeedValue: parseInt($("samplerSeed")?.value || "1062442950133633", 10),
     batchSize: parseInt($("batchSize")?.value || "1", 10),
@@ -3939,6 +4017,8 @@ function buildGraph(job){
 
   g[N.SAMPLER].inputs.eta = j ? j.eta : parseFloat($("etaSlider").value);
   g[N.SAMPLER].inputs.steps = j ? j.steps : parseInt($("steps").value, 10);
+  g[N.SAMPLER].inputs.sampler_name = (j ? j.sampler : $("samplerName")?.value) || KREA2_SAMPLER_DEFAULTS.sampler;
+  g[N.SAMPLER].inputs.scheduler = (j ? j.scheduler : $("schedulerName")?.value) || KREA2_SAMPLER_DEFAULTS.scheduler;
   const sampSeedMode = j ? j.samplerSeedMode : ($("segSamplerRandom").classList.contains("on") ? "random" : "fixed");
   const sampSeedVal = j ? j.samplerSeedValue : parseInt($("samplerSeed").value, 10);
   g[N.SAMPLER].inputs.seed = (sampSeedMode === "random") ? -1 : sampSeedVal;
@@ -4186,17 +4266,17 @@ $("btnSendRefLtxv").addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
-  const openLtxv = (filename) => {
-    const ref = encodeURIComponent(filename);
+  const openLtxv = (filename, subfolder) => {
+    const ref = buildRefParam(filename, subfolder);
     const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
     const win = window.open(url, "_blank");
     if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
     else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
   };
 
-  const m = src.match(/[?&]filename=([^&]+)/);
-  if(m){
-    openLtxv(decodeURIComponent(m[1]));
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openLtxv(fromView.filename, fromView.subfolder);
     return;
   }
 
@@ -4237,17 +4317,17 @@ $("btnSendRefH3")?.addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
-  const openH3 = (filename) => {
-    const ref = encodeURIComponent(filename);
+  const openH3 = (filename, subfolder) => {
+    const ref = buildRefParam(filename, subfolder);
     const url = `${here.protocol}//${targetHost}:${targetPort}/MiniMaxH3_WebUI.html?ref=${ref}`;
     const win = window.open(url, "_blank");
     if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
     else log("↗️ Abriendo MiniMax H3 con la imagen: "+filename, "l-ok");
   };
 
-  const m = src.match(/[?&]filename=([^&]+)/);
-  if(m){
-    openH3(decodeURIComponent(m[1]));
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openH3(fromView.filename, fromView.subfolder);
     return;
   }
 
@@ -4285,17 +4365,17 @@ $("btnSendRefX2")?.addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
-  const openX2 = (filename) => {
-    const ref = encodeURIComponent(filename);
+  const openX2 = (filename, subfolder) => {
+    const ref = buildRefParam(filename, subfolder);
     const url = `${here.protocol}//${targetHost}:${targetPort}/MMH3X2_WebUI.html?ref=${ref}`;
     const win = window.open(url, "_blank");
     if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
     else log("↗️ Abriendo MMH3X2 con la imagen: "+filename, "l-ok");
   };
 
-  const m = src.match(/[?&]filename=([^&]+)/);
-  if(m){
-    openX2(decodeURIComponent(m[1]));
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openX2(fromView.filename, fromView.subfolder);
     return;
   }
 

@@ -8,7 +8,7 @@ const CONFIG = {
   SERVERURL_KEY: 'krea2_serverUrl',
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "krea2",
-  DEFAULT_MODEL: "krea2_turbo_convrot_int4_fast.safetensors",
+  DEFAULT_MODEL: "Krea2_Turbo_convrot_int8mixed.safetensors",
   N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100",SAVE_IMAGE:"100"},
   loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
   ENHANCER_DEFAULT_PROMPTS: {
@@ -29,6 +29,23 @@ initCommon();
 
 let currentOutputMedia = null;
 let currentRefVariantIndex = -1;
+
+// Construye el parámetro ?ref= que entienden LTXV/MiniMaxH3/MMH3X2: incluye el
+// subfolder (p.ej. "krea2/afiador") para que /view encuentre la imagen. Sin él,
+// el receptor asume "krea2" y las imágenes en subcarpetas dan 404.
+function buildRefParam(filename, subfolder){
+  const sf = (subfolder || "").replace(/^\/+|\/+$/g, "");
+  return encodeURIComponent((sf ? sf + "/" : "") + filename);
+}
+// Extrae filename+subfolder de una URL /view y devuelve el ?ref= listo.
+function refFromViewSrc(src){
+  const m = src.match(/[?&]filename=([^&]+)/);
+  if(!m) return null;
+  const sm = src.match(/[?&]subfolder=([^&]*)/);
+  const filename = decodeURIComponent(m[1]);
+  const subfolder = sm ? decodeURIComponent(sm[1]) : "";
+  return { filename, subfolder, ref: buildRefParam(filename, subfolder) };
+}
 
 // Krea2 no usa el nodo TextGenerateLTX2Prompt de LTXV, así que la cadena de
 // mejora solo tiene sentido en modo Ollama. Limitamos el selector y ocultamos
@@ -76,6 +93,8 @@ CONFIG.variantMeta = function(){
     ["Aspecto", $("aspectRatio")?.value || ""],
     ["Steps", $("steps")?.value || ""],
     ["Eta", parseFloat($("etaSlider")?.value || 0).toFixed(2)],
+    ["Sampler", $("samplerName")?.value || ""],
+    ["Scheduler", $("schedulerName")?.value || ""],
     ["Projector", `${$("projectorPreset")?.value || ""} @ ${parseFloat($("projectorStrength")?.value || 0).toFixed(2)}`],
   ];
   const enhOn = $("enhancerEnabled")?.classList.contains("on");
@@ -217,7 +236,7 @@ $("btnSendLtxv").addEventListener("click", () => {
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = encodeURIComponent(filename);
+  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
@@ -233,7 +252,7 @@ $("btnSendH3")?.addEventListener("click", () => {
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = encodeURIComponent(filename);
+  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
@@ -249,7 +268,7 @@ $("btnSendX2")?.addEventListener("click", () => {
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = encodeURIComponent(filename);
+  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
@@ -443,6 +462,24 @@ function applySwarmParams(swarm){
     applied.push("semilla");
   } else { missing.push("semilla"); }
 
+  // Sampler / Scheduler / Steps: los nombres de SwarmUI no siempre coinciden con
+  // los del pack RES4LYF, así que solo se aplican si existen como opción.
+  if(p.sampler && $("samplerName")){
+    const opt = Array.from($("samplerName").options).find(o => o.value === p.sampler);
+    if(opt){ $("samplerName").value = p.sampler; applied.push("sampler"); }
+    else missing.push("sampler");
+  }
+  if(p.scheduler && $("schedulerName")){
+    const opt = Array.from($("schedulerName").options).find(o => o.value === p.scheduler);
+    if(opt){ $("schedulerName").value = p.scheduler; applied.push("scheduler"); }
+    else missing.push("scheduler");
+  }
+  if(p.steps != null && $("steps")){
+    const n = parseInt(p.steps, 10);
+    if(!isNaN(n) && n > 0){ $("steps").value = n; applied.push("steps"); }
+  }
+  saveKrea2Sampler();
+
   if(p.width != null && p.height != null){
     const w = +p.width, h = +p.height;
     const mpSlider = $("mpSlider");
@@ -583,6 +620,8 @@ function applyWorkflow(workflow){
   saveLoraState();
 
   if(g[N.SAMPLER]){
+    if(g[N.SAMPLER].inputs.sampler_name && $("samplerName")) $("samplerName").value = g[N.SAMPLER].inputs.sampler_name;
+    if(g[N.SAMPLER].inputs.scheduler && $("schedulerName")) $("schedulerName").value = g[N.SAMPLER].inputs.scheduler;
     if(g[N.SAMPLER].inputs.eta != null){
       $("etaSlider").value = g[N.SAMPLER].inputs.eta;
       $("etaVal").textContent = parseFloat(g[N.SAMPLER].inputs.eta).toFixed(2);
@@ -595,6 +634,7 @@ function applyWorkflow(workflow){
       $("segSamplerRandom").classList.remove("on");
       $("samplerSeed").disabled = false;
     }
+    saveKrea2Sampler();
   }
 
   log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
@@ -919,6 +959,40 @@ $("segSamplerFixed").addEventListener("click",()=>{$("segSamplerFixed").classLis
 // --- ETA ---
 $("etaSlider").addEventListener("input",()=>{$("etaVal").textContent=parseFloat($("etaSlider").value).toFixed(2);});
 
+// --- SAMPLER / SCHEDULER (parametrización del nodo ClownsharKSampler_Beta) ---
+const KREA2_SAMPLER_KEY = "krea2_sampler_settings";
+const KREA2_SAMPLER_DEFAULTS = { sampler: "exponential/ddim", scheduler: "beta57", eta: 0.5, steps: 8 };
+
+function loadKrea2Sampler(){
+  try { return Object.assign({}, KREA2_SAMPLER_DEFAULTS, JSON.parse(localStorage.getItem(KREA2_SAMPLER_KEY) || "{}")); }
+  catch(_) { return {...KREA2_SAMPLER_DEFAULTS}; }
+}
+function saveKrea2Sampler(){
+  try {
+    localStorage.setItem(KREA2_SAMPLER_KEY, JSON.stringify({
+      sampler: $("samplerName")?.value || KREA2_SAMPLER_DEFAULTS.sampler,
+      scheduler: $("schedulerName")?.value || KREA2_SAMPLER_DEFAULTS.scheduler,
+      eta: parseFloat($("etaSlider")?.value || String(KREA2_SAMPLER_DEFAULTS.eta)),
+      steps: parseInt($("steps")?.value || String(KREA2_SAMPLER_DEFAULTS.steps), 10),
+    }));
+  } catch(_){}
+}
+function setKrea2SamplerUI(s){
+  if($("samplerName") && s.sampler) $("samplerName").value = s.sampler;
+  if($("schedulerName") && s.scheduler) $("schedulerName").value = s.scheduler;
+  if($("etaSlider") && s.eta != null){
+    $("etaSlider").value = s.eta;
+    if($("etaVal")) $("etaVal").textContent = parseFloat(s.eta).toFixed(2);
+  }
+  if($("steps") && s.steps != null) $("steps").value = s.steps;
+}
+const _krea2Sampler = loadKrea2Sampler();
+setKrea2SamplerUI(_krea2Sampler);
+$("samplerName")?.addEventListener("change", saveKrea2Sampler);
+$("schedulerName")?.addEventListener("change", saveKrea2Sampler);
+$("steps")?.addEventListener("input", saveKrea2Sampler);
+$("etaSlider")?.addEventListener("input", saveKrea2Sampler);
+
 const savedKrea2Prefix = localStorage.getItem("krea2_filename_prefix");
 if(savedKrea2Prefix && $("filenamePrefix")) $("filenamePrefix").value = savedKrea2Prefix;
 $("filenamePrefix")?.addEventListener("input", (e) => {
@@ -1034,6 +1108,8 @@ function snapshotJob(){
     varianceSeedValue: parseInt($("varianceSeed")?.value || "315489554057974", 10),
     eta: parseFloat($("etaSlider")?.value || "0.5"),
     steps: parseInt($("steps")?.value || "8", 10),
+    sampler: $("samplerName")?.value || KREA2_SAMPLER_DEFAULTS.sampler,
+    scheduler: $("schedulerName")?.value || KREA2_SAMPLER_DEFAULTS.scheduler,
     samplerSeedMode: $("segSamplerRandom")?.classList.contains("on") ? "random" : "fixed",
     samplerSeedValue: parseInt($("samplerSeed")?.value || "1062442950133633", 10),
     batchSize: parseInt($("batchSize")?.value || "1", 10),
@@ -1114,6 +1190,8 @@ function buildGraph(job){
 
   g[N.SAMPLER].inputs.eta = j ? j.eta : parseFloat($("etaSlider").value);
   g[N.SAMPLER].inputs.steps = j ? j.steps : parseInt($("steps").value, 10);
+  g[N.SAMPLER].inputs.sampler_name = (j ? j.sampler : $("samplerName")?.value) || KREA2_SAMPLER_DEFAULTS.sampler;
+  g[N.SAMPLER].inputs.scheduler = (j ? j.scheduler : $("schedulerName")?.value) || KREA2_SAMPLER_DEFAULTS.scheduler;
   const sampSeedMode = j ? j.samplerSeedMode : ($("segSamplerRandom").classList.contains("on") ? "random" : "fixed");
   const sampSeedVal = j ? j.samplerSeedValue : parseInt($("samplerSeed").value, 10);
   g[N.SAMPLER].inputs.seed = (sampSeedMode === "random") ? -1 : sampSeedVal;
@@ -1361,17 +1439,17 @@ $("btnSendRefLtxv").addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
-  const openLtxv = (filename) => {
-    const ref = encodeURIComponent(filename);
+  const openLtxv = (filename, subfolder) => {
+    const ref = buildRefParam(filename, subfolder);
     const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
     const win = window.open(url, "_blank");
     if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
     else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
   };
 
-  const m = src.match(/[?&]filename=([^&]+)/);
-  if(m){
-    openLtxv(decodeURIComponent(m[1]));
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openLtxv(fromView.filename, fromView.subfolder);
     return;
   }
 
@@ -1412,17 +1490,17 @@ $("btnSendRefH3")?.addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
-  const openH3 = (filename) => {
-    const ref = encodeURIComponent(filename);
+  const openH3 = (filename, subfolder) => {
+    const ref = buildRefParam(filename, subfolder);
     const url = `${here.protocol}//${targetHost}:${targetPort}/MiniMaxH3_WebUI.html?ref=${ref}`;
     const win = window.open(url, "_blank");
     if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
     else log("↗️ Abriendo MiniMax H3 con la imagen: "+filename, "l-ok");
   };
 
-  const m = src.match(/[?&]filename=([^&]+)/);
-  if(m){
-    openH3(decodeURIComponent(m[1]));
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openH3(fromView.filename, fromView.subfolder);
     return;
   }
 
@@ -1460,17 +1538,17 @@ $("btnSendRefX2")?.addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
-  const openX2 = (filename) => {
-    const ref = encodeURIComponent(filename);
+  const openX2 = (filename, subfolder) => {
+    const ref = buildRefParam(filename, subfolder);
     const url = `${here.protocol}//${targetHost}:${targetPort}/MMH3X2_WebUI.html?ref=${ref}`;
     const win = window.open(url, "_blank");
     if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
     else log("↗️ Abriendo MMH3X2 con la imagen: "+filename, "l-ok");
   };
 
-  const m = src.match(/[?&]filename=([^&]+)/);
-  if(m){
-    openX2(decodeURIComponent(m[1]));
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openX2(fromView.filename, fromView.subfolder);
     return;
   }
 

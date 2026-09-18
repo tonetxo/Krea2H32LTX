@@ -50,6 +50,43 @@
       "title": "Sigma Shift"
     }
   },
+  "162": {
+    "inputs": {
+      "enabled": true,
+      "blend_weight": 0.5,
+      "degree": 1,
+      "ridge_lambda": 0.1,
+      "window_size": 2,
+      "flex_window": 0.75,
+      "warmup_steps": 1,
+      "tail_actual_steps": 1,
+      "max_history": 8,
+      "debug": false,
+      "history_storage": "system_ram",
+      "bootstrap_first_forecast": true,
+      "anchor_residual_feedback": false,
+      "selective_rollback_correction": false,
+      "offline_smoothing_replay": false,
+      "audio_blend_weight": 0,
+      "offline_archive_storage": "system_ram",
+      "model_aware_mode": "off",
+      "model_aware_risk_threshold": 0.65,
+      "model_aware_trust_shrinkage": false,
+      "model_aware_replay_generic_correction": false,
+      "generic_correction_mode": "coordinate_rls",
+      "generic_correction_limiter": "hard_clip",
+      "generic_correction_limit": 0.4,
+      "generic_correction_attenuation": "no_attenuation",
+      "model": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "SpectrumApplyMiniMaxH3",
+    "_meta": {
+      "title": "Spectrum Apply MiniMax H3"
+    }
+  },
   "6": {
     "inputs": {
       "fused_qkv": "auto",
@@ -61,7 +98,7 @@
       "embedding_memory_mode": "Auto",
       "kitchen_v_memory_mode": "Standard",
       "model": [
-        "5",
+        "162",
         0
       ]
     },
@@ -1059,7 +1096,6 @@
       "title": "Load Image"
     }
   },
-
   "86": {
     "inputs": {
       "enable_mirostat": false,

@@ -72,7 +72,8 @@ const CONFIG = {
     IMG4: "83",
     SPARSE_ATTN: "88",
     BLOCK_SPARSE: "90",
-    AIMDO: "91"
+    AIMDO: "91",
+    SPECTRUM: "162"
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -207,6 +208,40 @@ function mapBlockSparseSelection(sel){
   return BLOCK_SPARSE_MODES[sel] || BLOCK_SPARSE_MODES_REVERSE[sel] || sel;
 }
 const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0 };
+
+// --- SPECTRUM (MiniMax H3) ---
+const SPECTRUM_KEY = "mmh3x2_spectrum";
+const SPECTRUM_DEFAULTS = { enabled: true, blend: 0.5, flex: 0.75, warmup: 1, bootstrapFirstForecast: true, historyStorage: "system_ram" };
+
+function loadSpectrum(){
+  try { return Object.assign({}, SPECTRUM_DEFAULTS, JSON.parse(localStorage.getItem(SPECTRUM_KEY) || "{}")); }
+  catch(_) { return {...SPECTRUM_DEFAULTS}; }
+}
+function saveSpectrum(s){ try { localStorage.setItem(SPECTRUM_KEY, JSON.stringify(s)); } catch(_){} }
+function setSpectrumUI(s){
+  const on = $("segSpectrumOn"), off = $("segSpectrumOff");
+  if(s.enabled){ on?.classList.add("on"); off?.classList.remove("on"); }
+  else { off?.classList.add("on"); on?.classList.remove("on"); }
+  if($("spectrumBlend")){ $("spectrumBlend").value = s.blend; $("spectrumBlendVal").textContent = parseFloat(s.blend).toFixed(2); }
+  if($("spectrumFlex")){ $("spectrumFlex").value = s.flex; $("spectrumFlexVal").textContent = parseFloat(s.flex).toFixed(2); }
+  if($("spectrumWarmup")){ $("spectrumWarmup").value = s.warmup; $("spectrumWarmupVal").textContent = s.warmup; }
+  const bootOn = $("segBootstrapOn"), bootOff = $("segBootstrapOff");
+  if(bootOn && bootOff){
+    if(s.bootstrapFirstForecast !== false){ bootOn.classList.add("on"); bootOff.classList.remove("on"); }
+    else { bootOff.classList.add("on"); bootOn.classList.remove("on"); }
+  }
+  if($("spectrumHistoryStorage")) $("spectrumHistoryStorage").value = s.historyStorage;
+}
+function getSpectrumState(){
+  return {
+    enabled: $("segSpectrumOn")?.classList.contains("on") ?? true,
+    blend: parseFloat($("spectrumBlend")?.value ?? "0.5"),
+    flex: parseFloat($("spectrumFlex")?.value ?? "0.75"),
+    warmup: parseInt($("spectrumWarmup")?.value ?? "1", 10),
+    bootstrapFirstForecast: $("segBootstrapOn")?.classList.contains("on") ?? true,
+    historyStorage: $("spectrumHistoryStorage")?.value || "system_ram",
+  };
+}
 
 function loadAttentionBackend(){
   try { return Object.assign({}, ATTENTION_BACKEND_DEFAULTS, JSON.parse(localStorage.getItem(ATTENTION_BACKEND_KEY) || "{}")); }
@@ -374,6 +409,14 @@ function attachAttentionOptimizerListeners(){
   $("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("aimdoResidency")?.addEventListener("change", () => { saveAimdo(getAimdoState()); scheduleSaveSettings(); });
+  $("segSpectrumOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.enabled = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveSettings(); });
+  $("segSpectrumOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.enabled = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveSettings(); });
+  $("spectrumBlend")?.addEventListener("input", (e) => { $("spectrumBlendVal").textContent = parseFloat(e.target.value).toFixed(2); const s = getSpectrumState(); s.blend = parseFloat(e.target.value); saveSpectrum(s); scheduleSaveSettings(); });
+  $("spectrumFlex")?.addEventListener("input", (e) => { $("spectrumFlexVal").textContent = parseFloat(e.target.value).toFixed(2); const s = getSpectrumState(); s.flex = parseFloat(e.target.value); saveSpectrum(s); scheduleSaveSettings(); });
+  $("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").textContent = e.target.value; const s = getSpectrumState(); s.warmup = parseInt(e.target.value, 10); saveSpectrum(s); scheduleSaveSettings(); });
+  $("segBootstrapOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveSettings(); });
+  $("segBootstrapOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveSettings(); });
+  $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); scheduleSaveSettings(); });
 }
 
 // Callbacks CONFIG requeridos por common.js
@@ -457,7 +500,7 @@ CONFIG.variantMeta = function(){
   const rows = [
     ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
-    ["Modo Seg 2", seg2Mode === "guided" ? "Guía Ollama (continuación)" : "Prompt Directo"],
+    ["Modo Seg 2", seg2Mode === "ollama" ? "Guía Ollama (continuación)" : "Prompt Directo"],
     ["Modo Audio", audioDesc],
     ["Refs compartidas", $("shareRefsToggle")?.checked ? "sí (Img 2/3/4 en ambos)" : "no"],
     ["Ref size", $("refImageSize")?.value || "match"],
@@ -476,6 +519,7 @@ CONFIG.variantMeta = function(){
     ["Video budget", `${Math.round((parseFloat($("h3VideoBudget")?.value || "0.30")) * 100)}%`],
     ["Denser early/late", $("segDenserOn")?.classList.contains("on") ? "Sí" : "No"],
     ["Memory opt", $("segMemOptOn")?.classList.contains("on") ? "Sí" : "No"],
+    (() => { const s = getSpectrumState(); return ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup}${s.bootstrapFirstForecast ? ' · boot' : ''} · ${s.historyStorage}` : "off"]; })(),
     IS_BLOCKATT ? ["Optimizador", getAttentionOptimizerState().mode] : null,
     ["RIFE", `${rMode}x`]
   ].filter(Boolean);
@@ -508,6 +552,21 @@ function formatWorkflowToMeta(workflow){
 CONFIG.onNodeExecuted = function(data){
   if(!data) return;
   const nid = String(data.node);
+  if(nid === "99_savetext_prompt2" && data.output){
+    const promptSeg2Real = (Array.isArray(data.output.text) ? data.output.text[0] : data.output.text) || "";
+    if(promptSeg2Real){
+      const ta2 = $("finalPromptSeg2");
+      if(ta2){
+        ta2.value = promptSeg2Real;
+        ta2.style.transition = "border-color 0.5s ease";
+        ta2.style.borderColor = "var(--accent)";
+        setTimeout(() => { ta2.style.borderColor = ""; }, 2500);
+      }
+      const hint = $("finalPromptHint");
+      if(hint) hint.innerHTML = `<span style="color:var(--accent);font-weight:600;">✨ Prompt Seg 2 definitivo generado por Ollama</span> y aplicado al modelo:`;
+      log("🤖 Prompt final de Seg 2 generado por Ollama y aplicado al modelo.", "l-ok");
+    }
+  }
   if(nid === String(N.SAMPLE_1) || nid === String(N.SAVE_VID_1) || nid === "19" || nid === "23"){
     currentActiveSamplerSlot = 2;
   }
@@ -908,6 +967,17 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
         CONFIG.addToVariantGallery(mf, realSeed, varIndex);
       }
     }
+    if(entry?.outputs?.["99_savetext_prompt2"]?.text){
+      const promptSeg2Real = (Array.isArray(entry.outputs["99_savetext_prompt2"].text)
+        ? entry.outputs["99_savetext_prompt2"].text[0]
+        : entry.outputs["99_savetext_prompt2"].text) || "";
+      const ta2 = $("finalPromptSeg2");
+      if(ta2 && promptSeg2Real && ta2.value !== promptSeg2Real){
+        ta2.value = promptSeg2Real;
+        const hint = $("finalPromptHint");
+        if(hint) hint.innerHTML = `<span style="color:var(--accent);font-weight:600;">✨ Prompt Seg 2 definitivo generado por Ollama</span> y aplicado al modelo:`;
+      }
+    }
   } catch(e){
     console.error("Error mostrando resultados de media:", e);
     log(`⚠️ Error renderizando medios: ${e.message}`, "l-err");
@@ -1195,7 +1265,12 @@ function applyWorkflow(workflow){
   // 2. Modo Segmento 2 (Ollama vs Directo)
   const isGuided = !!(workflow["53"] || workflow["55"]);
   if($("seg2PromptMode")){
-    $("seg2PromptMode").value = isGuided ? "guided" : "direct";
+    $("seg2PromptMode").value = isGuided ? "ollama" : "direct";
+    if(typeof updateSeg2OllamaModelVisibility === "function") updateSeg2OllamaModelVisibility();
+  }
+  if(workflow["51"]?.inputs?.model){
+    const m = workflow["51"].inputs.model;
+    if($("seg2OllamaModel")) $("seg2OllamaModel").value = m;
   }
 
   // 3. Duración (Segmentos 1 y 2)
@@ -1313,7 +1388,23 @@ function applyWorkflow(workflow){
     saveAttentionOptimizer({ mode: "none" });
   }
 
-  // 11. Toggles postprocesado y RIFE
+  // 11. Spectrum
+  const spectrumNode = findByClass("SpectrumApplyMiniMaxH3");
+  if(spectrumNode && spectrumNode.inputs){
+    const s = {
+      enabled: spectrumNode.inputs.enabled !== false,
+      blend: typeof spectrumNode.inputs.blend_weight === "number" ? spectrumNode.inputs.blend_weight : 0.5,
+      flex: typeof spectrumNode.inputs.flex_window === "number" ? spectrumNode.inputs.flex_window : 0.75,
+      warmup: typeof spectrumNode.inputs.warmup_steps === "number" ? spectrumNode.inputs.warmup_steps : 1,
+      bootstrapFirstForecast: spectrumNode.inputs.bootstrap_first_forecast !== false,
+      historyStorage: spectrumNode.inputs.history_storage || "system_ram",
+    };
+    setSpectrumUI(s);
+    saveSpectrum(s);
+  }
+  // Sin nodo Spectrum en el workflow: no tocar el estado guardado.
+
+  // 12. Toggles postprocesado y RIFE
   const rifeNode = workflow["72"] || findByClass("FrameInterpolate");
   if($("rifeToggle")) $("rifeToggle").checked = !!rifeNode;
   if(rifeNode?.inputs?.multiplier && $("rifeMultiplier")){
@@ -1614,6 +1705,7 @@ function saveSettings(){
     prompt: $("prompt")?.value || "",
     prompt2: $("prompt2")?.value || "",
     seg2PromptMode: $("seg2PromptMode")?.value || "direct",
+    seg2OllamaModel: $("seg2OllamaModel")?.value || "",
     seedMode: $("segRandom")?.classList.contains("on") ? "random" : "fixed",
     seedVal: $("seedVal")?.value || "12345",
     duration1: $("durationSlider1")?.value || $("durationSlider")?.value || "15.0",
@@ -1633,6 +1725,7 @@ function saveSettings(){
     blockSparse: IS_BLOCKATT ? getBlockSparseState() : null,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
+    spectrum: getSpectrumState(),
     lora1Toggle: $("lora1Toggle") ? $("lora1Toggle").checked : false,
     lora1Select: $("lora1Select")?.value || "",
     lora1Strength: $("lora1Strength")?.value || "1.0",
@@ -1681,6 +1774,8 @@ function restoreSettings(){
     if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
     if(s.prompt2 !== undefined && $("prompt2")) $("prompt2").value = s.prompt2;
     if(s.seg2PromptMode !== undefined && $("seg2PromptMode")) $("seg2PromptMode").value = s.seg2PromptMode;
+    if(s.seg2OllamaModel !== undefined && $("seg2OllamaModel")) $("seg2OllamaModel").value = s.seg2OllamaModel;
+    if(typeof updateSeg2OllamaModelVisibility === "function") updateSeg2OllamaModelVisibility();
 
     if(s.seedMode === "random"){
       $("segRandom")?.classList.add("on");
@@ -1739,6 +1834,7 @@ function restoreSettings(){
       $("h3ShiftAudio").value = s.h3ShiftAudio;
       if($("h3ShiftAudioVal")) $("h3ShiftAudioVal").textContent = parseFloat(s.h3ShiftAudio).toFixed(1);
     }
+    if(s.spectrum){ setSpectrumUI(s.spectrum); saveSpectrum(s.spectrum); }
 
     if(s.lora1Toggle !== undefined && $("lora1Toggle")) $("lora1Toggle").checked = s.lora1Toggle;
     if(s.lora1Select && $("lora1Select")) $("lora1Select").value = s.lora1Select;
@@ -1829,7 +1925,7 @@ async function restoreSavedMedia(){
 
 function attachAutoSaveListeners(){
   const baseIds = [
-    "prompt", "prompt2", "seg2PromptMode", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
+    "prompt", "prompt2", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
     "unetModel", "clipModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
     "lora1Toggle", "lora1Select",
@@ -2340,14 +2436,14 @@ function updateFinalPromptPanel(graph){
     const guideKey = nodeKey(g["59"].inputs.string_b);
     const base = (baseKey && g[baseKey]?.inputs?.value) || "";
     const guide = (guideKey && g[guideKey]?.inputs?.value) || "";
-    p2Text = `${base}${g["59"].inputs.delimiter || "\n"}${guide}\n\n[+ Ollama en grafo: funde esto con la visión de los últimos 2s de Seg 1]`;
+    p2Text = `${base}${g["59"].inputs.delimiter || "\n"}${guide}`;
   }
   ta1.value = String(p1Text).trim();
   ta2.value = String(p2Text).trim();
   if(hint){
     const mode = $("seg2PromptMode")?.value || "direct";
-    hint.textContent = mode === "ollama"
-      ? "Seg 2 (Asistido): se muestra el borrador con tu dirección; el texto definitivo lo fusiona Ollama dentro del backend con los frames de Seg 1."
+    hint.innerHTML = mode === "ollama"
+      ? `<span style="color:var(--accent);font-weight:600;">⏳ Seg 2 en modo Asistido:</span> Mostrando el borrador de entrada enviado al backend. En cuanto Ollama analice los frames de Seg 1 en ComfyUI, este campo se actualizará automáticamente con el prompt definitivo generado.`
       : "Texto exacto que entra en el condicionamiento de cada segmento.";
   }
 }
@@ -2373,12 +2469,23 @@ function buildGraph(j){
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
     [N.OLLAMA_CONN, "52", N.OLLAMA_CHAT_1, N.OLLAMA_CHAT_2, "57", "59", "86"].forEach(id => { delete g[id]; });
   } else if(seg2Mode === "ollama" && g[N.OLLAMA_CONN]?.inputs){
-    const ollamaModel = $("enhancerModel")?.value;
+    const ollamaModel = $("seg2OllamaModel")?.value || $("enhancerModel")?.value;
     if(ollamaModel){
       g[N.OLLAMA_CONN].inputs.model = ollamaModel;
     } else {
-      log("⚠️ Modo Asistido requiere un modelo en Enhancer/Ollama. Se usa el del workflow.", "l-warn");
+      log("⚠️ Modo Asistido requiere un modelo en Ollama. Se usa el del workflow.", "l-warn");
     }
+
+    // Inyectar nodo nativo SaveText para capturar y devolver el prompt final generado por Ollama
+    g["99_savetext_prompt2"] = {
+      inputs: {
+        text: [N.OLLAMA_CHAT_2, 0],
+        filename_prefix: "video/MiniMax_H3_prompt_seg2",
+        format: "txt"
+      },
+      class_type: "SaveText",
+      _meta: { title: "Save Prompt Seg 2 (Ollama)" }
+    };
   }
 
   // 2. Duración y Megapíxeles
@@ -2452,6 +2559,44 @@ function buildGraph(j){
   }
   let currentModelNode = N.ATTN;
 
+  // Helper para aplicar Spectrum envolviendo el modelo optimizado
+  const spectrumState = j?.spectrum || getSpectrumState();
+  const applySpectrumNode = (nodeId) => {
+    if(spectrumState.enabled){
+      if(!g[nodeId] || !g[nodeId].inputs){
+        g[nodeId] = {
+          class_type: "SpectrumApplyMiniMaxH3",
+          inputs: {
+            enabled: true, blend_weight: spectrumState.blend, degree: 1, ridge_lambda: 0.1,
+            window_size: 2, flex_window: spectrumState.flex, warmup_steps: spectrumState.warmup,
+            tail_actual_steps: 1, max_history: 8, debug: false,
+            history_storage: spectrumState.historyStorage,
+            bootstrap_first_forecast: spectrumState.bootstrapFirstForecast !== false,
+            anchor_residual_feedback: false, selective_rollback_correction: false,
+            offline_smoothing_replay: false, audio_blend_weight: 0,
+            offline_archive_storage: "system_ram", model_aware_mode: "off",
+            model_aware_risk_threshold: 0.65, model_aware_trust_shrinkage: false,
+            model_aware_replay_generic_correction: false,
+            generic_correction_mode: "coordinate_rls", generic_correction_limiter: "hard_clip",
+            generic_correction_limit: 0.4, generic_correction_attenuation: "no_attenuation"
+          },
+          _meta: { title: "Spectrum Apply MiniMax H3" }
+        };
+      }
+      g[nodeId].inputs.model = [currentModelNode, 0];
+      g[nodeId].inputs.enabled = spectrumState.enabled;
+      g[nodeId].inputs.blend_weight = spectrumState.blend;
+      g[nodeId].inputs.flex_window = spectrumState.flex;
+      g[nodeId].inputs.warmup_steps = spectrumState.warmup;
+      g[nodeId].inputs.bootstrap_first_forecast = spectrumState.bootstrapFirstForecast !== false;
+      g[nodeId].inputs.history_storage = spectrumState.historyStorage;
+      g[nodeId].inputs.offline_smoothing_replay = false;
+      currentModelNode = nodeId;
+    } else if(g[nodeId]){
+      delete g[nodeId];
+    }
+  };
+
   if(IS_BLOCKATT){
     // Modo BlockATT: cadena flexible UNet -> ModelAttentionBackend -> (optimizador) -> SigmaShift -> MemOpt?
     const optimizerState = j?.attentionOptimizer || getAttentionOptimizerState();
@@ -2521,9 +2666,12 @@ function buildGraph(j){
     } else if(g[N.MEM_OPT]){
       delete g[N.MEM_OPT];
     }
+
+    // Spectrum (tras MemOpt, para envolver el modelo optimizado)
+    applySpectrumNode(N.SPECTRUM);
   } else {
     // Modo base: cadena fija del workflow original
-    // UNet -> ModelAttentionBackend -> H3SparseAttention -> SigmaShift -> H3MemoryOptimization
+    // UNet -> ModelAttentionBackend -> H3SparseAttention -> SigmaShift -> H3MemoryOptimization -> Spectrum
     if(g[N.SPARSE]?.inputs){
       g[N.SPARSE].inputs.video_budget = h3opt.videoBudget;
       g[N.SPARSE].inputs.denser_early_late_steps = h3opt.denserEarlyLate;
@@ -2558,6 +2706,9 @@ function buildGraph(j){
     } else if(g[N.MEM_OPT]){
       delete g[N.MEM_OPT];
     }
+
+    // Spectrum (tras MemOpt, para envolver el modelo optimizado)
+    applySpectrumNode(N.SPECTRUM);
 
     // Limpiar nodos de optimizadores avanzados no usados en modo base
     if(g[N.SPARSE_ATTN]) delete g[N.SPARSE_ATTN];
@@ -3071,7 +3222,8 @@ async function queueJob(runMode){
     aimdo: IS_BLOCKATT ? getAimdoState() : null,
     blockSparse: IS_BLOCKATT ? getBlockSparseState() : null,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
-    h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0"
+    h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
+    spectrum: getSpectrumState()
   };
 
   // Consultar en vivo el estado real de ComfyUI antes de decidir encolar
@@ -3563,6 +3715,20 @@ window.addEventListener("DOMContentLoaded", () => {
     $("prompt2").value = "";
   });
 
+  function updateSeg2OllamaModelVisibility(){
+    const isOllama = $("seg2PromptMode")?.value === "ollama";
+    const row = $("rowSeg2OllamaModel");
+    if(row) row.style.display = isOllama ? "block" : "none";
+  }
+  window.updateSeg2OllamaModelVisibility = updateSeg2OllamaModelVisibility;
+  if($("seg2PromptMode")){
+    $("seg2PromptMode").addEventListener("change", () => {
+      updateSeg2OllamaModelVisibility();
+      scheduleSaveSettings();
+    });
+    updateSeg2OllamaModelVisibility();
+  }
+
   if($("mpSlider")){
     $("mpSlider").addEventListener("input", (e) => {
       $("mpVal").textContent = parseFloat(e.target.value).toFixed(2);
@@ -3903,6 +4069,19 @@ window.addEventListener("DOMContentLoaded", () => {
   // Tras cargar los modelos de Ollama, restaurar el modelo guardado si sigue disponible.
   (async () => {
     await loadEnhancerModels();
+    const selEnh = $("enhancerModel");
+    const selSeg2 = $("seg2OllamaModel");
+    if(selEnh && selSeg2){
+      selSeg2.innerHTML = '<option value="">-- Mismo que Enhancer / Default --</option>';
+      Array.from(selEnh.options).forEach(opt => {
+        if(opt.value){
+          const o = document.createElement("option");
+          o.value = opt.value;
+          o.textContent = opt.textContent;
+          selSeg2.appendChild(o);
+        }
+      });
+    }
     const saved = restoreSettings();
     if(saved){
       const s = JSON.parse(localStorage.getItem(MMH3X2_SETTINGS_KEY) || "{}");
@@ -3912,7 +4091,13 @@ window.addEventListener("DOMContentLoaded", () => {
         if(hasModel) sel.value = s.enhancerModel;
         else if(sel.options.length > 1) log(`⚠️ Modelo Ollama guardado (${s.enhancerModel}) no disponible ahora.`, "l-warn");
       }
+      if(s.seg2OllamaModel && $("seg2OllamaModel")){
+        const sel2 = $("seg2OllamaModel");
+        const hasModel2 = Array.from(sel2.options).some(o => o.value === s.seg2OllamaModel);
+        if(hasModel2) sel2.value = s.seg2OllamaModel;
+      }
     }
+    if(typeof updateSeg2OllamaModelVisibility === "function") updateSeg2OllamaModelVisibility();
   })();
 
   updateDurationFrames();

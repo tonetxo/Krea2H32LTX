@@ -504,7 +504,7 @@
       "bootstrap_first_forecast": true,
       "anchor_residual_feedback": false,
       "selective_rollback_correction": false,
-      "offline_smoothing_replay": true,
+      "offline_smoothing_replay": false,
       "audio_blend_weight": 0,
       "offline_archive_storage": "system_ram",
       "model_aware_mode": "off",
