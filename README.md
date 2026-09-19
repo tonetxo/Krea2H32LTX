@@ -4,6 +4,11 @@ High-performance, self-contained single-page web interfaces for video and image 
 
 The project provides four standalone, zero-dependency web applications designed to maximize local GPU utilization and enable full control from both desktop workstations and mobile devices across local networks (LAN).
 
+> [!IMPORTANT]
+> **Update (v1.0.1) — Full Portability & Auto-Configuration**:
+> If you downloaded this repository recently and experienced errors due to hardcoded paths or missing files, please run `git pull` or download the latest release (**[v1.0.1](https://github.com/tonetxo/Krea2H32LTX/releases/tag/v1.0.1)**).
+> All internal paths, ComfyUI backend ports, and model directories are now dynamically resolved, slots are auto-pruned, and a pre-flight diagnostic tool (`python diagnostico_comfyui.py`) is included.
+
 ---
 
 ## Overview of Web Interfaces
