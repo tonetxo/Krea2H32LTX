@@ -2397,7 +2397,7 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = [];
-const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/H3-PK-Parasyte-Turbo.safetensors", "Ligaz\u00f3n para Lora/h3/MysticXXX_MMH3-V4.safetensors", "Ligaz\u00f3n para Lora/h3/Pussy4nus_Epoch80.safetensors", "Ligaz\u00f3n para Lora/h3/SexGod_NaughtyTimes_v3_rank64_unpruned.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors", "Ligaz\u00f3n para Lora/h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors"];
+const AVAILABLE_LORAS = ["Ligaz\u00f3n para Lora/h3/H3-PK-Parasyte-Turbo.safetensors", "Ligaz\u00f3n para Lora/h3/MysticXXX_MMH3-V4.safetensors", "Ligaz\u00f3n para Lora/h3/Pussy4nus_Epoch80.safetensors", "Ligaz\u00f3n para Lora/h3/SexGod_NaughtyTimes_v3_rank64_unpruned.safetensors", "Ligaz\u00f3n para Lora/h3/h3-realism-people-t2v-i2v-r2v.safetensors", "Ligaz\u00f3n para Lora/h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors", "Ligaz\u00f3n para Lora/h3/minimax_h3_turbo_v4_step600_ema.safetensors", "Ligaz\u00f3n para Lora/h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors"];
 const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors", "taeltx_2.safetensors"];
 const AVAILABLE_UNETS = ["Ligaz\u00f3n para diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimax_music3_dit_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "Ligaz\u00f3n para diffusion_models/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "Ligaz\u00f3n para diffusion_models/seedvr2_3b_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
@@ -4795,8 +4795,8 @@ CONFIG.variantMeta = function(){
   const steps = $("stepsSlider")?.value || "20";
   const sampler = $("samplerName")?.value || "res_multistep";
   const scheduler = $("schedulerName")?.value || "simple";
-  const unet = $("unetModel")?.value?.split('/')?.pop() || "";
-  const clip = $("clipModel")?.value?.split('/')?.pop() || "";
+  const unet = $("unetModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.UNET]?.inputs?.unet_name?.split('/')?.pop() || "";
+  const clip = $("clipModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.CLIP]?.inputs?.clip_name?.split('/')?.pop() || "";
   const w = $("width")?.value || "1280";
   const h = $("height")?.value || "720";
   const rMode = $("rifeMultiplier")?.value || "2";
@@ -4819,6 +4819,8 @@ CONFIG.variantMeta = function(){
   const audioCfSec = parseFloat($("audioCrossfadeSlider")?.value || "0.40").toFixed(2);
 
   const rows = [
+    ["Modelo", unet],
+    ["CLIP", clip],
     ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
     ["Modo Seg 2", seg2Mode === "ollama" ? "Guía Ollama (continuación)" : "Prompt Directo"],
@@ -4833,8 +4835,6 @@ CONFIG.variantMeta = function(){
     ["Pasos (Steps)", steps],
     ["Sampler", sampler],
     ["Scheduler", scheduler],
-    ["UNet", unet],
-    ["CLIP", clip],
     ["LoRAs", lorasActive.length ? lorasActive.join(", ") : "ninguno"],
     ["Backend denso", $("attentionBackend")?.value || "comfy kitchen attention"],
     ["Video budget", `${Math.round((parseFloat($("h3VideoBudget")?.value || "0.30")) * 100)}%`],
@@ -4848,9 +4848,35 @@ CONFIG.variantMeta = function(){
   return { title: "Parámetros MMH3X2", rows, loras: lorasActive };
 };
 
+function findModelInWorkflow(workflow){
+  if(!workflow || typeof workflow !== "object") return "";
+  for(const k of Object.keys(workflow)){
+    const node = workflow[k];
+    if(!node || !node.inputs) continue;
+    if(node.inputs.unet_name) return String(node.inputs.unet_name).split("/").pop();
+    if(node.inputs.ckpt_name) return String(node.inputs.ckpt_name).split("/").pop();
+    if(node.inputs.model_name) return String(node.inputs.model_name).split("/").pop();
+  }
+  return "";
+}
+
+function findClipInWorkflow(workflow){
+  if(!workflow || typeof workflow !== "object") return "";
+  for(const k of Object.keys(workflow)){
+    const node = workflow[k];
+    if(!node || !node.inputs) continue;
+    if(node.inputs.clip_name) return String(node.inputs.clip_name).split("/").pop();
+  }
+  return "";
+}
+
 function formatWorkflowToMeta(workflow){
   if(!workflow || typeof workflow !== "object") return null;
   const rows = [];
+  const modelName = findModelInWorkflow(workflow);
+  if(modelName) rows.push(["Modelo", modelName]);
+  const clipName = findClipInWorkflow(workflow);
+  if(clipName) rows.push(["CLIP", clipName]);
   if(workflow["50"]?.inputs?.value) rows.push(["Prompt 1", String(workflow["50"].inputs.value).slice(0, 80)]);
   else if(workflow["6"]?.inputs?.text) rows.push(["Prompt", String(workflow["6"].inputs.text).slice(0, 80)]);
   if(workflow["58"]?.inputs?.value) rows.push(["Prompt 2", String(workflow["58"].inputs.value).slice(0, 80)]);

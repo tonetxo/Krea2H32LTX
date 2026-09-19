@@ -474,8 +474,8 @@ CONFIG.variantMeta = function(){
   const steps = $("stepsSlider")?.value || "20";
   const sampler = $("samplerName")?.value || "res_multistep";
   const scheduler = $("schedulerName")?.value || "simple";
-  const unet = $("unetModel")?.value?.split('/')?.pop() || "";
-  const clip = $("clipModel")?.value?.split('/')?.pop() || "";
+  const unet = $("unetModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.UNET]?.inputs?.unet_name?.split('/')?.pop() || "";
+  const clip = $("clipModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.CLIP]?.inputs?.clip_name?.split('/')?.pop() || "";
   const w = $("width")?.value || "1280";
   const h = $("height")?.value || "720";
   const rMode = $("rifeMultiplier")?.value || "2";
@@ -498,6 +498,8 @@ CONFIG.variantMeta = function(){
   const audioCfSec = parseFloat($("audioCrossfadeSlider")?.value || "0.40").toFixed(2);
 
   const rows = [
+    ["Modelo", unet],
+    ["CLIP", clip],
     ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
     ["Modo Seg 2", seg2Mode === "ollama" ? "Guía Ollama (continuación)" : "Prompt Directo"],
@@ -512,8 +514,6 @@ CONFIG.variantMeta = function(){
     ["Pasos (Steps)", steps],
     ["Sampler", sampler],
     ["Scheduler", scheduler],
-    ["UNet", unet],
-    ["CLIP", clip],
     ["LoRAs", lorasActive.length ? lorasActive.join(", ") : "ninguno"],
     ["Backend denso", $("attentionBackend")?.value || "comfy kitchen attention"],
     ["Video budget", `${Math.round((parseFloat($("h3VideoBudget")?.value || "0.30")) * 100)}%`],
@@ -527,9 +527,35 @@ CONFIG.variantMeta = function(){
   return { title: "Parámetros MMH3X2", rows, loras: lorasActive };
 };
 
+function findModelInWorkflow(workflow){
+  if(!workflow || typeof workflow !== "object") return "";
+  for(const k of Object.keys(workflow)){
+    const node = workflow[k];
+    if(!node || !node.inputs) continue;
+    if(node.inputs.unet_name) return String(node.inputs.unet_name).split("/").pop();
+    if(node.inputs.ckpt_name) return String(node.inputs.ckpt_name).split("/").pop();
+    if(node.inputs.model_name) return String(node.inputs.model_name).split("/").pop();
+  }
+  return "";
+}
+
+function findClipInWorkflow(workflow){
+  if(!workflow || typeof workflow !== "object") return "";
+  for(const k of Object.keys(workflow)){
+    const node = workflow[k];
+    if(!node || !node.inputs) continue;
+    if(node.inputs.clip_name) return String(node.inputs.clip_name).split("/").pop();
+  }
+  return "";
+}
+
 function formatWorkflowToMeta(workflow){
   if(!workflow || typeof workflow !== "object") return null;
   const rows = [];
+  const modelName = findModelInWorkflow(workflow);
+  if(modelName) rows.push(["Modelo", modelName]);
+  const clipName = findClipInWorkflow(workflow);
+  if(clipName) rows.push(["CLIP", clipName]);
   if(workflow["50"]?.inputs?.value) rows.push(["Prompt 1", String(workflow["50"].inputs.value).slice(0, 80)]);
   else if(workflow["6"]?.inputs?.text) rows.push(["Prompt", String(workflow["6"].inputs.text).slice(0, 80)]);
   if(workflow["58"]?.inputs?.value) rows.push(["Prompt 2", String(workflow["58"].inputs.value).slice(0, 80)]);

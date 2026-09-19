@@ -5920,6 +5920,44 @@ async function loadVideoHistory(){
         card.dataset.type = item.type;
         makeCardDraggable(card);
 
+        card.addEventListener("mouseenter", async () => {
+          if(!card.dataset.meta && item.filename){
+            try {
+              const wfUrl = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
+              const wf = await extractWorkflowFromMP4(wfUrl);
+              if(wf){
+                function findModel(w){
+                  for(const k of Object.keys(w)){
+                    const n = w[k];
+                    if(!n || !n.inputs) continue;
+                    if(n.inputs.unet_name) return String(n.inputs.unet_name).split("/").pop();
+                    if(n.inputs.ckpt_name) return String(n.inputs.ckpt_name).split("/").pop();
+                    if(n.inputs.model_name) return String(n.inputs.model_name).split("/").pop();
+                  }
+                  return "";
+                }
+                const modelName = findModel(wf);
+                const rows = [];
+                if(modelName) rows.push(["Modelo", modelName]);
+                const p = wf["6"]?.inputs?.text || wf["50"]?.inputs?.value || "";
+                if(p) rows.push(["Prompt", p.length > 80 ? p.slice(0, 77) + "..." : p]);
+                const loras = [];
+                for(const k of Object.keys(wf)){
+                  if(wf[k]?.inputs?.lora_name){
+                    loras.push(`${String(wf[k].inputs.lora_name).split("/").pop()} (${wf[k].inputs.strength_model || 1})`);
+                  }
+                }
+                card.dataset.meta = JSON.stringify({ title: "Metadata Vídeo", rows, loras });
+                showVariantTooltip(card);
+              }
+            } catch(_){}
+          } else if(card.dataset.meta){
+            showVariantTooltip(card);
+          }
+        });
+        card.addEventListener("mouseleave", () => hideVariantTooltip());
+        card.addEventListener("mousemove", (e) => positionVariantTooltip(e));
+
         card.addEventListener("click", (e) => {
           if(e.target.closest("video")) return;
           if(e.target.closest("button") || e.target.closest(".variant-icons")) return;

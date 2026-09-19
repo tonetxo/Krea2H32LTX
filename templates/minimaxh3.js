@@ -1145,10 +1145,12 @@ CONFIG.variantMeta = function(){
   const r = getRifeState();
   const w = parseInt($("width")?.value || "1120", 10);
   const he = parseInt($("height")?.value || "640", 10);
+  const unet = ($("unetSelect")?.value || BASE_GRAPH?.[N.UNET]?.inputs?.unet_name || "").split('/').pop() || "";
+  const clip = ($("clipSelect")?.value || BASE_GRAPH?.[N.CLIP]?.inputs?.clip_name || "").split('/').pop() || "";
   const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
   const rows = [
-    ["UNet", $("unetSelect")?.value || ""],
-    ["CLIP", $("clipSelect")?.value || ""],
+    ["Modelo", unet],
+    ["CLIP", clip],
     ["LoRAs", activeLoras.length ? activeLoras.join(", ") : "ninguna"],
     ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
@@ -3678,15 +3680,45 @@ async function loadVideoHistory(){
               const wfUrl = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
               const wf = await extractWorkflowFromMP4(wfUrl);
               if(wf){
+                function findModel(w){
+                  for(const k of Object.keys(w)){
+                    const n = w[k];
+                    if(!n || !n.inputs) continue;
+                    if(n.inputs.unet_name) return String(n.inputs.unet_name).split("/").pop();
+                    if(n.inputs.ckpt_name) return String(n.inputs.ckpt_name).split("/").pop();
+                    if(n.inputs.model_name) return String(n.inputs.model_name).split("/").pop();
+                  }
+                  return "";
+                }
+                function findClip(w){
+                  for(const k of Object.keys(w)){
+                    const n = w[k];
+                    if(!n || !n.inputs) continue;
+                    if(n.inputs.clip_name) return String(n.inputs.clip_name).split("/").pop();
+                  }
+                  return "";
+                }
                 const p = wf["6"]?.inputs?.text || wf["50"]?.inputs?.value || "";
-                const rows = [
+                const modelName = findModel(wf);
+                const clipName = findClip(wf);
+                const rows = [];
+                if(modelName) rows.push(["Modelo", modelName]);
+                if(clipName) rows.push(["CLIP", clipName]);
+                rows.push(
                   ["Prompt", p ? (p.length > 80 ? p.slice(0, 77) + "..." : p) : "(vacío)"],
                   ["Sampler", wf["123"]?.inputs?.sampler_name || "—"],
                   ["Scheduler", wf["124"]?.inputs?.scheduler || "—"],
                   ["Pasos", wf["124"]?.inputs?.steps || "—"],
                   ["Seed", wf["15"]?.inputs?.noise_seed ?? "—"]
-                ];
-                card.dataset.meta = JSON.stringify({ title: "Metadata Vídeo", rows });
+                );
+                const loras = [];
+                for(const k of Object.keys(wf)){
+                  if(wf[k]?.inputs?.lora_name){
+                    loras.push(`${String(wf[k].inputs.lora_name).split("/").pop()} (${wf[k].inputs.strength_model || 1})`);
+                  }
+                }
+                if(loras.length) rows.push(["LoRAs", loras.join(", ")]);
+                card.dataset.meta = JSON.stringify({ title: "Metadata Vídeo", rows, loras });
                 showVariantTooltip(card);
               }
             } catch(_){}
