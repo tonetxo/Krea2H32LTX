@@ -1,24 +1,22 @@
 import os
+import config_loader
 from generar_common import generate_html
 
-# --- CONFIGURACIÓN ---
-# Las rutas son configurables vía env vars; los defaults son los del entorno
-# original del autor. Sobrescríbelas si tu instalación está en otro sitio:
-#   MINIMAXH3_JSON, MINIMAXH3_OUTPUT_HTML, MINIMAXH3_UNET_DIR,
-#   MINIMAXH3_UNET_PREFIX, MINIMAXH3_CLIP_DIR.
+# --- CONFIGURACIÓN DINÁMICA Y PORTABLE ---
 JSON_FILE = os.environ.get("MINIMAXH3_JSON", "MiniMax_H3_Prewiews_OK.json")
 OUTPUT_HTML = os.environ.get("MINIMAXH3_OUTPUT_HTML", "MiniMaxH3_WebUI.html")
-UNET_DIR = os.environ.get("MINIMAXH3_UNET_DIR", "/home/tonetxo/SwarmUI/Models/diffusion_models")
-UNET_PREFIX = os.environ.get("MINIMAXH3_UNET_PREFIX", "Ligazón para diffusion_models")
-CLIP_DIR = os.environ.get("MINIMAXH3_CLIP_DIR", "/home/tonetxo/SwarmUI/Models/text_encoders")
-LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/h3")
-LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "Ligazón para Lora/h3")
-INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/frame_interpolation")
-# Puerto donde se sirve esta UI (para el botón "enviar a ..." desde otras UIs).
-MINIMAXH3_UI_PORT = os.environ.get("MINIMAXH3_UI_PORT", "8002")
-# Puerto donde se sirve la UI MMH3X2 (para el botón "enviar a X2").
-MMH3X2_UI_PORT = os.environ.get("MMH3X2_UI_PORT", "8003")
-# ---------------------
+UNET_DIR = os.environ.get("MINIMAXH3_UNET_DIR", config_loader.get_model_subdirs("diffusion_models"))
+UNET_PREFIX = os.environ.get("MINIMAXH3_UNET_PREFIX", "")
+CLIP_DIR = os.environ.get("MINIMAXH3_CLIP_DIR", config_loader.get_model_subdirs("text_encoders"))
+_loras_base = config_loader.get_model_subdirs("loras")
+_loras_h3 = os.path.join(_loras_base, "h3")
+LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", _loras_h3 if os.path.isdir(_loras_h3) else _loras_base)
+LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "h3" if os.path.isdir(_loras_h3) else "")
+INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", config_loader.get_model_subdirs("frame_interpolation"))
+VAE_APPROX_DIR = os.environ.get("MINIMAXH3_VAE_DIR", os.path.join(config_loader.get_comfyui_root(), "models", "vae_approx"))
+MINIMAXH3_UI_PORT = config_loader.get_port("minimaxh3", 8002)
+MMH3X2_UI_PORT = config_loader.get_port("mmh3x2", 8003)
+# -----------------------------------------
 
 def main():
     generate_html({
@@ -36,16 +34,16 @@ def main():
         'model_exclude': (),
         # LoRAs / Turbo LoRAs de MiniMaxH3
         'lora_dirs': [(LORAS_DIR, LORAS_PREFIX)],
-        'lora_fallback': 'Ligazón para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors',
+        'lora_fallback': 'minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors',
         # VAEs aproximados (taeh3 para live previews de alta calidad)
-        'vae_dir': '/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/vae_approx',
+        'vae_dir': VAE_APPROX_DIR,
         'vae_fallback': 'taeh3.safetensors',
         # Frame Interpolation (RIFE / FILM)
         'interp_dir': INTERP_DIR,
         'interp_fallback': 'rife_v4.26.safetensors',
         # UNet y CLIP sí se exponen como selectores.
         'unet_dirs': [(UNET_DIR, UNET_PREFIX)],
-        'unet_fallback': 'Ligazón para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors',
+        'unet_fallback': 'minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors',
         # Conservar solo los modelos de la carpeta minimaxh3.
         'unet_exclude': ('/flux/', '/flux2/', '/ideogram/', '/boogu/', '/ernie/',
                          '/nunchaku/', '/qwen/', '/zimage/', 'MelBand', 'wav2vec',

@@ -1,27 +1,31 @@
 import os
+import config_loader
 from generar_common import generate_html
 
-# --- CONFIGURACIÓN ---
-# Las rutas son configurables vía env vars; los defaults son los del entorno
-# original del autor. Sobrescríbelas si tu instalación está en otro sitio:
-#   LTXV_JSON, LTXV_OUTPUT_HTML, LTXV_LORAS_DIR, LTXV_MODELS_DIR,
-#   LTXV_SD_MODELS_DIR (Stable-Diffusion, segundo origen de modelos).
+# --- CONFIGURACIÓN DINÁMICA Y PORTABLE ---
 JSON_FILE = os.environ.get("LTXV_JSON", "LTXV_DMD_OK.json")
 OUTPUT_HTML = os.environ.get("LTXV_OUTPUT_HTML", "LTXV_WebUI.html")
-LORAS_DIR = os.environ.get("LTXV_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/ltxv")
-MODELS_DIR = os.environ.get("LTXV_MODELS_DIR", "/media/tonetxo/datos/ltxv")
-SD_MODELS_DIR = os.environ.get("LTXV_SD_MODELS_DIR", "/home/tonetxo/SwarmUI/Models/Stable-Diffusion")
-DIFFUSION_MODELS_DIR = os.environ.get("LTXV_DIFFUSION_MODELS_DIR", "/home/tonetxo/SwarmUI/Models/diffusion_models")
-VAE_DIR = os.environ.get("LTXV_VAE_DIR", "/home/tonetxo/SwarmUI/Models/VAE")
-VAE_PREFIX = os.environ.get("LTXV_VAE_PREFIX", "Ligazón para VAE")
-VAE_FALLBACK = os.environ.get("LTXV_VAE_FALLBACK", "Ligazón para VAE/LTX-2/ltx-2.5-video-vae-bf16.safetensors")
-INTERP_DIR = os.environ.get("LTXV_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/frame_interpolation")
-CLIP_DIR = os.environ.get("LTXV_CLIP_DIR", "/home/tonetxo/SwarmUI/Models/text_encoders")
-# Puerto donde se sirve la UI LTXV (para el botón "enviar a LTXV" de Krea2).
-LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
-# Puerto donde se sirve la UI MMH3X2 (para el botón "enviar a X2").
-MMH3X2_UI_PORT = os.environ.get("MMH3X2_UI_PORT", "8003")
-# ---------------------
+_loras_base = config_loader.get_model_subdirs("loras")
+_loras_ltxv = os.path.join(_loras_base, "ltxv")
+LORAS_DIR = os.environ.get("LTXV_LORAS_DIR", _loras_ltxv if os.path.isdir(_loras_ltxv) else _loras_base)
+
+_checkpoints = config_loader.get_model_subdirs("checkpoints")
+_diff_models = config_loader.get_model_subdirs("diffusion_models")
+_ltxv_models = os.path.join(_diff_models, "ltxv")
+
+MODELS_DIR = os.environ.get("LTXV_MODELS_DIR", _ltxv_models if os.path.isdir(_ltxv_models) else _diff_models)
+SD_MODELS_DIR = os.environ.get("LTXV_SD_MODELS_DIR", _checkpoints)
+DIFFUSION_MODELS_DIR = os.environ.get("LTXV_DIFFUSION_MODELS_DIR", _diff_models)
+
+VAE_DIR = os.environ.get("LTXV_VAE_DIR", config_loader.get_model_subdirs("vae"))
+VAE_PREFIX = os.environ.get("LTXV_VAE_PREFIX", "")
+VAE_FALLBACK = os.environ.get("LTXV_VAE_FALLBACK", "LTX-2/ltx-2.5-video-vae-bf16.safetensors")
+INTERP_DIR = os.environ.get("LTXV_INTERP_DIR", config_loader.get_model_subdirs("frame_interpolation"))
+CLIP_DIR = os.environ.get("LTXV_CLIP_DIR", config_loader.get_model_subdirs("text_encoders"))
+
+LTXV_UI_PORT = config_loader.get_port("ltxv", 8000)
+MMH3X2_UI_PORT = config_loader.get_port("mmh3x2", 8003)
+# -----------------------------------------
 
 def main():
     generate_html({

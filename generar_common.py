@@ -64,7 +64,7 @@ def get_lora_list(directory, fallback="ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safet
     return [fallback] if fallback else []
 
 
-def get_vae_list(directory, fallback="Ligazón para VAE/LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors"):
+def get_vae_list(directory, fallback="LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors"):
     return get_file_list(directory, fallback=fallback)
 
 
@@ -136,8 +136,7 @@ def generate_html(config):
     if config.get('unet_dirs'):
         raw_unets = get_file_list(config['unet_dirs'], fallback=config.get('unet_fallback'))
         unet_exclude = config.get('unet_exclude', ())
-        # Para UNet/CLIP usamos coincidencia por subcadena (el path incluye
-        # el prefijo "Ligazón para diffusion_models/..."), no por prefijo.
+        # Para UNet/CLIP usamos coincidencia por subcadena, no por prefijo.
         unet_files = [m for m in raw_unets if not any(x in m for x in unet_exclude)]
     else:
         unet_files = []

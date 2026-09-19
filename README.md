@@ -99,18 +99,36 @@ git clone https://github.com/tonetxo/Krea2H32LTX.git
 cd Krea2H32LTX
 ```
 
-### 2. Build the Web Interfaces
-To index local model, LoRA, and VAE directories:
+### 2. Configuration & Pre-Flight Check (Optional but Recommended)
+The system automatically discovers ComfyUI installations in standard locations (`~/ComfyUI`, `../ComfyUI`, SwarmUI, etc.) and auto-probes active ports.
+
+If you have custom directories or ports, copy the example configuration:
 ```bash
-python3 generar_minimaxh3.py
-python3 generar_ltxv.py
-python3 generar_krea2.py
-python3 generar_mmh3x2.py
+cp config.example.json config.json
+# Edit config.json with your paths if necessary
 ```
 
-### 3. Launch the Servers
+Run the pre-flight diagnostics to verify ComfyUI, Ollama, and required custom nodes:
+```bash
+python3 diagnostico_comfyui.py
+```
+If any custom node is missing, the diagnostic script prints the exact `git clone` commands to install it into your `custom_nodes/` folder.
+
+### 3. Build the Web Interfaces
+To compile the standalone HTML interfaces and index your local models, LoRAs, and VAEs:
+```bash
+python3 generar_mmh3x2.py
+python3 generar_minimaxh3.py
+python3 generar_krea2.py
+python3 generar_ltxv.py
+```
+
+### 4. Launch the Servers
 
 ```bash
+# MMH3X2 (Video continuation: 2 segments, 4 images + 1 video) - Port 8003
+./lanzar_mmh3x2.sh
+
 # MiniMaxH3 (Video generation: i2v / flf2v / r2v) - Port 8002
 ./lanzar_minimaxh3.sh
 
@@ -119,9 +137,6 @@ python3 generar_mmh3x2.py
 
 # Krea2 (Image generation: Flux2 / Krea2) - Port 8001
 ./lanzar_krea2.sh
-
-# MMH3X2 (Video continuation: 2 segments, 4 images + 1 video) - Port 8003
-./lanzar_mmh3x2.sh
 ```
 
 ---

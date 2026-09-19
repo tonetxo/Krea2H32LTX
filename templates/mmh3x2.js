@@ -2791,11 +2791,24 @@ function buildGraph(j){
   if(g[N.GUIDER_2]?.inputs) g[N.GUIDER_2].inputs.model = [currentModelNode, 0];
   if(g[N.SCHEDULER_2]?.inputs) g[N.SCHEDULER_2].inputs.model = [currentModelNode, 0];
 
-  // 10. Conexión de Imágenes de Entrada (Slots 1..4)
-  if(mediaSlots[1].uploaded && g[N.IMG1]?.inputs) g[N.IMG1].inputs.image = mediaSlots[1].uploaded.name;
-  if(mediaSlots[2].uploaded && g[N.IMG2]?.inputs) g[N.IMG2].inputs.image = mediaSlots[2].uploaded.name;
-  if(mediaSlots[3].uploaded && g[N.IMG3]?.inputs) g[N.IMG3].inputs.image = mediaSlots[3].uploaded.name;
-  if(mediaSlots[4].uploaded && g[N.IMG4]?.inputs) g[N.IMG4].inputs.image = mediaSlots[4].uploaded.name;
+  // 10. Conexión dinámica y limpia de Imágenes de Entrada (Slots 1..4)
+  // Limpiar referencias previas de imágenes en ambos segmentos para evitar entradas fantasma
+  if(g[N.REF2V_SEG1]?.inputs){
+    for(let i = 0; i < 8; i++) delete g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${i}`];
+  }
+  if(g[N.REF2V_SEG2]?.inputs){
+    for(let i = 0; i < 8; i++) delete g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${i}`];
+  }
+
+  const slotHasImg = (idx) => !!(mediaSlots[idx]?.uploaded?.name);
+  const usedSlots = new Set();
+
+  // Slot 1 (primer frame de inicio)
+  if(slotHasImg(1) && g[N.IMG1]?.inputs){
+    g[N.IMG1].inputs.image = mediaSlots[1].uploaded.name;
+    if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs["ref_images.ref_image_0"] = [N.IMG1, 0];
+    usedSlots.add(1);
+  }
 
   // 10b. Referencias compartidas + tamaño de referencias (match/max)
   const sharedRefs = (j ? (j.sharedRefs !== undefined ? j.sharedRefs : false)
@@ -2803,31 +2816,65 @@ function buildGraph(j){
   const refSize = (j ? (j.refImageSize || "match") : ($("refImageSize")?.value || "match"));
   if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs.ref_image_size = refSize;
   if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs.ref_image_size = refSize;
-  if(sharedRefs){
-    // Seg 1 (nodo 14): base ref_image_0 = Img1, _1 = Img2 (cable base);
-    // añadimos Img3/Img4 como _2/_3 cuando el slot tiene imagen.
-    if(mediaSlots[3].uploaded && g[N.REF2V_SEG1]?.inputs){
-      g[N.REF2V_SEG1].inputs["ref_images.ref_image_2"] = [N.IMG3, 0];
+
+  if(!sharedRefs){
+    // Modo estándar / NO compartido:
+    // Seg 1 ve: Img1 (ref_image_0), e Img2 (ref_image_1) si se ha subido
+    let seg1Idx = 1;
+    if(slotHasImg(2)){
+      if(g[N.IMG2]?.inputs) g[N.IMG2].inputs.image = mediaSlots[2].uploaded.name;
+      if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${seg1Idx++}`] = [N.IMG2, 0];
+      usedSlots.add(2);
     }
-    if(mediaSlots[4].uploaded && g[N.REF2V_SEG1]?.inputs){
-      g[N.REF2V_SEG1].inputs["ref_images.ref_image_3"] = [N.IMG4, 0];
+    // Seg 2 ve: Last frame de Seg 1 (ref_image_0), e Img3 / Img4 si se han subido
+    let seg2Idx = 0;
+    if(g[N.REF2V_SEG2]?.inputs){
+      g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.LAST_FRAME, 0];
     }
-    // Seg 2 (nodo 30): base ref_image_0 = last frame (26), _1 = Img3 (82),
-    // _2 = Img4 (83). Con compartidas, Img2 entra como _1 y desplazamos.
-    if(mediaSlots[2].uploaded && g[N.REF2V_SEG2]?.inputs){
-      g[N.REF2V_SEG2].inputs["ref_images.ref_image_1"] = [N.IMG2, 0];
-      if(mediaSlots[3].uploaded){
-        g[N.REF2V_SEG2].inputs["ref_images.ref_image_2"] = [N.IMG3, 0];
-      } else {
-        delete g[N.REF2V_SEG2].inputs["ref_images.ref_image_2"];
+    if(slotHasImg(3)){
+      if(g[N.IMG3]?.inputs) g[N.IMG3].inputs.image = mediaSlots[3].uploaded.name;
+      if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.IMG3, 0];
+      usedSlots.add(3);
+    }
+    if(slotHasImg(4)){
+      if(g[N.IMG4]?.inputs) g[N.IMG4].inputs.image = mediaSlots[4].uploaded.name;
+      if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.IMG4, 0];
+      usedSlots.add(4);
+    }
+  } else {
+    // Modo Compartido:
+    // Seg 1 ve: Img1 (0) + todos los slots 2, 3, 4 que tengan imagen subida
+    let seg1Idx = 1;
+    const nodeMap = { 2: N.IMG2, 3: N.IMG3, 4: N.IMG4 };
+    [2, 3, 4].forEach(s => {
+      if(slotHasImg(s)){
+        const nid = nodeMap[s];
+        if(g[nid]?.inputs) g[nid].inputs.image = mediaSlots[s].uploaded.name;
+        if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${seg1Idx++}`] = [nid, 0];
+        usedSlots.add(s);
       }
-      if(mediaSlots[4].uploaded){
-        g[N.REF2V_SEG2].inputs["ref_images.ref_image_3"] = [N.IMG4, 0];
-      } else {
-        delete g[N.REF2V_SEG2].inputs["ref_images.ref_image_3"];
-      }
+    });
+    // Seg 2 ve: Last frame (0) + todos los slots 2, 3, 4 que tengan imagen subida
+    let seg2Idx = 0;
+    if(g[N.REF2V_SEG2]?.inputs){
+      g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.LAST_FRAME, 0];
     }
+    [2, 3, 4].forEach(s => {
+      if(slotHasImg(s)){
+        const nid = nodeMap[s];
+        if(g[nid]?.inputs) g[nid].inputs.image = mediaSlots[s].uploaded.name;
+        if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [nid, 0];
+        usedSlots.add(s);
+      }
+    });
   }
+
+  // Pruning: eliminar del grafo los nodos LoadImage de slots 2, 3, 4 que no se hayan subido,
+  // para que ComfyUI no intente buscar archivos inexistentes en disco.
+  if(!usedSlots.has(2) && g[N.IMG2]) delete g[N.IMG2];
+  if(!usedSlots.has(3) && g[N.IMG3]) delete g[N.IMG3];
+  if(!usedSlots.has(4) && g[N.IMG4]) delete g[N.IMG4];
+
 
   // 11. Vídeo de Referencia para Seg 2
   if(videoSlot.uploaded && g[N.REF2V_SEG2]?.inputs){
@@ -3919,43 +3966,15 @@ window.addEventListener("DOMContentLoaded", () => {
     $("prompt2").value = BASE_GRAPH[N.PROMPT_2].inputs.value;
   }
 
-  // Restaurar medios guardados en IndexedDB con fallback al grafo por defecto
+  // Restaurar medios guardados en IndexedDB
   restoreSavedMedia().then(hasSavedMedia => {
-    if(!hasSavedMedia){
-      const defaultImgs = [
-        BASE_GRAPH[N.IMG1]?.inputs?.image,
-        BASE_GRAPH[N.IMG2]?.inputs?.image,
-        BASE_GRAPH[N.IMG3]?.inputs?.image,
-        BASE_GRAPH[N.IMG4]?.inputs?.image
-      ];
-      defaultImgs.forEach((fn, idx) => {
-        const slotIdx = idx + 1;
-        if(fn && !mediaSlots[slotIdx].file && !mediaSlots[slotIdx].dataUrl){
-          mediaSlots[slotIdx].uploaded = { name: fn, subfolder: "", type: "input" };
-          mediaSlots[slotIdx].name = fn;
-          const url = server() + `/view?filename=${encodeURIComponent(fn)}&type=input`;
-          const img = $(`previewSlotImg${slotIdx}`);
-          const ph = $(`phImg${slotIdx}`);
-          const info = $(`infoImg${slotIdx}`);
-          if(img){
-            img.style.display = "block";
-            img.onload = () => {
-              if(slotIdx === 1) updateCalculatedResolution(img.naturalWidth, img.naturalHeight);
-              if(info) info.textContent = `${img.naturalWidth}x${img.naturalHeight} · ${fn.slice(0, 25)}…`;
-            };
-            img.src = url;
-          }
-          if(ph) ph.style.display = "none";
-        }
-      });
-    } else {
+    if(hasSavedMedia){
       log("💾 Sesión anterior restaurada (ajustes y medios guardados)", "l-ok");
     }
     const img1 = $("previewSlotImg1");
     if(img1 && img1.complete && img1.naturalWidth){
       updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
     }
-    // Si aún no cargó, el listener img.onload ya actualizará al terminar.
     updateRefNumberingHint();
   });
 

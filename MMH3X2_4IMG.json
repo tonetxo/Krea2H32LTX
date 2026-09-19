@@ -1,7 +1,7 @@
 {
   "1": {
     "inputs": {
-      "unet_name": "Ligazón para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors",
+      "unet_name": "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -138,7 +138,7 @@
   },
   "10": {
     "inputs": {
-      "image": "1756002-sab, a beautiful tanned, tattooed brunet-flux2Krea2_Turbo_convrot_int8mixed.png"
+      "image": ""
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -1071,7 +1071,7 @@
   },
   "81": {
     "inputs": {
-      "image": "1204002-Wide angle shot of sab, a spanish woman-flux2Krea2_Turbo_convrot_int8mixed.png"
+      "image": ""
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -1080,7 +1080,7 @@
   },
   "82": {
     "inputs": {
-      "image": "1738001-Wide angle shot of sab, a nude spanish w-flux2krea2_turbo_fp8_scaled.png"
+      "image": ""
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -1089,7 +1089,7 @@
   },
   "83": {
     "inputs": {
-      "image": "2239001-eva, a young woman with long dark brown-flux2Krea2_Turbo_convrot_int8mixed.png"
+      "image": ""
     },
     "class_type": "LoadImage",
     "_meta": {

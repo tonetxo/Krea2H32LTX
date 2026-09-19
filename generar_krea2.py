@@ -1,20 +1,22 @@
 import os
+import config_loader
 from generar_common import generate_html
 
-# --- CONFIGURACIÓN ---
-# Rutas configurables vía env vars; defaults = entorno original del autor.
-#   KREA2_JSON, KREA2_OUTPUT_HTML, KREA2_MODELS_DIR, KREA2_LORAS_DIR.
+# --- CONFIGURACIÓN DINÁMICA Y PORTABLE ---
 JSON_FILE = os.environ.get("KREA2_JSON", "Krea2_OK.json")
 OUTPUT_HTML = os.environ.get("KREA2_OUTPUT_HTML", "Krea2_WebUI.html")
-MODELS_DIR = os.environ.get("KREA2_MODELS_DIR", "/home/tonetxo/SwarmUI/Models/diffusion_models/flux2")
-LORAS_DIR = os.environ.get("KREA2_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/K2")
-# Puerto donde se sirve la UI LTXV (para el botón "enviar a LTXV").
-LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
-# Puerto donde se sirve la UI MiniMaxH3 (para el botón "enviar a H3").
-MINIMAXH3_UI_PORT = os.environ.get("MINIMAXH3_UI_PORT", "8002")
-# Puerto donde se sirve la UI MMH3X2 (para el botón "enviar a X2").
-MMH3X2_UI_PORT = os.environ.get("MMH3X2_UI_PORT", "8003")
-# ---------------------
+_diff_base = config_loader.get_model_subdirs("diffusion_models")
+_diff_flux2 = os.path.join(_diff_base, "flux2")
+MODELS_DIR = os.environ.get("KREA2_MODELS_DIR", _diff_flux2 if os.path.isdir(_diff_flux2) else _diff_base)
+
+_loras_base = config_loader.get_model_subdirs("loras")
+_loras_k2 = os.path.join(_loras_base, "K2")
+LORAS_DIR = os.environ.get("KREA2_LORAS_DIR", _loras_k2 if os.path.isdir(_loras_k2) else _loras_base)
+
+LTXV_UI_PORT = config_loader.get_port("ltxv", 8000)
+MINIMAXH3_UI_PORT = config_loader.get_port("minimaxh3", 8002)
+MMH3X2_UI_PORT = config_loader.get_port("mmh3x2", 8003)
+# -----------------------------------------
 
 def main():
     generate_html({

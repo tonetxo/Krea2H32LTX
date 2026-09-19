@@ -2264,7 +2264,8 @@ function loadUnets(){
     opt.textContent = u;
     sel.appendChild(opt);
   }
-  const fb = "Ligazón para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors";
+  const available = typeof AVAILABLE_UNETS !== "undefined" ? AVAILABLE_UNETS : [];
+  const fb = available.find(u => u.includes("convrot")) || available.find(u => u.includes("minimax")) || available[0] || "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors";
   if(Array.from(sel.options).some(o => o.value === fb)) sel.value = fb;
 }
 loadUnets();
@@ -2285,11 +2286,12 @@ function loadClips(){
 loadClips();
 
 function setDefaultSelectors(){
-  const fbU = "Ligazón para diffusion_models/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors";
+  const availableU = typeof AVAILABLE_UNETS !== "undefined" ? AVAILABLE_UNETS : [];
+  const fbU = availableU.find(u => u.includes("convrot")) || availableU.find(u => u.includes("minimax")) || availableU[0] || "";
   const fbC = "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors";
   const unetSel = $("unetSelect");
   const clipSel = $("clipSelect");
-  if(unetSel && unetSel.value !== fbU && Array.from(unetSel.options).some(o => o.value === fbU)) unetSel.value = fbU;
+  if(unetSel && (!unetSel.value || unetSel.value === "") && fbU) unetSel.value = fbU;
   if(clipSel && clipSel.value !== fbC && Array.from(clipSel.options).some(o => o.value === fbC)) clipSel.value = fbC;
 }
 

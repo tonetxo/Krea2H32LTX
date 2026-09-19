@@ -1,0 +1,17 @@
+{
+  "comfyui": {
+    "url": "http://127.0.0.1:8188",
+    "root_dir": "",
+    "models_dir": "",
+    "output_dir": ""
+  },
+  "ollama": {
+    "url": "http://127.0.0.1:11434"
+  },
+  "ports": {
+    "ltxv": 8000,
+    "krea2": 8001,
+    "minimaxh3": 8002,
+    "mmh3x2": 8003
+  }
+}

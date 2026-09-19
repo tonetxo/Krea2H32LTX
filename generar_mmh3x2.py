@@ -1,18 +1,22 @@
 import os
+import config_loader
 from generar_common import generate_html
 
-# --- CONFIGURACIÓN ---
+# --- CONFIGURACIÓN DINÁMICA Y PORTABLE ---
 JSON_FILE = os.environ.get("MMH3X2_JSON", "MMH3X2_4IMG.json")
 OUTPUT_HTML = os.environ.get("MMH3X2_OUTPUT_HTML", "MMH3X2_WebUI.html")
-UNET_DIR = os.environ.get("MINIMAXH3_UNET_DIR", "/home/tonetxo/SwarmUI/Models/diffusion_models")
-UNET_PREFIX = os.environ.get("MINIMAXH3_UNET_PREFIX", "Ligazón para diffusion_models")
-CLIP_DIR = os.environ.get("MINIMAXH3_CLIP_DIR", "/home/tonetxo/SwarmUI/Models/text_encoders")
-LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", "/home/tonetxo/SwarmUI/Models/Lora/h3")
-LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "Ligazón para Lora/h3")
-INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/frame_interpolation")
-MMH3X2_UI_PORT = os.environ.get("MMH3X2_UI_PORT", "8003")
-LTXV_UI_PORT = os.environ.get("LTXV_UI_PORT", "8000")
-# ---------------------
+UNET_DIR = os.environ.get("MINIMAXH3_UNET_DIR", config_loader.get_model_subdirs("diffusion_models"))
+UNET_PREFIX = os.environ.get("MINIMAXH3_UNET_PREFIX", "")
+CLIP_DIR = os.environ.get("MINIMAXH3_CLIP_DIR", config_loader.get_model_subdirs("text_encoders"))
+_loras_base = config_loader.get_model_subdirs("loras")
+_loras_h3 = os.path.join(_loras_base, "h3")
+LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", _loras_h3 if os.path.isdir(_loras_h3) else _loras_base)
+LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "h3" if os.path.isdir(_loras_h3) else "")
+INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", config_loader.get_model_subdirs("frame_interpolation"))
+VAE_APPROX_DIR = os.environ.get("MINIMAXH3_VAE_DIR", os.path.join(config_loader.get_comfyui_root(), "models", "vae_approx"))
+MMH3X2_UI_PORT = config_loader.get_port("mmh3x2", 8003)
+LTXV_UI_PORT = config_loader.get_port("ltxv", 8000)
+# -----------------------------------------
 
 def build_config(json_file, output_html, header_sub):
     return {
@@ -27,13 +31,13 @@ def build_config(json_file, output_html, header_sub):
         'model_fallback': '',
         'model_exclude': (),
         'lora_dirs': [(LORAS_DIR, LORAS_PREFIX)],
-        'lora_fallback': 'Ligazón para Lora/h3/minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors',
-        'vae_dir': '/home/tonetxo/SwarmUI/dlbackend/ComfyUI/models/vae_approx',
+        'lora_fallback': 'minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors',
+        'vae_dir': VAE_APPROX_DIR,
         'vae_fallback': 'taeh3.safetensors',
         'interp_dir': INTERP_DIR,
         'interp_fallback': 'rife_v4.26.safetensors',
         'unet_dirs': [(UNET_DIR, UNET_PREFIX)],
-        'unet_fallback': 'Ligazón para diffusion_models/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors',
+        'unet_fallback': 'minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors',
         'unet_exclude': ('/flux/', '/flux2/', '/ideogram/', '/boogu/', '/ernie/',
                          '/nunchaku/', '/qwen/', '/zimage/', 'MelBand', 'wav2vec',
                          'acestep'),

@@ -1580,7 +1580,7 @@ function buildGraph(mode, job){
   const isDiffusionModel = modelChoice.startsWith("diffusion_models/") || modelChoice.includes("diffusion_models") || modelChoice.includes("transformer") || modelChoice.includes("int8-convrot");
 
   if(isDiffusionModel){
-    const unetName = modelChoice.startsWith("Ligazón para ") ? modelChoice : ("Ligazón para " + modelChoice);
+    const unetName = modelChoice;
     g[N.CHECKPOINT] = {
       class_type: "UNETLoader",
       inputs: {
@@ -1614,7 +1614,7 @@ function buildGraph(mode, job){
   if(isDiffusionModel && (!vaeChoice || vaeChoice === "Checkpoint")){
     vaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-bf16")) ||
                 (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("pruna_ltx2.3_vae")) ||
-                "Ligazón para VAE/LTX-2/ltx-2.5-video-vae-bf16.safetensors";
+                "LTX-2/ltx-2.5-video-vae-bf16.safetensors";
   }
   const useCustomVae = vaeChoice && vaeChoice !== "Checkpoint";
   if(useCustomVae && g[N.CUSTOM_VAE] && g[N.CUSTOM_VAE].inputs){
@@ -1637,7 +1637,7 @@ function buildGraph(mode, job){
   if(isDiffusionModel && (!audioVaeChoice || audioVaeChoice === "Checkpoint")){
     audioVaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-audio-vae-bf16")) ||
                      (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("LTX23_audio_vae")) ||
-                     "Ligazón para VAE/LTX-2/ltx-2.5-audio-vae-bf16.safetensors";
+                     "LTX-2/ltx-2.5-audio-vae-bf16.safetensors";
   }
   if(audioVaeChoice && audioVaeChoice !== "Checkpoint" && g["617"]){
     g["617"] = {

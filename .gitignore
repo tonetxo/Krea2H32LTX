@@ -2,4 +2,4 @@ __pycache__/
 *.pyc
 prompts_*.json
 *.tmp
-
+config.json

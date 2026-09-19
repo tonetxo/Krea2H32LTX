@@ -55,8 +55,9 @@ OLLAMA = "http://127.0.0.1:11434"
 # Custom routes that should be served locally (not proxied).
 CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/mmh3x2_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess", "/api/prompts", "/view")
 
+import config_loader
+
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
-# Default: relative to ComfyUI's typical install at ~/ComfyUI/output/krea2.
 # Override via env var KREA2_OUTPUT_DIR or third CLI arg.
 def _resolve_krea2_dir():
     if len(sys.argv) > 3:
@@ -64,16 +65,8 @@ def _resolve_krea2_dir():
     env = os.environ.get("KREA2_OUTPUT_DIR")
     if env:
         return os.path.expanduser(env)
-    candidates = [
-        os.path.expanduser("~/ComfyUI/output/krea2"),
-        "/home/tonetxo/ComfyUI/output/krea2",
-        os.path.expanduser("~/SwarmUI/dlbackend/ComfyUI/output/krea2"),
-        "/home/tonetxo/SwarmUI/dlbackend/ComfyUI/output/krea2",
-    ]
-    for c in candidates:
-        if os.path.isdir(c):
-            return c
-    return candidates[0]  # fall back; will report empty list
+    out = os.path.join(config_loader.get_output_dir(), "krea2")
+    return out
 
 KREA2_OUTPUT_DIR = _resolve_krea2_dir()
 
@@ -86,22 +79,14 @@ LIST_CACHE_TTL = 5.0  # segundos
 # ComfyUI's install root (parent of /output and /temp). Used to validate
 # that file_delete targets are inside the backend's writable areas.
 def _resolve_comfyui_root():
-    candidates = [
-        os.path.expanduser("~/ComfyUI"),
-        os.path.expanduser("~/SwarmUI/dlbackend/ComfyUI"),
-        "/home/tonetxo/ComfyUI",
-        "/home/tonetxo/SwarmUI/dlbackend/ComfyUI",
-    ]
-    for c in candidates:
-        if os.path.isdir(os.path.join(c, "output")):
-            return c
-    return os.path.dirname(KREA2_OUTPUT_DIR) + "/.."  # best-effort
+    return config_loader.get_comfyui_root()
 
 COMFYUI_ROOT = os.path.realpath(_resolve_comfyui_root())
 ALLOWED_DELETE_DIRS = (
     os.path.realpath(os.path.join(COMFYUI_ROOT, "output")),
     os.path.realpath(os.path.join(COMFYUI_ROOT, "temp")),
 )
+
 
 
 def _parse_time_arg(value):
