@@ -626,6 +626,16 @@ function setModeUI(mode){
     if(startPanel) startPanel.style.display = "";
     if(hint) hint.textContent = "Imagen de inicio → vídeo.";
   }
+  if(mode !== "r2v"){
+    const firstImg = $("inputImg");
+    if(firstImg && firstImg.naturalWidth && firstImg.naturalHeight && firstImg.style.display !== "none"){
+      rawInputImageWidth = firstImg.naturalWidth;
+      rawInputImageHeight = firstImg.naturalHeight;
+      imageNativeAspectRatio = firstImg.naturalWidth / firstImg.naturalHeight;
+      if(arMode !== "16:9") setArModeUI("auto");
+      else recalcResolution();
+    }
+  }
   try { localStorage.setItem(MODE_KEY, mode); } catch(_){}
   scheduleSaveH3Settings();
 }
@@ -1120,6 +1130,12 @@ function setArModeUI(mode){
     f169?.classList.add("on"); auto?.classList.remove("on");
   } else {
     auto?.classList.add("on"); f169?.classList.remove("on");
+    const firstImg = $("inputImg");
+    if(firstImg && firstImg.naturalWidth && firstImg.naturalHeight && firstImg.style.display !== "none"){
+      rawInputImageWidth = firstImg.naturalWidth;
+      rawInputImageHeight = firstImg.naturalHeight;
+      imageNativeAspectRatio = firstImg.naturalWidth / firstImg.naturalHeight;
+    }
   }
   recalcResolution();
   saveArMode(mode);
@@ -2214,7 +2230,10 @@ function updateDzInfo(w, h, infoEl){
     const ratioStr = getFriendlyRatio(w, h);
     info.textContent = `${w}×${h} · ${ratioStr}`;
   }
-  if(w && h){
+  const isFirst = (!infoEl || infoEl === $("dzInfo"));
+  const firstImg = $("inputImg");
+  const hasFirst = !!(firstImg && firstImg.naturalWidth && firstImg.naturalHeight && firstImg.style.display !== "none");
+  if(w && h && (isFirst || !hasFirst)){
     rawInputImageWidth = w;
     rawInputImageHeight = h;
     imageNativeAspectRatio = w / h;
@@ -4241,7 +4260,12 @@ if(!$("enhancerChainMode").value) $("enhancerChainMode").value = "ollama";
 
 async function restoreMiniMaxH3MediaFromDB(){
   const entries = await dbGetAllMedia();
-  for(const e of entries){
+  const sortedEntries = entries.filter(e => e && e.key).sort((a, b) => {
+    if(a.key === "firstImage") return 1;
+    if(b.key === "firstImage") return -1;
+    return 0;
+  });
+  for(const e of sortedEntries){
     if(!e || !e.key) continue;
     try {
       if(e.key === "firstImage" && e.data){
