@@ -13,7 +13,7 @@ _loras_h3 = os.path.join(_loras_base, "h3")
 LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", _loras_h3 if os.path.isdir(_loras_h3) else _loras_base)
 LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "h3" if os.path.isdir(_loras_h3) else "")
 INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", config_loader.get_model_subdirs("frame_interpolation"))
-VAE_APPROX_DIR = os.environ.get("MINIMAXH3_VAE_DIR", os.path.join(config_loader.get_comfyui_root(), "models", "vae_approx"))
+VAE_DIR = os.environ.get("MINIMAXH3_VAE_DIR", config_loader.get_model_subdirs("vae"))
 MMH3X2_UI_PORT = config_loader.get_port("mmh3x2", 8003)
 LTXV_UI_PORT = config_loader.get_port("ltxv", 8000)
 # -----------------------------------------
@@ -32,8 +32,10 @@ def build_config(json_file, output_html, header_sub):
         'model_exclude': (),
         'lora_dirs': [(LORAS_DIR, LORAS_PREFIX)],
         'lora_fallback': 'minimax_h3_fl2v_turbo_4step_v1.1_768p_comfyui_bf16.safetensors',
-        'vae_dir': VAE_APPROX_DIR,
-        'vae_fallback': 'taeh3.safetensors',
+        'vae_dir': VAE_DIR,
+        'vae_fallback': 'MiniMaxH3/minimax_h3_video_vae_fp16.safetensors',
+        'vae_include': ('minimax_h3_video_vae',),
+        'vae_exclude': ('audio',),
         'interp_dir': INTERP_DIR,
         'interp_fallback': 'rife_v4.26.safetensors',
         'unet_dirs': [(UNET_DIR, UNET_PREFIX)],

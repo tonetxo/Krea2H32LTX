@@ -476,6 +476,7 @@ CONFIG.variantMeta = function(){
   const scheduler = $("schedulerName")?.value || "simple";
   const unet = $("unetModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.UNET]?.inputs?.unet_name?.split('/')?.pop() || "";
   const clip = $("clipModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.CLIP]?.inputs?.clip_name?.split('/')?.pop() || "";
+  const vae = $("vaeModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.VAE_VID]?.inputs?.vae_name?.split('/')?.pop() || "";
   const w = $("width")?.value || "1280";
   const h = $("height")?.value || "720";
   const rMode = $("rifeMultiplier")?.value || "2";
@@ -494,12 +495,13 @@ CONFIG.variantMeta = function(){
   else if(audioMode === "passthrough") audioDesc = "Pista Directa Final (BGM limpio)";
     else if(audioMode === "hybrid") audioDesc = `Híbrido (IA puro seg1/seg2; final: pista ${$("audioUserVolume")?.value ?? "-12"} dB + IA ${$("audioGuideVolume")?.value ?? "-6"} dB)`;
 
-  const audioCfOn = $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : true;
-  const audioCfSec = parseFloat($("audioCrossfadeSlider")?.value || "0.40").toFixed(2);
+  const audioCfOn = $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : false;
+  const audioCfSec = $("audioCrossfadeSlider") ? parseFloat($("audioCrossfadeSlider").value).toFixed(2) : "1.00";
 
   const rows = [
     ["Modelo", unet],
     ["CLIP", clip],
+    ["VAE Vídeo", vae],
     ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
     ["Modo Seg 2", seg2Mode === "ollama" ? "Guía Ollama (continuación)" : "Prompt Directo"],
@@ -1352,14 +1354,18 @@ function applyWorkflow(workflow){
     $("schedulerName").value = schedNode.inputs.scheduler;
   }
 
-  // 9. Modelos UNet & CLIP
-  const unetNode = workflow["14"] || workflow["10"] || findByClass("UNETLoader");
+  // 9. Modelos UNet, CLIP & VAE Vídeo
+  const unetNode = workflow["14"] || workflow["10"] || workflow[N.UNET] || findByClass("UNETLoader");
   if(unetNode?.inputs?.unet_name && $("unetModel")){
     $("unetModel").value = unetNode.inputs.unet_name;
   }
-  const clipNode = workflow["11"] || findByClass("CLIPLoader");
+  const clipNode = workflow["11"] || workflow[N.CLIP] || findByClass("CLIPLoader");
   if(clipNode?.inputs?.clip_name && $("clipModel")){
     $("clipModel").value = clipNode.inputs.clip_name;
+  }
+  const vaeNode = workflow[N.VAE_VID] || workflow["8"] || findByClass("VAELoader");
+  if(vaeNode?.inputs?.vae_name && $("vaeModel")){
+    $("vaeModel").value = vaeNode.inputs.vae_name;
   }
 
   // 10. Optimizaciones de atención MMH3X2
@@ -1744,6 +1750,7 @@ function saveSettings(){
     scheduler: $("schedulerName")?.value || "simple",
     unetModel: $("unetModel")?.value || "",
     clipModel: $("clipModel")?.value || "",
+    vaeModel: $("vaeModel")?.value || "",
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: IS_BLOCKATT ? getAttentionOptimizerState() : null,
     h3opt: getH3OptState(),
@@ -1841,6 +1848,7 @@ function restoreSettings(){
 
     if(s.unetModel && $("unetModel")) $("unetModel").value = s.unetModel;
     if(s.clipModel && $("clipModel")) $("clipModel").value = s.clipModel;
+    if(s.vaeModel && $("vaeModel")) $("vaeModel").value = s.vaeModel;
 
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
     if(IS_BLOCKATT){
@@ -1953,7 +1961,7 @@ function attachAutoSaveListeners(){
   const baseIds = [
     "prompt", "prompt2", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
-    "unetModel", "clipModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
+    "unetModel", "clipModel", "vaeModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
     "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
@@ -2569,11 +2577,13 @@ function buildGraph(j){
   if(g[N.SCHEDULER_1]?.inputs) g[N.SCHEDULER_1].inputs.scheduler = scheduler;
   if(g[N.SCHEDULER_2]?.inputs) g[N.SCHEDULER_2].inputs.scheduler = scheduler;
 
-  // 6. Modelos: UNet y CLIP
+  // 6. Modelos: UNet, CLIP y VAE Vídeo
   const unet = $("unetModel")?.value;
   if(unet && g[N.UNET]?.inputs) g[N.UNET].inputs.unet_name = unet;
   const clip = $("clipModel")?.value;
   if(clip && g[N.CLIP]?.inputs) g[N.CLIP].inputs.clip_name = clip;
+  const vae = $("vaeModel")?.value;
+  if(vae && g[N.VAE_VID]?.inputs) g[N.VAE_VID].inputs.vae_name = vae;
 
   // 7. Pipeline de Modelo Base & Optimizaciones H3
   const backendState = j?.attentionBackend || getAttentionBackendState();
@@ -3943,6 +3953,11 @@ window.addEventListener("DOMContentLoaded", () => {
     const sel = $("clipModel");
     const defaultClip = BASE_GRAPH[N.CLIP]?.inputs?.clip_name || "";
     sel.innerHTML = AVAILABLE_CLIPS.map(m => `<option value="${m}" ${m === defaultClip ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
+  }
+  if(typeof AVAILABLE_VAES !== "undefined" && $("vaeModel")){
+    const sel = $("vaeModel");
+    const defaultVae = BASE_GRAPH[N.VAE_VID]?.inputs?.vae_name || "";
+    sel.innerHTML = AVAILABLE_VAES.map(m => `<option value="${m}" ${m === defaultVae ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
   }
   if(typeof AVAILABLE_LORAS !== "undefined"){
     ["lora1Select", "lora2Select"].forEach(id => {

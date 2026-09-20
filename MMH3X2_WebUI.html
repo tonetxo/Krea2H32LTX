@@ -861,6 +861,10 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <label>CLIP / Text Encoder</label>
           <select id="clipModel"><option value="">Cargando CLIPs...</option></select>
         </div>
+        <div class="row">
+          <label>VAE Vídeo</label>
+          <select id="vaeModel"><option value="">Cargando VAE...</option></select>
+        </div>
 
         <!-- LoRA 1 -->
         <div class="lora-slot" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
@@ -2439,7 +2443,7 @@ const BASE_GRAPH = {
 };
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["h3/H3-PK-Parasyte-Turbo.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/SexGod_NaughtyTimes_v3_rank64_unpruned.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors"];
-const AVAILABLE_VAES = ["lighttaew2_2.safetensors", "taeh3.safetensors", "taeltx2_3.safetensors", "taeltx_2.safetensors"];
+const AVAILABLE_VAES = ["MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors"];
 const AVAILABLE_UNETS = ["boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ernie/ernie-image-turbo.safetensors", "ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "minimax_music3_dit_int8_convrot.safetensors", "minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "minimaxh3/Minimax-h3_Singularity_ref2va_v1.3_Pruned_w4a8.safetensors", "minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "seedvr2_3b_int8_convrot.safetensors", "zimage/z_image_turbo_bf16.safetensors"];
 const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
@@ -4838,6 +4842,7 @@ CONFIG.variantMeta = function(){
   const scheduler = $("schedulerName")?.value || "simple";
   const unet = $("unetModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.UNET]?.inputs?.unet_name?.split('/')?.pop() || "";
   const clip = $("clipModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.CLIP]?.inputs?.clip_name?.split('/')?.pop() || "";
+  const vae = $("vaeModel")?.value?.split('/')?.pop() || BASE_GRAPH?.[N.VAE_VID]?.inputs?.vae_name?.split('/')?.pop() || "";
   const w = $("width")?.value || "1280";
   const h = $("height")?.value || "720";
   const rMode = $("rifeMultiplier")?.value || "2";
@@ -4856,12 +4861,13 @@ CONFIG.variantMeta = function(){
   else if(audioMode === "passthrough") audioDesc = "Pista Directa Final (BGM limpio)";
     else if(audioMode === "hybrid") audioDesc = `Híbrido (IA puro seg1/seg2; final: pista ${$("audioUserVolume")?.value ?? "-12"} dB + IA ${$("audioGuideVolume")?.value ?? "-6"} dB)`;
 
-  const audioCfOn = $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : true;
-  const audioCfSec = parseFloat($("audioCrossfadeSlider")?.value || "0.40").toFixed(2);
+  const audioCfOn = $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : false;
+  const audioCfSec = $("audioCrossfadeSlider") ? parseFloat($("audioCrossfadeSlider").value).toFixed(2) : "1.00";
 
   const rows = [
     ["Modelo", unet],
     ["CLIP", clip],
+    ["VAE Vídeo", vae],
     ["Prompt Seg 1", p1 ? (p1.length > 80 ? p1.slice(0, 77) + "..." : p1) : "(vacío)"],
     ["Prompt Seg 2", p2 ? (p2.length > 80 ? p2.slice(0, 77) + "..." : p2) : `[${seg2Mode}]`],
     ["Modo Seg 2", seg2Mode === "ollama" ? "Guía Ollama (continuación)" : "Prompt Directo"],
@@ -5714,14 +5720,18 @@ function applyWorkflow(workflow){
     $("schedulerName").value = schedNode.inputs.scheduler;
   }
 
-  // 9. Modelos UNet & CLIP
-  const unetNode = workflow["14"] || workflow["10"] || findByClass("UNETLoader");
+  // 9. Modelos UNet, CLIP & VAE Vídeo
+  const unetNode = workflow["14"] || workflow["10"] || workflow[N.UNET] || findByClass("UNETLoader");
   if(unetNode?.inputs?.unet_name && $("unetModel")){
     $("unetModel").value = unetNode.inputs.unet_name;
   }
-  const clipNode = workflow["11"] || findByClass("CLIPLoader");
+  const clipNode = workflow["11"] || workflow[N.CLIP] || findByClass("CLIPLoader");
   if(clipNode?.inputs?.clip_name && $("clipModel")){
     $("clipModel").value = clipNode.inputs.clip_name;
+  }
+  const vaeNode = workflow[N.VAE_VID] || workflow["8"] || findByClass("VAELoader");
+  if(vaeNode?.inputs?.vae_name && $("vaeModel")){
+    $("vaeModel").value = vaeNode.inputs.vae_name;
   }
 
   // 10. Optimizaciones de atención MMH3X2
@@ -6106,6 +6116,7 @@ function saveSettings(){
     scheduler: $("schedulerName")?.value || "simple",
     unetModel: $("unetModel")?.value || "",
     clipModel: $("clipModel")?.value || "",
+    vaeModel: $("vaeModel")?.value || "",
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: IS_BLOCKATT ? getAttentionOptimizerState() : null,
     h3opt: getH3OptState(),
@@ -6203,6 +6214,7 @@ function restoreSettings(){
 
     if(s.unetModel && $("unetModel")) $("unetModel").value = s.unetModel;
     if(s.clipModel && $("clipModel")) $("clipModel").value = s.clipModel;
+    if(s.vaeModel && $("vaeModel")) $("vaeModel").value = s.vaeModel;
 
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
     if(IS_BLOCKATT){
@@ -6315,7 +6327,7 @@ function attachAutoSaveListeners(){
   const baseIds = [
     "prompt", "prompt2", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
-    "unetModel", "clipModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
+    "unetModel", "clipModel", "vaeModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
     "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
@@ -6931,11 +6943,13 @@ function buildGraph(j){
   if(g[N.SCHEDULER_1]?.inputs) g[N.SCHEDULER_1].inputs.scheduler = scheduler;
   if(g[N.SCHEDULER_2]?.inputs) g[N.SCHEDULER_2].inputs.scheduler = scheduler;
 
-  // 6. Modelos: UNet y CLIP
+  // 6. Modelos: UNet, CLIP y VAE Vídeo
   const unet = $("unetModel")?.value;
   if(unet && g[N.UNET]?.inputs) g[N.UNET].inputs.unet_name = unet;
   const clip = $("clipModel")?.value;
   if(clip && g[N.CLIP]?.inputs) g[N.CLIP].inputs.clip_name = clip;
+  const vae = $("vaeModel")?.value;
+  if(vae && g[N.VAE_VID]?.inputs) g[N.VAE_VID].inputs.vae_name = vae;
 
   // 7. Pipeline de Modelo Base & Optimizaciones H3
   const backendState = j?.attentionBackend || getAttentionBackendState();
@@ -8305,6 +8319,11 @@ window.addEventListener("DOMContentLoaded", () => {
     const sel = $("clipModel");
     const defaultClip = BASE_GRAPH[N.CLIP]?.inputs?.clip_name || "";
     sel.innerHTML = AVAILABLE_CLIPS.map(m => `<option value="${m}" ${m === defaultClip ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
+  }
+  if(typeof AVAILABLE_VAES !== "undefined" && $("vaeModel")){
+    const sel = $("vaeModel");
+    const defaultVae = BASE_GRAPH[N.VAE_VID]?.inputs?.vae_name || "";
+    sel.innerHTML = AVAILABLE_VAES.map(m => `<option value="${m}" ${m === defaultVae ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
   }
   if(typeof AVAILABLE_LORAS !== "undefined"){
     ["lora1Select", "lora2Select"].forEach(id => {

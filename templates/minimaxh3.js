@@ -299,6 +299,7 @@ setBlockSparseUI(_blockSparseState);
 $("attentionBackend")?.addEventListener("change", () => { saveAttentionBackend(getAttentionBackendState()); scheduleSaveH3Settings(); });
 $("unetSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("clipSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
+$("vaeSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("samplerName")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("schedulerName")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("filenamePrefix")?.addEventListener("input", () => scheduleSaveH3Settings());
@@ -421,6 +422,7 @@ function saveH3Settings(){
     frames: $("frames")?.value || "243",
     unet: $("unetSelect")?.value || "",
     clip: $("clipSelect")?.value || "",
+    vae: $("vaeSelect")?.value || "",
     samplerName: $("samplerName")?.value || "res_multistep",
     schedulerName: $("schedulerName")?.value || "simple",
     steps: $("stepsSlider")?.value || "20",
@@ -460,6 +462,7 @@ function restoreH3Settings(){
     if(s.frames !== undefined && $("frames")) $("frames").value = s.frames;
     if(s.unet && $("unetSelect")) $("unetSelect").value = s.unet;
     if(s.clip && $("clipSelect")) $("clipSelect").value = s.clip;
+    if(s.vae && $("vaeSelect")) $("vaeSelect").value = s.vae;
     if(s.samplerName && $("samplerName")) $("samplerName").value = s.samplerName;
     if(s.schedulerName && $("schedulerName")) $("schedulerName").value = s.schedulerName;
     if(s.steps !== undefined && $("stepsSlider")){ $("stepsSlider").value = s.steps; $("stepsVal").textContent = s.steps; }
@@ -1163,10 +1166,12 @@ CONFIG.variantMeta = function(){
   const he = parseInt($("height")?.value || "640", 10);
   const unet = ($("unetSelect")?.value || BASE_GRAPH?.[N.UNET]?.inputs?.unet_name || "").split('/').pop() || "";
   const clip = ($("clipSelect")?.value || BASE_GRAPH?.[N.CLIP]?.inputs?.clip_name || "").split('/').pop() || "";
+  const vae = ($("vaeSelect")?.value || BASE_GRAPH?.[N.VAE_VIDEO]?.inputs?.vae_name || "").split('/').pop() || "";
   const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
   const rows = [
     ["Modelo", unet],
     ["CLIP", clip],
+    ["VAE Vídeo", vae],
     ["LoRAs", activeLoras.length ? activeLoras.join(", ") : "ninguna"],
     ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
@@ -1492,6 +1497,7 @@ function snapshotJob(){
     mp: $("mpSlider").value,
     unet: $("unetSelect")?.value,
     clip: $("clipSelect")?.value,
+    vae: $("vaeSelect")?.value,
     samplerName: $("samplerName")?.value,
     schedulerName: $("schedulerName")?.value,
     steps: $("stepsSlider")?.value,
@@ -1541,6 +1547,7 @@ function restoreJob(job){
   $("mpVal").textContent = parseFloat(job.mp).toFixed(2);
   if($("unetSelect") && job.unet) $("unetSelect").value = job.unet;
   if($("clipSelect") && job.clip) $("clipSelect").value = job.clip;
+  if($("vaeSelect") && job.vae) $("vaeSelect").value = job.vae;
   if($("samplerName") && job.samplerName) $("samplerName").value = job.samplerName;
   if($("schedulerName") && job.schedulerName) $("schedulerName").value = job.schedulerName;
   if($("stepsSlider") && job.steps){ $("stepsSlider").value = job.steps; $("stepsVal").textContent = job.steps; }
@@ -2002,6 +2009,22 @@ async function applyWorkflow(workflow, opts={}){
   }
   if(clipSet) setApplied("CLIP"); else setMissing("CLIP");
 
+  // VAE Vídeo
+  let vaeSet = false;
+  const vaeNode = (workflow && workflow[N.VAE_VIDEO]) || findByClass("VAELoader");
+  if(vaeNode && vaeNode.inputs && vaeNode.inputs.vae_name){
+    const name = vaeNode.inputs.vae_name;
+    const sel = $("vaeSelect");
+    if(sel){
+      for(const opt of sel.options){
+        if(opt.value === name || name.endsWith("/"+opt.value) || opt.value.endsWith(name)){
+          opt.selected = true; vaeSet = true; break;
+        }
+      }
+    }
+  }
+  if(vaeSet) setApplied("VAE Vídeo"); else setMissing("VAE Vídeo");
+
   // LoRAs
   const loraNodesFound = findAllByClass("LoraLoaderModelOnly").concat(findAllByClass("LoraLoader"));
   if(loraNodesFound.length > 0){
@@ -2304,14 +2327,33 @@ function loadClips(){
 }
 loadClips();
 
+function loadVaes(){
+  const sel = $("vaeSelect");
+  if(!sel) return;
+  sel.innerHTML = "";
+  for(const v of (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : [])){
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = v;
+    sel.appendChild(opt);
+  }
+  const defaultVae = BASE_GRAPH[N.VAE_VIDEO]?.inputs?.vae_name || (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES[0] : "") || "";
+  if(defaultVae && Array.from(sel.options).some(o => o.value === defaultVae)) sel.value = defaultVae;
+}
+loadVaes();
+
 function setDefaultSelectors(){
   const availableU = typeof AVAILABLE_UNETS !== "undefined" ? AVAILABLE_UNETS : [];
   const fbU = availableU.find(u => u.includes("convrot")) || availableU.find(u => u.includes("minimax")) || availableU[0] || "";
   const fbC = "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors";
+  const availableV = typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : [];
+  const fbV = BASE_GRAPH[N.VAE_VIDEO]?.inputs?.vae_name || availableV[0] || "";
   const unetSel = $("unetSelect");
   const clipSel = $("clipSelect");
+  const vaeSel = $("vaeSelect");
   if(unetSel && (!unetSel.value || unetSel.value === "") && fbU) unetSel.value = fbU;
   if(clipSel && clipSel.value !== fbC && Array.from(clipSel.options).some(o => o.value === fbC)) clipSel.value = fbC;
+  if(vaeSel && (!vaeSel.value || vaeSel.value === "") && fbV) vaeSel.value = fbV;
 }
 
 function loadInterpModels(){
@@ -2884,11 +2926,13 @@ function buildGraph(job){
   // Duración (segundos) → nodo PrimitiveFloat 132
   g[N.DURATION].inputs.value = parseFloat((j ? j.duration : $("duration").value) || "10");
 
-  // UNet & CLIP
+  // UNet, CLIP & VAE Video
   const unetVal = (j ? j.unet : $("unetSelect")?.value) || "";
   const clipVal = (j ? j.clip : $("clipSelect")?.value) || "";
+  const vaeVal = (j ? j.vae : $("vaeSelect")?.value) || "";
   if(g[N.UNET] && g[N.UNET].inputs && unetVal) g[N.UNET].inputs.unet_name = unetVal;
   if(g[N.CLIP] && g[N.CLIP].inputs && clipVal) g[N.CLIP].inputs.clip_name = clipVal;
+  if(g[N.VAE_VIDEO] && g[N.VAE_VIDEO].inputs && vaeVal) g[N.VAE_VIDEO].inputs.vae_name = vaeVal;
 
   const modeVal = j ? j.mode : currentMode;
   if(modeVal === "r2v"){

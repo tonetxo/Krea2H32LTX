@@ -129,7 +129,20 @@ def generate_html(config):
         lora_files = get_lora_list(config.get('lora_dir'), fallback=config.get('lora_fallback'))
     lora_js_array = json.dumps(lora_files)
 
-    vae_files = get_vae_list(config.get('vae_dir'), fallback=config.get('vae_fallback'))
+    if config.get('vae_dirs'):
+        raw_vaes = get_file_list(config['vae_dirs'], fallback=config.get('vae_fallback'))
+    else:
+        raw_vaes = get_vae_list(config.get('vae_dir'), fallback=config.get('vae_fallback'))
+    vae_exclude = config.get('vae_exclude', ())
+    vae_include = config.get('vae_include', None)
+    if vae_include:
+        vae_files = [
+            v for v in raw_vaes
+            if any(inc.lower() in v.lower() for inc in vae_include)
+            and not any(x in v for x in vae_exclude)
+        ]
+    else:
+        vae_files = [v for v in raw_vaes if not any(x in v for x in vae_exclude)]
     vae_js_array = json.dumps(vae_files)
 
     # --- UNet / CLIP lists (optional, used by MiniMaxH3) ---
