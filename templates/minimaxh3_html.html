@@ -213,6 +213,22 @@
       <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple" selected>simple (recomendado H3)</option><option value="sgm_uniform">sgm_uniform</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="ddim_uniform">ddim_uniform</option><option value="beta">beta</option><option value="normal">normal</option><option value="linear_quadratic">linear_quadratic</option><option value="kl_optimal">kl_optimal</option><option value="capitanZiT">capitanZiT</option><option value="bong_tangent">bong_tangent</option><option value="beta57">beta57</option><option value="beta_33">beta_33</option><option value="beta_44">beta_44</option><option value="beta_53">beta_53</option><option value="beta_54">beta_54</option><option value="beta_57">beta_57</option><option value="beta_32">beta_32</option><option value="beta_43">beta_43</option><option value="beta_42">beta_42</option><option value="power_shift">power_shift</option><option value="radiance_shift">radiance_shift</option><option value="sigma_curve_from_points">sigma_curve_from_points</option><option value="sigma_curve_pchip">sigma_curve_pchip</option><option value="sigmoid_offset">sigmoid_offset</option></select></div></div>
       <div class="panel"><h2>Steps</h2><div class="row slider-row"><input type="range" id="stepsSlider" min="1" max="50" step="1" value="20"><div class="slider-val" id="stepsVal">20</div></div></div>
       <div class="panel">
+        <h2>Latent Upscaler 3D (MiniMax H3)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segLatentUpscaleOn" data-value="true">Activo</div>
+          <div class="seg on" id="segLatentUpscaleOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="latentUpscaleControls" style="display:none; margin-top:8px;">
+          <div class="row slider-row">
+            <label>Multiplicador de escala <span class="hint" id="latentScaleHint">(1.50x)</span></label>
+            <input type="range" id="latentScaleSlider" min="1.0" max="2.0" step="0.05" value="1.5">
+            <div class="slider-val" id="latentScaleVal">1.50x</div>
+          </div>
+          <div class="hint" id="latentResHint" style="margin-top:4px;font-size:10px;">Latent nativo: 1120×640 px (sin escalado)</div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Escala el espacio latente antes de decodificar VAE con red 3D temporal. Incluye chunking y descarga automática de VRAM (force_unload) para evitar OOM.</div>
+      </div>
+      <div class="panel">
         <h2>Interpolación de Frames (RIFE)</h2>
         <div class="seed-toggle">
           <div class="seg on" id="segRifeOn" data-value="true">Activo</div>

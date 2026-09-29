@@ -542,5 +542,26 @@
     "_meta": {
       "title": "H3 Memory Optimization"
     }
+  },
+  "165": {
+    "inputs": {
+      "latent": [
+        "125",
+        0
+      ],
+      "model_name": "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",
+      "mode": "scale by multiplier",
+      "mode.scale": 1.5,
+      "scale": 1.5,
+      "align": 32,
+      "enable_temporal_chunking": true,
+      "force_unload": true,
+      "device": "cuda",
+      "precision": "bf16"
+    },
+    "class_type": "MinimaxH3LatentUpscaler3D",
+    "_meta": {
+      "title": "MiniMax H3 Latent Upscaler (3D)"
+    }
   }
 }

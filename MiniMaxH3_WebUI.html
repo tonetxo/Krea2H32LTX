@@ -708,6 +708,22 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple" selected>simple (recomendado H3)</option><option value="sgm_uniform">sgm_uniform</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="ddim_uniform">ddim_uniform</option><option value="beta">beta</option><option value="normal">normal</option><option value="linear_quadratic">linear_quadratic</option><option value="kl_optimal">kl_optimal</option><option value="capitanZiT">capitanZiT</option><option value="bong_tangent">bong_tangent</option><option value="beta57">beta57</option><option value="beta_33">beta_33</option><option value="beta_44">beta_44</option><option value="beta_53">beta_53</option><option value="beta_54">beta_54</option><option value="beta_57">beta_57</option><option value="beta_32">beta_32</option><option value="beta_43">beta_43</option><option value="beta_42">beta_42</option><option value="power_shift">power_shift</option><option value="radiance_shift">radiance_shift</option><option value="sigma_curve_from_points">sigma_curve_from_points</option><option value="sigma_curve_pchip">sigma_curve_pchip</option><option value="sigmoid_offset">sigmoid_offset</option></select></div></div>
       <div class="panel"><h2>Steps</h2><div class="row slider-row"><input type="range" id="stepsSlider" min="1" max="50" step="1" value="20"><div class="slider-val" id="stepsVal">20</div></div></div>
       <div class="panel">
+        <h2>Latent Upscaler 3D (MiniMax H3)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segLatentUpscaleOn" data-value="true">Activo</div>
+          <div class="seg on" id="segLatentUpscaleOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="latentUpscaleControls" style="display:none; margin-top:8px;">
+          <div class="row slider-row">
+            <label>Multiplicador de escala <span class="hint" id="latentScaleHint">(1.50x)</span></label>
+            <input type="range" id="latentScaleSlider" min="1.0" max="2.0" step="0.05" value="1.5">
+            <div class="slider-val" id="latentScaleVal">1.50x</div>
+          </div>
+          <div class="hint" id="latentResHint" style="margin-top:4px;font-size:10px;">Latent nativo: 1120×640 px (sin escalado)</div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Escala el espacio latente antes de decodificar VAE con red 3D temporal. Incluye chunking y descarga automática de VRAM (force_unload) para evitar OOM.</div>
+      </div>
+      <div class="panel">
         <h2>Interpolación de Frames (RIFE)</h2>
         <div class="seed-toggle">
           <div class="seg on" id="segRifeOn" data-value="true">Activo</div>
@@ -1375,12 +1391,33 @@ const BASE_GRAPH = {
     "_meta": {
       "title": "H3 Memory Optimization"
     }
+  },
+  "165": {
+    "inputs": {
+      "latent": [
+        "125",
+        0
+      ],
+      "model_name": "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",
+      "mode": "scale by multiplier",
+      "mode.scale": 1.5,
+      "scale": 1.5,
+      "align": 32,
+      "enable_temporal_chunking": true,
+      "force_unload": true,
+      "device": "cuda",
+      "precision": "bf16"
+    },
+    "class_type": "MinimaxH3LatentUpscaler3D",
+    "_meta": {
+      "title": "MiniMax H3 Latent Upscaler (3D)"
+    }
   }
 };
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["h3/H3-PK-Parasyte-Turbo.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-3step-ComfyUI.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors"];
 const AVAILABLE_VAES = ["MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors"];
-const AVAILABLE_UNETS = ["boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ernie/ernie-image-turbo.safetensors", "ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "minimax_music3_dit_int8_convrot.safetensors", "minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "minimaxh3/Minimax-h3_Singularity_ref2va_v1.3_Pruned_w4a8.safetensors", "minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "seedvr2_3b_int8_convrot.safetensors", "zimage/z_image_turbo_bf16.safetensors"];
+const AVAILABLE_UNETS = ["boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ernie/ernie-image-turbo.safetensors", "ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "minimax_music3_dit_int8_convrot.safetensors", "minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "seedvr2_3b_int8_convrot.safetensors", "zimage/z_image_turbo_bf16.safetensors"];
 const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
 const LTXV_UI_PORT = "8002";
@@ -2554,6 +2591,26 @@ async function loadEnhancerModels(){
     });
     sel.dataset.listenerBound = "true";
   }
+
+  // Sincronizar selector de Prompt 2 (seg2OllamaModel) si existe en la página
+  const selSeg2 = $("seg2OllamaModel");
+  if(selSeg2){
+    const prevSeg2 = selSeg2.value || (JSON.parse(localStorage.getItem(typeof MMH3X2_SETTINGS_KEY !== "undefined" ? MMH3X2_SETTINGS_KEY : "mmh3x2_settings") || "{}")).seg2OllamaModel || "";
+    selSeg2.innerHTML = '<option value="">-- Mismo que Enhancer / Default --</option>';
+    for(const child of sel.children){
+      if(child.tagName === "OPTGROUP" || (child.tagName === "OPTION" && child.value)){
+        selSeg2.appendChild(child.cloneNode(true));
+      }
+    }
+    if(prevSeg2){
+      for(const opt of selSeg2.querySelectorAll("option")){
+        if(opt.value === prevSeg2 || opt.value.endsWith(":" + prevSeg2)){
+          selSeg2.value = opt.value;
+          break;
+        }
+      }
+    }
+  }
 }
 
 function renderSysPromptEditor(){
@@ -3537,7 +3594,7 @@ const CONFIG = {
     ATTN_BACKEND:"147", BLOCK_SPARSE:"190", AIMDO:"191",
     NOISE:"129", DURATION:"132", MATH:"131",
     SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
-    SAMPLER:"125", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
+    SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
     RIFE_LOADER:"180", RIFE_INTERP:"181",
     RTX_SR:"148", CREATE_VIDEO:"130", SAVE:"92",
   },
@@ -3680,6 +3737,10 @@ const MINIMAXH3_SETTINGS_KEY = "minimaxh3_ui_settings_v1";
 const MINIMAXH3_DB_NAME = "minimaxh3_media_db";
 const MINIMAXH3_STORE_NAME = "slots";
 let currentMode = "i2v"; // "i2v" | "flf2v" | "r2v"
+let arMode = "auto"; // "auto" | "16:9"
+let imageNativeAspectRatio = 16 / 9;
+let rawInputImageWidth = 0;
+let rawInputImageHeight = 0;
 window.currentBatchMode = false;
 let jobQueue = [];
 let activeJob = null;
@@ -3951,6 +4012,7 @@ function saveH3Settings(){
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
+    latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
@@ -3989,6 +4051,7 @@ function restoreH3Settings(){
     if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
     if(s.sigmaShift){ setSigmaShiftUI(s.sigmaShift); saveSigmaShift(s.sigmaShift); }
     if(s.spectrum){ setSpectrumUI(s.spectrum); saveSpectrum(s.spectrum); }
+    if(s.latentUpscale){ setLatentUpscaleUI(s.latentUpscale); saveLatentUpscale(s.latentUpscale); }
     if(s.rife){ setRifeUI(s.rife); saveRife(s.rife); }
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
     if(s.attentionOptimizer){ setAttentionOptimizerUI(s.attentionOptimizer.mode); saveAttentionOptimizer(s.attentionOptimizer); }
@@ -4080,6 +4143,65 @@ $("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").t
 $("segBootstrapOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("segBootstrapOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); scheduleSaveH3Settings(); });
+
+// --- LATENT UPSCALER 3D (MiniMax H3) ---
+const LATENT_UPSCALE_KEY = "minimaxh3_latent_upscale_state";
+const LATENT_UPSCALE_DEFAULTS = { enabled: false, scale: 1.5 };
+function loadLatentUpscale(){
+  try { return Object.assign({}, LATENT_UPSCALE_DEFAULTS, JSON.parse(localStorage.getItem(LATENT_UPSCALE_KEY) || "{}")); }
+  catch(_) { return {...LATENT_UPSCALE_DEFAULTS}; }
+}
+function saveLatentUpscale(s){ try { localStorage.setItem(LATENT_UPSCALE_KEY, JSON.stringify(s)); } catch(_){} }
+function getLatentUpscaleState(){
+  return {
+    enabled: $("segLatentUpscaleOn")?.classList.contains("on") ?? false,
+    scale: parseFloat($("latentScaleSlider")?.value || "1.5")
+  };
+}
+function setLatentUpscaleUI(s){
+  const on = $("segLatentUpscaleOn"), off = $("segLatentUpscaleOff");
+  const panel = $("latentUpscaleControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("latentScaleSlider")){
+    const sc = parseFloat(s.scale != null ? s.scale : 1.5);
+    $("latentScaleSlider").value = sc;
+    if($("latentScaleVal")) $("latentScaleVal").textContent = sc.toFixed(2) + "x";
+    if($("latentScaleHint")) $("latentScaleHint").textContent = `(${sc.toFixed(2)}x)`;
+  }
+}
+const _latentUpscaleState = loadLatentUpscale();
+setLatentUpscaleUI(_latentUpscaleState);
+$("segLatentUpscaleOn")?.addEventListener("click", () => {
+  const s = getLatentUpscaleState();
+  s.enabled = true;
+  setLatentUpscaleUI(s);
+  saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+  if(typeof recalcResolution === "function") recalcResolution();
+});
+$("segLatentUpscaleOff")?.addEventListener("click", () => {
+  const s = getLatentUpscaleState();
+  s.enabled = false;
+  setLatentUpscaleUI(s);
+  saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+  if(typeof recalcResolution === "function") recalcResolution();
+});
+$("latentScaleSlider")?.addEventListener("input", (e) => {
+  const sc = parseFloat(e.target.value) || 1.5;
+  if($("latentScaleVal")) $("latentScaleVal").textContent = sc.toFixed(2) + "x";
+  if($("latentScaleHint")) $("latentScaleHint").textContent = `(${sc.toFixed(2)}x)`;
+  const s = { enabled: $("segLatentUpscaleOn")?.classList.contains("on") ?? false, scale: sc };
+  saveLatentUpscale(s);
+  if(typeof recalcResolution === "function") recalcResolution();
+  scheduleSaveH3Settings();
+});
 
 // --- FRAME INTERPOLATION (RIFE) ---
 const RIFE_KEY = "minimaxh3_rife_state";
@@ -4621,10 +4743,6 @@ async function prepareRefAudio(i, force = false){
 
 // --- ASPECT RATIO MODE (Auto vs Forzar 16:9) ---
 const AR_MODE_KEY = "minimaxh3_ar_mode";
-let arMode = "auto"; // "auto" | "16:9"
-let imageNativeAspectRatio = 16 / 9;
-let rawInputImageWidth = 0;
-let rawInputImageHeight = 0;
 
 function updateArLabel(w, h){
   const auto = $("segArAuto");
@@ -4907,10 +5025,30 @@ function recalcResolution(){
   $("width").value = w;
   $("height").value = h;
   $("mpVal").textContent = mp.toFixed(2);
-  const finalW = w * 2;
-  const finalH = h * 2;
+
+  const latentState = (typeof getLatentUpscaleState === "function") ? getLatentUpscaleState() : { enabled: false, scale: 1.5 };
+  const latentScale = latentState.enabled ? latentState.scale : 1.0;
+  const latentW = latentState.enabled ? nearest32(w * latentScale) : w;
+  const latentH = latentState.enabled ? nearest32(h * latentScale) : h;
+
+  if($("latentResHint")){
+    if(latentState.enabled){
+      $("latentResHint").textContent = `Latent: ${w}×${h} → ~${latentW}×${latentH} px (${latentScale.toFixed(2)}x)`;
+    } else {
+      $("latentResHint").textContent = `Latent nativo: ${w}×${h} px (sin escalado)`;
+    }
+  }
+
+  const finalW = latentW * 2;
+  const finalH = latentH * 2;
   const currentRatioName = getFriendlyRatio(w, h);
-  if($("resFinalHint")) $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras RTX 2x`;
+  if($("resFinalHint")){
+    if(latentState.enabled){
+      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras Latent ${latentScale.toFixed(2)}x + RTX 2x`;
+    } else {
+      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras RTX 2x`;
+    }
+  }
   updateArLabel(rawInputImageWidth, rawInputImageHeight);
 }
 
@@ -5026,6 +5164,7 @@ function snapshotJob(){
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
+    latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
@@ -5072,6 +5211,7 @@ function restoreJob(job){
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
   if(job.spectrum){ setSpectrumUI(job.spectrum); saveSpectrum(job.spectrum); }
+  if(job.latentUpscale){ setLatentUpscaleUI(job.latentUpscale); saveLatentUpscale(job.latentUpscale); }
   if(job.rife){ setRifeUI(job.rife); saveRife(job.rife); }
   if(job.attentionBackend){ setAttentionBackendUI(job.attentionBackend); saveAttentionBackend(job.attentionBackend); }
   if(job.attentionOptimizer){ setAttentionOptimizerUI(job.attentionOptimizer.mode); saveAttentionOptimizer(job.attentionOptimizer); }
@@ -5750,6 +5890,23 @@ async function applyWorkflow(workflow, opts={}){
     }
   }
   if(!bitDepthSet) setMissing("profundidad de color");
+
+  // Latent Upscaler 3D
+  const latentUpNode = findByClass("MinimaxH3LatentUpscaler3D");
+  if(latentUpNode && latentUpNode.inputs){
+    let sc = 1.5;
+    if(typeof latentUpNode.inputs.scale === "number") sc = latentUpNode.inputs.scale;
+    else if(typeof latentUpNode.inputs["mode.scale"] === "number") sc = latentUpNode.inputs["mode.scale"];
+    else if(latentUpNode.inputs.mode && typeof latentUpNode.inputs.mode === "object" && typeof latentUpNode.inputs.mode.scale === "number") sc = latentUpNode.inputs.mode.scale;
+    const lu = { enabled: true, scale: sc };
+    setLatentUpscaleUI(lu);
+    saveLatentUpscale(lu);
+    setApplied(`latent upscaler 3D (${sc.toFixed(2)}x)`);
+  } else if(latentUpNode === null){
+    const lu = { enabled: false, scale: 1.5 };
+    setLatentUpscaleUI(lu);
+    saveLatentUpscale(lu);
+  }
 
   updateDurationHints();
 
@@ -6788,6 +6945,40 @@ function buildGraph(job){
   const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "video/MiniMax_H3";
   if(g[N.SAVE] && g[N.SAVE].inputs){
     g[N.SAVE].inputs.filename_prefix = prefix;
+  }
+
+  // 9b. Latent Upscaler 3D (MiniMax H3) — se conecta entre SAMPLER y DECODE_VIDEO
+  const latentState = j ? j.latentUpscale : getLatentUpscaleState();
+  const latentUpscaleEnabled = latentState ? latentState.enabled : false;
+  const latentScale = latentState ? parseFloat(latentState.scale || "1.5") : 1.5;
+
+  if(latentUpscaleEnabled){
+    g[N.LATENT_UPSCALE] = {
+      inputs: {
+        latent: [N.SAMPLER, 0],
+        model_name: "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",
+        mode: "scale by multiplier",
+        "mode.scale": latentScale,
+        scale: latentScale,
+        align: 32,
+        enable_temporal_chunking: true,
+        force_unload: true,
+        device: "cuda",
+        precision: "bf16"
+      },
+      class_type: "MinimaxH3LatentUpscaler3D",
+      _meta: {
+        title: "MiniMax H3 Latent Upscaler (3D)"
+      }
+    };
+    if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
+      g[N.DECODE_VIDEO].inputs.samples = [N.LATENT_UPSCALE, 0];
+    }
+  } else {
+    delete g[N.LATENT_UPSCALE];
+    if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
+      g[N.DECODE_VIDEO].inputs.samples = [N.SAMPLER, 0];
+    }
   }
 
   // 10. Frame Interpolation (RIFE) — se conecta ANTES de RTXVideoSuperResolution

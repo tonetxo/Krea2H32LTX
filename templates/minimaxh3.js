@@ -19,7 +19,7 @@ const CONFIG = {
     ATTN_BACKEND:"147", BLOCK_SPARSE:"190", AIMDO:"191",
     NOISE:"129", DURATION:"132", MATH:"131",
     SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
-    SAMPLER:"125", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
+    SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
     RIFE_LOADER:"180", RIFE_INTERP:"181",
     RTX_SR:"148", CREATE_VIDEO:"130", SAVE:"92",
   },
@@ -162,6 +162,10 @@ const MINIMAXH3_SETTINGS_KEY = "minimaxh3_ui_settings_v1";
 const MINIMAXH3_DB_NAME = "minimaxh3_media_db";
 const MINIMAXH3_STORE_NAME = "slots";
 let currentMode = "i2v"; // "i2v" | "flf2v" | "r2v"
+let arMode = "auto"; // "auto" | "16:9"
+let imageNativeAspectRatio = 16 / 9;
+let rawInputImageWidth = 0;
+let rawInputImageHeight = 0;
 window.currentBatchMode = false;
 let jobQueue = [];
 let activeJob = null;
@@ -433,6 +437,7 @@ function saveH3Settings(){
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
+    latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
@@ -471,6 +476,7 @@ function restoreH3Settings(){
     if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
     if(s.sigmaShift){ setSigmaShiftUI(s.sigmaShift); saveSigmaShift(s.sigmaShift); }
     if(s.spectrum){ setSpectrumUI(s.spectrum); saveSpectrum(s.spectrum); }
+    if(s.latentUpscale){ setLatentUpscaleUI(s.latentUpscale); saveLatentUpscale(s.latentUpscale); }
     if(s.rife){ setRifeUI(s.rife); saveRife(s.rife); }
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
     if(s.attentionOptimizer){ setAttentionOptimizerUI(s.attentionOptimizer.mode); saveAttentionOptimizer(s.attentionOptimizer); }
@@ -562,6 +568,65 @@ $("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").t
 $("segBootstrapOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("segBootstrapOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); scheduleSaveH3Settings(); });
+
+// --- LATENT UPSCALER 3D (MiniMax H3) ---
+const LATENT_UPSCALE_KEY = "minimaxh3_latent_upscale_state";
+const LATENT_UPSCALE_DEFAULTS = { enabled: false, scale: 1.5 };
+function loadLatentUpscale(){
+  try { return Object.assign({}, LATENT_UPSCALE_DEFAULTS, JSON.parse(localStorage.getItem(LATENT_UPSCALE_KEY) || "{}")); }
+  catch(_) { return {...LATENT_UPSCALE_DEFAULTS}; }
+}
+function saveLatentUpscale(s){ try { localStorage.setItem(LATENT_UPSCALE_KEY, JSON.stringify(s)); } catch(_){} }
+function getLatentUpscaleState(){
+  return {
+    enabled: $("segLatentUpscaleOn")?.classList.contains("on") ?? false,
+    scale: parseFloat($("latentScaleSlider")?.value || "1.5")
+  };
+}
+function setLatentUpscaleUI(s){
+  const on = $("segLatentUpscaleOn"), off = $("segLatentUpscaleOff");
+  const panel = $("latentUpscaleControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("latentScaleSlider")){
+    const sc = parseFloat(s.scale != null ? s.scale : 1.5);
+    $("latentScaleSlider").value = sc;
+    if($("latentScaleVal")) $("latentScaleVal").textContent = sc.toFixed(2) + "x";
+    if($("latentScaleHint")) $("latentScaleHint").textContent = `(${sc.toFixed(2)}x)`;
+  }
+}
+const _latentUpscaleState = loadLatentUpscale();
+setLatentUpscaleUI(_latentUpscaleState);
+$("segLatentUpscaleOn")?.addEventListener("click", () => {
+  const s = getLatentUpscaleState();
+  s.enabled = true;
+  setLatentUpscaleUI(s);
+  saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+  if(typeof recalcResolution === "function") recalcResolution();
+});
+$("segLatentUpscaleOff")?.addEventListener("click", () => {
+  const s = getLatentUpscaleState();
+  s.enabled = false;
+  setLatentUpscaleUI(s);
+  saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+  if(typeof recalcResolution === "function") recalcResolution();
+});
+$("latentScaleSlider")?.addEventListener("input", (e) => {
+  const sc = parseFloat(e.target.value) || 1.5;
+  if($("latentScaleVal")) $("latentScaleVal").textContent = sc.toFixed(2) + "x";
+  if($("latentScaleHint")) $("latentScaleHint").textContent = `(${sc.toFixed(2)}x)`;
+  const s = { enabled: $("segLatentUpscaleOn")?.classList.contains("on") ?? false, scale: sc };
+  saveLatentUpscale(s);
+  if(typeof recalcResolution === "function") recalcResolution();
+  scheduleSaveH3Settings();
+});
 
 // --- FRAME INTERPOLATION (RIFE) ---
 const RIFE_KEY = "minimaxh3_rife_state";
@@ -1103,10 +1168,6 @@ async function prepareRefAudio(i, force = false){
 
 // --- ASPECT RATIO MODE (Auto vs Forzar 16:9) ---
 const AR_MODE_KEY = "minimaxh3_ar_mode";
-let arMode = "auto"; // "auto" | "16:9"
-let imageNativeAspectRatio = 16 / 9;
-let rawInputImageWidth = 0;
-let rawInputImageHeight = 0;
 
 function updateArLabel(w, h){
   const auto = $("segArAuto");
@@ -1389,10 +1450,30 @@ function recalcResolution(){
   $("width").value = w;
   $("height").value = h;
   $("mpVal").textContent = mp.toFixed(2);
-  const finalW = w * 2;
-  const finalH = h * 2;
+
+  const latentState = (typeof getLatentUpscaleState === "function") ? getLatentUpscaleState() : { enabled: false, scale: 1.5 };
+  const latentScale = latentState.enabled ? latentState.scale : 1.0;
+  const latentW = latentState.enabled ? nearest32(w * latentScale) : w;
+  const latentH = latentState.enabled ? nearest32(h * latentScale) : h;
+
+  if($("latentResHint")){
+    if(latentState.enabled){
+      $("latentResHint").textContent = `Latent: ${w}×${h} → ~${latentW}×${latentH} px (${latentScale.toFixed(2)}x)`;
+    } else {
+      $("latentResHint").textContent = `Latent nativo: ${w}×${h} px (sin escalado)`;
+    }
+  }
+
+  const finalW = latentW * 2;
+  const finalH = latentH * 2;
   const currentRatioName = getFriendlyRatio(w, h);
-  if($("resFinalHint")) $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras RTX 2x`;
+  if($("resFinalHint")){
+    if(latentState.enabled){
+      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras Latent ${latentScale.toFixed(2)}x + RTX 2x`;
+    } else {
+      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras RTX 2x`;
+    }
+  }
   updateArLabel(rawInputImageWidth, rawInputImageHeight);
 }
 
@@ -1508,6 +1589,7 @@ function snapshotJob(){
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
+    latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
@@ -1554,6 +1636,7 @@ function restoreJob(job){
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
   if(job.spectrum){ setSpectrumUI(job.spectrum); saveSpectrum(job.spectrum); }
+  if(job.latentUpscale){ setLatentUpscaleUI(job.latentUpscale); saveLatentUpscale(job.latentUpscale); }
   if(job.rife){ setRifeUI(job.rife); saveRife(job.rife); }
   if(job.attentionBackend){ setAttentionBackendUI(job.attentionBackend); saveAttentionBackend(job.attentionBackend); }
   if(job.attentionOptimizer){ setAttentionOptimizerUI(job.attentionOptimizer.mode); saveAttentionOptimizer(job.attentionOptimizer); }
@@ -2232,6 +2315,23 @@ async function applyWorkflow(workflow, opts={}){
     }
   }
   if(!bitDepthSet) setMissing("profundidad de color");
+
+  // Latent Upscaler 3D
+  const latentUpNode = findByClass("MinimaxH3LatentUpscaler3D");
+  if(latentUpNode && latentUpNode.inputs){
+    let sc = 1.5;
+    if(typeof latentUpNode.inputs.scale === "number") sc = latentUpNode.inputs.scale;
+    else if(typeof latentUpNode.inputs["mode.scale"] === "number") sc = latentUpNode.inputs["mode.scale"];
+    else if(latentUpNode.inputs.mode && typeof latentUpNode.inputs.mode === "object" && typeof latentUpNode.inputs.mode.scale === "number") sc = latentUpNode.inputs.mode.scale;
+    const lu = { enabled: true, scale: sc };
+    setLatentUpscaleUI(lu);
+    saveLatentUpscale(lu);
+    setApplied(`latent upscaler 3D (${sc.toFixed(2)}x)`);
+  } else if(latentUpNode === null){
+    const lu = { enabled: false, scale: 1.5 };
+    setLatentUpscaleUI(lu);
+    saveLatentUpscale(lu);
+  }
 
   updateDurationHints();
 
@@ -3270,6 +3370,40 @@ function buildGraph(job){
   const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "video/MiniMax_H3";
   if(g[N.SAVE] && g[N.SAVE].inputs){
     g[N.SAVE].inputs.filename_prefix = prefix;
+  }
+
+  // 9b. Latent Upscaler 3D (MiniMax H3) — se conecta entre SAMPLER y DECODE_VIDEO
+  const latentState = j ? j.latentUpscale : getLatentUpscaleState();
+  const latentUpscaleEnabled = latentState ? latentState.enabled : false;
+  const latentScale = latentState ? parseFloat(latentState.scale || "1.5") : 1.5;
+
+  if(latentUpscaleEnabled){
+    g[N.LATENT_UPSCALE] = {
+      inputs: {
+        latent: [N.SAMPLER, 0],
+        model_name: "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",
+        mode: "scale by multiplier",
+        "mode.scale": latentScale,
+        scale: latentScale,
+        align: 32,
+        enable_temporal_chunking: true,
+        force_unload: true,
+        device: "cuda",
+        precision: "bf16"
+      },
+      class_type: "MinimaxH3LatentUpscaler3D",
+      _meta: {
+        title: "MiniMax H3 Latent Upscaler (3D)"
+      }
+    };
+    if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
+      g[N.DECODE_VIDEO].inputs.samples = [N.LATENT_UPSCALE, 0];
+    }
+  } else {
+    delete g[N.LATENT_UPSCALE];
+    if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
+      g[N.DECODE_VIDEO].inputs.samples = [N.SAMPLER, 0];
+    }
   }
 
   // 10. Frame Interpolation (RIFE) — se conecta ANTES de RTXVideoSuperResolution
