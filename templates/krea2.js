@@ -1021,6 +1021,36 @@ $("attentionBackend")?.addEventListener("change", (e) => {
   saveKrea2AttnBackend(e.target.value);
 });
 
+const KREA2_KEEP_RAM_KEY = 'krea2_keep_model_in_ram';
+function loadKrea2KeepRam(){
+  try {
+    const val = localStorage.getItem(KREA2_KEEP_RAM_KEY);
+    return val === null ? true : val === "1";
+  } catch(_) { return true; }
+}
+function saveKrea2KeepRam(val){
+  try { localStorage.setItem(KREA2_KEEP_RAM_KEY, val ? "1" : "0"); } catch(_) {}
+}
+if($("keepModelInRam")){
+  $("keepModelInRam").checked = loadKrea2KeepRam();
+  $("keepModelInRam").addEventListener("change", (e) => {
+    saveKrea2KeepRam(e.target.checked);
+  });
+}
+$("btnFreeMemory")?.addEventListener("click", async () => {
+  try {
+    const srv = typeof getServerUrl === "function" ? getServerUrl() : (CONFIG.serverUrl || "http://127.0.0.1:7821");
+    await fetch(`${srv}/free`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unload_models: true, free_memory: true })
+    });
+    log("🧹 Memoria VRAM y modelos descargados de ComfyUI bajo demanda.", "l-ok");
+  } catch(e) {
+    log("⚠️ Error liberando memoria: " + e.message, "l-err");
+  }
+});
+
 let jobQueue = [];
 let activeJob = null;
 let jobCounter = 0;
@@ -1137,6 +1167,7 @@ function snapshotJob(){
     samplerSeedValue: parseInt($("samplerSeed")?.value || "1062442950133633", 10),
     batchSize: parseInt($("batchSize")?.value || "1", 10),
     filenamePrefix: $("filenamePrefix")?.value,
+    keepModelInRam: $("keepModelInRam") ? $("keepModelInRam").checked : true,
     loras: JSON.parse(JSON.stringify(loras)),
     createdAt: Date.now(),
   };
@@ -1242,6 +1273,15 @@ function buildGraph(job){
   const saveNode = g[N.SAVE_IMAGE] || g[N.SAVE];
   if(saveNode && saveNode.inputs){
     saveNode.inputs.filename_prefix = prefix;
+  }
+
+  // Gestión de memoria: mantener modelo en RAM (evita recarga de disco entre variantes)
+  const keepInRam = j && j.keepModelInRam !== undefined ? j.keepModelInRam : ($("keepModelInRam") ? $("keepModelInRam").checked : true);
+  if(keepInRam){
+    delete g[N.PURGE];
+  } else if(g[N.PURGE] && g[N.PURGE].inputs){
+    g[N.PURGE].inputs.purge_models = true;
+    g[N.PURGE].inputs.purge_cache = true;
   }
 
   return g;
