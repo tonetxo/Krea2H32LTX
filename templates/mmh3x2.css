@@ -36,11 +36,11 @@ input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
 .video-slot-wrap video{max-width:100%;max-height:140px;object-fit:contain;background:#000;border-radius:4px;display:block;margin:0 auto;}
 
 /* Reproductores y Vidbox */
-.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;position:relative;contain:layout style;margin-bottom:12px;}
-.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;}
-.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;flex:1;}
-.vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
-.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;position:relative;contain:layout style;margin-bottom:12px;overflow:hidden;}
+.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px 10px;flex-wrap:wrap;}
+.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0;display:flex;align-items:center;gap:6px;flex:1 1 180px;min-width:0;line-height:1.3;}
+.vid-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex:0 1 auto;max-width:100%;}
+.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:3px 7px;font-size:10px;font-weight:500;cursor:pointer;transition:color .15s,background .15s,border-color .15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
 .vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
 .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;gap:10px;flex-wrap:wrap;}
 .res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}

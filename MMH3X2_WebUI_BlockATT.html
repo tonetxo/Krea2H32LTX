@@ -357,11 +357,11 @@ input.ro{opacity:.7;cursor:default;}input.ro:focus{border-color:var(--border);}
 .video-slot-wrap video{max-width:100%;max-height:140px;object-fit:contain;background:#000;border-radius:4px;display:block;margin:0 auto;}
 
 /* Reproductores y Vidbox */
-.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;position:relative;contain:layout style;margin-bottom:12px;}
-.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;}
-.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;flex:1;}
-.vid-actions{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;}
-.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:4px 7px;font-size:11px;cursor:pointer;transition:color .15s,background .15s;text-decoration:none;display:inline-flex;align-items:center;}
+.vidbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;position:relative;contain:layout style;margin-bottom:12px;overflow:hidden;}
+.vid-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px 10px;flex-wrap:wrap;}
+.vid-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0;display:flex;align-items:center;gap:6px;flex:1 1 180px;min-width:0;line-height:1.3;}
+.vid-actions{display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex:0 1 auto;max-width:100%;}
+.vid-action-btn{background:var(--panel-2);border:1px solid var(--border);color:var(--muted);border-radius:4px;padding:3px 7px;font-size:10px;font-weight:500;cursor:pointer;transition:color .15s,background .15s,border-color .15s;text-decoration:none;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;}
 .vid-action-btn:hover{color:var(--accent);background:var(--accent-dim);border-color:var(--accent);}
 .vid-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;gap:10px;flex-wrap:wrap;}
 .res-tag{font-family:var(--mono);font-size:10.5px;color:var(--muted-2);letter-spacing:.04em;white-space:nowrap;}
@@ -1295,12 +1295,12 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
       <!-- REPRODUCTOR FINAL (CONTINUO CON RTX + RIFE) -->
       <div class="vidbox" id="boxFinal">
         <div class="vid-header">
-          <h3>Vídeo <em style="color:var(--accent)">Final Continuo</em> (Seg 1 + Seg 2 + RTX + RIFE)</h3>
+          <h3>Vídeo <em style="color:var(--accent)">Final Continuo</em> <span style="font-size:9.5px; opacity:0.8; font-weight:normal;">(Seg 1 + Seg 2 + RTX + RIFE)</span></h3>
           <div class="vid-actions">
-            <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">⬇ Descargar</button>
-            <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
-            <button class="vid-action-btn" id="btnFaceRefineFinal" title="Refinar los rostros del vídeo final con H3 FaceRefine" style="display:none;" type="button">😊 Refinar rostro</button>
-            <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+            <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">Extraer Frame</button>
+            <button class="vid-action-btn" id="btnFaceRefineFinal" title="Refinar los rostros del vídeo final con H3 FaceRefine" style="display:none;" type="button">Refinar Rostro</button>
+            <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>Workflow</button>
           </div>
         </div>
         <div class="empty" id="emptyFinal">sin generar</div>
@@ -1322,9 +1322,9 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">Segmento 1</em></h3>
           <div class="vid-actions">
-            <button class="vid-action-btn" id="btnDownloadSeg1" title="Descargar segmento 1" style="display:none;" type="button">⬇ Descargar</button>
-            <button class="vid-action-btn" id="btnExtractFrameSeg1" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
-            <button class="vid-action-btn" id="btnLoadMetaSeg1" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+            <button class="vid-action-btn" id="btnDownloadSeg1" title="Descargar segmento 1" style="display:none;" type="button">Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameSeg1" title="Extraer frame como imagen" style="display:none;" type="button">Extraer Frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaSeg1" title="Recuperar parámetros del workflow" disabled>Workflow</button>
           </div>
         </div>
         <div class="empty" id="emptySeg1">sin generar</div>
@@ -1346,9 +1346,9 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
         <div class="vid-header">
           <h3>Vídeo <em style="color:var(--accent)">Segmento 2</em></h3>
           <div class="vid-actions">
-            <button class="vid-action-btn" id="btnDownloadSeg2" title="Descargar segmento 2" style="display:none;" type="button">⬇ Descargar</button>
-            <button class="vid-action-btn" id="btnExtractFrameSeg2" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
-            <button class="vid-action-btn" id="btnLoadMetaSeg2" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
+            <button class="vid-action-btn" id="btnDownloadSeg2" title="Descargar segmento 2" style="display:none;" type="button">Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameSeg2" title="Extraer frame como imagen" style="display:none;" type="button">Extraer Frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaSeg2" title="Recuperar parámetros del workflow" disabled>Workflow</button>
           </div>
         </div>
         <div class="empty" id="emptySeg2">sin generar</div>
@@ -2562,9 +2562,11 @@ const AVAILABLE_VAES = ["MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "Mini
 const AVAILABLE_UNETS = ["boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ernie/ernie-image-turbo.safetensors", "ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "minimax_music3_dit_int8_convrot.safetensors", "minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "seedvr2_3b_int8_convrot.safetensors", "zimage/z_image_turbo_bf16.safetensors"];
 const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
+const AVAILABLE_UPSCALE_MODELS = [];
 const LTXV_UI_PORT = "8000";
 const MINIMAXH3_UI_PORT = "8002";
 const MMH3X2_UI_PORT = "8003";
+const KREAQWEN_UI_PORT = "8004";
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
 //
 // This file is injected BEFORE the UI-specific JS (ltxv.js / krea2.js).
@@ -4803,7 +4805,8 @@ const CONFIG = {
     FACE_DECODE: "310",
     FACE_STITCH: "311",
     FACE_LOAD_VIDEO: "312",
-    FACE_COMPONENTS: "313"
+    FACE_COMPONENTS: "313",
+    FACE_SAMPLER_SELECT: "314"
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -6483,7 +6486,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
       const err = video.error;
       const code = err ? err.code : "desconocido";
       console.error(`Error cargando vídeo slot ${suffix} (código ${code})`);
-      log(`⚠️ Vídeo ${suffix}: error de reproducción (${code}). Prueba '⬇ Descargar' si el navegador no soporta el formato.`, "l-err");
+      log(`Vídeo ${suffix}: error de reproducción (${code}). Prueba 'Descargar' si el navegador no soporta el formato.`, "l-err");
     };
   }
 
@@ -6539,7 +6542,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
       const wfUrl = `${server()}/view?filename=${encodeURIComponent(m.filename)}&subfolder=${encodeURIComponent(m.subfolder||"")}&type=${encodeURIComponent(m.type||"output")}`;
       btnMeta.disabled = true;
       const orig = btnMeta.innerHTML;
-      btnMeta.textContent = "⏳";
+      btnMeta.textContent = "...";
       try {
         const workflow = await extractWorkflowFromMP4(wfUrl);
         if(workflow){
@@ -7900,10 +7903,11 @@ function buildGraph(j){
     // Eliminar generación completa de Seg 1 y Seg 2 para ahorrar recursos
     const nodesToDelete = [
       N.IMG2, N.IMG3, N.IMG4,
-      N.REF2V_SEG1, N.GUIDER_1, N.SAMPLER_1, N.SCHEDULER_1, N.SAMPLE_1, N.DECODE_VID_1, N.DECODE_AUD_1, N.CREATE_VID_1, N.SAVE_VID_1,
+      N.REF2V_SEG1, N.GUIDER_1, N.SCHEDULER_1, N.SAMPLE_1, N.DECODE_VID_1, N.DECODE_AUD_1, N.CREATE_VID_1, N.SAVE_VID_1,
       N.REF2V_SEG2, N.GUIDER_2, N.SAMPLER_2, N.SCHEDULER_2, N.SAMPLE_2, N.DECODE_VID_2, N.DECODE_AUD_2, N.CREATE_VID_2, N.SAVE_VID_2,
       N.IMAGE_BATCH, N.AUDIO_CONCAT, N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.SEED,
       "12_seg2", "13_seg2", "61", "64", "65", "25", "26", "27", "28", "29", "54", "57", "59",
+      "51", "52", "53", "55", "86", "77", "78", "79", "12", "13", "75", "76", "11",
       "190_load_audio1", "191_load_audio2", "192_trim_final_audio", "193_trim_audio1", "194_trim_audio2",
       "195_concat_direct_audio", "198_ia_boost_seg1", "198_ia_vol_seg1", "199_ia_trim_seg1",
       "199_ia_boost_seg2", "199_ia_vol_seg2", "199_ia_trim_seg2", "199_ia_boost_final", "199_user_vol_final",
@@ -8034,12 +8038,21 @@ function buildGraph(j){
       _meta: { title: "Face Noise" }
     };
 
+    const frSamplerName = (j ? j.sampler : $("samplerName")?.value) || "res_multistep";
+    g[N.FACE_SAMPLER_SELECT] = {
+      class_type: "KSamplerSelect",
+      inputs: {
+        sampler_name: frSamplerName
+      },
+      _meta: { title: "Face Sampler Select" }
+    };
+
     g[N.FACE_SAMPLER] = {
       class_type: "SamplerCustomAdvanced",
       inputs: {
         noise: [N.FACE_NOISE, 0],
         guider: [N.FACE_GUIDER, 0],
-        sampler: [N.SAMPLER_1, 0],
+        sampler: [N.FACE_SAMPLER_SELECT, 0],
         sigmas: [N.FACE_SCHEDULER, 0],
         latent_image: [N.FACE_PERFRAME_DENOISE, 0]
       },
@@ -8650,12 +8663,21 @@ function buildGraph(j){
       _meta: { title: "Face Noise" }
     };
 
+    const frSamplerName = (j ? j.sampler : $("samplerName")?.value) || "res_multistep";
+    g[N.FACE_SAMPLER_SELECT] = {
+      class_type: "KSamplerSelect",
+      inputs: {
+        sampler_name: frSamplerName
+      },
+      _meta: { title: "Face Sampler Select" }
+    };
+
     g[N.FACE_SAMPLER] = {
       class_type: "SamplerCustomAdvanced",
       inputs: {
         noise: [N.FACE_NOISE, 0],
         guider: [N.FACE_GUIDER, 0],
-        sampler: [N.SAMPLER_1, 0],
+        sampler: [N.FACE_SAMPLER_SELECT, 0],
         sigmas: [N.FACE_SCHEDULER, 0],
         latent_image: [N.FACE_PERFRAME_DENOISE, 0]
       },
@@ -8698,6 +8720,7 @@ function buildGraph(j){
     delete g[N.FACE_GUIDER];
     delete g[N.FACE_NOISE];
     delete g[N.FACE_SAMPLER];
+    delete g[N.FACE_SAMPLER_SELECT];
     delete g[N.FACE_DECODE];
     delete g[N.FACE_STITCH];
     delete g[N.FACE_LOAD_VIDEO];
@@ -8750,7 +8773,7 @@ function buildGraph(j){
       N.IMAGE_BATCH, N.AUDIO_CONCAT, N.CREATE_VID_FINAL, N.SAVE_VID_FINAL,
       N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.RTX, N.RIFE, N.RIFE_LOADER, N.RIFE_MULT,
       N.FACE_CROP, N.FACE_REF2V, N.FACE_INJECT, N.FACE_PERFRAME_DENOISE, N.FACE_SCHEDULER,
-      N.FACE_GUIDER, N.FACE_NOISE, N.FACE_SAMPLER, N.FACE_DECODE, N.FACE_STITCH,
+      N.FACE_GUIDER, N.FACE_NOISE, N.FACE_SAMPLER, N.FACE_SAMPLER_SELECT, N.FACE_DECODE, N.FACE_STITCH,
       N.FACE_LOAD_VIDEO, N.FACE_COMPONENTS
     ];
     nodesToDelete.forEach(id => { delete g[id]; });

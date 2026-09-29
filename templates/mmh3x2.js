@@ -86,7 +86,8 @@ const CONFIG = {
     FACE_DECODE: "310",
     FACE_STITCH: "311",
     FACE_LOAD_VIDEO: "312",
-    FACE_COMPONENTS: "313"
+    FACE_COMPONENTS: "313",
+    FACE_SAMPLER_SELECT: "314"
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -1766,7 +1767,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
       const err = video.error;
       const code = err ? err.code : "desconocido";
       console.error(`Error cargando vídeo slot ${suffix} (código ${code})`);
-      log(`⚠️ Vídeo ${suffix}: error de reproducción (${code}). Prueba '⬇ Descargar' si el navegador no soporta el formato.`, "l-err");
+      log(`Vídeo ${suffix}: error de reproducción (${code}). Prueba 'Descargar' si el navegador no soporta el formato.`, "l-err");
     };
   }
 
@@ -1822,7 +1823,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
       const wfUrl = `${server()}/view?filename=${encodeURIComponent(m.filename)}&subfolder=${encodeURIComponent(m.subfolder||"")}&type=${encodeURIComponent(m.type||"output")}`;
       btnMeta.disabled = true;
       const orig = btnMeta.innerHTML;
-      btnMeta.textContent = "⏳";
+      btnMeta.textContent = "...";
       try {
         const workflow = await extractWorkflowFromMP4(wfUrl);
         if(workflow){
@@ -3183,10 +3184,11 @@ function buildGraph(j){
     // Eliminar generación completa de Seg 1 y Seg 2 para ahorrar recursos
     const nodesToDelete = [
       N.IMG2, N.IMG3, N.IMG4,
-      N.REF2V_SEG1, N.GUIDER_1, N.SAMPLER_1, N.SCHEDULER_1, N.SAMPLE_1, N.DECODE_VID_1, N.DECODE_AUD_1, N.CREATE_VID_1, N.SAVE_VID_1,
+      N.REF2V_SEG1, N.GUIDER_1, N.SCHEDULER_1, N.SAMPLE_1, N.DECODE_VID_1, N.DECODE_AUD_1, N.CREATE_VID_1, N.SAVE_VID_1,
       N.REF2V_SEG2, N.GUIDER_2, N.SAMPLER_2, N.SCHEDULER_2, N.SAMPLE_2, N.DECODE_VID_2, N.DECODE_AUD_2, N.CREATE_VID_2, N.SAVE_VID_2,
       N.IMAGE_BATCH, N.AUDIO_CONCAT, N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.SEED,
       "12_seg2", "13_seg2", "61", "64", "65", "25", "26", "27", "28", "29", "54", "57", "59",
+      "51", "52", "53", "55", "86", "77", "78", "79", "12", "13", "75", "76", "11",
       "190_load_audio1", "191_load_audio2", "192_trim_final_audio", "193_trim_audio1", "194_trim_audio2",
       "195_concat_direct_audio", "198_ia_boost_seg1", "198_ia_vol_seg1", "199_ia_trim_seg1",
       "199_ia_boost_seg2", "199_ia_vol_seg2", "199_ia_trim_seg2", "199_ia_boost_final", "199_user_vol_final",
@@ -3317,12 +3319,21 @@ function buildGraph(j){
       _meta: { title: "Face Noise" }
     };
 
+    const frSamplerName = (j ? j.sampler : $("samplerName")?.value) || "res_multistep";
+    g[N.FACE_SAMPLER_SELECT] = {
+      class_type: "KSamplerSelect",
+      inputs: {
+        sampler_name: frSamplerName
+      },
+      _meta: { title: "Face Sampler Select" }
+    };
+
     g[N.FACE_SAMPLER] = {
       class_type: "SamplerCustomAdvanced",
       inputs: {
         noise: [N.FACE_NOISE, 0],
         guider: [N.FACE_GUIDER, 0],
-        sampler: [N.SAMPLER_1, 0],
+        sampler: [N.FACE_SAMPLER_SELECT, 0],
         sigmas: [N.FACE_SCHEDULER, 0],
         latent_image: [N.FACE_PERFRAME_DENOISE, 0]
       },
@@ -3933,12 +3944,21 @@ function buildGraph(j){
       _meta: { title: "Face Noise" }
     };
 
+    const frSamplerName = (j ? j.sampler : $("samplerName")?.value) || "res_multistep";
+    g[N.FACE_SAMPLER_SELECT] = {
+      class_type: "KSamplerSelect",
+      inputs: {
+        sampler_name: frSamplerName
+      },
+      _meta: { title: "Face Sampler Select" }
+    };
+
     g[N.FACE_SAMPLER] = {
       class_type: "SamplerCustomAdvanced",
       inputs: {
         noise: [N.FACE_NOISE, 0],
         guider: [N.FACE_GUIDER, 0],
-        sampler: [N.SAMPLER_1, 0],
+        sampler: [N.FACE_SAMPLER_SELECT, 0],
         sigmas: [N.FACE_SCHEDULER, 0],
         latent_image: [N.FACE_PERFRAME_DENOISE, 0]
       },
@@ -3981,6 +4001,7 @@ function buildGraph(j){
     delete g[N.FACE_GUIDER];
     delete g[N.FACE_NOISE];
     delete g[N.FACE_SAMPLER];
+    delete g[N.FACE_SAMPLER_SELECT];
     delete g[N.FACE_DECODE];
     delete g[N.FACE_STITCH];
     delete g[N.FACE_LOAD_VIDEO];
@@ -4033,7 +4054,7 @@ function buildGraph(j){
       N.IMAGE_BATCH, N.AUDIO_CONCAT, N.CREATE_VID_FINAL, N.SAVE_VID_FINAL,
       N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.RTX, N.RIFE, N.RIFE_LOADER, N.RIFE_MULT,
       N.FACE_CROP, N.FACE_REF2V, N.FACE_INJECT, N.FACE_PERFRAME_DENOISE, N.FACE_SCHEDULER,
-      N.FACE_GUIDER, N.FACE_NOISE, N.FACE_SAMPLER, N.FACE_DECODE, N.FACE_STITCH,
+      N.FACE_GUIDER, N.FACE_NOISE, N.FACE_SAMPLER, N.FACE_SAMPLER_SELECT, N.FACE_DECODE, N.FACE_STITCH,
       N.FACE_LOAD_VIDEO, N.FACE_COMPONENTS
     ];
     nodesToDelete.forEach(id => { delete g[id]; });
