@@ -48,3 +48,50 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
 .ref-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .enhancer-caption-row{margin-top:8px;}
 .enhancer-caption-row button{flex:1;min-width:120px;}
+
+/* ============================================================
+   Layout a 3 columnas para Krea2 (Entrada/Prompts · Ajustes/Modelos · Ejecución/Resultados)
+   ============================================================ */
+.wrap {
+  max-width: 1760px;
+  padding: 18px 18px 60px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr) minmax(360px, 1.25fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.controls-col, .settings-col, .results-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Pantallas medianas / escritorios compactos (hasta 1380px): 2 columnas */
+@media (max-width: 1380px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .results-col {
+    grid-column: span 2;
+  }
+}
+
+/* Tablets y móviles (hasta 920px): 1 columna única fluida y legible */
+@media (max-width: 920px) {
+  .wrap {
+    padding: 12px 10px 40px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .results-col {
+    grid-column: span 1;
+  }
+}
