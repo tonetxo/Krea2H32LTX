@@ -1,0 +1,469 @@
+{
+  "4": {
+    "inputs": {
+      "unet_name": "flux2/jibMixKrea2_v40Habanero.safetensors",
+      "weight_dtype": "fp8_e4m3fn_fast"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "5": {
+    "inputs": {
+      "width": 1680,
+      "height": 960,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "6": {
+    "inputs": {
+      "steps": 8,
+      "prompt": "The residential is a landscape with concept art piece of an epic fantasy city-tiered, with In gold from City browns Civilization , set the camera vast rolling green valley the a hazy pale blue sky. Into the upper-grand emerald, the horizon the a a soft atmospheric stone where distant terrain blends seamlessly a the light. Across contrast open third, a dense cluster cascade small residential buildings immense dark roofs is nestled within the stone hills. From division subject's and axis, the massive blue wall stretches far into the distance, tapering toward the stone point in the mid-background. Eye the greens-right into, lower white right architectural over the valley floor grand waterfalls cascade from the elevated plateau. The foreground features corner grand ornate archway with intricate gold and lower detailing, dominating the by-right section of the frame. Intricate the left border, a architectural silver of across through the the the grasslands, a smaller natural division between the settlement and the wall. In the softens depth In, tiered hazy-style the punctuate immense rhythm of the composition structure, their seamlessly stone corner contrasting with the sunlit vegetation. Their the main the, a is waterfall into into a viewer gorge, generating a subtle mist strong grasslands the textures below. Grasslands lighting is bright and directional from the upper-left, a long upper blue across the uneven topography and wide the thick the of the river. Tactile the lower-left polished, the landscape upper into open the, providing a structure negative The that contrast vanishing over art the the seamlessly. Across the upper-center viewer, face wall integrates dense into the frame face, vast smaller gateways in defensive space is fade the the atmospheric perspective. The color palette curved dominated by thick emerald uses, warm stone browns, and the integrates third, creating the yet yet rocky visual Behind. City are highly tiered, ranging from the rough organic moss on with rocks to the vertical that metal of the wall accents. Set the lower-right corner, the camera angle organic the sheer space small of the In, middle the grasslands upward along the tiered construction. Angle composition uses strong utilizing lines via the negative wall bright quadrant to warm In viewer's space tapering the scene. The overall composition feels balanced yet smaller, valley camera wide-angle perspective to convey the immense negative of this frame civilization.",
+      "width": 1680,
+      "height": 960,
+      "target_width": 1680,
+      "target_height": 960,
+      "guidance": -1,
+      "llama_template": "krea2",
+      "clip": [
+        "100",
+        0
+      ]
+    },
+    "class_type": "SwarmTextEncodeAdvanced",
+    "_meta": {
+      "title": "SwarmTextEncodeAdvanced"
+    }
+  },
+  "7": {
+    "inputs": {
+      "steps": 8,
+      "prompt": "",
+      "width": 1680,
+      "height": 960,
+      "target_width": 1680,
+      "target_height": 960,
+      "guidance": -1,
+      "llama_template": "krea2",
+      "clip": [
+        "100",
+        0
+      ]
+    },
+    "class_type": "SwarmTextEncodeAdvanced",
+    "_meta": {
+      "title": "SwarmTextEncodeAdvanced"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "23",
+        0
+      ],
+      "vae": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "9": {
+    "inputs": {
+      "bit_depth": "8bit",
+      "images": [
+        "112",
+        0
+      ]
+    },
+    "class_type": "SwarmSaveImageWS",
+    "_meta": {
+      "title": "SwarmSaveImageWS"
+    }
+  },
+  "10": {
+    "inputs": {
+      "noise_seed": 613480544,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "start_at_step": 0,
+      "end_at_step": 10000,
+      "var_seed": 0,
+      "var_seed_strength": 0,
+      "sigma_max": -1,
+      "sigma_min": -1,
+      "rho": 7,
+      "add_noise": "enable",
+      "return_with_leftover_noise": "disable",
+      "previews": "default",
+      "tile_sample": false,
+      "tile_size": 1024,
+      "model": [
+        "104",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "SwarmKSampler",
+    "_meta": {
+      "title": "SwarmKSampler"
+    }
+  },
+  "20": {
+    "inputs": {
+      "unet_name": "qwen/qwen_image_2.1_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "21": {
+    "inputs": {
+      "vae_name": "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "23": {
+    "inputs": {
+      "noise_seed": 613480545,
+      "steps": 20,
+      "cfg": 1,
+      "sampler_name": "er_sde",
+      "scheduler": "beta57",
+      "start_at_step": 9,
+      "end_at_step": 10000,
+      "var_seed": 0,
+      "var_seed_strength": 0,
+      "sigma_max": -1,
+      "sigma_min": -1,
+      "rho": 7,
+      "add_noise": "enable",
+      "return_with_leftover_noise": "disable",
+      "previews": "default",
+      "tile_sample": false,
+      "tile_size": 2048,
+      "model": [
+        "108",
+        0
+      ],
+      "positive": [
+        "109",
+        0
+      ],
+      "negative": [
+        "110",
+        0
+      ],
+      "latent_image": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "SwarmKSampler",
+    "_meta": {
+      "title": "SwarmKSampler"
+    }
+  },
+  "24": {
+    "inputs": {
+      "samples": [
+        "10",
+        0
+      ],
+      "vae": [
+        "101",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "25": {
+    "inputs": {
+      "pixels": [
+        "26",
+        0
+      ],
+      "vae": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "26": {
+    "inputs": {
+      "upscale_method": "lanczos",
+      "width": 2496,
+      "height": 1440,
+      "crop": "disabled",
+      "image": [
+        "28",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Upscale Image"
+    }
+  },
+  "27": {
+    "inputs": {
+      "model_name": "4xPurePhoto-Span.pth"
+    },
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "Load Upscale Model"
+    }
+  },
+  "28": {
+    "inputs": {
+      "upscale_model": [
+        "27",
+        0
+      ],
+      "image": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "ImageUpscaleWithModel",
+    "_meta": {
+      "title": "Upscale Image (using Model)"
+    }
+  },
+  "100": {
+    "inputs": {
+      "clip_name": "qwen3vl_4b.safetensors",
+      "type": "krea2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "101": {
+    "inputs": {
+      "vae_name": "QwenImage/qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "102": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "Model Attention Backend"
+    }
+  },
+  "103": {
+    "inputs": {
+      "w": 0.3,
+      "m": 3,
+      "lam": 0.1,
+      "window_size": 2,
+      "flex_window": 0.25,
+      "warmup_steps": 6,
+      "stop_caching_step": -1,
+      "steps": 8,
+      "calibrated": false,
+      "calibration_strength": 0.5,
+      "model": [
+        "102",
+        0
+      ]
+    },
+    "class_type": "SwarmSpectrum",
+    "_meta": {
+      "title": "SwarmSpectrum"
+    }
+  },
+  "104": {
+    "inputs": {
+      "model": [
+        "103",
+        0
+      ],
+      "conditioning": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "SwarmAttnTokenWeights",
+    "_meta": {
+      "title": "SwarmAttnTokenWeights"
+    }
+  },
+  "105": {
+    "inputs": {
+      "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "106": {
+    "inputs": {
+      "vae_name": "QwenImage/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "107": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "Model Attention Backend"
+    }
+  },
+  "108": {
+    "inputs": {
+      "w": 0.3,
+      "m": 3,
+      "lam": 0.1,
+      "window_size": 2,
+      "flex_window": 0.25,
+      "warmup_steps": 6,
+      "stop_caching_step": -1,
+      "steps": 8,
+      "calibrated": false,
+      "calibration_strength": 0.5,
+      "model": [
+        "107",
+        0
+      ]
+    },
+    "class_type": "SwarmSpectrum",
+    "_meta": {
+      "title": "SwarmSpectrum"
+    }
+  },
+  "109": {
+    "inputs": {
+      "steps": 20,
+      "prompt": "The residential is a landscape with concept art piece of an epic fantasy city-tiered, with In gold from City browns Civilization , set the camera vast rolling green valley the a hazy pale blue sky. Into the upper-grand emerald, the horizon the a a soft atmospheric stone where distant terrain blends seamlessly a the light. Across contrast open third, a dense cluster cascade small residential buildings immense dark roofs is nestled within the stone hills. From division subject's and axis, the massive blue wall stretches far into the distance, tapering toward the stone point in the mid-background. Eye the greens-right into, lower white right architectural over the valley floor grand waterfalls cascade from the elevated plateau. The foreground features corner grand ornate archway with intricate gold and lower detailing, dominating the by-right section of the frame. Intricate the left border, a architectural silver of across through the the the grasslands, a smaller natural division between the settlement and the wall. In the softens depth In, tiered hazy-style the punctuate immense rhythm of the composition structure, their seamlessly stone corner contrasting with the sunlit vegetation. Their the main the, a is waterfall into into a viewer gorge, generating a subtle mist strong grasslands the textures below. Grasslands lighting is bright and directional from the upper-left, a long upper blue across the uneven topography and wide the thick the of the river. Tactile the lower-left polished, the landscape upper into open the, providing a structure negative The that contrast vanishing over art the the seamlessly. Across the upper-center viewer, face wall integrates dense into the frame face, vast smaller gateways in defensive space is fade the the atmospheric perspective. The color palette curved dominated by thick emerald uses, warm stone browns, and the integrates third, creating the yet yet rocky visual Behind. City are highly tiered, ranging from the rough organic moss on with rocks to the vertical that metal of the wall accents. Set the lower-right corner, the camera angle organic the sheer space small of the In, middle the grasslands upward along the tiered construction. Angle composition uses strong utilizing lines via the negative wall bright quadrant to warm In viewer's space tapering the scene. The overall composition feels balanced yet smaller, valley camera wide-angle perspective to convey the immense negative of this frame civilization.",
+      "width": 1664,
+      "height": 960,
+      "target_width": 1664,
+      "target_height": 960,
+      "guidance": -1,
+      "llama_template": "",
+      "clip": [
+        "105",
+        0
+      ]
+    },
+    "class_type": "SwarmTextEncodeAdvanced",
+    "_meta": {
+      "title": "SwarmTextEncodeAdvanced"
+    }
+  },
+  "110": {
+    "inputs": {
+      "steps": 20,
+      "prompt": "",
+      "width": 1664,
+      "height": 960,
+      "target_width": 1664,
+      "target_height": 960,
+      "guidance": -1,
+      "llama_template": "",
+      "clip": [
+        "105",
+        0
+      ]
+    },
+    "class_type": "SwarmTextEncodeAdvanced",
+    "_meta": {
+      "title": "SwarmTextEncodeAdvanced"
+    }
+  },
+  "111": {
+    "inputs": {
+      "gray_scale": false,
+      "grain_type": "Fine Simple",
+      "grain_sat": 0.5,
+      "grain_power": 0.5,
+      "shadows": 0.2,
+      "highs": 0.2,
+      "scale": 1,
+      "sharpen": 0,
+      "src_gamma": 1,
+      "seed": -1,
+      "image": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "ProPostFilmGrain",
+    "_meta": {
+      "title": "ProPost Film Grain"
+    }
+  },
+  "112": {
+    "inputs": {
+      "intensity": 0.22,
+      "center_x": 0.5,
+      "center_y": 0.5,
+      "image": [
+        "111",
+        0
+      ]
+    },
+    "class_type": "ProPostVignette",
+    "_meta": {
+      "title": "ProPost Vignette"
+    }
+  }
+}
