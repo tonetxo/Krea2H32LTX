@@ -215,6 +215,20 @@ def generate_html(config):
 
     common_html = common_html.replace('__ENHANCER_TITLE__', config['enhancer_title'])
 
+    server_panel = ""
+    prompt_panels = common_html
+    if '<h2>Servidor</h2>' in common_html:
+        idx_serv = common_html.find('<h2>Servidor</h2>')
+        start_panel = common_html.rfind('<div class="panel">', 0, idx_serv)
+        end_panel = common_html.find('</div></div>', idx_serv) + 12
+        if start_panel != -1 and end_panel != -1:
+            server_panel = common_html[start_panel:end_panel]
+            prompt_panels = (common_html[:start_panel] + common_html[end_panel:]).strip()
+
+    if '__SERVER_PANEL__' in ui_html:
+        ui_html = ui_html.replace('__SERVER_PANEL__', server_panel)
+    if '__PROMPT_PANELS__' in ui_html:
+        ui_html = ui_html.replace('__PROMPT_PANELS__', prompt_panels)
     ui_html = ui_html.replace('__COMMON_PANELS__', common_html)
 
     html = f"""<!DOCTYPE html>

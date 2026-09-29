@@ -391,6 +391,53 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
 #inputWrap img{display:block;max-width:100%;max-height:45vh;width:auto;height:auto;object-fit:contain;margin:0 auto;}
 #inputWrap:fullscreen,#inputWrap:-webkit-full-screen{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;max-height:none!important;background:#000;border-radius:0;display:flex;align-items:center;justify-content:center;padding:0;margin:0;z-index:99999;}
 #inputWrap:fullscreen img,#inputWrap:-webkit-full-screen img{max-width:100vw!important;max-height:100vh!important;width:auto!important;height:auto!important;object-fit:contain!important;display:block;}
+
+/* ============================================================
+   Layout a 3 columnas para LTXV (Entrada/Prompts · Ajustes/Modelos · Ejecución/Resultados)
+   ============================================================ */
+.wrap {
+  max-width: 1760px;
+  padding: 18px 18px 60px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr) minmax(360px, 1.25fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.controls-col, .settings-col, .results-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Pantallas medianas / escritorios compactos (hasta 1380px): 2 columnas */
+@media (max-width: 1380px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .results-col {
+    grid-column: span 2;
+  }
+}
+
+/* Tablets y móviles (hasta 920px): 1 columna única fluida y legible */
+@media (max-width: 920px) {
+  .wrap {
+    padding: 12px 10px 40px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .results-col {
+    grid-column: span 1;
+  }
+}
 </style>
 </head>
 <body>
@@ -402,8 +449,21 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
     <div class="node" data-n="p2">2º pase</div><div class="arrow">→</div><div class="node" data-n="out">final</div>
   </div>
   <div class="grid">
+    <!-- COLUMNA 1 (IZQUIERDA): ENTRADA, PROMPTS Y REFERENCIAS -->
     <div class="controls-col">
-            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+
+      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="inputWrap" style="visibility:hidden;"><img id="inputImg" style="display:none;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="krea2RecentToggle">
+          <span class="arrow">▶</span> Imágenes Krea2 recientes
+        </div>
+        <div class="collapsible-body" id="krea2RecentBody">
+          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="gallery-grid" id="krea2RecentGrid"></div>
+        </div>
+      </div>
 
       <div class="panel">
         <div class="collapsible-header" id="promptLibToggle">
@@ -470,19 +530,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
       </div>
-      <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="inputWrap" style="visibility:hidden;"><img id="inputImg" style="display:none;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
 
-      <div class="panel">
-        <div class="collapsible-header" id="krea2RecentToggle">
-          <span class="arrow">▶</span> Imágenes Krea2 recientes
-        </div>
-        <div class="collapsible-body" id="krea2RecentBody">
-          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
-          <div class="gallery-grid" id="krea2RecentGrid"></div>
-        </div>
-      </div>
-
-      <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
       <div class="panel">
         <div class="collapsible-header" id="evolveToggle">
           <span class="arrow">▶</span> Evolve / Transmutar prompt
@@ -509,12 +557,32 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- COLUMNA 2 (CENTRO): AJUSTES, MODELOS Y PIPELINE -->
+    <div class="settings-col">
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
       <div class="panel" id="textEncoderPanel"><h2>Text Encoder (Gemma)</h2><div class="row"><select id="textEncoderSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Text Encoder para LTX-2.5 (UNet/diffusion model). LTX-2.3 utiliza su encoder integrado.</div></div>
       <div class="panel"><h2>VAE Vídeo</h2><div class="row"><select id="vaeSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">"Checkpoint" usa el VAE integrado. Para UNet/LTX-2.5 se utiliza el VAE de vídeo seleccionado.</div></div>
       <div class="panel"><h2>VAE Audio</h2><div class="row"><select id="audioVaeSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">"Checkpoint" usa el Audio VAE integrado. O selecciona un Audio VAE dedicado (ej: ltx-2.5-audio-vae).</div></div>
-      <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="sageattn3">sageattn3</option><option value="sageattn2">sageattn2</option><option value="sageattn" selected>sageattn</option><option value="sageattn_qk">sageattn_qk</option><option value="auto">auto</option><option value="comfy kitchen attention">comfy kitchen attention</option></select></div></div>
-      <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
+      <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
+      <div class="panel"><h2>Resolución &amp; duración</h2><div class="row slider-row"><label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
+      <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div></div>
+      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
+      <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="10"><div class="slider-val" id="firstPassStepsVal">10</div></div></div>
+      <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
+      <div class="panel">
+        <div class="collapsible-header" id="loraToggle">
+          <span class="arrow">▶</span> LoRAs
+        </div>
+        <div class="collapsible-body" id="loraBody">
+          <div id="loraList"></div>
+          <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+            <div class="switch on" id="dmdBypassSwitch"><i></i></div>
+            <label for="dmdBypassSwitch" style="margin:0;font-size:11px;color:var(--muted-2);flex:1;">DMD LoRA (LTX2.3_DMD_reshaped_r256)</label>
+          </div>
+        </div>
+      </div>
       <div class="panel">
         <h2>Interpolación de Frames (RIFE)</h2>
         <div class="seed-toggle">
@@ -542,72 +610,12 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes de RTX Super Resolution para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
       </div>
-      <div class="panel">
-        <div class="collapsible-header" id="loraToggle">
-          <span class="arrow">▶</span> LoRAs
-        </div>
-        <div class="collapsible-body" id="loraBody">
-          <div id="loraList"></div>
-          <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-            <div class="switch on" id="dmdBypassSwitch"><i></i></div>
-            <label for="dmdBypassSwitch" style="margin:0;font-size:11px;color:var(--muted-2);flex:1;">DMD LoRA (LTX2.3_DMD_reshaped_r256)</label>
-          </div>
-        </div>
-      </div>
-      <div class="panel"><h2>Resolución &amp; duración</h2><div class="row slider-row"><label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
-      <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div></div>
-      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
-      <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="10"><div class="slider-val" id="firstPassStepsVal">10</div></div></div>
-      <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
+      <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="sageattn3">sageattn3</option><option value="sageattn2">sageattn2</option><option value="sageattn" selected>sageattn</option><option value="sageattn_qk">sageattn_qk</option><option value="auto">auto</option><option value="comfy kitchen attention">comfy kitchen attention</option></select></div></div>
+      <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
     </div>
+
+    <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, RESULTADOS Y COLA -->
     <div class="results-col">
-      <!-- REPRODUCTOR 1ER PASE -->
-      <div class="vidbox">
-        <div class="vid-header">
-          <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
-          <div class="vid-actions">
-            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
-            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
-          </div>
-        </div>
-        <div class="empty" id="empty1">sin generar</div>
-        <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa 1er pase">
-        <video class="preview-img" id="previewVideo1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
-        <span class="video-badge" id="badge1"></span>
-        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
-        <div class="vid-footer">
-          <span class="time-tag" id="time1"></span>
-          <span class="res-tag" id="res1"></span>
-        </div>
-      </div>
-
-      <!-- REPRODUCTOR FINAL -->
-      <div class="vidbox">
-        <div class="vid-header">
-          <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
-          <div class="vid-actions">
-            <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
-            <button class="vid-action-btn" id="btnSaveFrame2" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
-            <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
-          </div>
-        </div>
-        <div class="empty" id="empty2">sin generar</div>
-        <img class="preview-img" id="previewImg2" style="display:none;" alt="Vista previa 2º pase">
-        <video class="preview-img" id="previewVideo2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
-        <span class="video-badge" id="badge2"></span>
-        <video id="video2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
-        <div class="vid-footer">
-          <span class="time-tag" id="time2"></span>
-          <span class="res-tag" id="res2"></span>
-        </div>
-      </div>
-      
-      <!-- GALERÍA DE VARIANTES -->
-      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
-        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
-        <div class="variant-grid" id="variantGrid"></div>
-      </div>
-
       <!-- PANEL DE EJECUCIÓN Y COLAS -->
       <div class="panel" style="margin-bottom:0;">
         <h2>Ejecución</h2>
@@ -644,6 +652,53 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
         <div class="log" id="log">listo.</div>
+      </div>
+
+      <!-- REPRODUCTOR FINAL -->
+      <div class="vidbox">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnSaveFrame2" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="empty2">sin generar</div>
+        <img class="preview-img" id="previewImg2" style="display:none;" alt="Vista previa 2º pase">
+        <video class="preview-img" id="previewVideo2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        <span class="video-badge" id="badge2"></span>
+        <video id="video2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="time2"></span>
+          <span class="res-tag" id="res2"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR 1ER PASE -->
+      <div class="vidbox">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa 1er pase">
+        <video class="preview-img" id="previewVideo1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        <span class="video-badge" id="badge1"></span>
+        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="time1"></span>
+          <span class="res-tag" id="res1"></span>
+        </div>
+      </div>
+      
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
       </div>
 
       <!-- HISTORIAL DE VÍDEOS -->
@@ -1787,7 +1842,7 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltxv/MelBandRoformer_fp16.safetensors", "ltxv/acestep_v1.5_turbo.safetensors", "ltxv/acestep_v1.5_xl_turbo_bf16.safetensors", "ltxv/boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ltxv/ernie/ernie-image-turbo.safetensors", "ltxv/ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ltxv/ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltxv/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltxv/minimax_music3_dit_int8_convrot.safetensors", "ltxv/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "ltxv/minimaxh3/Minimax-h3_Singularity_ref2va_v1.3_Pruned_w4a8.safetensors", "ltxv/minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "ltxv/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "ltxv/seedvr2_3b_int8_convrot.safetensors", "ltxv/wav2vec2-chinese-base_fp16.safetensors", "ltxv/zimage/z_image_turbo_bf16.safetensors"];
+const AVAILABLE_MODELS = ["diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltxv/MelBandRoformer_fp16.safetensors", "ltxv/acestep_v1.5_turbo.safetensors", "ltxv/acestep_v1.5_xl_turbo_bf16.safetensors", "ltxv/boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ltxv/ernie/ernie-image-turbo.safetensors", "ltxv/ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ltxv/ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltxv/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltxv/minimax_music3_dit_int8_convrot.safetensors", "ltxv/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "ltxv/minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "ltxv/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "ltxv/seedvr2_3b_int8_convrot.safetensors", "ltxv/wav2vec2-chinese-base_fp16.safetensors", "ltxv/zimage/z_image_turbo_bf16.safetensors"];
 const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "IvoriLTX_000000250.safetensors", "IvoriLTX_000000750.safetensors", "IvoriLTX_000001000.safetensors", "IvoriLTX_000001250.safetensors", "IvoriLTX_000001500.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "Post_Apocalyptic.safetensors", "anal-insertion-i2v.safetensors", "beauty_of_rain_ltx23.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
 const AVAILABLE_VAES = ["AceStep/ace_1.5_vae.safetensors", "Flux/ae.safetensors", "Flux/flux2-vae.safetensors", "Flux/ultra_flux1.safetensors", "LTX-2/LTX23_audio_vae_bf16.safetensors", "LTX-2/LTX23_video_vae_bf16.safetensors", "LTX-2/ltx-2.5-audio-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors", "LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors", "LTX2/LTX23_audio_vae_bf16.safetensors", "LTX2/LTX23_video_vae_bf16.safetensors", "LTX2/LTX2_audio_vae.safetensors", "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors", "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors", "MiniMaxMusic3/minimax_music3_dav.safetensors", "QwenImage/REPA-E_qwen.safetensors", "QwenImage/qwen_image_2.1_vae_bf16.safetensors", "QwenImage/qwen_image_vae.safetensors", "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors", "SeedVR2/seedvr2_ema_vae_fp16.safetensors", "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Wan/wan_2.1_vae.safetensors", "ace_1.5_vae.safetensors", "ema_vae_fp16.safetensors", "flux2-vae.safetensors", "lumina2_vae_fp32.safetensors", "qwenImageVAESharpKrea2_sharpFp32.safetensors", "qwen_image_vae.safetensors", "sd3_vae.safetensors", "sdxl_vae.safetensors", "taeltx2_3.safetensors", "wan/wan_2.1_vae.safetensors"];
 const AVAILABLE_UNETS = [];
@@ -2963,6 +3018,26 @@ async function loadEnhancerModels(){
       if(sel.value) localStorage.setItem("enhancer_model_selected", sel.value);
     });
     sel.dataset.listenerBound = "true";
+  }
+
+  // Sincronizar selector de Prompt 2 (seg2OllamaModel) si existe en la página
+  const selSeg2 = $("seg2OllamaModel");
+  if(selSeg2){
+    const prevSeg2 = selSeg2.value || (JSON.parse(localStorage.getItem(typeof MMH3X2_SETTINGS_KEY !== "undefined" ? MMH3X2_SETTINGS_KEY : "mmh3x2_settings") || "{}")).seg2OllamaModel || "";
+    selSeg2.innerHTML = '<option value="">-- Mismo que Enhancer / Default --</option>';
+    for(const child of sel.children){
+      if(child.tagName === "OPTGROUP" || (child.tagName === "OPTION" && child.value)){
+        selSeg2.appendChild(child.cloneNode(true));
+      }
+    }
+    if(prevSeg2){
+      for(const opt of selSeg2.querySelectorAll("option")){
+        if(opt.value === prevSeg2 || opt.value.endsWith(":" + prevSeg2)){
+          selSeg2.value = opt.value;
+          break;
+        }
+      }
+    }
   }
 }
 

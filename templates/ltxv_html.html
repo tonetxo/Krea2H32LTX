@@ -4,8 +4,10 @@
     <div class="node" data-n="p2">2º pase</div><div class="arrow">→</div><div class="node" data-n="out">final</div>
   </div>
   <div class="grid">
+    <!-- COLUMNA 1 (IZQUIERDA): ENTRADA, PROMPTS Y REFERENCIAS -->
     <div class="controls-col">
-      __COMMON_PANELS__
+      __SERVER_PANEL__
+
       <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="inputWrap" style="visibility:hidden;"><img id="inputImg" style="display:none;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
 
       <div class="panel">
@@ -18,7 +20,8 @@
         </div>
       </div>
 
-      <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
+      __PROMPT_PANELS__
+
       <div class="panel">
         <div class="collapsible-header" id="evolveToggle">
           <span class="arrow">▶</span> Evolve / Transmutar prompt
@@ -45,12 +48,32 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- COLUMNA 2 (CENTRO): AJUSTES, MODELOS Y PIPELINE -->
+    <div class="settings-col">
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
       <div class="panel" id="textEncoderPanel"><h2>Text Encoder (Gemma)</h2><div class="row"><select id="textEncoderSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Text Encoder para LTX-2.5 (UNet/diffusion model). LTX-2.3 utiliza su encoder integrado.</div></div>
       <div class="panel"><h2>VAE Vídeo</h2><div class="row"><select id="vaeSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">"Checkpoint" usa el VAE integrado. Para UNet/LTX-2.5 se utiliza el VAE de vídeo seleccionado.</div></div>
       <div class="panel"><h2>VAE Audio</h2><div class="row"><select id="audioVaeSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">"Checkpoint" usa el Audio VAE integrado. O selecciona un Audio VAE dedicado (ej: ltx-2.5-audio-vae).</div></div>
-      <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="sageattn3">sageattn3</option><option value="sageattn2">sageattn2</option><option value="sageattn" selected>sageattn</option><option value="sageattn_qk">sageattn_qk</option><option value="auto">auto</option><option value="comfy kitchen attention">comfy kitchen attention</option></select></div></div>
-      <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
+      <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
+      <div class="panel"><h2>Resolución &amp; duración</h2><div class="row slider-row"><label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
+      <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div></div>
+      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
+      <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="10"><div class="slider-val" id="firstPassStepsVal">10</div></div></div>
+      <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
+      <div class="panel">
+        <div class="collapsible-header" id="loraToggle">
+          <span class="arrow">▶</span> LoRAs
+        </div>
+        <div class="collapsible-body" id="loraBody">
+          <div id="loraList"></div>
+          <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+            <div class="switch on" id="dmdBypassSwitch"><i></i></div>
+            <label for="dmdBypassSwitch" style="margin:0;font-size:11px;color:var(--muted-2);flex:1;">DMD LoRA (LTX2.3_DMD_reshaped_r256)</label>
+          </div>
+        </div>
+      </div>
       <div class="panel">
         <h2>Interpolación de Frames (RIFE)</h2>
         <div class="seed-toggle">
@@ -78,72 +101,12 @@
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes de RTX Super Resolution para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
       </div>
-      <div class="panel">
-        <div class="collapsible-header" id="loraToggle">
-          <span class="arrow">▶</span> LoRAs
-        </div>
-        <div class="collapsible-body" id="loraBody">
-          <div id="loraList"></div>
-          <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-            <div class="switch on" id="dmdBypassSwitch"><i></i></div>
-            <label for="dmdBypassSwitch" style="margin:0;font-size:11px;color:var(--muted-2);flex:1;">DMD LoRA (LTX2.3_DMD_reshaped_r256)</label>
-          </div>
-        </div>
-      </div>
-      <div class="panel"><h2>Resolución &amp; duración</h2><div class="row slider-row"><label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
-      <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div></div>
-      <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
-      <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="10"><div class="slider-val" id="firstPassStepsVal">10</div></div></div>
-      <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
+      <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="sageattn3">sageattn3</option><option value="sageattn2">sageattn2</option><option value="sageattn" selected>sageattn</option><option value="sageattn_qk">sageattn_qk</option><option value="auto">auto</option><option value="comfy kitchen attention">comfy kitchen attention</option></select></div></div>
+      <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
     </div>
+
+    <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, RESULTADOS Y COLA -->
     <div class="results-col">
-      <!-- REPRODUCTOR 1ER PASE -->
-      <div class="vidbox">
-        <div class="vid-header">
-          <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
-          <div class="vid-actions">
-            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
-            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
-          </div>
-        </div>
-        <div class="empty" id="empty1">sin generar</div>
-        <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa 1er pase">
-        <video class="preview-img" id="previewVideo1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
-        <span class="video-badge" id="badge1"></span>
-        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
-        <div class="vid-footer">
-          <span class="time-tag" id="time1"></span>
-          <span class="res-tag" id="res1"></span>
-        </div>
-      </div>
-
-      <!-- REPRODUCTOR FINAL -->
-      <div class="vidbox">
-        <div class="vid-header">
-          <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
-          <div class="vid-actions">
-            <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
-            <button class="vid-action-btn" id="btnSaveFrame2" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
-            <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
-          </div>
-        </div>
-        <div class="empty" id="empty2">sin generar</div>
-        <img class="preview-img" id="previewImg2" style="display:none;" alt="Vista previa 2º pase">
-        <video class="preview-img" id="previewVideo2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
-        <span class="video-badge" id="badge2"></span>
-        <video id="video2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
-        <div class="vid-footer">
-          <span class="time-tag" id="time2"></span>
-          <span class="res-tag" id="res2"></span>
-        </div>
-      </div>
-      
-      <!-- GALERÍA DE VARIANTES -->
-      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
-        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
-        <div class="variant-grid" id="variantGrid"></div>
-      </div>
-
       <!-- PANEL DE EJECUCIÓN Y COLAS -->
       <div class="panel" style="margin-bottom:0;">
         <h2>Ejecución</h2>
@@ -180,6 +143,53 @@
           </div>
         </div>
         <div class="log" id="log">listo.</div>
+      </div>
+
+      <!-- REPRODUCTOR FINAL -->
+      <div class="vidbox">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnSaveFrame2" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="empty2">sin generar</div>
+        <img class="preview-img" id="previewImg2" style="display:none;" alt="Vista previa 2º pase">
+        <video class="preview-img" id="previewVideo2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        <span class="video-badge" id="badge2"></span>
+        <video id="video2" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="time2"></span>
+          <span class="res-tag" id="res2"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR 1ER PASE -->
+      <div class="vidbox">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">1er pase</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa 1er pase">
+        <video class="preview-img" id="previewVideo1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        <span class="video-badge" id="badge1"></span>
+        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="time1"></span>
+          <span class="res-tag" id="res1"></span>
+        </div>
+      </div>
+      
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
       </div>
 
       <!-- HISTORIAL DE VÍDEOS -->
