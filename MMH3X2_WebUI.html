@@ -995,6 +995,40 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             </div>
           </div>
 
+          <!-- Sol-H3 (SM120 Blackwell) -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label>Acelerador Sol-H3 (SM120 Blackwell)</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg" id="segSolH3On" data-value="true">Activo</div>
+              <div class="seg on" id="segSolH3Off" data-value="false">Desactivado</div>
+            </div>
+            <div id="solH3Controls" style="display:none; margin-top:8px;">
+              <div class="row" style="margin-top:6px;">
+                <label style="font-size:10px;">Fusión exacta (exact_fusion)</label>
+                <div class="seed-toggle" style="margin-top:4px;">
+                  <div class="seg on" id="segSolExactOn" data-value="true">Sí</div>
+                  <div class="seg" id="segSolExactOff" data-value="false">No</div>
+                </div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Evaluaciones densas <span class="hint" id="solDenseEvalHint">(1 = estable)</span></label>
+                <input type="range" id="solDenseEvalSlider" min="0" max="4" step="1" value="1">
+                <div class="slider-val" id="solDenseEvalVal">1</div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Capas densas (dense_layers)</label>
+                <input type="range" id="solDenseLayersSlider" min="0" max="8" step="1" value="2">
+                <div class="slider-val" id="solDenseLayersVal">2</div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Tau (umbral)</label>
+                <input type="range" id="solTauSlider" min="0.1" max="2.0" step="0.1" value="1.0">
+                <div class="slider-val" id="solTauVal">1.0</div>
+              </div>
+            </div>
+            <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Acelera la atención de vídeo en ambos segmentos simultáneamente.</div>
+          </div>
+
           <!-- Spectrum (MiniMax H3) -->
           <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
             <label>Spectrum (MiniMax H3)</label>
@@ -1034,6 +1068,35 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div>
           </div>
         </div>
+      </div>
+
+      <!-- REFINADO FACIAL (H3 FaceRefine) -->
+      <div class="panel">
+        <h2>Refinado facial (H3 FaceRefine)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segFaceRefineOn" data-value="true">Activo</div>
+          <div class="seg on" id="segFaceRefineOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="faceRefineControls" style="display:none; margin-top:8px;">
+          <div class="row slider-row">
+            <label>Denoise base <span class="hint" id="faceRefineDenoiseHint">(0.35)</span></label>
+            <input type="range" id="faceRefineDenoiseSlider" min="0.15" max="0.55" step="0.05" value="0.35">
+            <div class="slider-val" id="faceRefineDenoiseVal">0.35</div>
+          </div>
+          <div class="row slider-row">
+            <label>Suavizado de borde (Feather) <span class="hint" id="faceRefineFeatherHint">(16 px)</span></label>
+            <input type="range" id="faceRefineFeatherSlider" min="4" max="32" step="2" value="16">
+            <div class="slider-val" id="faceRefineFeatherVal">16 px</div>
+          </div>
+          <div class="row">
+            <label>Selección de rostro</label>
+            <select id="faceRefineSelectMode">
+              <option value="largest_face" selected>Rostro principal (más grande)</option>
+              <option value="centre_most">Rostro más centrado</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera los rostros del vídeo continuo en alta escala con Denoise adaptativo por fotograma, recomponiéndolos mediante recorte y fundido suave.</div>
       </div>
 
       <!-- POSTPROCESADO: RTX SUPER RESOLUTION & RIFE -->
@@ -1144,6 +1207,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <div class="vid-actions">
             <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">⬇ Descargar</button>
             <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnFaceRefineFinal" title="Refinar los rostros del vídeo final con H3 FaceRefine" style="display:none;" type="button">😊 Refinar rostro</button>
             <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
           </div>
         </div>
@@ -4675,7 +4739,20 @@ const CONFIG = {
     SPARSE_ATTN: "88",
     BLOCK_SPARSE: "90",
     AIMDO: "91",
-    SPECTRUM: "162"
+    SPECTRUM: "162",
+    SOL_H3: "166",
+    FACE_CROP: "301",
+    FACE_REF2V: "302",
+    FACE_INJECT: "303",
+    FACE_PERFRAME_DENOISE: "305",
+    FACE_SCHEDULER: "306",
+    FACE_GUIDER: "307",
+    FACE_NOISE: "308",
+    FACE_SAMPLER: "309",
+    FACE_DECODE: "310",
+    FACE_STITCH: "311",
+    FACE_LOAD_VIDEO: "312",
+    FACE_COMPONENTS: "313"
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -4949,6 +5026,117 @@ if(IS_BLOCKATT){
   setH3OptUI(_h3OptState);
 }
 
+// --- SOL-H3 (SM120 Blackwell) ---
+const SOL_H3_KEY = "mmh3x2_sol_h3_state";
+const SOL_H3_DEFAULTS = {
+  enabled: true,
+  exact_fusion: true,
+  dense_evaluations: 1,
+  dense_layers: 2,
+  tau: 1.0
+};
+function loadSolH3(){
+  try { return Object.assign({}, SOL_H3_DEFAULTS, JSON.parse(localStorage.getItem(SOL_H3_KEY) || "{}")); }
+  catch(_) { return {...SOL_H3_DEFAULTS}; }
+}
+function saveSolH3(s){ try { localStorage.setItem(SOL_H3_KEY, JSON.stringify(s)); } catch(_){} }
+function getSolH3State(){
+  return {
+    enabled: $("segSolH3On")?.classList.contains("on") ?? true,
+    exact_fusion: $("segSolExactOn")?.classList.contains("on") ?? true,
+    dense_evaluations: parseInt($("solDenseEvalSlider")?.value || "1", 10),
+    dense_layers: parseInt($("solDenseLayersSlider")?.value || "2", 10),
+    tau: parseFloat($("solTauSlider")?.value || "1.0")
+  };
+}
+function setSolH3UI(s){
+  if(!s) return;
+  const on = $("segSolH3On"), off = $("segSolH3Off");
+  const panel = $("solH3Controls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  const exactOn = $("segSolExactOn"), exactOff = $("segSolExactOff");
+  if(s.exact_fusion !== false){
+    exactOn?.classList.add("on"); exactOff?.classList.remove("on");
+  } else {
+    exactOff?.classList.add("on"); exactOn?.classList.remove("on");
+  }
+  if($("solDenseEvalSlider")){
+    const de = (s.dense_evaluations != null) ? parseInt(s.dense_evaluations, 10) : 1;
+    $("solDenseEvalSlider").value = de;
+    if($("solDenseEvalVal")) $("solDenseEvalVal").textContent = de;
+    if($("solDenseEvalHint")) $("solDenseEvalHint").textContent = (de === 0) ? "(0 = turbo, posible inestabilidad)" : `(${de} = estable)`;
+  }
+  if($("solDenseLayersSlider")){
+    const dl = (s.dense_layers != null) ? parseInt(s.dense_layers, 10) : 2;
+    $("solDenseLayersSlider").value = dl;
+    if($("solDenseLayersVal")) $("solDenseLayersVal").textContent = dl;
+  }
+  if($("solTauSlider")){
+    const tau = (s.tau != null) ? parseFloat(s.tau) : 1.0;
+    $("solTauSlider").value = tau;
+    if($("solTauVal")) $("solTauVal").textContent = tau.toFixed(1);
+  }
+}
+const _solH3State = loadSolH3();
+setSolH3UI(_solH3State);
+
+// --- FACE REFINE (ComfyUI-H3-FaceRefine) ---
+const FACEREFINE_KEY = "mmh3x2_facerefine_state";
+const FACEREFINE_DEFAULTS = {
+  enabled: false,
+  denoise: 0.35,
+  feather: 16,
+  select: "largest_face"
+};
+function loadFaceRefine(){
+  try { return Object.assign({}, FACEREFINE_DEFAULTS, JSON.parse(localStorage.getItem(FACEREFINE_KEY) || "{}")); }
+  catch(_) { return {...FACEREFINE_DEFAULTS}; }
+}
+function saveFaceRefine(s){ try { localStorage.setItem(FACEREFINE_KEY, JSON.stringify(s)); } catch(_){} }
+function getFaceRefineState(){
+  return {
+    enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
+    denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.35"),
+    feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
+    select: $("faceRefineSelectMode")?.value || "largest_face"
+  };
+}
+function setFaceRefineUI(s){
+  if(!s) return;
+  const on = $("segFaceRefineOn"), off = $("segFaceRefineOff");
+  const panel = $("faceRefineControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("faceRefineDenoiseSlider")){
+    const d = parseFloat(s.denoise != null ? s.denoise : 0.35);
+    $("faceRefineDenoiseSlider").value = d;
+    if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+    if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+  }
+  if($("faceRefineFeatherSlider")){
+    const f = parseInt(s.feather != null ? s.feather : 16, 10);
+    $("faceRefineFeatherSlider").value = f;
+    if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+    if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  }
+  if($("faceRefineSelectMode") && s.select){
+    $("faceRefineSelectMode").value = s.select;
+  }
+}
+const _faceRefineState = loadFaceRefine();
+setFaceRefineUI(_faceRefineState);
+
 // Estado de imágenes, vídeo y audio
 let mediaSlots = {
   1: { file: null, dataUrl: null, uploaded: null, name: "" },
@@ -5019,6 +5207,101 @@ function attachAttentionOptimizerListeners(){
   $("segBootstrapOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveSettings(); });
   $("segBootstrapOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveSettings(); });
   $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); scheduleSaveSettings(); });
+
+  // Listeners Sol-H3
+  $("segSolH3On")?.addEventListener("click", () => {
+    const s = getSolH3State();
+    s.enabled = true;
+    setSolH3UI(s);
+    saveSolH3(s);
+    scheduleSaveSettings();
+  });
+  $("segSolH3Off")?.addEventListener("click", () => {
+    const s = getSolH3State();
+    s.enabled = false;
+    setSolH3UI(s);
+    saveSolH3(s);
+    scheduleSaveSettings();
+  });
+  $("segSolExactOn")?.addEventListener("click", () => {
+    const s = getSolH3State();
+    s.exact_fusion = true;
+    setSolH3UI(s);
+    saveSolH3(s);
+    scheduleSaveSettings();
+  });
+  $("segSolExactOff")?.addEventListener("click", () => {
+    const s = getSolH3State();
+    s.exact_fusion = false;
+    setSolH3UI(s);
+    saveSolH3(s);
+    scheduleSaveSettings();
+  });
+  $("solDenseEvalSlider")?.addEventListener("input", (e) => {
+    const de = parseInt(e.target.value, 10) || 0;
+    if($("solDenseEvalVal")) $("solDenseEvalVal").textContent = de;
+    if($("solDenseEvalHint")) $("solDenseEvalHint").textContent = (de === 0) ? "(0 = turbo, posible inestabilidad)" : `(${de} = estable)`;
+    const s = getSolH3State();
+    s.dense_evaluations = de;
+    saveSolH3(s);
+    scheduleSaveSettings();
+  });
+  $("solDenseLayersSlider")?.addEventListener("input", (e) => {
+    const dl = parseInt(e.target.value, 10) || 0;
+    if($("solDenseLayersVal")) $("solDenseLayersVal").textContent = dl;
+    const s = getSolH3State();
+    s.dense_layers = dl;
+    saveSolH3(s);
+    scheduleSaveSettings();
+  });
+  $("solTauSlider")?.addEventListener("input", (e) => {
+    const tau = parseFloat(e.target.value) || 1.0;
+    if($("solTauVal")) $("solTauVal").textContent = tau.toFixed(1);
+    const s = getSolH3State();
+    s.tau = tau;
+    saveSolH3(s);
+    scheduleSaveSettings();
+  });
+
+  // Listeners FaceRefine
+  $("segFaceRefineOn")?.addEventListener("click", () => {
+    const s = getFaceRefineState();
+    s.enabled = true;
+    setFaceRefineUI(s);
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
+  $("segFaceRefineOff")?.addEventListener("click", () => {
+    const s = getFaceRefineState();
+    s.enabled = false;
+    setFaceRefineUI(s);
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
+  $("faceRefineDenoiseSlider")?.addEventListener("input", (e) => {
+    const d = parseFloat(e.target.value) || 0.35;
+    if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+    if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+    const s = getFaceRefineState();
+    s.denoise = d;
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
+  $("faceRefineFeatherSlider")?.addEventListener("input", (e) => {
+    const f = parseInt(e.target.value, 10) || 16;
+    if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+    if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+    const s = getFaceRefineState();
+    s.feather = f;
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
+  $("faceRefineSelectMode")?.addEventListener("change", (e) => {
+    const s = getFaceRefineState();
+    s.select = e.target.value;
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
 }
 
 // Callbacks CONFIG requeridos por common.js
@@ -5271,6 +5554,9 @@ CONFIG.onProgress = function(value, max, prompt_id, node){
     activeSlot = "Seg2";
     currentActiveSamplerSlot = 2;
     label = "Seg 2";
+  } else if(nid === String(N.FACE_SAMPLER) || nid === "309"){
+    activeSlot = "Final";
+    label = "FaceRefine";
   } else if(nid === String(N.RIFE) || nid === "72"){
     label = "RIFE";
   }
@@ -5364,6 +5650,18 @@ CONFIG.onNodeExecuting = function(data){
     log("💾 Guardando vídeo Segmento 2...", "l-busy");
   } else if(node === String(N.BLEND) || node === "66" || node === String(N.IMAGE_BATCH) || node === "40"){
     log("✨ Suavizando empalme y uniendo Segmentos 1 y 2...", "l-busy");
+  } else if(node === String(N.FACE_CROP) || node === "301"){
+    log("Rastreando y recortando rostros (Face Track Crop)...", "l-busy");
+    const tFin = $("previewStepTextFinal");
+    if(tFin) tFin.textContent = "FaceRefine: Detectando rostros...";
+  } else if(node === String(N.FACE_PERFRAME_DENOISE) || node === "305"){
+    log("Calculando denoise adaptativo por fotograma (FaceRefine)...", "l-busy");
+  } else if(node === String(N.FACE_SAMPLER) || node === "309"){
+    log("Muestreando detalle facial de alta fidelidad (DiT FaceRefine)...", "l-busy");
+  } else if(node === String(N.FACE_DECODE) || node === "310"){
+    log("Decodificando rostros refinados (VAE)...", "l-busy");
+  } else if(node === String(N.FACE_STITCH) || node === "311"){
+    log("Componiendo rostros refinados sobre el vídeo continuo (Face Stitch)...", "l-busy");
   } else if(node === String(N.RTX) || node === "71"){
     log("🚀 Aplicando RTX Video Super Resolution (2x)...", "l-busy");
     const tFin = $("previewStepTextFinal");
@@ -6058,6 +6356,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
   const pVid = $("previewVideo" + suffix);
   const btnDl = $("btnDownload" + suffix);
   const btnExt = $("btnExtractFrame" + suffix);
+  const btnFr = $("btnFaceRefine" + suffix);
   const btnMeta = $("btnLoadMeta" + suffix);
   const timeTag = $("time" + suffix);
   const resTag = $("res" + suffix);
@@ -6174,6 +6473,13 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
     };
   }
 
+  if(btnFr){
+    btnFr.style.display = "inline-flex";
+    btnFr.onclick = () => {
+      enqueueFaceRefineCurrent(slotIndex);
+    };
+  }
+
   if(btnMeta){
     btnMeta.disabled = false;
     btnMeta.onclick = async () => {
@@ -6204,6 +6510,49 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
 // Alias showVideo
 function showVideo(slotIndex, media, options = {}){
   displayVideoInPlayer(slotIndex, media, options);
+}
+
+// --- FACE REFINE ON-DEMAND ---
+async function enqueueFaceRefineCurrent(slotIndex = 3){
+  const media = currentMedia[slotIndex] || currentMedia[3];
+  if(!media || !media.filename){
+    log("No hay ningún vídeo en el reproductor para refinar.", "l-warn");
+    return;
+  }
+  const job = {
+    id: "fr_" + Date.now(),
+    runMode: "facerefine_only",
+    isFaceRefineOnly: true,
+    sourceMedia: { ...media },
+    prompt: $("prompt")?.value?.trim() || "",
+    prompt2: $("prompt2")?.value?.trim() || "",
+    duration1: parseFloat($("durationSlider1")?.value || $("durationSlider")?.value || "15.0"),
+    duration2: parseFloat($("durationSlider2")?.value || "15.0"),
+    megapixels: parseFloat($("mpSlider")?.value || "0.70"),
+    steps: parseInt($("stepsSlider")?.value || "20", 10),
+    sampler: $("samplerName")?.value || "res_multistep",
+    scheduler: $("schedulerName")?.value || "simple",
+    seedMode: "random",
+    seed: Math.floor(Math.random() * 100000000),
+    batchSize: 1,
+    attentionBackend: getAttentionBackendState(),
+    h3opt: getH3OptState(),
+    solH3: getSolH3State(),
+    faceRefine: getFaceRefineState()
+  };
+  log(`Añadido refinado facial para ${media.filename} a la cola...`, "l-info");
+  if(!activeJob){
+    startJob(job);
+  } else {
+    jobQueue.push(job);
+    updateQueueUI();
+    log(`📥 Tarea añadida a la cola (${jobQueue.length} en espera)`, "l-ok");
+  }
+}
+
+const btnFaceRefineFinalEl = $("btnFaceRefineFinal");
+if(btnFaceRefineFinalEl){
+  btnFaceRefineFinalEl.addEventListener("click", () => enqueueFaceRefineCurrent(3));
 }
 
 // --- Extracción de fotograma exacto (patrón H3/LTX) ---
@@ -6384,7 +6733,9 @@ function saveSettings(){
     enhancerStyle: $("enhancerStyle")?.value || "A",
     enhancerChainMode: $("enhancerChainMode")?.value || "ollama",
     shareRefsToggle: !!$("shareRefsToggle")?.checked,
-    refImageSize: $("refImageSize")?.value || "match"
+    refImageSize: $("refImageSize")?.value || "match",
+    solH3: getSolH3State(),
+    faceRefine: getFaceRefineState()
   };
   try {
     localStorage.setItem(MMH3X2_SETTINGS_KEY, JSON.stringify(s));
@@ -6471,6 +6822,8 @@ function restoreSettings(){
       if($("h3ShiftAudioVal")) $("h3ShiftAudioVal").textContent = parseFloat(s.h3ShiftAudio).toFixed(1);
     }
     if(s.spectrum){ setSpectrumUI(s.spectrum); saveSpectrum(s.spectrum); }
+    if(s.solH3){ setSolH3UI(s.solH3); saveSolH3(s.solH3); }
+    if(s.faceRefine){ setFaceRefineUI(s.faceRefine); saveFaceRefine(s.faceRefine); }
 
     if(s.lora1Toggle !== undefined && $("lora1Toggle")) $("lora1Toggle").checked = s.lora1Toggle;
     if(s.lora1Select && $("lora1Select")) $("lora1Select").value = s.lora1Select;
@@ -7360,6 +7713,25 @@ function buildGraph(j){
     if(g[N.AIMDO]) delete g[N.AIMDO];
   }
 
+  // Sol-H3 SOL Attention (Experimental) — kernel CuTe SM120 para Blackwell
+  const solH3State = j ? j.solH3 : getSolH3State();
+  if(solH3State && solH3State.enabled){
+    g[N.SOL_H3] = {
+      class_type: "SolH3Experimental",
+      inputs: {
+        model: [currentModelNode, 0],
+        exact_fusion: solH3State.exact_fusion !== false,
+        tau: (typeof solH3State.tau === "number") ? solH3State.tau : 1.0,
+        dense_evaluations: (typeof solH3State.dense_evaluations === "number") ? solH3State.dense_evaluations : 1,
+        dense_layers: (typeof solH3State.dense_layers === "number") ? solH3State.dense_layers : 2
+      },
+      _meta: { title: "Sol-H3 SOL Attention (Experimental)" }
+    };
+    currentModelNode = N.SOL_H3;
+  } else {
+    delete g[N.SOL_H3];
+  }
+
   // 8. Inyección dinámica de LoRAs
   if($("lora1Toggle")?.checked && $("lora1Select")?.value){
     const l1 = $("lora1Select").value;
@@ -7401,6 +7773,234 @@ function buildGraph(j){
       _meta: { title: "Model Preview Override (animado L2RGB)" }
     };
     currentModelNode = previewOverrideKey;
+  }
+
+  // MODO ON-DEMAND: Refinar rostro del clip final sin re-muestrear los dos segmentos principales
+  if(j && j.isFaceRefineOnly){
+    const frState = j.faceRefine || getFaceRefineState();
+    const sourceMedia = j.sourceMedia || currentMedia[3];
+    const videoFilePath = (sourceMedia && sourceMedia.subfolder ? sourceMedia.subfolder + "/" : "") + (sourceMedia ? sourceMedia.filename : "") + " [output]";
+
+    // Eliminar generación completa de Seg 1 y Seg 2 para ahorrar recursos
+    const nodesToDelete = [
+      N.REF2V_SEG1, N.GUIDER_1, N.SAMPLER_1, N.SCHEDULER_1, N.SAMPLE_1, N.DECODE_VID_1, N.DECODE_AUD_1, N.CREATE_VID_1, N.SAVE_VID_1,
+      N.REF2V_SEG2, N.GUIDER_2, N.SAMPLER_2, N.SCHEDULER_2, N.SAMPLE_2, N.DECODE_VID_2, N.DECODE_AUD_2, N.CREATE_VID_2, N.SAVE_VID_2,
+      N.IMAGE_BATCH, N.AUDIO_CONCAT, N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.SEED,
+      "12_seg2", "13_seg2", "61", "64", "65", "25", "26", "27", "28", "29", "54", "57", "59",
+      "190_load_audio1", "191_load_audio2", "192_trim_final_audio", "193_trim_audio1", "194_trim_audio2",
+      "195_concat_direct_audio", "198_ia_boost_seg1", "198_ia_vol_seg1", "199_ia_trim_seg1",
+      "199_ia_boost_seg2", "199_ia_vol_seg2", "199_ia_trim_seg2", "199_ia_boost_final", "199_user_vol_final",
+      "199_ia_vol_final", "199_merge_final"
+    ];
+    nodesToDelete.forEach(id => { delete g[id]; });
+
+    // Carga y demux nativos de ComfyUI (cero dependencias externas)
+    g[N.FACE_LOAD_VIDEO] = {
+      class_type: "LoadVideo",
+      inputs: { file: videoFilePath },
+      _meta: { title: "Load Video (Native)" }
+    };
+    g[N.FACE_COMPONENTS] = {
+      class_type: "GetVideoComponents",
+      inputs: { video: [N.FACE_LOAD_VIDEO, 0] },
+      _meta: { title: "Get Video Components (Native)" }
+    };
+
+    // Sub-grafo FaceRefine
+    g[N.FACE_CROP] = {
+      class_type: "H3FaceTrackCrop",
+      inputs: {
+        images: [N.FACE_COMPONENTS, 0],
+        detector: "face_yolov8m.pt",
+        confidence: 0.35,
+        crop_factor: 3.0,
+        canvas_width: 768,
+        canvas_height: 768,
+        canvas_mode: "auto_capped_768",
+        smooth_window: 21,
+        size_smooth_window: 51,
+        smooth_method: "gaussian",
+        size_mode: "per_frame",
+        identity_track: false,
+        identity_threshold: 0.28,
+        select: frState.select || "largest_face",
+        fallback_detector: "none",
+        fallback_head_frac: 0.5,
+        select_index: 0,
+        identity_model: "insightface",
+        cut_detection: "none",
+        cut_threshold: 3.0,
+        absent_shots: "off",
+        X: 0,
+        Y: 0,
+        frame_index: 0
+      },
+      _meta: { title: "Face Track Crop" }
+    };
+
+    const frPrompt = p1 || "cinematic face, natural expression, ultra high detail, sharp focus, 8k";
+    const frRef2vInputs = {
+      clip: [N.CLIP, 0],
+      vae: [N.VAE_VID, 0],
+      audio_vae: [N.VAE_AUD, 0],
+      prompt: frPrompt,
+      width: [N.FACE_CROP, 4],
+      height: [N.FACE_CROP, 5],
+      length: [N.FACE_CROP, 6],
+      ref_image_size: "match",
+      "ref_audios.ref_audio_0": [N.FACE_COMPONENTS, 1]
+    };
+    if(g[N.IMG1]){
+      frRef2vInputs["ref_images.ref_image_0"] = [N.IMG1, 0];
+    }
+    g[N.FACE_REF2V] = {
+      class_type: "MiniMaxH3ReferenceToVideo",
+      inputs: frRef2vInputs,
+      _meta: { title: "Face Conditioning & AV Latent" }
+    };
+
+    g[N.FACE_INJECT] = {
+      class_type: "H3InjectVideoLatent",
+      inputs: {
+        av_latent: [N.FACE_REF2V, 1],
+        images: [N.FACE_CROP, 0],
+        vae: [N.VAE_VID, 0]
+      },
+      _meta: { title: "Inject Face Video Latent" }
+    };
+
+    g[N.FACE_PERFRAME_DENOISE] = {
+      class_type: "H3PerFrameDenoise",
+      inputs: {
+        model: [currentModelNode, 0],
+        av_latent: [N.FACE_INJECT, 0],
+        transform: [N.FACE_CROP, 1],
+        denoise_multiplier_small_face: 1.0,
+        denoise_multiplier_large_face: frState.denoise || 0.35,
+        scale_mode: "absolute_px",
+        face_px_small: 30.0,
+        face_px_large: 120.0,
+        gamma: 1.0,
+        smooth_frames: 9
+      },
+      _meta: { title: "Per-Frame Face Denoise" }
+    };
+
+    g[N.FACE_SCHEDULER] = {
+      class_type: "BasicScheduler",
+      inputs: {
+        model: [N.FACE_PERFRAME_DENOISE, 2],
+        scheduler: "simple",
+        steps: 8,
+        denoise: frState.denoise || 0.35
+      },
+      _meta: { title: "Face Basic Scheduler" }
+    };
+
+    g[N.FACE_GUIDER] = {
+      class_type: "BasicGuider",
+      inputs: {
+        model: [N.FACE_PERFRAME_DENOISE, 2],
+        conditioning: [N.FACE_REF2V, 0]
+      },
+      _meta: { title: "Face Guider" }
+    };
+
+    g[N.FACE_NOISE] = {
+      class_type: "RandomNoise",
+      inputs: {
+        noise_seed: (j && j.seed) ? j.seed : Math.floor(Math.random() * 100000000)
+      },
+      _meta: { title: "Face Noise" }
+    };
+
+    g[N.FACE_SAMPLER] = {
+      class_type: "SamplerCustomAdvanced",
+      inputs: {
+        noise: [N.FACE_NOISE, 0],
+        guider: [N.FACE_GUIDER, 0],
+        sampler: [N.SAMPLER_1, 0],
+        sigmas: [N.FACE_SCHEDULER, 0],
+        latent_image: [N.FACE_PERFRAME_DENOISE, 0]
+      },
+      _meta: { title: "Sample Face Latent" }
+    };
+
+    g[N.FACE_DECODE] = {
+      class_type: "VAEDecode",
+      inputs: {
+        samples: [N.FACE_SAMPLER, 0],
+        vae: [N.VAE_VID, 0]
+      },
+      _meta: { title: "Decode Face Crops" }
+    };
+
+    g[N.FACE_STITCH] = {
+      class_type: "H3FaceStitch",
+      inputs: {
+        base_images: [N.FACE_COMPONENTS, 0],
+        refined_crops: [N.FACE_DECODE, 0],
+        transform: [N.FACE_CROP, 1],
+        paste_region: "face_only",
+        mask_dilation: 16,
+        feather: frState.feather || 16,
+        colour_match: 1.0,
+        blend: 1.0,
+        undetected_frames: "fade_out",
+        feather_scales_with_crop: false
+      },
+      _meta: { title: "Stitch Face" }
+    };
+
+    let faceFinalImages = [N.FACE_STITCH, 0];
+    const rtxOn = $("rtxToggle") ? $("rtxToggle").checked : true;
+    const rifeOn = $("rifeToggle") ? $("rifeToggle").checked : true;
+
+    if(rtxOn && g[N.RTX]?.inputs){
+      g[N.RTX].inputs.images = faceFinalImages;
+      faceFinalImages = [N.RTX, 0];
+    } else {
+      delete g[N.RTX];
+    }
+
+    if(rifeOn && g[N.RIFE]?.inputs){
+      const mult = parseInt($("rifeMultiplier")?.value || "2", 10);
+      if(g[N.RIFE_MULT]?.inputs) g[N.RIFE_MULT].inputs.value = mult;
+      const rifeModel = $("rifeModel")?.value || "rife_v4.26.safetensors";
+      if(g[N.RIFE_LOADER]?.inputs) g[N.RIFE_LOADER].inputs.model_name = rifeModel;
+      g[N.RIFE].inputs.images = faceFinalImages;
+      faceFinalImages = [N.RIFE, 0];
+    } else {
+      delete g[N.RIFE];
+      delete g[N.RIFE_LOADER];
+      delete g[N.RIFE_MULT];
+    }
+
+    const prefix = ($("filenamePrefix")?.value || "video/MiniMax_H3").trim();
+    g[N.CREATE_VID_FINAL] = {
+      class_type: "CreateVideo",
+      inputs: {
+        fps: [N.FACE_COMPONENTS, 2],
+        bit_depth: [N.FACE_COMPONENTS, 3],
+        color_space: [N.FACE_COMPONENTS, 4],
+        images: faceFinalImages,
+        audio: [N.FACE_COMPONENTS, 1]
+      },
+      _meta: { title: "Create Video Final (Face Refined)" }
+    };
+    g[N.SAVE_VID_FINAL] = {
+      class_type: "SaveVideo",
+      inputs: {
+        filename_prefix: prefix + "_facerefined",
+        format: "auto",
+        "format.codec": "auto",
+        codec: "auto",
+        video: [N.CREATE_VID_FINAL, 0]
+      },
+      _meta: { title: "Save Video Final (Face Refined)" }
+    };
+
+    return g;
   }
 
   // Conectar el modelo resultante a Guiders y Schedulers
@@ -7806,6 +8406,171 @@ function buildGraph(j){
 
   let finalImagesSource = [N.IMAGE_BATCH, 0];
 
+  // 13a. Refinado facial (ComfyUI-H3-FaceRefine) sobre el vídeo continuo unificado
+  const frState = j ? j.faceRefine : getFaceRefineState();
+  const faceRefineEnabled = frState ? frState.enabled : false;
+
+  if(faceRefineEnabled){
+    g[N.FACE_CROP] = {
+      class_type: "H3FaceTrackCrop",
+      inputs: {
+        images: finalImagesSource,
+        detector: "face_yolov8m.pt",
+        confidence: 0.35,
+        crop_factor: 3.0,
+        canvas_width: 768,
+        canvas_height: 768,
+        canvas_mode: "auto_capped_768",
+        smooth_window: 21,
+        size_smooth_window: 51,
+        smooth_method: "gaussian",
+        size_mode: "per_frame",
+        identity_track: false,
+        identity_threshold: 0.28,
+        select: frState.select || "largest_face",
+        fallback_detector: "none",
+        fallback_head_frac: 0.5,
+        select_index: 0,
+        identity_model: "insightface",
+        cut_detection: "none",
+        cut_threshold: 3.0,
+        absent_shots: "off",
+        X: 0,
+        Y: 0,
+        frame_index: 0
+      },
+      _meta: { title: "Face Track Crop" }
+    };
+
+    const frPrompt = p1 || "cinematic face, natural expression, ultra high detail, sharp focus, 8k";
+    const frRef2vInputs = {
+      clip: [N.CLIP, 0],
+      vae: [N.VAE_VID, 0],
+      audio_vae: [N.VAE_AUD, 0],
+      prompt: frPrompt,
+      width: [N.FACE_CROP, 4],
+      height: [N.FACE_CROP, 5],
+      length: [N.FACE_CROP, 6],
+      ref_image_size: "match"
+    };
+    if(g[N.IMG1]){
+      frRef2vInputs["ref_images.ref_image_0"] = [N.IMG1, 0];
+    }
+    g[N.FACE_REF2V] = {
+      class_type: "MiniMaxH3ReferenceToVideo",
+      inputs: frRef2vInputs,
+      _meta: { title: "Face Conditioning & AV Latent" }
+    };
+
+    g[N.FACE_INJECT] = {
+      class_type: "H3InjectVideoLatent",
+      inputs: {
+        av_latent: [N.FACE_REF2V, 1],
+        images: [N.FACE_CROP, 0],
+        vae: [N.VAE_VID, 0]
+      },
+      _meta: { title: "Inject Face Video Latent" }
+    };
+
+    g[N.FACE_PERFRAME_DENOISE] = {
+      class_type: "H3PerFrameDenoise",
+      inputs: {
+        model: [currentModelNode, 0],
+        av_latent: [N.FACE_INJECT, 0],
+        transform: [N.FACE_CROP, 1],
+        denoise_multiplier_small_face: 1.0,
+        denoise_multiplier_large_face: frState.denoise || 0.35,
+        scale_mode: "absolute_px",
+        face_px_small: 30.0,
+        face_px_large: 120.0,
+        gamma: 1.0,
+        smooth_frames: 9
+      },
+      _meta: { title: "Per-Frame Face Denoise" }
+    };
+
+    g[N.FACE_SCHEDULER] = {
+      class_type: "BasicScheduler",
+      inputs: {
+        model: [N.FACE_PERFRAME_DENOISE, 2],
+        scheduler: "simple",
+        steps: 8,
+        denoise: frState.denoise || 0.35
+      },
+      _meta: { title: "Face Basic Scheduler" }
+    };
+
+    g[N.FACE_GUIDER] = {
+      class_type: "BasicGuider",
+      inputs: {
+        model: [N.FACE_PERFRAME_DENOISE, 2],
+        conditioning: [N.FACE_REF2V, 0]
+      },
+      _meta: { title: "Face Guider" }
+    };
+
+    g[N.FACE_NOISE] = {
+      class_type: "RandomNoise",
+      inputs: {
+        noise_seed: Math.floor(Math.random() * 100000000)
+      },
+      _meta: { title: "Face Noise" }
+    };
+
+    g[N.FACE_SAMPLER] = {
+      class_type: "SamplerCustomAdvanced",
+      inputs: {
+        noise: [N.FACE_NOISE, 0],
+        guider: [N.FACE_GUIDER, 0],
+        sampler: [N.SAMPLER_1, 0],
+        sigmas: [N.FACE_SCHEDULER, 0],
+        latent_image: [N.FACE_PERFRAME_DENOISE, 0]
+      },
+      _meta: { title: "Sample Face Latent" }
+    };
+
+    g[N.FACE_DECODE] = {
+      class_type: "VAEDecode",
+      inputs: {
+        samples: [N.FACE_SAMPLER, 0],
+        vae: [N.VAE_VID, 0]
+      },
+      _meta: { title: "Decode Face Crops" }
+    };
+
+    g[N.FACE_STITCH] = {
+      class_type: "H3FaceStitch",
+      inputs: {
+        base_images: finalImagesSource,
+        refined_crops: [N.FACE_DECODE, 0],
+        transform: [N.FACE_CROP, 1],
+        paste_region: "face_only",
+        mask_dilation: 16,
+        feather: frState.feather || 16,
+        colour_match: 1.0,
+        blend: 1.0,
+        undetected_frames: "fade_out",
+        feather_scales_with_crop: false
+      },
+      _meta: { title: "Stitch Face" }
+    };
+
+    finalImagesSource = [N.FACE_STITCH, 0];
+  } else {
+    delete g[N.FACE_CROP];
+    delete g[N.FACE_REF2V];
+    delete g[N.FACE_INJECT];
+    delete g[N.FACE_PERFRAME_DENOISE];
+    delete g[N.FACE_SCHEDULER];
+    delete g[N.FACE_GUIDER];
+    delete g[N.FACE_NOISE];
+    delete g[N.FACE_SAMPLER];
+    delete g[N.FACE_DECODE];
+    delete g[N.FACE_STITCH];
+    delete g[N.FACE_LOAD_VIDEO];
+    delete g[N.FACE_COMPONENTS];
+  }
+
   if(rtxOn && g[N.RTX]?.inputs){
     g[N.RTX].inputs.images = finalImagesSource;
     finalImagesSource = [N.RTX, 0];
@@ -7850,7 +8615,10 @@ function buildGraph(j){
     const nodesToDelete = [
       N.REF2V_SEG2, N.SAMPLE_2, N.DECODE_VID_2, N.DECODE_AUD_2, N.CREATE_VID_2, N.SAVE_VID_2,
       N.IMAGE_BATCH, N.AUDIO_CONCAT, N.CREATE_VID_FINAL, N.SAVE_VID_FINAL,
-      N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.RTX, N.RIFE, N.RIFE_LOADER, N.RIFE_MULT
+      N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.RTX, N.RIFE, N.RIFE_LOADER, N.RIFE_MULT,
+      N.FACE_CROP, N.FACE_REF2V, N.FACE_INJECT, N.FACE_PERFRAME_DENOISE, N.FACE_SCHEDULER,
+      N.FACE_GUIDER, N.FACE_NOISE, N.FACE_SAMPLER, N.FACE_DECODE, N.FACE_STITCH,
+      N.FACE_LOAD_VIDEO, N.FACE_COMPONENTS
     ];
     nodesToDelete.forEach(id => { delete g[id]; });
     // Nodos auxiliares de audio que sobran en modo solo-Seg1.
@@ -7914,7 +8682,9 @@ async function queueJob(runMode){
     blockSparse: IS_BLOCKATT ? getBlockSparseState() : null,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
-    spectrum: getSpectrumState()
+    spectrum: getSpectrumState(),
+    solH3: getSolH3State(),
+    faceRefine: getFaceRefineState()
   };
 
   // Consultar en vivo el estado real de ComfyUI antes de decidir encolar
@@ -7971,7 +8741,7 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
     resetPreviewPanes();
     updateFinalPromptPanel(graph);
 
-    log(`🚀 Procesando ${job.runMode === 'seg1_only' ? 'Solo Seg 1' : 'Vídeo MMH3X2'} · Var ${varIdx} (seed ${seedUsed})...`);
+    log(`🚀 Procesando ${job.isFaceRefineOnly ? 'Refinado Facial (FaceRefine)' : (job.runMode === 'seg1_only' ? 'Solo Seg 1' : 'Vídeo MMH3X2')} · Var ${varIdx} (seed ${seedUsed})...`);
     const r = await fetch(server() + "/prompt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -8003,14 +8773,23 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
     if(stageTimers.ivSeg2) clearInterval(stageTimers.ivSeg2);
     if(stageTimers.ivFinal) clearInterval(stageTimers.ivFinal);
 
-    const el1 = $("timeSeg1"), el2 = $("timeSeg2");
-    if(el1){ el1.textContent = "⏱ 00:00"; el1.classList.add("live"); }
-    if(el2){ el2.textContent = ""; el2.classList.remove("live"); }
+    if(job.isFaceRefineOnly){
+      const elFinal = $("timeFinal");
+      if(elFinal){ elFinal.textContent = "⏱ 00:00"; elFinal.classList.add("live"); }
+      stageTimers.ivFinal = setInterval(() => {
+        const elapsed = Date.now() - stageTimers.startPrompt;
+        if(elFinal) elFinal.textContent = `⏱ ${fmtMs(elapsed)}`;
+      }, 500);
+    } else {
+      const el1 = $("timeSeg1"), el2 = $("timeSeg2");
+      if(el1){ el1.textContent = "⏱ 00:00"; el1.classList.add("live"); }
+      if(el2){ el2.textContent = ""; el2.classList.remove("live"); }
 
-    stageTimers.ivSeg1 = setInterval(() => {
-      const elapsed = Date.now() - stageTimers.startSeg1;
-      if(el1) el1.textContent = `⏱ ${fmtMs(elapsed)}`;
-    }, 500);
+      stageTimers.ivSeg1 = setInterval(() => {
+        const elapsed = Date.now() - stageTimers.startSeg1;
+        if(el1) el1.textContent = `⏱ ${fmtMs(elapsed)}`;
+      }, 500);
+    }
 
     pendingSeeds[data.prompt_id] = seedUsed;
     promptVariantMap[data.prompt_id] = varIdx;

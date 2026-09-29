@@ -512,6 +512,40 @@
             </div>
           </div>
 
+          <!-- Sol-H3 (SM120 Blackwell) -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label>Acelerador Sol-H3 (SM120 Blackwell)</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg" id="segSolH3On" data-value="true">Activo</div>
+              <div class="seg on" id="segSolH3Off" data-value="false">Desactivado</div>
+            </div>
+            <div id="solH3Controls" style="display:none; margin-top:8px;">
+              <div class="row" style="margin-top:6px;">
+                <label style="font-size:10px;">Fusión exacta (exact_fusion)</label>
+                <div class="seed-toggle" style="margin-top:4px;">
+                  <div class="seg on" id="segSolExactOn" data-value="true">Sí</div>
+                  <div class="seg" id="segSolExactOff" data-value="false">No</div>
+                </div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Evaluaciones densas <span class="hint" id="solDenseEvalHint">(1 = estable)</span></label>
+                <input type="range" id="solDenseEvalSlider" min="0" max="4" step="1" value="1">
+                <div class="slider-val" id="solDenseEvalVal">1</div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Capas densas (dense_layers)</label>
+                <input type="range" id="solDenseLayersSlider" min="0" max="8" step="1" value="2">
+                <div class="slider-val" id="solDenseLayersVal">2</div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Tau (umbral)</label>
+                <input type="range" id="solTauSlider" min="0.1" max="2.0" step="0.1" value="1.0">
+                <div class="slider-val" id="solTauVal">1.0</div>
+              </div>
+            </div>
+            <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Acelera la atención de vídeo en ambos segmentos simultáneamente.</div>
+          </div>
+
           <!-- Spectrum (MiniMax H3) -->
           <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
             <label>Spectrum (MiniMax H3)</label>
@@ -551,6 +585,35 @@
             <div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div>
           </div>
         </div>
+      </div>
+
+      <!-- REFINADO FACIAL (H3 FaceRefine) -->
+      <div class="panel">
+        <h2>Refinado facial (H3 FaceRefine)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segFaceRefineOn" data-value="true">Activo</div>
+          <div class="seg on" id="segFaceRefineOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="faceRefineControls" style="display:none; margin-top:8px;">
+          <div class="row slider-row">
+            <label>Denoise base <span class="hint" id="faceRefineDenoiseHint">(0.35)</span></label>
+            <input type="range" id="faceRefineDenoiseSlider" min="0.15" max="0.55" step="0.05" value="0.35">
+            <div class="slider-val" id="faceRefineDenoiseVal">0.35</div>
+          </div>
+          <div class="row slider-row">
+            <label>Suavizado de borde (Feather) <span class="hint" id="faceRefineFeatherHint">(16 px)</span></label>
+            <input type="range" id="faceRefineFeatherSlider" min="4" max="32" step="2" value="16">
+            <div class="slider-val" id="faceRefineFeatherVal">16 px</div>
+          </div>
+          <div class="row">
+            <label>Selección de rostro</label>
+            <select id="faceRefineSelectMode">
+              <option value="largest_face" selected>Rostro principal (más grande)</option>
+              <option value="centre_most">Rostro más centrado</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera los rostros del vídeo continuo en alta escala con Denoise adaptativo por fotograma, recomponiéndolos mediante recorte y fundido suave.</div>
       </div>
 
       <!-- POSTPROCESADO: RTX SUPER RESOLUTION & RIFE -->
@@ -661,6 +724,7 @@
           <div class="vid-actions">
             <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">⬇ Descargar</button>
             <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnFaceRefineFinal" title="Refinar los rostros del vídeo final con H3 FaceRefine" style="display:none;" type="button">😊 Refinar rostro</button>
             <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>📋 Workflow</button>
           </div>
         </div>
