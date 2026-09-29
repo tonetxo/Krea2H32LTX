@@ -3543,6 +3543,9 @@ function buildGraph(job){
   }
 
   // 9b. Latent Upscaler 3D (MiniMax H3) — se conecta entre SAMPLER y DECODE_VIDEO
+  // TODO [Hires-Fix 2-Stage Sampler]: Para máxima nitidez en Latent Upscaling y evitar el aspecto blando/plástico
+  // del latent interpolado directo a VAE, se requerirá un segundo pase de muestreo:
+  // Sampler 1 (base baja res) -> MinimaxH3LatentUpscaler3D -> Sampler 2 (denoise 0.35-0.40 con DiT H3) -> VAEDecode.
   const latentState = j ? j.latentUpscale : getLatentUpscaleState();
   const latentUpscaleEnabled = latentState ? latentState.enabled : false;
   const latentScale = latentState ? parseFloat(latentState.scale || "1.5") : 1.5;
