@@ -34,7 +34,7 @@
           </div>
           <div class="enhancer-row">
             <label>Cadena de mejora</label>
-            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">Ollama</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
+            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">LLM (Ollama / llama.cpp)</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
           </div>
           <div class="enhancer-row">
             <label>Temperatura LTX2 <span class="hint">(Generate LTX2 Prompt)</span></label>
@@ -48,15 +48,15 @@
             <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
           </div>
           <div class="enhancer-row">
-            <label>Cadena Ollama + LTX2 <span class="hint">(comparativa)</span></label>
-            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt de Ollama y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
+            <label>Cadena LLM + LTX2 <span class="hint">(comparativa)</span></label>
+            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt del LLM y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
           </div>
           <div class="enhancer-row">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <label style="margin-bottom:0;">Resultado Ollama</label>
+              <label style="margin-bottom:0;">Resultado LLM</label>
               <span id="enhancerMetaInfo" style="font-size:10px; color:var(--accent);"></span>
             </div>
-            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado de Ollama aparecerá aquí..."></textarea>
+            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado del LLM aparecerá aquí..."></textarea>
           </div>
           <div class="enhancer-actions">
             <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>

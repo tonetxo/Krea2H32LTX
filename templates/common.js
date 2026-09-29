@@ -842,8 +842,132 @@ function cleanOllamaResponse(raw){
   return text;
 }
 
+async function streamLlamaCppGenerate(payload, outputEl, onChunk, signal){
+  const rawModel = payload.model || "";
+  const modelName = rawModel.replace(/^llamacpp:/, "");
+  const messages = [];
+
+  if(payload.system && payload.system.trim()){
+    messages.push({ role: "system", content: payload.system.trim() });
+  }
+
+  const userPrompt = payload.prompt || "";
+  if(Array.isArray(payload.images) && payload.images.length > 0){
+    const userContent = [];
+    if(userPrompt) {
+      userContent.push({ type: "text", text: userPrompt });
+    }
+    for(const img of payload.images){
+      const dataUrl = img.startsWith("data:") ? img : `data:image/jpeg;base64,${img}`;
+      userContent.push({
+        type: "image_url",
+        image_url: { url: dataUrl }
+      });
+    }
+    messages.push({ role: "user", content: userContent });
+  } else {
+    messages.push({ role: "user", content: userPrompt });
+  }
+
+  const reqBody = {
+    model: modelName,
+    messages: messages,
+    temperature: (payload.options && payload.options.temperature != null) ? payload.options.temperature : 0.3,
+    stream: true
+  };
+  if(payload.options && payload.options.max_tokens){
+    reqBody.max_tokens = payload.options.max_tokens;
+  }
+
+  const origPlaceholder = outputEl ? outputEl.placeholder : "";
+  if(outputEl){
+    outputEl.value = "";
+    outputEl.placeholder = "Generando prompt con llama.cpp...";
+  }
+
+  const startTime = Date.now();
+
+  const r = await fetch("/llamacpp/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reqBody),
+    signal
+  });
+
+  if(!r.ok){
+    const t = await r.text().catch(()=>"");
+    if(outputEl) outputEl.placeholder = origPlaceholder;
+    let errMsg = "HTTP " + r.status;
+    try {
+      const errJson = JSON.parse(t);
+      if(errJson.error && errJson.error.message) errMsg += ": " + errJson.error.message;
+      else errMsg += " " + t.slice(0, 200);
+    } catch(_) {
+      errMsg += " " + t.slice(0, 200);
+    }
+    throw new Error(errMsg);
+  }
+
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let accumulated = "";
+  let buffer = "";
+
+  while(true){
+    const { done, value } = await reader.read();
+    if(done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for(const rawLine of lines){
+      const line = rawLine.trim();
+      if(!line || !line.startsWith("data:")) continue;
+      const dataStr = line.slice(5).trim();
+      if(dataStr === "[DONE]") break;
+      try {
+        const json = JSON.parse(dataStr);
+        const delta = json.choices && json.choices[0] && json.choices[0].delta;
+        if(delta){
+          const chunk = delta.content || "";
+          if(chunk){
+            accumulated += chunk;
+            if(outputEl){
+              if(accumulated.includes("</think>")){
+                const after = accumulated.split(/<\/think>/i).pop().trimStart();
+                if(after) outputEl.value = after;
+              } else if(accumulated.includes("</thought>")){
+                const after = accumulated.split(/<\/thought>/i).pop().trimStart();
+                if(after) outputEl.value = after;
+              } else {
+                outputEl.value = accumulated;
+              }
+            }
+            if(onChunk) onChunk(chunk);
+          }
+        }
+      } catch(_){}
+    }
+  }
+
+  const elapsedMs = Date.now() - startTime;
+  const finalClean = cleanOllamaResponse(accumulated);
+  if(outputEl){
+    outputEl.value = finalClean;
+    outputEl.placeholder = origPlaceholder;
+  }
+  return { text: finalClean, elapsedMs };
+}
+
 async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
-  const bodyPayload = Object.assign({ stream: true }, payload);
+  const model = payload.model || "";
+  if(model.startsWith("llamacpp:")){
+    return streamLlamaCppGenerate(payload, outputEl, onChunk, signal);
+  }
+
+  const bodyPayload = Object.assign({ stream: true }, payload, {
+    model: model.replace(/^ollama:/, "")
+  });
   if(!bodyPayload.options) bodyPayload.options = {};
   if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
   if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
@@ -852,7 +976,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   const origPlaceholder = outputEl ? outputEl.placeholder : "";
   if(outputEl){
     outputEl.value = "";
-    outputEl.placeholder = "Generando prompt...";
+    outputEl.placeholder = "Generando prompt con Ollama...";
   }
 
   const startTime = Date.now();
@@ -895,8 +1019,11 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
             } else if(accumulated.includes("</thought>")){
               const after = accumulated.split(/<\/thought>/i).pop().trimStart();
               if(after) outputEl.value = after;
+            } else {
+              outputEl.value = accumulated;
             }
           }
+          if(onChunk) onChunk(json.response);
         }
       } catch(e){}
     }
@@ -918,6 +1045,8 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   return { text: finalClean, elapsedMs };
 }
 
+const streamEnhanceGenerate = streamOllamaGenerate;
+
 function makeCollapsible(toggleId, bodyId, onOpen){
   const h = $(toggleId), b = $(bodyId);
   if(!h || !b) return;
@@ -932,23 +1061,110 @@ function makeCollapsible(toggleId, bodyId, onOpen){
 
 async function loadEnhancerModels(){
   const sel = $("enhancerModel");
-  try {
-    const r = await fetch("/api/tags");
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const data = await r.json();
-    const models = data.models || [];
-    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
-    for(const m of models){
-      const opt = document.createElement("option");
-      opt.value = m.name;
-      opt.textContent = m.name;
-      sel.appendChild(opt);
+  if(!sel) return;
+
+  const prevSelected = localStorage.getItem("enhancer_model_selected") || sel.value;
+  sel.innerHTML = '<option value="">Cargando modelos...</option>';
+
+  let ollamaModels = [];
+  let llamacppModels = [];
+
+  const fetchOllama = (async () => {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3500);
+      const r = await fetch("/api/tags", { signal: ctrl.signal });
+      clearTimeout(timer);
+      if(r.ok){
+        const data = await r.json();
+        ollamaModels = data.models || [];
+      }
+    } catch(e){
+      console.warn("Ollama no disponible:", e.message);
     }
-    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
-    if(defaultModel) sel.value = defaultModel.name;
-  } catch(e) {
-    sel.innerHTML = '<option value="">Ollama no disponible</option>';
-    console.warn("No se pudieron cargar modelos:", e.message);
+  })();
+
+  const fetchLlamaCpp = (async () => {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3500);
+      const r = await fetch("/llamacpp/v1/models", { signal: ctrl.signal });
+      clearTimeout(timer);
+      if(r.ok){
+        const data = await r.json();
+        llamacppModels = data.data || [];
+      }
+    } catch(e){
+      console.warn("llama.cpp no disponible:", e.message);
+    }
+  })();
+
+  await Promise.allSettled([fetchOllama, fetchLlamaCpp]);
+
+  sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
+
+  if(llamacppModels.length > 0){
+    const grp = document.createElement("optgroup");
+    grp.label = "llama.cpp";
+    for(const m of llamacppModels){
+      const opt = document.createElement("option");
+      const id = m.id || m.name;
+      opt.value = "llamacpp:" + id;
+      const isVision = m.architecture && Array.isArray(m.architecture.input_modalities) && m.architecture.input_modalities.includes("image");
+      opt.textContent = id + (isVision ? " [vision]" : "");
+      grp.appendChild(opt);
+    }
+    sel.appendChild(grp);
+  }
+
+  if(ollamaModels.length > 0){
+    const grp = document.createElement("optgroup");
+    grp.label = "Ollama";
+    for(const m of ollamaModels){
+      const opt = document.createElement("option");
+      opt.value = "ollama:" + m.name;
+      opt.textContent = m.name;
+      grp.appendChild(opt);
+    }
+    sel.appendChild(grp);
+  }
+
+  if(llamacppModels.length === 0 && ollamaModels.length === 0){
+    sel.innerHTML = '<option value="">Ningún modelo disponible (Ollama/llama.cpp offline)</option>';
+    return;
+  }
+
+  // Restaurar selección previa si coincide con algún option
+  let restored = false;
+  if(prevSelected){
+    for(const opt of sel.querySelectorAll("option")){
+      if(opt.value === prevSelected || opt.value.endsWith(":" + prevSelected)){
+        sel.value = opt.value;
+        restored = true;
+        break;
+      }
+    }
+  }
+
+  if(!restored){
+    const allOptions = Array.from(sel.querySelectorAll("option")).filter(o => o.value);
+    const preferred = allOptions.find(o =>
+      o.value.includes("minimax-enhancer") ||
+      o.value.toLowerCase().includes("qwythos") ||
+      o.value.toLowerCase().includes("qwen")
+    );
+    if(preferred){
+      sel.value = preferred.value;
+    } else if(allOptions.length > 0){
+      sel.value = allOptions[0].value;
+    }
+  }
+
+  if(!sel.dataset.listenerBound){
+    sel.addEventListener("change", () => {
+      if(sel.value) localStorage.setItem("enhancer_model_selected", sel.value);
+    });
+    sel.dataset.listenerBound = "true";
   }
 }
 
@@ -1616,7 +1832,7 @@ function initCommon(){
 
   $("btnUseAsPrompt").addEventListener("click", () => {
     let text = $("enhancerOutput").value.trim();
-    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
+    text = text.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
     $("prompt").value = text;
     log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
@@ -1624,7 +1840,7 @@ function initCommon(){
 
   $("btnSaveEnhanced").addEventListener("click", () => {
     let text = $("enhancerOutput").value.trim();
-    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
+    text = text.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
     const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
     const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);

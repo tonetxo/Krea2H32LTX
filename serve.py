@@ -49,13 +49,14 @@ def get_backend():
             pass
     return "http://127.0.0.1:7821"
 
+import config_loader
+
 BACKEND = get_backend()
-OLLAMA = "http://127.0.0.1:11434"
+OLLAMA = config_loader.get_ollama_url()
+LLAMACPP = config_loader.get_llamacpp_url()
 
 # Custom routes that should be served locally (not proxied).
 CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/mmh3x2_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess", "/api/prompts", "/view")
-
-import config_loader
 
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Override via env var KREA2_OUTPUT_DIR or third CLI arg.
@@ -132,6 +133,7 @@ def _parse_time_arg(value):
 # Routes that should be proxied to the backend instead of served as files.
 PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt")
 OLLAMA_PREFIXES = ("/api",)
+LLAMACPP_PREFIXES = ("/llamacpp",)
 WS_PREFIX = "/ws"
 
 
@@ -352,6 +354,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_view("HEAD")
         elif self._is_ollama_route():
             self._proxy("HEAD", OLLAMA)
+        elif self._is_llamacpp_route():
+            self._proxy("HEAD", LLAMACPP)
         elif self._is_proxy_route():
             self._proxy("HEAD", get_backend())
         else:
@@ -369,6 +373,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def _is_ollama_route(self):
         path = self.path.split("?")[0]
         return any(path.startswith(p) for p in OLLAMA_PREFIXES)
+
+    def _is_llamacpp_route(self):
+        path = self.path.split("?")[0]
+        return any(path.startswith(p) for p in LLAMACPP_PREFIXES)
 
     def _is_krea2_list(self):
         path = self.path.split("?")[0]
@@ -706,6 +714,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_prompts_get()
         elif self._is_ollama_route():
             self._proxy("GET", OLLAMA)
+        elif self._is_llamacpp_route():
+            self._proxy("GET", LLAMACPP)
         elif self._is_proxy_route():
             self._proxy("GET", get_backend())
         else:
@@ -732,6 +742,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_video_preprocess()
         elif self._is_ollama_route():
             self._proxy("POST", OLLAMA)
+        elif self._is_llamacpp_route():
+            self._proxy("POST", LLAMACPP)
         elif self._is_proxy_route():
             self._proxy("POST", get_backend())
         else:
@@ -740,10 +752,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         if self._is_ws():
             self._ws_proxy()
-        elif self._is_ollama_route():
-            # Ollama rechaza preflight CORS desde orígenes no-localhost con 403.
+        elif self._is_ollama_route() or self._is_llamacpp_route():
+            # Rechazar o preflight CORS desde orígenes no-localhost.
             # Respondemos nosotros con los headers CORS correctos para que el
-            # navegador deje pasar la POST real.
+            # navegador deje pasar la petición real.
             self._cors_preflight()
         elif self._is_proxy_route():
             self._proxy("OPTIONS", get_backend())
@@ -1210,7 +1222,12 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def _proxy(self, method, base):
         """Forward the request to `base` and relay the response."""
-        target = base + self.path
+        path_to_forward = self.path
+        if base == LLAMACPP and path_to_forward.startswith("/llamacpp"):
+            path_to_forward = path_to_forward[len("/llamacpp"):]
+            if not path_to_forward.startswith("/"):
+                path_to_forward = "/" + path_to_forward
+        target = base + path_to_forward
         body = None
         if method in ("POST", "PUT", "PATCH"):
             length = int(self.headers.get("Content-Length", 0))
@@ -1242,15 +1259,16 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             method=method,
         )
         # Forzar cierre de conexión tras la respuesta: evita reuse de sockets
-        # que Ollama pueda haber reseteado por carga/descarga de modelos.
+        # que Ollama o llama-server puedan haber reseteado por carga/descarga de modelos.
         req.add_header("Connection", "close")
 
-        # Si reenviamos a Ollama, reescribimos el Origin: Ollama solo permite
-        # CORS desde localhost/127.0.0.1, por lo que un cliente LAN sería
-        # bloqueado. Este rewrite afecta ÚNICAMENTE al tráfico proxy hacia
-        # Ollama; los endpoints locales siguen protegidos por _allowed_origin().
+        # Si reenviamos a Ollama o llama.cpp, reescribimos el Origin: Ollama y llama-server
+        # esperan peticiones locales para evitar bloqueos CORS. Este rewrite afecta ÚNICAMENTE
+        # al tráfico proxy saliente; los endpoints locales siguen protegidos por _allowed_origin().
         if base == OLLAMA:
             req.add_header("Origin", "http://127.0.0.1:11434")
+        elif base == LLAMACPP:
+            req.add_header("Origin", "http://127.0.0.1:8080")
 
         # Siempre añadimos los headers CORS correctos para el cliente en la respuesta,
         # pero solo si el origen del cliente es same-origin (mismo host:port).
@@ -1326,11 +1344,23 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Vary", "Origin")
             self.end_headers()
 
-            # Stream the body in 64KB chunks
-            chunk = resp.read(65536)
-            while chunk:
+            # Stream the body
+            is_streaming = (
+                "event-stream" in resp.headers.get("Content-Type", "").lower()
+                or "application/x-ndjson" in resp.headers.get("Content-Type", "").lower()
+                or "chunked" in resp.headers.get("Transfer-Encoding", "").lower()
+            )
+            chunk_size = 512 if is_streaming else 65536
+            while True:
+                chunk = resp.read(chunk_size)
+                if not chunk:
+                    break
                 self.wfile.write(chunk)
-                chunk = resp.read(65536)
+                if is_streaming:
+                    try:
+                        self.wfile.flush()
+                    except Exception:
+                        pass
             try:
                 self.wfile.flush()
             except Exception:

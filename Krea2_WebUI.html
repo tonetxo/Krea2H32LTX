@@ -412,7 +412,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
           </div>
           <div class="enhancer-row">
             <label>Cadena de mejora</label>
-            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">Ollama</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
+            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">LLM (Ollama / llama.cpp)</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
           </div>
           <div class="enhancer-row">
             <label>Temperatura LTX2 <span class="hint">(Generate LTX2 Prompt)</span></label>
@@ -426,15 +426,15 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
             <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
           </div>
           <div class="enhancer-row">
-            <label>Cadena Ollama + LTX2 <span class="hint">(comparativa)</span></label>
-            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt de Ollama y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
+            <label>Cadena LLM + LTX2 <span class="hint">(comparativa)</span></label>
+            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt del LLM y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
           </div>
           <div class="enhancer-row">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <label style="margin-bottom:0;">Resultado Ollama</label>
+              <label style="margin-bottom:0;">Resultado LLM</label>
               <span id="enhancerMetaInfo" style="font-size:10px; color:var(--accent);"></span>
             </div>
-            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado de Ollama aparecerá aquí..."></textarea>
+            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado del LLM aparecerá aquí..."></textarea>
           </div>
           <div class="enhancer-actions">
             <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
@@ -907,8 +907,8 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b.safetensors", "jibMixKrea2_v40Habanero.safetensors", "krea2_turbo_fp8_scaled.safetensors"];
-const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "GalKrea.safetensors", "GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "VBVR_H3_attn_only.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_identity_edit_v1_2.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2_turbo_sda_v1.0_comfy.safetensors", "krea2_warmpastel.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
+const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b.safetensors", "jibMixKrea2_v40Habanero.safetensors"];
+const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "GalKrea.safetensors", "GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "VBVR_H3_attn_only.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "bfs_head_swap_v1.1_krea2.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_identity_edit_v1_2.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2_turbo_sda_v1.0_comfy.safetensors", "krea2_warmpastel.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
 const AVAILABLE_VAES = [];
 const AVAILABLE_UNETS = [];
 const AVAILABLE_CLIPS = [];
@@ -1760,8 +1760,132 @@ function cleanOllamaResponse(raw){
   return text;
 }
 
+async function streamLlamaCppGenerate(payload, outputEl, onChunk, signal){
+  const rawModel = payload.model || "";
+  const modelName = rawModel.replace(/^llamacpp:/, "");
+  const messages = [];
+
+  if(payload.system && payload.system.trim()){
+    messages.push({ role: "system", content: payload.system.trim() });
+  }
+
+  const userPrompt = payload.prompt || "";
+  if(Array.isArray(payload.images) && payload.images.length > 0){
+    const userContent = [];
+    if(userPrompt) {
+      userContent.push({ type: "text", text: userPrompt });
+    }
+    for(const img of payload.images){
+      const dataUrl = img.startsWith("data:") ? img : `data:image/jpeg;base64,${img}`;
+      userContent.push({
+        type: "image_url",
+        image_url: { url: dataUrl }
+      });
+    }
+    messages.push({ role: "user", content: userContent });
+  } else {
+    messages.push({ role: "user", content: userPrompt });
+  }
+
+  const reqBody = {
+    model: modelName,
+    messages: messages,
+    temperature: (payload.options && payload.options.temperature != null) ? payload.options.temperature : 0.3,
+    stream: true
+  };
+  if(payload.options && payload.options.max_tokens){
+    reqBody.max_tokens = payload.options.max_tokens;
+  }
+
+  const origPlaceholder = outputEl ? outputEl.placeholder : "";
+  if(outputEl){
+    outputEl.value = "";
+    outputEl.placeholder = "Generando prompt con llama.cpp...";
+  }
+
+  const startTime = Date.now();
+
+  const r = await fetch("/llamacpp/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reqBody),
+    signal
+  });
+
+  if(!r.ok){
+    const t = await r.text().catch(()=>"");
+    if(outputEl) outputEl.placeholder = origPlaceholder;
+    let errMsg = "HTTP " + r.status;
+    try {
+      const errJson = JSON.parse(t);
+      if(errJson.error && errJson.error.message) errMsg += ": " + errJson.error.message;
+      else errMsg += " " + t.slice(0, 200);
+    } catch(_) {
+      errMsg += " " + t.slice(0, 200);
+    }
+    throw new Error(errMsg);
+  }
+
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let accumulated = "";
+  let buffer = "";
+
+  while(true){
+    const { done, value } = await reader.read();
+    if(done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for(const rawLine of lines){
+      const line = rawLine.trim();
+      if(!line || !line.startsWith("data:")) continue;
+      const dataStr = line.slice(5).trim();
+      if(dataStr === "[DONE]") break;
+      try {
+        const json = JSON.parse(dataStr);
+        const delta = json.choices && json.choices[0] && json.choices[0].delta;
+        if(delta){
+          const chunk = delta.content || "";
+          if(chunk){
+            accumulated += chunk;
+            if(outputEl){
+              if(accumulated.includes("</think>")){
+                const after = accumulated.split(/<\/think>/i).pop().trimStart();
+                if(after) outputEl.value = after;
+              } else if(accumulated.includes("</thought>")){
+                const after = accumulated.split(/<\/thought>/i).pop().trimStart();
+                if(after) outputEl.value = after;
+              } else {
+                outputEl.value = accumulated;
+              }
+            }
+            if(onChunk) onChunk(chunk);
+          }
+        }
+      } catch(_){}
+    }
+  }
+
+  const elapsedMs = Date.now() - startTime;
+  const finalClean = cleanOllamaResponse(accumulated);
+  if(outputEl){
+    outputEl.value = finalClean;
+    outputEl.placeholder = origPlaceholder;
+  }
+  return { text: finalClean, elapsedMs };
+}
+
 async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
-  const bodyPayload = Object.assign({ stream: true }, payload);
+  const model = payload.model || "";
+  if(model.startsWith("llamacpp:")){
+    return streamLlamaCppGenerate(payload, outputEl, onChunk, signal);
+  }
+
+  const bodyPayload = Object.assign({ stream: true }, payload, {
+    model: model.replace(/^ollama:/, "")
+  });
   if(!bodyPayload.options) bodyPayload.options = {};
   if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
   if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
@@ -1770,7 +1894,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   const origPlaceholder = outputEl ? outputEl.placeholder : "";
   if(outputEl){
     outputEl.value = "";
-    outputEl.placeholder = "Generando prompt...";
+    outputEl.placeholder = "Generando prompt con Ollama...";
   }
 
   const startTime = Date.now();
@@ -1813,8 +1937,11 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
             } else if(accumulated.includes("</thought>")){
               const after = accumulated.split(/<\/thought>/i).pop().trimStart();
               if(after) outputEl.value = after;
+            } else {
+              outputEl.value = accumulated;
             }
           }
+          if(onChunk) onChunk(json.response);
         }
       } catch(e){}
     }
@@ -1836,6 +1963,8 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   return { text: finalClean, elapsedMs };
 }
 
+const streamEnhanceGenerate = streamOllamaGenerate;
+
 function makeCollapsible(toggleId, bodyId, onOpen){
   const h = $(toggleId), b = $(bodyId);
   if(!h || !b) return;
@@ -1850,23 +1979,110 @@ function makeCollapsible(toggleId, bodyId, onOpen){
 
 async function loadEnhancerModels(){
   const sel = $("enhancerModel");
-  try {
-    const r = await fetch("/api/tags");
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const data = await r.json();
-    const models = data.models || [];
-    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
-    for(const m of models){
-      const opt = document.createElement("option");
-      opt.value = m.name;
-      opt.textContent = m.name;
-      sel.appendChild(opt);
+  if(!sel) return;
+
+  const prevSelected = localStorage.getItem("enhancer_model_selected") || sel.value;
+  sel.innerHTML = '<option value="">Cargando modelos...</option>';
+
+  let ollamaModels = [];
+  let llamacppModels = [];
+
+  const fetchOllama = (async () => {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3500);
+      const r = await fetch("/api/tags", { signal: ctrl.signal });
+      clearTimeout(timer);
+      if(r.ok){
+        const data = await r.json();
+        ollamaModels = data.models || [];
+      }
+    } catch(e){
+      console.warn("Ollama no disponible:", e.message);
     }
-    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
-    if(defaultModel) sel.value = defaultModel.name;
-  } catch(e) {
-    sel.innerHTML = '<option value="">Ollama no disponible</option>';
-    console.warn("No se pudieron cargar modelos:", e.message);
+  })();
+
+  const fetchLlamaCpp = (async () => {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3500);
+      const r = await fetch("/llamacpp/v1/models", { signal: ctrl.signal });
+      clearTimeout(timer);
+      if(r.ok){
+        const data = await r.json();
+        llamacppModels = data.data || [];
+      }
+    } catch(e){
+      console.warn("llama.cpp no disponible:", e.message);
+    }
+  })();
+
+  await Promise.allSettled([fetchOllama, fetchLlamaCpp]);
+
+  sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
+
+  if(llamacppModels.length > 0){
+    const grp = document.createElement("optgroup");
+    grp.label = "llama.cpp";
+    for(const m of llamacppModels){
+      const opt = document.createElement("option");
+      const id = m.id || m.name;
+      opt.value = "llamacpp:" + id;
+      const isVision = m.architecture && Array.isArray(m.architecture.input_modalities) && m.architecture.input_modalities.includes("image");
+      opt.textContent = id + (isVision ? " [vision]" : "");
+      grp.appendChild(opt);
+    }
+    sel.appendChild(grp);
+  }
+
+  if(ollamaModels.length > 0){
+    const grp = document.createElement("optgroup");
+    grp.label = "Ollama";
+    for(const m of ollamaModels){
+      const opt = document.createElement("option");
+      opt.value = "ollama:" + m.name;
+      opt.textContent = m.name;
+      grp.appendChild(opt);
+    }
+    sel.appendChild(grp);
+  }
+
+  if(llamacppModels.length === 0 && ollamaModels.length === 0){
+    sel.innerHTML = '<option value="">Ningún modelo disponible (Ollama/llama.cpp offline)</option>';
+    return;
+  }
+
+  // Restaurar selección previa si coincide con algún option
+  let restored = false;
+  if(prevSelected){
+    for(const opt of sel.querySelectorAll("option")){
+      if(opt.value === prevSelected || opt.value.endsWith(":" + prevSelected)){
+        sel.value = opt.value;
+        restored = true;
+        break;
+      }
+    }
+  }
+
+  if(!restored){
+    const allOptions = Array.from(sel.querySelectorAll("option")).filter(o => o.value);
+    const preferred = allOptions.find(o =>
+      o.value.includes("minimax-enhancer") ||
+      o.value.toLowerCase().includes("qwythos") ||
+      o.value.toLowerCase().includes("qwen")
+    );
+    if(preferred){
+      sel.value = preferred.value;
+    } else if(allOptions.length > 0){
+      sel.value = allOptions[0].value;
+    }
+  }
+
+  if(!sel.dataset.listenerBound){
+    sel.addEventListener("change", () => {
+      if(sel.value) localStorage.setItem("enhancer_model_selected", sel.value);
+    });
+    sel.dataset.listenerBound = "true";
   }
 }
 
@@ -2534,7 +2750,7 @@ function initCommon(){
 
   $("btnUseAsPrompt").addEventListener("click", () => {
     let text = $("enhancerOutput").value.trim();
-    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
+    text = text.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
     $("prompt").value = text;
     log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
@@ -2542,7 +2758,7 @@ function initCommon(){
 
   $("btnSaveEnhanced").addEventListener("click", () => {
     let text = $("enhancerOutput").value.trim();
-    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
+    text = text.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
     const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
     const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);
@@ -4185,11 +4401,11 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
   $("btnEnhance").addEventListener("click", async () => {
     const chainMode = $("enhancerChainMode")?.value || "ollama";
     if(chainMode === "off"){
-      log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' para usar el botón.", "l-warn");
+      log("⚠️ Cadena de mejora desactivada. Activa 'LLM' para usar el botón.", "l-warn");
       return;
     }
     const model = $("enhancerModel").value;
-    if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+    if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
     const mode = $("enhancerMode").value;
     const styleKey = $("enhancerStyle").value;
     const data = loadSysPrompts();
@@ -4221,7 +4437,7 @@ async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
 // --- CAPTION (Krea2-specific) ---
 $("btnCaption").addEventListener("click", async () => {
   const model = $("enhancerModel").value;
-  if(!model){ log("Selecciona un modelo de Ollama", "l-err"); return; }
+  if(!model){ log("Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
   const refImgEl = $("refImg");
   if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
     log("Primero carga una imagen de referencia", "l-err"); return;

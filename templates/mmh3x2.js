@@ -4021,11 +4021,11 @@ window.addEventListener("DOMContentLoaded", () => {
   $("btnEnhance")?.addEventListener("click", async () => {
     const chainMode = $("enhancerChainMode")?.value || "ollama";
     if(chainMode === "off"){
-      log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' para usar el botón.", "l-warn");
+      log("⚠️ Cadena de mejora desactivada. Activa 'LLM' para usar el botón.", "l-warn");
       return;
     }
     const model = $("enhancerModel")?.value;
-    if(!model){ log("⚠️ Selecciona un modelo de Ollama en el selector", "l-err"); return; }
+    if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp) en el selector", "l-err"); return; }
     const mode = $("enhancerMode")?.value || "text";
     const styleKey = $("enhancerStyle")?.value || "A";
     const data = loadSysPrompts();
@@ -4114,14 +4114,14 @@ window.addEventListener("DOMContentLoaded", () => {
     $("enhancerOutput").value = "";
     if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
     try {
-      log(`🧠 Solicitando mejora a Ollama (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
+      log(`🧠 Solicitando mejora al LLM (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
       const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
       const timeStr = fmtMs(elapsedMs);
       $("enhancerOutput").value = text;
       if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
       log(`✅ Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
     } catch(e){
-      log(`❌ Error al mejorar prompt con Ollama: ${e.message}`, "l-err");
+      log(`❌ Error al mejorar prompt con LLM: ${e.message}`, "l-err");
       $("enhancerOutput").value = "Error: " + e.message;
     } finally {
       btn.disabled = false;

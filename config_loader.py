@@ -190,3 +190,9 @@ def get_ollama_url():
     """Devuelve la URL de Ollama."""
     cfg = load_config()
     return cfg.get("ollama", {}).get("url") or os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+
+
+def get_llamacpp_url():
+    """Devuelve la URL de llama.cpp / llama-server."""
+    cfg = load_config()
+    return cfg.get("llamacpp", {}).get("url") or os.environ.get("LLAMACPP_URL", "http://127.0.0.1:8080")

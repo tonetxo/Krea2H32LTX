@@ -4007,11 +4007,11 @@ $("btnGenerate").addEventListener("click",()=>enqueueGeneration());
 $("btnEnhance").addEventListener("click", async () => {
   const chainMode = $("enhancerChainMode").value;
   if(chainMode === "off"){
-    log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' para usar el botón.", "l-warn");
+    log("⚠️ Cadena de mejora desactivada. Activa 'LLM' para usar el botón.", "l-warn");
     return;
   }
   const model = $("enhancerModel").value;
-  if(!model){ log("⚠️ Selecciona un modelo de Ollama", "l-err"); return; }
+  if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
   const mode = $("enhancerMode").value;
   const styleKey = $("enhancerStyle").value;
   const data = loadSysPrompts();

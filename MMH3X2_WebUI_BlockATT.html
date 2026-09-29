@@ -463,7 +463,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           </div>
           <div class="enhancer-row">
             <label>Cadena de mejora</label>
-            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">Ollama</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
+            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">LLM (Ollama / llama.cpp)</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
           </div>
           <div class="enhancer-row">
             <label>Temperatura LTX2 <span class="hint">(Generate LTX2 Prompt)</span></label>
@@ -477,15 +477,15 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
           </div>
           <div class="enhancer-row">
-            <label>Cadena Ollama + LTX2 <span class="hint">(comparativa)</span></label>
-            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt de Ollama y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
+            <label>Cadena LLM + LTX2 <span class="hint">(comparativa)</span></label>
+            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt del LLM y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
           </div>
           <div class="enhancer-row">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-              <label style="margin-bottom:0;">Resultado Ollama</label>
+              <label style="margin-bottom:0;">Resultado LLM</label>
               <span id="enhancerMetaInfo" style="font-size:10px; color:var(--accent);"></span>
             </div>
-            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado de Ollama aparecerá aquí..."></textarea>
+            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado del LLM aparecerá aquí..."></textarea>
           </div>
           <div class="enhancer-actions">
             <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
@@ -2443,7 +2443,7 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = [];
-const AVAILABLE_LORAS = ["h3/H3-PK-Parasyte-Turbo.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/SexGod_NaughtyTimes_v3_rank64_unpruned.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors"];
+const AVAILABLE_LORAS = ["h3/H3-PK-Parasyte-Turbo.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-3step-ComfyUI.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors"];
 const AVAILABLE_VAES = ["MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors"];
 const AVAILABLE_UNETS = ["boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ernie/ernie-image-turbo.safetensors", "ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "minimax_music3_dit_int8_convrot.safetensors", "minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "minimaxh3/Minimax-h3_Singularity_ref2va_v1.3_Pruned_w4a8.safetensors", "minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "seedvr2_3b_int8_convrot.safetensors", "zimage/z_image_turbo_bf16.safetensors"];
 const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
@@ -3295,8 +3295,132 @@ function cleanOllamaResponse(raw){
   return text;
 }
 
+async function streamLlamaCppGenerate(payload, outputEl, onChunk, signal){
+  const rawModel = payload.model || "";
+  const modelName = rawModel.replace(/^llamacpp:/, "");
+  const messages = [];
+
+  if(payload.system && payload.system.trim()){
+    messages.push({ role: "system", content: payload.system.trim() });
+  }
+
+  const userPrompt = payload.prompt || "";
+  if(Array.isArray(payload.images) && payload.images.length > 0){
+    const userContent = [];
+    if(userPrompt) {
+      userContent.push({ type: "text", text: userPrompt });
+    }
+    for(const img of payload.images){
+      const dataUrl = img.startsWith("data:") ? img : `data:image/jpeg;base64,${img}`;
+      userContent.push({
+        type: "image_url",
+        image_url: { url: dataUrl }
+      });
+    }
+    messages.push({ role: "user", content: userContent });
+  } else {
+    messages.push({ role: "user", content: userPrompt });
+  }
+
+  const reqBody = {
+    model: modelName,
+    messages: messages,
+    temperature: (payload.options && payload.options.temperature != null) ? payload.options.temperature : 0.3,
+    stream: true
+  };
+  if(payload.options && payload.options.max_tokens){
+    reqBody.max_tokens = payload.options.max_tokens;
+  }
+
+  const origPlaceholder = outputEl ? outputEl.placeholder : "";
+  if(outputEl){
+    outputEl.value = "";
+    outputEl.placeholder = "Generando prompt con llama.cpp...";
+  }
+
+  const startTime = Date.now();
+
+  const r = await fetch("/llamacpp/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reqBody),
+    signal
+  });
+
+  if(!r.ok){
+    const t = await r.text().catch(()=>"");
+    if(outputEl) outputEl.placeholder = origPlaceholder;
+    let errMsg = "HTTP " + r.status;
+    try {
+      const errJson = JSON.parse(t);
+      if(errJson.error && errJson.error.message) errMsg += ": " + errJson.error.message;
+      else errMsg += " " + t.slice(0, 200);
+    } catch(_) {
+      errMsg += " " + t.slice(0, 200);
+    }
+    throw new Error(errMsg);
+  }
+
+  const reader = r.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let accumulated = "";
+  let buffer = "";
+
+  while(true){
+    const { done, value } = await reader.read();
+    if(done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for(const rawLine of lines){
+      const line = rawLine.trim();
+      if(!line || !line.startsWith("data:")) continue;
+      const dataStr = line.slice(5).trim();
+      if(dataStr === "[DONE]") break;
+      try {
+        const json = JSON.parse(dataStr);
+        const delta = json.choices && json.choices[0] && json.choices[0].delta;
+        if(delta){
+          const chunk = delta.content || "";
+          if(chunk){
+            accumulated += chunk;
+            if(outputEl){
+              if(accumulated.includes("</think>")){
+                const after = accumulated.split(/<\/think>/i).pop().trimStart();
+                if(after) outputEl.value = after;
+              } else if(accumulated.includes("</thought>")){
+                const after = accumulated.split(/<\/thought>/i).pop().trimStart();
+                if(after) outputEl.value = after;
+              } else {
+                outputEl.value = accumulated;
+              }
+            }
+            if(onChunk) onChunk(chunk);
+          }
+        }
+      } catch(_){}
+    }
+  }
+
+  const elapsedMs = Date.now() - startTime;
+  const finalClean = cleanOllamaResponse(accumulated);
+  if(outputEl){
+    outputEl.value = finalClean;
+    outputEl.placeholder = origPlaceholder;
+  }
+  return { text: finalClean, elapsedMs };
+}
+
 async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
-  const bodyPayload = Object.assign({ stream: true }, payload);
+  const model = payload.model || "";
+  if(model.startsWith("llamacpp:")){
+    return streamLlamaCppGenerate(payload, outputEl, onChunk, signal);
+  }
+
+  const bodyPayload = Object.assign({ stream: true }, payload, {
+    model: model.replace(/^ollama:/, "")
+  });
   if(!bodyPayload.options) bodyPayload.options = {};
   if(!bodyPayload.options.num_ctx) bodyPayload.options.num_ctx = 4096;
   if(bodyPayload.options.temperature == null) bodyPayload.options.temperature = 0.3;
@@ -3305,7 +3429,7 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   const origPlaceholder = outputEl ? outputEl.placeholder : "";
   if(outputEl){
     outputEl.value = "";
-    outputEl.placeholder = "Generando prompt...";
+    outputEl.placeholder = "Generando prompt con Ollama...";
   }
 
   const startTime = Date.now();
@@ -3348,8 +3472,11 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
             } else if(accumulated.includes("</thought>")){
               const after = accumulated.split(/<\/thought>/i).pop().trimStart();
               if(after) outputEl.value = after;
+            } else {
+              outputEl.value = accumulated;
             }
           }
+          if(onChunk) onChunk(json.response);
         }
       } catch(e){}
     }
@@ -3371,6 +3498,8 @@ async function streamOllamaGenerate(payload, outputEl, onChunk, signal){
   return { text: finalClean, elapsedMs };
 }
 
+const streamEnhanceGenerate = streamOllamaGenerate;
+
 function makeCollapsible(toggleId, bodyId, onOpen){
   const h = $(toggleId), b = $(bodyId);
   if(!h || !b) return;
@@ -3385,23 +3514,110 @@ function makeCollapsible(toggleId, bodyId, onOpen){
 
 async function loadEnhancerModels(){
   const sel = $("enhancerModel");
-  try {
-    const r = await fetch("/api/tags");
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    const data = await r.json();
-    const models = data.models || [];
-    sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
-    for(const m of models){
-      const opt = document.createElement("option");
-      opt.value = m.name;
-      opt.textContent = m.name;
-      sel.appendChild(opt);
+  if(!sel) return;
+
+  const prevSelected = localStorage.getItem("enhancer_model_selected") || sel.value;
+  sel.innerHTML = '<option value="">Cargando modelos...</option>';
+
+  let ollamaModels = [];
+  let llamacppModels = [];
+
+  const fetchOllama = (async () => {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3500);
+      const r = await fetch("/api/tags", { signal: ctrl.signal });
+      clearTimeout(timer);
+      if(r.ok){
+        const data = await r.json();
+        ollamaModels = data.models || [];
+      }
+    } catch(e){
+      console.warn("Ollama no disponible:", e.message);
     }
-    const defaultModel = models.find(m => m.name.includes("Qwythos") || m.name.includes("qwythos"));
-    if(defaultModel) sel.value = defaultModel.name;
-  } catch(e) {
-    sel.innerHTML = '<option value="">Ollama no disponible</option>';
-    console.warn("No se pudieron cargar modelos:", e.message);
+  })();
+
+  const fetchLlamaCpp = (async () => {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3500);
+      const r = await fetch("/llamacpp/v1/models", { signal: ctrl.signal });
+      clearTimeout(timer);
+      if(r.ok){
+        const data = await r.json();
+        llamacppModels = data.data || [];
+      }
+    } catch(e){
+      console.warn("llama.cpp no disponible:", e.message);
+    }
+  })();
+
+  await Promise.allSettled([fetchOllama, fetchLlamaCpp]);
+
+  sel.innerHTML = '<option value="">-- Seleccionar modelo --</option>';
+
+  if(llamacppModels.length > 0){
+    const grp = document.createElement("optgroup");
+    grp.label = "llama.cpp";
+    for(const m of llamacppModels){
+      const opt = document.createElement("option");
+      const id = m.id || m.name;
+      opt.value = "llamacpp:" + id;
+      const isVision = m.architecture && Array.isArray(m.architecture.input_modalities) && m.architecture.input_modalities.includes("image");
+      opt.textContent = id + (isVision ? " [vision]" : "");
+      grp.appendChild(opt);
+    }
+    sel.appendChild(grp);
+  }
+
+  if(ollamaModels.length > 0){
+    const grp = document.createElement("optgroup");
+    grp.label = "Ollama";
+    for(const m of ollamaModels){
+      const opt = document.createElement("option");
+      opt.value = "ollama:" + m.name;
+      opt.textContent = m.name;
+      grp.appendChild(opt);
+    }
+    sel.appendChild(grp);
+  }
+
+  if(llamacppModels.length === 0 && ollamaModels.length === 0){
+    sel.innerHTML = '<option value="">Ningún modelo disponible (Ollama/llama.cpp offline)</option>';
+    return;
+  }
+
+  // Restaurar selección previa si coincide con algún option
+  let restored = false;
+  if(prevSelected){
+    for(const opt of sel.querySelectorAll("option")){
+      if(opt.value === prevSelected || opt.value.endsWith(":" + prevSelected)){
+        sel.value = opt.value;
+        restored = true;
+        break;
+      }
+    }
+  }
+
+  if(!restored){
+    const allOptions = Array.from(sel.querySelectorAll("option")).filter(o => o.value);
+    const preferred = allOptions.find(o =>
+      o.value.includes("minimax-enhancer") ||
+      o.value.toLowerCase().includes("qwythos") ||
+      o.value.toLowerCase().includes("qwen")
+    );
+    if(preferred){
+      sel.value = preferred.value;
+    } else if(allOptions.length > 0){
+      sel.value = allOptions[0].value;
+    }
+  }
+
+  if(!sel.dataset.listenerBound){
+    sel.addEventListener("change", () => {
+      if(sel.value) localStorage.setItem("enhancer_model_selected", sel.value);
+    });
+    sel.dataset.listenerBound = "true";
   }
 }
 
@@ -4069,7 +4285,7 @@ function initCommon(){
 
   $("btnUseAsPrompt").addEventListener("click", () => {
     let text = $("enhancerOutput").value.trim();
-    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
+    text = text.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado para usar como prompt", "l-err"); return; }
     $("prompt").value = text;
     log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
@@ -4077,7 +4293,7 @@ function initCommon(){
 
   $("btnSaveEnhanced").addEventListener("click", () => {
     let text = $("enhancerOutput").value.trim();
-    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
+    text = text.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
     const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
     const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);
@@ -8388,11 +8604,11 @@ window.addEventListener("DOMContentLoaded", () => {
   $("btnEnhance")?.addEventListener("click", async () => {
     const chainMode = $("enhancerChainMode")?.value || "ollama";
     if(chainMode === "off"){
-      log("⚠️ Cadena de mejora desactivada. Activa 'Ollama' para usar el botón.", "l-warn");
+      log("⚠️ Cadena de mejora desactivada. Activa 'LLM' para usar el botón.", "l-warn");
       return;
     }
     const model = $("enhancerModel")?.value;
-    if(!model){ log("⚠️ Selecciona un modelo de Ollama en el selector", "l-err"); return; }
+    if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp) en el selector", "l-err"); return; }
     const mode = $("enhancerMode")?.value || "text";
     const styleKey = $("enhancerStyle")?.value || "A";
     const data = loadSysPrompts();
@@ -8481,14 +8697,14 @@ window.addEventListener("DOMContentLoaded", () => {
     $("enhancerOutput").value = "";
     if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
     try {
-      log(`🧠 Solicitando mejora a Ollama (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
+      log(`🧠 Solicitando mejora al LLM (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
       const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
       const timeStr = fmtMs(elapsedMs);
       $("enhancerOutput").value = text;
       if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
       log(`✅ Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
     } catch(e){
-      log(`❌ Error al mejorar prompt con Ollama: ${e.message}`, "l-err");
+      log(`❌ Error al mejorar prompt con LLM: ${e.message}`, "l-err");
       $("enhancerOutput").value = "Error: " + e.message;
     } finally {
       btn.disabled = false;
