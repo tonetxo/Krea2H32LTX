@@ -422,6 +422,53 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
 .ref-video-card .ref-useaudio{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);}
 .ref-video-card .ref-status{font-size:10px;color:var(--accent);font-family:var(--mono);}
 
+/* ============================================================
+   Layout a 3 columnas para MiniMaxH3 (Entrada/Prompts · Ajustes/Modelos · Ejecución/Resultados)
+   ============================================================ */
+.wrap {
+  max-width: 1760px;
+  padding: 18px 18px 60px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr) minmax(360px, 1.25fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.controls-col, .settings-col, .results-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Pantallas medianas / escritorios compactos (hasta 1380px): 2 columnas */
+@media (max-width: 1380px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .results-col {
+    grid-column: span 2;
+  }
+}
+
+/* Tablets y móviles (hasta 920px): 1 columna única fluida y legible */
+@media (max-width: 920px) {
+  .wrap {
+    padding: 12px 10px 40px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .results-col {
+    grid-column: span 1;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -433,8 +480,60 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
     <div class="node" data-n="out">final</div>
   </div>
   <div class="grid">
+    <!-- COLUMNA 1 (IZQUIERDA): ENTRADA, MODOS Y PROMPTS -->
     <div class="controls-col">
-            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+
+      <div class="panel"><h2>Modo</h2><div class="seed-toggle"><div class="seg on" id="segI2V" data-value="i2v">i2v (una imagen)</div><div class="seg" id="segFLF2V" data-value="flf2v">flf2v (1er + último frame)</div><div class="seg" id="segR2V" data-value="r2v">r2v (referencias)</div></div><div class="hint" id="modeHint" style="margin-top:4px;font-size:10px;">Imagen de inicio → vídeo.</div></div>
+
+      <div class="panel" id="startImagePanel"><h2>Imagen de inicio</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="inputWrap" style="visibility:hidden;"><img id="inputImg" style="display:none;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
+
+      <div class="panel" id="lastFramePanel" style="display:none;"><h2>Último frame</h2><div class="dropzone" id="lastFrameDropzone"><input type="file" id="lastFrameFileInput" accept="image/*"><div class="ph" id="lastFrameDzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="lastFrameDzInfo"></div><div class="img-input-actions" id="lastFrameActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomLast" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenLast" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearLast" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="lastFrameWrap" style="visibility:hidden;"><img id="lastFrameImg" style="display:none;width:100%;height:auto;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div></div>
+
+      <div class="panel" id="r2vPanel" style="display:none;"><h2>Referencias</h2>
+        <div class="hint" style="font-size:10px;margin-bottom:8px;">Modo referencia completa. Hasta 6 imágenes, 3 vídeos (c/u con su audio) y 3 audios. El prompt se reescribe con la guía full-reference.</div>
+        <div class="row" style="align-items:center;gap:8px;margin-bottom:8px;">
+          <label style="font-size:10px;margin:0;">Tamaño de referencias</label>
+          <select id="refImageSize" style="width:auto;padding:3px 6px;font-size:10px;height:24px;">
+            <option value="match" selected>match (rápido)</option>
+            <option value="max">max (máxima identidad, más lento)</option>
+          </select>
+        </div>
+        <div class="r2v-section">
+          <div class="collapsible-header open" id="r2vImagesToggle">
+            <span class="arrow">▼</span> Imágenes de referencia <span id="r2vImagesCount" class="hint" style="margin-left:auto;"></span>
+          </div>
+          <div class="collapsible-body open" id="r2vImagesBody">
+            <div class="ref-grid" id="refImgGrid" style="margin-top:6px;"></div>
+          </div>
+        </div>
+        <div class="r2v-section" style="margin-top:8px;">
+          <div class="collapsible-header" id="r2vVideosToggle">
+            <span class="arrow">▶</span> Vídeos de referencia <span id="r2vVideosCount" class="hint" style="margin-left:auto;"></span>
+          </div>
+          <div class="collapsible-body" id="r2vVideosBody">
+            <div id="refVideoList" style="margin-top:6px;"></div>
+          </div>
+        </div>
+        <div class="r2v-section" style="margin-top:8px;">
+          <div class="collapsible-header" id="r2vAudiosToggle">
+            <span class="arrow">▶</span> Audios de referencia <span id="r2vAudiosCount" class="hint" style="margin-left:auto;"></span>
+          </div>
+          <div class="collapsible-body" id="r2vAudiosBody">
+            <div class="ref-grid" id="refAudioGrid" style="margin-top:6px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="krea2RecentToggle">
+          <span class="arrow">▶</span> Imágenes Krea2 recientes
+        </div>
+        <div class="collapsible-body" id="krea2RecentBody">
+          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="gallery-grid" id="krea2RecentGrid"></div>
+        </div>
+      </div>
 
       <div class="panel">
         <div class="collapsible-header" id="promptLibToggle">
@@ -502,58 +601,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
       </div>
 
-      <div class="panel"><h2>Modo</h2><div class="seed-toggle"><div class="seg on" id="segI2V" data-value="i2v">i2v (una imagen)</div><div class="seg" id="segFLF2V" data-value="flf2v">flf2v (1er + último frame)</div><div class="seg" id="segR2V" data-value="r2v">r2v (referencias)</div></div><div class="hint" id="modeHint" style="margin-top:4px;font-size:10px;">Imagen de inicio → vídeo.</div></div>
-
-      <div class="panel" id="startImagePanel"><h2>Imagen de inicio</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="inputWrap" style="visibility:hidden;"><img id="inputImg" style="display:none;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
-
-      <div class="panel" id="lastFramePanel" style="display:none;"><h2>Último frame</h2><div class="dropzone" id="lastFrameDropzone"><input type="file" id="lastFrameFileInput" accept="image/*"><div class="ph" id="lastFrameDzPlaceholder">arrastra imagen o clic</div></div><div class="dz-info" id="lastFrameDzInfo"></div><div class="img-input-actions" id="lastFrameActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomLast" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenLast" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearLast" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="lastFrameWrap" style="visibility:hidden;"><img id="lastFrameImg" style="display:none;width:100%;height:auto;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div></div>
-
-      <div class="panel" id="r2vPanel" style="display:none;"><h2>Referencias</h2>
-        <div class="hint" style="font-size:10px;margin-bottom:8px;">Modo referencia completa. Hasta 6 imágenes, 3 vídeos (c/u con su audio) y 3 audios. El prompt se reescribe con la guía full-reference.</div>
-        <div class="row" style="align-items:center;gap:8px;margin-bottom:8px;">
-          <label style="font-size:10px;margin:0;">Tamaño de referencias</label>
-          <select id="refImageSize" style="width:auto;padding:3px 6px;font-size:10px;height:24px;">
-            <option value="match" selected>match (rápido)</option>
-            <option value="max">max (máxima identidad, más lento)</option>
-          </select>
-        </div>
-        <div class="r2v-section">
-          <div class="collapsible-header open" id="r2vImagesToggle">
-            <span class="arrow">▼</span> Imágenes de referencia <span id="r2vImagesCount" class="hint" style="margin-left:auto;"></span>
-          </div>
-          <div class="collapsible-body open" id="r2vImagesBody">
-            <div class="ref-grid" id="refImgGrid" style="margin-top:6px;"></div>
-          </div>
-        </div>
-        <div class="r2v-section" style="margin-top:8px;">
-          <div class="collapsible-header" id="r2vVideosToggle">
-            <span class="arrow">▶</span> Vídeos de referencia <span id="r2vVideosCount" class="hint" style="margin-left:auto;"></span>
-          </div>
-          <div class="collapsible-body" id="r2vVideosBody">
-            <div id="refVideoList" style="margin-top:6px;"></div>
-          </div>
-        </div>
-        <div class="r2v-section" style="margin-top:8px;">
-          <div class="collapsible-header" id="r2vAudiosToggle">
-            <span class="arrow">▶</span> Audios de referencia <span id="r2vAudiosCount" class="hint" style="margin-left:auto;"></span>
-          </div>
-          <div class="collapsible-body" id="r2vAudiosBody">
-            <div class="ref-grid" id="refAudioGrid" style="margin-top:6px;"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="collapsible-header" id="krea2RecentToggle">
-          <span class="arrow">▶</span> Imágenes Krea2 recientes
-        </div>
-        <div class="collapsible-body" id="krea2RecentBody">
-          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
-          <div class="gallery-grid" id="krea2RecentGrid"></div>
-        </div>
-      </div>
-
-      <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
       <div class="panel">
         <div class="collapsible-header" id="evolveToggle">
           <span class="arrow">▶</span> Evolve / Transmutar prompt
@@ -580,9 +627,36 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- COLUMNA 2 (CENTRO): AJUSTES, MODELOS Y OPTIMIZACIONES -->
+    <div class="settings-col">
       <div class="panel"><h2>Modelo UNet</h2><div class="row"><select id="unetSelect"></select></div></div>
       <div class="panel"><h2>Modelo CLIP</h2><div class="row"><select id="clipSelect"></select></div></div>
       <div class="panel"><h2>Modelo VAE (Vídeo)</h2><div class="row"><select id="vaeSelect"></select></div></div>
+
+      <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
+
+      <div class="panel"><h2>Megapíxeles &amp; resolución</h2>
+        <div class="row">
+          <label>Relación de aspecto <span class="hint" id="arDetectHint">(Auto · 16:9)</span></label>
+          <div class="seed-toggle">
+            <div class="seg on" id="segArAuto" data-value="auto">Auto (Imagen)</div>
+            <div class="seg" id="segAr169" data-value="16:9">Forzar 16:9</div>
+          </div>
+        </div>
+        <div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.7"><div class="slider-val" id="mpVal">0.70</div></div>
+        <div class="row two-col"><div><label>Ancho base</label><input type="number" id="width" value="1120" step="32" min="256" class="ro" readonly></div><div><label>Alto base</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div></div>
+        <div class="hint" id="resFinalHint" style="font-size:10px;margin-top:4px;">Vídeo final: 2240×1280 px tras RTX 2x</div>
+        <div class="row" style="margin-top:6px;"><label>Duración (s) <span class="hint" id="durHint">(10s)</span></label><input type="number" id="duration" value="10" step="1" min="1" max="60"></div>
+        <div class="row"><label>Frames <span class="hint" id="framesHint">(243 / 24fps = 10.12s)</span></label><input type="number" id="frames" value="243" step="17" min="17" class="ro" readonly></div>
+        <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div>
+      </div>
+
+      <div class="panel"><h2>Sampler</h2><div class="row"><select id="samplerName"><option value="res_multistep" selected>res_multistep (recomendado H3)</option><option value="res_multistep_cfg_pp">res_multistep_cfg_pp</option><option value="res_multistep_ancestral">res_multistep_ancestral</option><option value="res_multistep_ancestral_cfg_pp">res_multistep_ancestral_cfg_pp</option><option value="res_2m">res_2m</option><option value="res_2m_ode">res_2m_ode</option><option value="res_2s">res_2s</option><option value="res_2s_ode">res_2s_ode</option><option value="res_3m">res_3m</option><option value="res_3m_ode">res_3m_ode</option><option value="res_3s">res_3s</option><option value="res_3s_ode">res_3s_ode</option><option value="res_5s">res_5s</option><option value="res_5s_ode">res_5s_ode</option><option value="res_6s">res_6s</option><option value="res_6s_ode">res_6s_ode</option><option value="euler">euler</option><option value="euler_cfg_pp">euler_cfg_pp</option><option value="euler_ancestral">euler_ancestral</option><option value="euler_ancestral_cfg_pp">euler_ancestral_cfg_pp</option><option value="heun">heun</option><option value="heunpp2">heunpp2</option><option value="exp_heun_2_x0">exp_heun_2_x0</option><option value="exp_heun_2_x0_sde">exp_heun_2_x0_sde</option><option value="dpm_2">dpm_2</option><option value="dpm_2_ancestral">dpm_2_ancestral</option><option value="lms">lms</option><option value="dpm_fast">dpm_fast</option><option value="dpm_adaptive">dpm_adaptive</option><option value="dpmpp_2s_ancestral">dpmpp_2s_ancestral</option><option value="dpmpp_2s_ancestral_cfg_pp">dpmpp_2s_ancestral_cfg_pp</option><option value="dpmpp_sde">dpmpp_sde</option><option value="dpmpp_sde_gpu">dpmpp_sde_gpu</option><option value="dpmpp_2m">dpmpp_2m</option><option value="dpmpp_2m_cfg_pp">dpmpp_2m_cfg_pp</option><option value="dpmpp_2m_sde">dpmpp_2m_sde</option><option value="dpmpp_2m_sde_gpu">dpmpp_2m_sde_gpu</option><option value="dpmpp_2m_sde_heun">dpmpp_2m_sde_heun</option><option value="dpmpp_2m_sde_heun_gpu">dpmpp_2m_sde_heun_gpu</option><option value="dpmpp_3m_sde">dpmpp_3m_sde</option><option value="dpmpp_3m_sde_gpu">dpmpp_3m_sde_gpu</option><option value="ddpm">ddpm</option><option value="lcm">lcm</option><option value="ipndm">ipndm</option><option value="ipndm_v">ipndm_v</option><option value="deis">deis</option><option value="deis_2m">deis_2m</option><option value="deis_2m_ode">deis_2m_ode</option><option value="deis_3m">deis_3m</option><option value="deis_3m_ode">deis_3m_ode</option><option value="cfgpp_ud10_ab">cfgpp_ud10_ab</option><option value="gradient_estimation">gradient_estimation</option><option value="gradient_estimation_cfg_pp">gradient_estimation_cfg_pp</option><option value="er_sde">er_sde</option><option value="seeds_2">seeds_2</option><option value="seeds_3">seeds_3</option><option value="sa_solver">sa_solver</option><option value="sa_solver_pece">sa_solver_pece</option><option value="ddim">ddim</option><option value="uni_pc">uni_pc</option><option value="uni_pc_bh2">uni_pc_bh2</option><option value="legacy_rk">legacy_rk</option><option value="rk">rk</option><option value="rk_beta">rk_beta</option></select></div></div>
+      <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple" selected>simple (recomendado H3)</option><option value="sgm_uniform">sgm_uniform</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="ddim_uniform">ddim_uniform</option><option value="beta">beta</option><option value="normal">normal</option><option value="linear_quadratic">linear_quadratic</option><option value="kl_optimal">kl_optimal</option><option value="capitanZiT">capitanZiT</option><option value="bong_tangent">bong_tangent</option><option value="beta57">beta57</option><option value="beta_33">beta_33</option><option value="beta_44">beta_44</option><option value="beta_53">beta_53</option><option value="beta_54">beta_54</option><option value="beta_57">beta_57</option><option value="beta_32">beta_32</option><option value="beta_43">beta_43</option><option value="beta_42">beta_42</option><option value="power_shift">power_shift</option><option value="radiance_shift">radiance_shift</option><option value="sigma_curve_from_points">sigma_curve_from_points</option><option value="sigma_curve_pchip">sigma_curve_pchip</option><option value="sigmoid_offset">sigmoid_offset</option></select></div></div>
+      <div class="panel"><h2>Steps</h2><div class="row slider-row"><input type="range" id="stepsSlider" min="1" max="50" step="1" value="20"><div class="slider-val" id="stepsVal">20</div></div></div>
+
       <div class="panel">
         <div class="collapsible-header" id="loraToggle">
           <span class="arrow">▶</span> LoRAs / Turbo LoRA
@@ -591,6 +665,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           <div id="loraList"></div>
         </div>
       </div>
+
       <div class="panel">
         <h2>Optimizaciones de atención</h2>
 
@@ -690,20 +765,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           <div class="hint" style="margin-top:6px;font-size:10px;">Atención block-sparse nativa de Comfy. Solo Sol-Attn está completamente configurado.</div>
         </div>
       </div>
-      <div class="panel"><h2>Sigma Shift (Flow Match)</h2>
-        <div class="row slider-row">
-          <label>Shift Vídeo <span class="hint">(desplazamiento de flujo vídeo)</span></label>
-          <input type="range" id="sigmaShiftVideo" min="1.0" max="30.0" step="0.5" value="8.0">
-          <div class="slider-val" id="sigmaShiftVideoVal">8.0</div>
-        </div>
-        <div class="row slider-row">
-          <label>Shift Audio <span class="hint">(desplazamiento de flujo audio)</span></label>
-          <input type="range" id="sigmaShiftAudio" min="1.0" max="30.0" step="0.5" value="3.0">
-          <div class="slider-val" id="sigmaShiftAudioVal">3.0</div>
-        </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Ajusta el schedule temporal (flow shifts) del DiT de MiniMax H3. Por defecto: 8.0 vídeo / 3.0 audio.</div>
-      </div>
-      <div class="panel"><h2>Spectrum (MiniMax H3)</h2><div class="seed-toggle"><div class="seg on" id="segSpectrumOn" data-value="true">Activo</div><div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div></div><div class="row slider-row"><label>Blend weight <span class="hint">(peso espectral)</span></label><input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5"><div class="slider-val" id="spectrumBlendVal">0.50</div></div><div class="row slider-row"><label>Flex window <span class="hint">(ajuste intervalo)</span></label><input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75"><div class="slider-val" id="spectrumFlexVal">0.75</div></div><div class="row slider-row"><label>Warmup steps <span class="hint">(pasos nativos iniciales)</span></label><input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="1"><div class="slider-val" id="spectrumWarmupVal">1</div></div><div class="row" style="margin-top:6px;"><label>Bootstrap primer paso <span class="hint">(pronóstico rápido paso 2)</span></label><div class="seed-toggle" style="margin-top:4px;"><div class="seg on" id="segBootstrapOn" data-value="true">Sí</div><div class="seg" id="segBootstrapOff" data-value="false">No</div></div></div><div class="row"><label>Historial en <span class="hint">(VRAM más rápido, más memoria)</span></label><select id="spectrumHistoryStorage"><option value="system_ram" selected>RAM sistema</option><option value="vram">VRAM</option></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div></div>
+
       <div class="panel">
         <h2>Acelerador Sol-H3 (SM120 Blackwell)</h2>
         <div class="seed-toggle">
@@ -736,9 +798,23 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Acelera la atención de vídeo. 'Evaluaciones densas = 1' garantiza máxima estabilidad visual en el arranque.</div>
       </div>
-      <div class="panel"><h2>Sampler</h2><div class="row"><select id="samplerName"><option value="res_multistep" selected>res_multistep (recomendado H3)</option><option value="res_multistep_cfg_pp">res_multistep_cfg_pp</option><option value="res_multistep_ancestral">res_multistep_ancestral</option><option value="res_multistep_ancestral_cfg_pp">res_multistep_ancestral_cfg_pp</option><option value="res_2m">res_2m</option><option value="res_2m_ode">res_2m_ode</option><option value="res_2s">res_2s</option><option value="res_2s_ode">res_2s_ode</option><option value="res_3m">res_3m</option><option value="res_3m_ode">res_3m_ode</option><option value="res_3s">res_3s</option><option value="res_3s_ode">res_3s_ode</option><option value="res_5s">res_5s</option><option value="res_5s_ode">res_5s_ode</option><option value="res_6s">res_6s</option><option value="res_6s_ode">res_6s_ode</option><option value="euler">euler</option><option value="euler_cfg_pp">euler_cfg_pp</option><option value="euler_ancestral">euler_ancestral</option><option value="euler_ancestral_cfg_pp">euler_ancestral_cfg_pp</option><option value="heun">heun</option><option value="heunpp2">heunpp2</option><option value="exp_heun_2_x0">exp_heun_2_x0</option><option value="exp_heun_2_x0_sde">exp_heun_2_x0_sde</option><option value="dpm_2">dpm_2</option><option value="dpm_2_ancestral">dpm_2_ancestral</option><option value="lms">lms</option><option value="dpm_fast">dpm_fast</option><option value="dpm_adaptive">dpm_adaptive</option><option value="dpmpp_2s_ancestral">dpmpp_2s_ancestral</option><option value="dpmpp_2s_ancestral_cfg_pp">dpmpp_2s_ancestral_cfg_pp</option><option value="dpmpp_sde">dpmpp_sde</option><option value="dpmpp_sde_gpu">dpmpp_sde_gpu</option><option value="dpmpp_2m">dpmpp_2m</option><option value="dpmpp_2m_cfg_pp">dpmpp_2m_cfg_pp</option><option value="dpmpp_2m_sde">dpmpp_2m_sde</option><option value="dpmpp_2m_sde_gpu">dpmpp_2m_sde_gpu</option><option value="dpmpp_2m_sde_heun">dpmpp_2m_sde_heun</option><option value="dpmpp_2m_sde_heun_gpu">dpmpp_2m_sde_heun_gpu</option><option value="dpmpp_3m_sde">dpmpp_3m_sde</option><option value="dpmpp_3m_sde_gpu">dpmpp_3m_sde_gpu</option><option value="ddpm">ddpm</option><option value="lcm">lcm</option><option value="ipndm">ipndm</option><option value="ipndm_v">ipndm_v</option><option value="deis">deis</option><option value="deis_2m">deis_2m</option><option value="deis_2m_ode">deis_2m_ode</option><option value="deis_3m">deis_3m</option><option value="deis_3m_ode">deis_3m_ode</option><option value="cfgpp_ud10_ab">cfgpp_ud10_ab</option><option value="gradient_estimation">gradient_estimation</option><option value="gradient_estimation_cfg_pp">gradient_estimation_cfg_pp</option><option value="er_sde">er_sde</option><option value="seeds_2">seeds_2</option><option value="seeds_3">seeds_3</option><option value="sa_solver">sa_solver</option><option value="sa_solver_pece">sa_solver_pece</option><option value="ddim">ddim</option><option value="uni_pc">uni_pc</option><option value="uni_pc_bh2">uni_pc_bh2</option><option value="legacy_rk">legacy_rk</option><option value="rk">rk</option><option value="rk_beta">rk_beta</option></select></div></div>
-      <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple" selected>simple (recomendado H3)</option><option value="sgm_uniform">sgm_uniform</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="ddim_uniform">ddim_uniform</option><option value="beta">beta</option><option value="normal">normal</option><option value="linear_quadratic">linear_quadratic</option><option value="kl_optimal">kl_optimal</option><option value="capitanZiT">capitanZiT</option><option value="bong_tangent">bong_tangent</option><option value="beta57">beta57</option><option value="beta_33">beta_33</option><option value="beta_44">beta_44</option><option value="beta_53">beta_53</option><option value="beta_54">beta_54</option><option value="beta_57">beta_57</option><option value="beta_32">beta_32</option><option value="beta_43">beta_43</option><option value="beta_42">beta_42</option><option value="power_shift">power_shift</option><option value="radiance_shift">radiance_shift</option><option value="sigma_curve_from_points">sigma_curve_from_points</option><option value="sigma_curve_pchip">sigma_curve_pchip</option><option value="sigmoid_offset">sigmoid_offset</option></select></div></div>
-      <div class="panel"><h2>Steps</h2><div class="row slider-row"><input type="range" id="stepsSlider" min="1" max="50" step="1" value="20"><div class="slider-val" id="stepsVal">20</div></div></div>
+
+      <div class="panel"><h2>Sigma Shift (Flow Match)</h2>
+        <div class="row slider-row">
+          <label>Shift Vídeo <span class="hint">(desplazamiento de flujo vídeo)</span></label>
+          <input type="range" id="sigmaShiftVideo" min="1.0" max="30.0" step="0.5" value="8.0">
+          <div class="slider-val" id="sigmaShiftVideoVal">8.0</div>
+        </div>
+        <div class="row slider-row">
+          <label>Shift Audio <span class="hint">(desplazamiento de flujo audio)</span></label>
+          <input type="range" id="sigmaShiftAudio" min="1.0" max="30.0" step="0.5" value="3.0">
+          <div class="slider-val" id="sigmaShiftAudioVal">3.0</div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Ajusta el schedule temporal (flow shifts) del DiT de MiniMax H3. Por defecto: 8.0 vídeo / 3.0 audio.</div>
+      </div>
+
+      <div class="panel"><h2>Spectrum (MiniMax H3)</h2><div class="seed-toggle"><div class="seg on" id="segSpectrumOn" data-value="true">Activo</div><div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div></div><div class="row slider-row"><label>Blend weight <span class="hint">(peso espectral)</span></label><input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5"><div class="slider-val" id="spectrumBlendVal">0.50</div></div><div class="row slider-row"><label>Flex window <span class="hint">(ajuste intervalo)</span></label><input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75"><div class="slider-val" id="spectrumFlexVal">0.75</div></div><div class="row slider-row"><label>Warmup steps <span class="hint">(pasos nativos iniciales)</span></label><input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="1"><div class="slider-val" id="spectrumWarmupVal">1</div></div><div class="row" style="margin-top:6px;"><label>Bootstrap primer paso <span class="hint">(pronóstico rápido paso 2)</span></label><div class="seed-toggle" style="margin-top:4px;"><div class="seg on" id="segBootstrapOn" data-value="true">Sí</div><div class="seg" id="segBootstrapOff" data-value="false">No</div></div></div><div class="row"><label>Historial en <span class="hint">(VRAM más rápido, más memoria)</span></label><select id="spectrumHistoryStorage"><option value="system_ram" selected>RAM sistema</option><option value="vram">VRAM</option></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div></div>
+
       <div class="panel">
         <h2>Latent Upscaler 3D (MiniMax H3)</h2>
         <div class="seed-toggle">
@@ -755,6 +831,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Escala el espacio latente antes de decodificar VAE con red 3D temporal. Incluye chunking y descarga automática de VRAM (force_unload) para evitar OOM.</div>
       </div>
+
       <div class="panel">
         <h2>Interpolación de Frames (RIFE)</h2>
         <div class="seed-toggle">
@@ -782,6 +859,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes de RTX Super Resolution para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
       </div>
+
       <div class="panel">
         <h2>Refinado facial (H3 FaceRefine)</h2>
         <div class="seed-toggle">
@@ -809,55 +887,12 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera los rostros en alta escala con Denoise adaptativo por fotograma, recomponiéndolos mediante recorte y fundido suave.</div>
       </div>
+
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
-      <div class="panel"><h2>Megapíxeles &amp; resolución</h2>
-        <div class="row">
-          <label>Relación de aspecto <span class="hint" id="arDetectHint">(Auto · 16:9)</span></label>
-          <div class="seed-toggle">
-            <div class="seg on" id="segArAuto" data-value="auto">Auto (Imagen)</div>
-            <div class="seg" id="segAr169" data-value="16:9">Forzar 16:9</div>
-          </div>
-        </div>
-        <div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.7"><div class="slider-val" id="mpVal">0.70</div></div>
-        <div class="row two-col"><div><label>Ancho base</label><input type="number" id="width" value="1120" step="32" min="256" class="ro" readonly></div><div><label>Alto base</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div></div>
-        <div class="hint" id="resFinalHint" style="font-size:10px;margin-top:4px;">Vídeo final: 2240×1280 px tras RTX 2x</div>
-        <div class="row" style="margin-top:6px;"><label>Duración (s) <span class="hint" id="durHint">(10s)</span></label><input type="number" id="duration" value="10" step="1" min="1" max="60"></div>
-        <div class="row"><label>Frames <span class="hint" id="framesHint">(243 / 24fps = 10.12s)</span></label><input type="number" id="frames" value="243" step="17" min="17" class="ro" readonly></div>
-        <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div>
-      </div>
     </div>
+
+    <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, RESULTADOS Y COLA -->
     <div class="results-col">
-      <!-- REPRODUCTOR ÚNICO -->
-      <div class="vidbox">
-        <div class="vid-header">
-          <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
-          <div class="vid-actions">
-            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
-            <button class="vid-action-btn" id="btnSaveFrame1" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
-            <button class="vid-action-btn" id="btnFaceRefine1" title="Refinar los rostros del clip actual con H3 FaceRefine" style="display:none;" type="button">😊 Refinar rostro</button>
-            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
-          </div>
-        </div>
-        <div class="empty" id="empty1">sin generar</div>
-        <div class="preview-wrap" id="previewWrap1" style="display:none;">
-          <div class="preview-step-badge" id="previewStep1" style="display:none;"><span class="spinner-dot"></span><span id="previewStepText1">Paso 0/0 · 0%</span></div>
-          <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa vídeo">
-          <video class="preview-img" id="previewVideo1" muted autoplay loop playsinline style="display:none;" alt="Vista previa vídeo"></video>
-        </div>
-        <span class="video-badge" id="badge1"></span>
-        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
-        <div class="vid-footer">
-          <span class="time-tag" id="time1"></span>
-          <span class="res-tag" id="res1"></span>
-        </div>
-      </div>
-
-      <!-- GALERÍA DE VARIANTES -->
-      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
-        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
-        <div class="variant-grid" id="variantGrid"></div>
-      </div>
-
       <!-- PANEL DE EJECUCIÓN Y COLAS -->
       <div class="panel" style="margin-bottom:0;">
         <h2>Ejecución</h2>
@@ -891,6 +926,37 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           </div>
         </div>
         <div class="log" id="log">listo.</div>
+      </div>
+
+      <!-- REPRODUCTOR ÚNICO -->
+      <div class="vidbox">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnSaveFrame1" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnFaceRefine1" title="Refinar los rostros del clip actual con H3 FaceRefine" style="display:none;" type="button">😊 Refinar rostro</button>
+            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <div class="preview-wrap" id="previewWrap1" style="display:none;">
+          <div class="preview-step-badge" id="previewStep1" style="display:none;"><span class="spinner-dot"></span><span id="previewStepText1">Paso 0/0 · 0%</span></div>
+          <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa vídeo">
+          <video class="preview-img" id="previewVideo1" muted autoplay loop playsinline style="display:none;" alt="Vista previa vídeo"></video>
+        </div>
+        <span class="video-badge" id="badge1"></span>
+        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="time1"></span>
+          <span class="res-tag" id="res1"></span>
+        </div>
+      </div>
+
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
       </div>
 
       <!-- HISTORIAL DE VÍDEOS -->
