@@ -1872,7 +1872,18 @@ async function enqueueFaceRefineCurrent(slotIndex = 3){
     attentionBackend: getAttentionBackendState(),
     h3opt: getH3OptState(),
     solH3: getSolH3State(),
-    faceRefine: getFaceRefineState()
+    faceRefine: getFaceRefineState(),
+    mediaSlotsSnapshot: {
+      1: mediaSlots[1]?.uploaded ? { ...mediaSlots[1].uploaded } : null,
+      2: mediaSlots[2]?.uploaded ? { ...mediaSlots[2].uploaded } : null,
+      3: mediaSlots[3]?.uploaded ? { ...mediaSlots[3].uploaded } : null,
+      4: mediaSlots[4]?.uploaded ? { ...mediaSlots[4].uploaded } : null
+    },
+    audioSlotsSnapshot: {
+      1: audioSlots[1]?.uploaded ? { ...audioSlots[1].uploaded } : null,
+      2: audioSlots[2]?.uploaded ? { ...audioSlots[2].uploaded } : null
+    },
+    videoSlotSnapshot: videoSlot?.uploaded ? { ...videoSlot.uploaded } : null
   };
   log(`Añadido refinado facial para ${media.filename} a la cola...`, "l-info");
   if(!activeJob){
@@ -2771,11 +2782,65 @@ function updateFinalPromptPanel(graph){
   }
 }
 
+// Sanitizador global de seguridad: elimina del grafo cualquier nodo LoadImage, LoadAudio o LoadVideo
+// que tenga una ruta vacía o inválida, desconectando sus enlaces dependientes para evitar IsADirectoryError en ComfyUI.
+function sanitizeGraph(g){
+  if(!g || typeof g !== "object") return g;
+  for(const nid of Object.keys(g)){
+    const node = g[nid];
+    if(!node || !node.class_type || !node.inputs) continue;
+    let removeNode = false;
+    if(node.class_type === "LoadImage"){
+      if(!node.inputs.image || typeof node.inputs.image !== "string" || node.inputs.image.trim() === ""){
+        removeNode = true;
+      }
+    } else if(node.class_type === "LoadAudio"){
+      if(!node.inputs.audio || typeof node.inputs.audio !== "string" || node.inputs.audio.trim() === ""){
+        removeNode = true;
+      }
+    } else if(node.class_type === "LoadVideo" || node.class_type === "VHS_LoadVideo"){
+      const f = node.inputs.file || node.inputs.video;
+      if(!f || typeof f !== "string" || f.trim() === ""){
+        removeNode = true;
+      }
+    }
+    if(removeNode){
+      for(const otherId of Object.keys(g)){
+        const otherInputs = g[otherId]?.inputs;
+        if(!otherInputs) continue;
+        for(const k of Object.keys(otherInputs)){
+          if(Array.isArray(otherInputs[k]) && otherInputs[k][0] === nid){
+            delete otherInputs[k];
+          }
+        }
+      }
+      delete g[nid];
+    }
+  }
+  return g;
+}
+
 // ==========================================
 // CONSTRUCCIÓN DEL GRAFO (buildGraph)
 // ==========================================
 function buildGraph(j){
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
+
+  // Instantánea de medios (inmunidad a cambios en UI durante el render)
+  const mSlots = j?.mediaSlotsSnapshot || {
+    1: mediaSlots[1]?.uploaded ? { ...mediaSlots[1].uploaded } : (mediaSlots[1]?.name ? { name: mediaSlots[1].name } : null),
+    2: mediaSlots[2]?.uploaded ? { ...mediaSlots[2].uploaded } : (mediaSlots[2]?.name ? { name: mediaSlots[2].name } : null),
+    3: mediaSlots[3]?.uploaded ? { ...mediaSlots[3].uploaded } : (mediaSlots[3]?.name ? { name: mediaSlots[3].name } : null),
+    4: mediaSlots[4]?.uploaded ? { ...mediaSlots[4].uploaded } : (mediaSlots[4]?.name ? { name: mediaSlots[4].name } : null)
+  };
+  const aSlots = j?.audioSlotsSnapshot || {
+    1: audioSlots[1]?.uploaded ? { ...audioSlots[1].uploaded } : (audioSlots[1]?.file ? { name: audioSlots[1].file.name } : null),
+    2: audioSlots[2]?.uploaded ? { ...audioSlots[2].uploaded } : (audioSlots[2]?.file ? { name: audioSlots[2].file.name } : null)
+  };
+  const vSlot = j?.videoSlotSnapshot !== undefined ? (j.videoSlotSnapshot ? { uploaded: j.videoSlotSnapshot } : null) : videoSlot;
+
+  const slotHasImg = (idx) => !!(mSlots[idx]?.name || mSlots[idx]?.uploaded?.name);
+  const getSlotImgName = (idx) => mSlots[idx]?.name || mSlots[idx]?.uploaded?.name || "";
 
   // 1. Prompts
   const p1 = (j ? j.prompt : $("prompt")?.value) || "";
@@ -3117,6 +3182,7 @@ function buildGraph(j){
 
     // Eliminar generación completa de Seg 1 y Seg 2 para ahorrar recursos
     const nodesToDelete = [
+      N.IMG2, N.IMG3, N.IMG4,
       N.REF2V_SEG1, N.GUIDER_1, N.SAMPLER_1, N.SCHEDULER_1, N.SAMPLE_1, N.DECODE_VID_1, N.DECODE_AUD_1, N.CREATE_VID_1, N.SAVE_VID_1,
       N.REF2V_SEG2, N.GUIDER_2, N.SAMPLER_2, N.SCHEDULER_2, N.SAMPLE_2, N.DECODE_VID_2, N.DECODE_AUD_2, N.CREATE_VID_2, N.SAVE_VID_2,
       N.IMAGE_BATCH, N.AUDIO_CONCAT, N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.SEED,
@@ -3184,8 +3250,11 @@ function buildGraph(j){
       ref_image_size: "match",
       "ref_audios.ref_audio_0": [N.FACE_COMPONENTS, 1]
     };
-    if(g[N.IMG1]){
+    if(slotHasImg(1) && g[N.IMG1]?.inputs){
+      g[N.IMG1].inputs.image = getSlotImgName(1);
       frRef2vInputs["ref_images.ref_image_0"] = [N.IMG1, 0];
+    } else {
+      if(g[N.IMG1]) delete g[N.IMG1];
     }
     g[N.FACE_REF2V] = {
       class_type: "MiniMaxH3ReferenceToVideo",
@@ -3334,7 +3403,7 @@ function buildGraph(j){
       _meta: { title: "Save Video Final (Face Refined)" }
     };
 
-    return g;
+    return sanitizeGraph(g);
   }
 
   // Conectar el modelo resultante a Guiders y Schedulers
@@ -3352,14 +3421,18 @@ function buildGraph(j){
     for(let i = 0; i < 8; i++) delete g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${i}`];
   }
 
-  const slotHasImg = (idx) => !!(mediaSlots[idx]?.uploaded?.name);
   const usedSlots = new Set();
 
   // Slot 1 (primer frame de inicio)
   if(slotHasImg(1) && g[N.IMG1]?.inputs){
-    g[N.IMG1].inputs.image = mediaSlots[1].uploaded.name;
+    g[N.IMG1].inputs.image = getSlotImgName(1);
     if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs["ref_images.ref_image_0"] = [N.IMG1, 0];
     usedSlots.add(1);
+  } else {
+    if(g[N.REF2V_SEG1]?.inputs && g[N.REF2V_SEG1].inputs["ref_images.ref_image_0"] && g[N.REF2V_SEG1].inputs["ref_images.ref_image_0"][0] === N.IMG1){
+      delete g[N.REF2V_SEG1].inputs["ref_images.ref_image_0"];
+    }
+    if(g[N.IMG1]) delete g[N.IMG1];
   }
 
   // 10b. Referencias compartidas + tamaño de referencias (match/max)
@@ -3374,7 +3447,7 @@ function buildGraph(j){
     // Seg 1 ve: Img1 (ref_image_0), e Img2 (ref_image_1) si se ha subido
     let seg1Idx = 1;
     if(slotHasImg(2)){
-      if(g[N.IMG2]?.inputs) g[N.IMG2].inputs.image = mediaSlots[2].uploaded.name;
+      if(g[N.IMG2]?.inputs) g[N.IMG2].inputs.image = getSlotImgName(2);
       if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${seg1Idx++}`] = [N.IMG2, 0];
       usedSlots.add(2);
     }
@@ -3384,12 +3457,12 @@ function buildGraph(j){
       g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.LAST_FRAME, 0];
     }
     if(slotHasImg(3)){
-      if(g[N.IMG3]?.inputs) g[N.IMG3].inputs.image = mediaSlots[3].uploaded.name;
+      if(g[N.IMG3]?.inputs) g[N.IMG3].inputs.image = getSlotImgName(3);
       if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.IMG3, 0];
       usedSlots.add(3);
     }
     if(slotHasImg(4)){
-      if(g[N.IMG4]?.inputs) g[N.IMG4].inputs.image = mediaSlots[4].uploaded.name;
+      if(g[N.IMG4]?.inputs) g[N.IMG4].inputs.image = getSlotImgName(4);
       if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.IMG4, 0];
       usedSlots.add(4);
     }
@@ -3401,7 +3474,7 @@ function buildGraph(j){
     [2, 3, 4].forEach(s => {
       if(slotHasImg(s)){
         const nid = nodeMap[s];
-        if(g[nid]?.inputs) g[nid].inputs.image = mediaSlots[s].uploaded.name;
+        if(g[nid]?.inputs) g[nid].inputs.image = getSlotImgName(s);
         if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${seg1Idx++}`] = [nid, 0];
         usedSlots.add(s);
       }
@@ -3414,29 +3487,34 @@ function buildGraph(j){
     [2, 3, 4].forEach(s => {
       if(slotHasImg(s)){
         const nid = nodeMap[s];
-        if(g[nid]?.inputs) g[nid].inputs.image = mediaSlots[s].uploaded.name;
+        if(g[nid]?.inputs) g[nid].inputs.image = getSlotImgName(s);
         if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [nid, 0];
         usedSlots.add(s);
       }
     });
   }
 
-  // Pruning: eliminar del grafo los nodos LoadImage de slots 2, 3, 4 que no se hayan subido,
-  // para que ComfyUI no intente buscar archivos inexistentes en disco.
+  // Pruning: eliminar del grafo los nodos LoadImage que no se hayan subido o no se usen
+  if(!usedSlots.has(1) && g[N.IMG1]) delete g[N.IMG1];
   if(!usedSlots.has(2) && g[N.IMG2]) delete g[N.IMG2];
   if(!usedSlots.has(3) && g[N.IMG3]) delete g[N.IMG3];
   if(!usedSlots.has(4) && g[N.IMG4]) delete g[N.IMG4];
 
-
   // 11. Vídeo de Referencia para Seg 2
-  if(videoSlot.uploaded && g[N.REF2V_SEG2]?.inputs){
+  const vUp = vSlot?.uploaded || vSlot;
+  if(vUp && vUp.name && g[N.REF2V_SEG2]?.inputs){
     g["195_user_vid"] = {
       class_type: "VHS_LoadVideo",
-      inputs: { video: videoSlot.uploaded.name, force_rate: 0, force_size: "Disabled", custom_width: 512, custom_height: 512, frame_load_cap: 0, skip_first_frames: 0, select_every_nth: 1 },
+      inputs: { video: vUp.name, force_rate: 0, force_size: "Disabled", custom_width: 512, custom_height: 512, frame_load_cap: 0, skip_first_frames: 0, select_every_nth: 1 },
       _meta: { title: "Vídeo Ref Usuario" }
     };
     if(g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0']){
       g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0'] = ["195_user_vid", 0];
+    }
+  } else {
+    if(g["195_user_vid"]) delete g["195_user_vid"];
+    if(g[N.REF2V_SEG2]?.inputs && g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0'] && g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0'][0] === "195_user_vid"){
+      delete g[N.REF2V_SEG2].inputs['ref_videos.ref_video_0'];
     }
   }
 
@@ -3485,12 +3563,16 @@ function buildGraph(j){
   // LoadAudio resuelve el filename relativo a input/ (soporta "sub/name");
   // los audios de /api/video_preprocess se guardan en input/reference/.
   const audioPath = (slot) => {
-    const up = slot?.uploaded;
-    if(up && up.subfolder) return `${up.subfolder}/${up.name}`;
-    return up?.name || (slot?.file ? slot.file.name : null);
+    if(!slot) return null;
+    const up = slot.uploaded || slot;
+    if(up && up.name){
+      if(up.subfolder) return `${up.subfolder}/${up.name}`;
+      return up.name;
+    }
+    return slot.file ? slot.file.name : null;
   };
-  const a1 = audioPath(audioSlots[1]);
-  const a2 = audioPath(audioSlots[2]);
+  const a1 = audioPath(aSlots[1]);
+  const a2 = audioPath(aSlots[2]);
   const totalDurExact = parseFloat((((calcFramesForDuration(dur1) - 1) + calcFramesForDuration(dur2)) / 24).toFixed(4));
 
   if(audioMode !== "none" && (a1 || a2)){
@@ -3787,7 +3869,7 @@ function buildGraph(j){
       length: [N.FACE_CROP, 6],
       ref_image_size: "match"
     };
-    if(g[N.IMG1]){
+    if(slotHasImg(1) && g[N.IMG1]?.inputs?.image){
       frRef2vInputs["ref_images.ref_image_0"] = [N.IMG1, 0];
     }
     g[N.FACE_REF2V] = {
@@ -3961,7 +4043,7 @@ function buildGraph(j){
       .forEach(id => { delete g[id]; });
   }
 
-  return g;
+  return sanitizeGraph(g);
 }
 
 // ==========================================
@@ -4018,7 +4100,18 @@ async function queueJob(runMode){
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     spectrum: getSpectrumState(),
     solH3: getSolH3State(),
-    faceRefine: getFaceRefineState()
+    faceRefine: getFaceRefineState(),
+    mediaSlotsSnapshot: {
+      1: mediaSlots[1]?.uploaded ? { ...mediaSlots[1].uploaded } : null,
+      2: mediaSlots[2]?.uploaded ? { ...mediaSlots[2].uploaded } : null,
+      3: mediaSlots[3]?.uploaded ? { ...mediaSlots[3].uploaded } : null,
+      4: mediaSlots[4]?.uploaded ? { ...mediaSlots[4].uploaded } : null
+    },
+    audioSlotsSnapshot: {
+      1: audioSlots[1]?.uploaded ? { ...audioSlots[1].uploaded } : null,
+      2: audioSlots[2]?.uploaded ? { ...audioSlots[2].uploaded } : null
+    },
+    videoSlotSnapshot: videoSlot?.uploaded ? { ...videoSlot.uploaded } : null
   };
 
   // Consultar en vivo el estado real de ComfyUI antes de decidir encolar
