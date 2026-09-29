@@ -88,8 +88,8 @@ REQUIRED_PACKAGES = [
         "workflows": ["MiniMaxH3 (Latent Upscaler 3D)"],
     },
     {
-        "name": "MiniMax-H3 / Sparse Attention",
-        "repo": "Nativo en ComfyUI / ComfyUI-PromptStudio",
+        "name": "ComfyUI-H3PromptStudio",
+        "repo": "https://github.com/tonetxo/ComfyUI-H3PromptStudio",
         "nodes": ["MiniMaxH3ReferenceToVideo", "MiniMaxH3SigmaShift", "ModelAttentionBackend"],
         "critical": True,
         "workflows": ["MMH3X2", "MiniMaxH3"],

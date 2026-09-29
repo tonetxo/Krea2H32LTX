@@ -109,7 +109,7 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | **Comfyui_Minimax_h3_latent_Upscaler** *(optional)* | [Comfyui_Minimax_h3_latent_Upscaler](https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler.git) | `MinimaxH3LatentUpscaler3D` | MiniMaxH3 (3D temporal latent upscaler with VRAM dynamic chunking) |
 | **Spectrum** *(optional)* | [ComfyUI-Spectrum](https://github.com/MinusZoneAI/ComfyUI-Spectrum) | `SpectrumApplyMiniMaxH3` | MMH3X2 (Spectrum), MiniMaxH3 |
 | **rgthree-comfy** *(optional)* | [rgthree-comfy](https://github.com/rgthree/rgthree-comfy) | `Power Lora Loader`, `Seed` | Krea2, LTXV |
-| **MiniMax-H3 / Sparse Attention** | Native in ComfyUI / PromptStudio | `MiniMaxH3ReferenceToVideo`, `MiniMaxH3SigmaShift`, `ModelAttentionBackend` | MMH3X2, MiniMaxH3 |
+| **ComfyUI-H3PromptStudio** | [ComfyUI-H3PromptStudio](https://github.com/tonetxo/ComfyUI-H3PromptStudio) | `MiniMaxH3ReferenceToVideo`, `MiniMaxH3SigmaShift`, `ModelAttentionBackend` | MMH3X2, MiniMaxH3 |
 
 > [!TIP]
 > You can run `python3 diagnostico_comfyui.py` at any time to automatically check which nodes are installed on your backend.
