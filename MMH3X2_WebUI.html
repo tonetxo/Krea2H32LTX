@@ -410,6 +410,53 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
 .audio-slot-wrap input[type="file"]{display:none;}
 .audio-slot-wrap audio{width:100%;height:30px;margin-top:4px;border-radius:4px;}
 
+/* ============================================================
+   Layout a 3 columnas para MMH3X2 (Entrada/Prompts · Ajustes/Modelos · Ejecución/Resultados)
+   ============================================================ */
+.wrap {
+  max-width: 1760px;
+  padding: 18px 18px 60px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr) minmax(360px, 1.25fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.controls-col, .settings-col, .results-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* Pantallas medianas / escritorios compactos (hasta 1380px): 2 columnas */
+@media (max-width: 1380px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .results-col {
+    grid-column: span 2;
+  }
+}
+
+/* Tablets y móviles (hasta 920px): 1 columna única fluida y legible */
+@media (max-width: 920px) {
+  .wrap {
+    padding: 12px 10px 40px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .results-col {
+    grid-column: span 1;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -426,8 +473,9 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
   </div>
 
   <div class="grid">
+    <!-- COLUMNA 1 (IZQUIERDA): ENTRADA, PROMPTS Y MEDIOS DE REFERENCIA -->
     <div class="controls-col">
-            <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="promptLibToggle">
@@ -656,16 +704,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
         </div>
       </div>
 
-      <!-- SEMILLA -->
-      <div class="panel">
-        <h2>Semilla</h2>
-        <div class="seed-toggle">
-          <div class="seg on" id="segRandom">Aleatoria</div>
-          <div class="seg" id="segFixed">Fija</div>
-        </div>
-        <input type="number" id="seedVal" value="12345" step="1" disabled>
-      </div>
-
       <!-- EVOLVE / TRANSMUTAR PROMPT -->
       <div class="panel">
         <div class="collapsible-header" id="evolveToggle">
@@ -706,6 +744,66 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <textarea class="enhancer-output" id="evolveOutput" readonly placeholder="Las variantes aparecerán aquí..."></textarea>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 2 (CENTRO): MODELOS, MUESTREO, ENLACE Y OPTIMIZACIONES -->
+    <div class="settings-col">
+      <!-- MODELOS & LORAS -->
+      <div class="panel">
+        <h2>Modelos &amp; LoRAs</h2>
+        <div class="row">
+          <label>UNet / Diffusion Model</label>
+          <select id="unetModel"><option value="">Cargando modelos...</option></select>
+        </div>
+        <div class="row">
+          <label>CLIP / Text Encoder</label>
+          <select id="clipModel"><option value="">Cargando CLIPs...</option></select>
+        </div>
+        <div class="row">
+          <label>VAE Vídeo</label>
+          <select id="vaeModel"><option value="">Cargando VAE...</option></select>
+        </div>
+
+        <!-- LoRA 1 -->
+        <div class="lora-slot" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="lora1Toggle"> <span>LoRA 1</span>
+            </label>
+          </div>
+          <select id="lora1Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
+          <div class="slider-row" style="margin-top:4px;">
+            <label style="font-size:10px;">Fuerza</label>
+            <input type="range" id="lora1Strength" min="0" max="2" step="0.05" value="1.0">
+            <div class="slider-val" id="lora1StrengthVal">1.00</div>
+          </div>
+        </div>
+
+        <!-- LoRA 2 -->
+        <div class="lora-slot" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="lora2Toggle"> <span>LoRA 2</span>
+            </label>
+          </div>
+          <select id="lora2Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
+          <div class="slider-row" style="margin-top:4px;">
+            <label style="font-size:10px;">Fuerza</label>
+            <input type="range" id="lora2Strength" min="0" max="2" step="0.05" value="1.0">
+            <div class="slider-val" id="lora2StrengthVal">1.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEMILLA -->
+      <div class="panel">
+        <h2>Semilla</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRandom">Aleatoria</div>
+          <div class="seg" id="segFixed">Fija</div>
+        </div>
+        <input type="number" id="seedVal" value="12345" step="1" disabled>
       </div>
 
       <!-- RESOLUCIÓN & DURACIÓN -->
@@ -850,53 +948,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
         </div>
       </div>
 
-      <!-- MODELOS & LORAS -->
-      <div class="panel">
-        <h2>Modelos &amp; LoRAs</h2>
-        <div class="row">
-          <label>UNet / Diffusion Model</label>
-          <select id="unetModel"><option value="">Cargando modelos...</option></select>
-        </div>
-        <div class="row">
-          <label>CLIP / Text Encoder</label>
-          <select id="clipModel"><option value="">Cargando CLIPs...</option></select>
-        </div>
-        <div class="row">
-          <label>VAE Vídeo</label>
-          <select id="vaeModel"><option value="">Cargando VAE...</option></select>
-        </div>
-
-        <!-- LoRA 1 -->
-        <div class="lora-slot" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
-          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
-            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="lora1Toggle"> <span>LoRA 1</span>
-            </label>
-          </div>
-          <select id="lora1Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
-          <div class="slider-row" style="margin-top:4px;">
-            <label style="font-size:10px;">Fuerza</label>
-            <input type="range" id="lora1Strength" min="0" max="2" step="0.05" value="1.0">
-            <div class="slider-val" id="lora1StrengthVal">1.00</div>
-          </div>
-        </div>
-
-        <!-- LoRA 2 -->
-        <div class="lora-slot" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
-          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
-            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="lora2Toggle"> <span>LoRA 2</span>
-            </label>
-          </div>
-          <select id="lora2Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
-          <div class="slider-row" style="margin-top:4px;">
-            <label style="font-size:10px;">Fuerza</label>
-            <input type="range" id="lora2Strength" min="0" max="2" step="0.05" value="1.0">
-            <div class="slider-val" id="lora2StrengthVal">1.00</div>
-          </div>
-        </div>
-      </div>
-
       <!-- OPTIMIZACIONES H3 -->
       <div class="panel">
         <div class="collapsible-header" id="h3OptToggle">
@@ -928,7 +979,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <div class="seed-toggle" style="margin-top:4px;">
               <div class="seg on" id="segAttnNone" data-value="none">Ninguno</div>
               <div class="seg" id="segAttnH3" data-value="h3-optimizations">H3-Optimizations</div>
-              <!-- Block Sparse desactivado: incompatible con MiniMax H3 en MMH3X2 -->
             </div>
           </div>
 
@@ -1190,10 +1240,52 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
       </div>
     </div>
 
-    <!-- COLUMNA DE RESULTADOS Y REPRODUCTORES -->
+    <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, RESULTADOS Y REPRODUCTORES -->
     <div class="results-col">
+      <!-- PANEL DE EJECUCIÓN Y COLAS -->
+      <div class="panel" style="margin-bottom:0;">
+        <h2>Ejecución</h2>
+        <div class="row" style="margin-bottom:8px;">
+          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
+          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
+        </div>
+        <div class="btn-row">
+          <button type="button" id="btnFull" class="primary" style="flex:2;">⚡ Generar Completo (Seg 1 + Seg 2 + Final)</button>
+          <button type="button" id="btnSeg1" style="flex:1;">Solo Seg 1</button>
+          <button type="button" id="btnSeg2" style="flex:1;">Solo Seg 2 + Final</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button type="button" id="btnStopVideo" disabled>Parar actual</button>
+          <button type="button" id="btnStopAll" class="danger" disabled>Parar todo</button>
+          <button type="button" id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
+        </div>
+        <div class="queue-status-box">
+          <div class="queue-status-row">
+            <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
+            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
+          </div>
+          <div class="queue-splits">
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div>
+              <div class="queue-split-main" id="queueWebuiSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueWebuiDetail">En reposo</div>
+            </div>
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div>
+              <div class="queue-split-main" id="queueServerSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div>
+            </div>
+          </div>
+          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
+            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
+            <div class="queue-items-body" id="queueItemsList"></div>
+          </div>
+        </div>
+        <div class="log" id="log">listo.</div>
+      </div>
+
       <!-- TABS DE VISTA DE REPRODUCTORES -->
-      <div class="vid-view-tabs">
+      <div class="vid-view-tabs" style="margin-top:12px;">
         <div class="vid-view-tab active" data-view="all">Todos los Reproductores</div>
         <div class="vid-view-tab" data-view="final">Solo Vídeo Final</div>
         <div class="vid-view-tab" data-view="seg1">Solo Seg 1</div>
@@ -1277,48 +1369,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
       <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
         <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
         <div class="variant-grid" id="variantGrid"></div>
-      </div>
-
-      <!-- PANEL DE EJECUCIÓN Y COLAS -->
-      <div class="panel" style="margin-bottom:0;">
-        <h2>Ejecución</h2>
-        <div class="row" style="margin-bottom:8px;">
-          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
-          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
-        </div>
-        <div class="btn-row">
-          <button type="button" id="btnFull" class="primary" style="flex:2;">⚡ Generar Completo (Seg 1 + Seg 2 + Final)</button>
-          <button type="button" id="btnSeg1" style="flex:1;">Solo Seg 1</button>
-          <button type="button" id="btnSeg2" style="flex:1;">Solo Seg 2 + Final</button>
-        </div>
-        <div class="btn-row" style="margin-top:6px;">
-          <button type="button" id="btnStopVideo" disabled>Parar actual</button>
-          <button type="button" id="btnStopAll" class="danger" disabled>Parar todo</button>
-          <button type="button" id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
-        </div>
-        <div class="queue-status-box">
-          <div class="queue-status-row">
-            <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
-            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
-          </div>
-          <div class="queue-splits">
-            <div class="queue-split-card">
-              <div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div>
-              <div class="queue-split-main" id="queueWebuiSummary">0 en espera</div>
-              <div class="queue-split-sub" id="queueWebuiDetail">En reposo</div>
-            </div>
-            <div class="queue-split-card">
-              <div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div>
-              <div class="queue-split-main" id="queueServerSummary">0 en espera</div>
-              <div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div>
-            </div>
-          </div>
-          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
-            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
-            <div class="queue-items-body" id="queueItemsList"></div>
-          </div>
-        </div>
-        <div class="log" id="log">listo.</div>
       </div>
 
       <!-- PROMPT FINAL ENVIADO AL BACKEND -->
