@@ -1166,6 +1166,26 @@ async function loadEnhancerModels(){
     });
     sel.dataset.listenerBound = "true";
   }
+
+  // Sincronizar selector de Prompt 2 (seg2OllamaModel) si existe en la página
+  const selSeg2 = $("seg2OllamaModel");
+  if(selSeg2){
+    const prevSeg2 = selSeg2.value || (JSON.parse(localStorage.getItem(typeof MMH3X2_SETTINGS_KEY !== "undefined" ? MMH3X2_SETTINGS_KEY : "mmh3x2_settings") || "{}")).seg2OllamaModel || "";
+    selSeg2.innerHTML = '<option value="">-- Mismo que Enhancer / Default --</option>';
+    for(const child of sel.children){
+      if(child.tagName === "OPTGROUP" || (child.tagName === "OPTION" && child.value)){
+        selSeg2.appendChild(child.cloneNode(true));
+      }
+    }
+    if(prevSeg2){
+      for(const opt of selSeg2.querySelectorAll("option")){
+        if(opt.value === prevSeg2 || opt.value.endsWith(":" + prevSeg2)){
+          selSeg2.value = opt.value;
+          break;
+        }
+      }
+    }
+  }
 }
 
 function renderSysPromptEditor(){

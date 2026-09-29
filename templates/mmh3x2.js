@@ -2505,9 +2505,15 @@ function buildGraph(j){
   } else if(seg2Mode === "ollama" && g[N.OLLAMA_CONN]?.inputs){
     const ollamaModel = $("seg2OllamaModel")?.value || $("enhancerModel")?.value;
     if(ollamaModel){
-      g[N.OLLAMA_CONN].inputs.model = ollamaModel;
+      if(ollamaModel.startsWith("llamacpp:")){
+        g[N.OLLAMA_CONN].inputs.url = "http://127.0.0.1:8080";
+        g[N.OLLAMA_CONN].inputs.model = ollamaModel.replace(/^llamacpp:/, "");
+      } else {
+        g[N.OLLAMA_CONN].inputs.url = "http://127.0.0.1:11434";
+        g[N.OLLAMA_CONN].inputs.model = ollamaModel.replace(/^ollama:/, "");
+      }
     } else {
-      log("⚠️ Modo Asistido requiere un modelo en Ollama. Se usa el del workflow.", "l-warn");
+      log("⚠️ Modo Asistido requiere un modelo en Ollama / llama.cpp. Se usa el del workflow.", "l-warn");
     }
 
     // Inyectar nodo nativo SaveText para capturar y devolver el prompt final generado por Ollama
@@ -4129,22 +4135,9 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Tras cargar los modelos de Ollama, restaurar el modelo guardado si sigue disponible.
+  // Tras cargar los modelos de Ollama / llama.cpp, restaurar configuración guardada.
   (async () => {
     await loadEnhancerModels();
-    const selEnh = $("enhancerModel");
-    const selSeg2 = $("seg2OllamaModel");
-    if(selEnh && selSeg2){
-      selSeg2.innerHTML = '<option value="">-- Mismo que Enhancer / Default --</option>';
-      Array.from(selEnh.options).forEach(opt => {
-        if(opt.value){
-          const o = document.createElement("option");
-          o.value = opt.value;
-          o.textContent = opt.textContent;
-          selSeg2.appendChild(o);
-        }
-      });
-    }
     const saved = restoreSettings();
     if(saved){
       const s = JSON.parse(localStorage.getItem(MMH3X2_SETTINGS_KEY) || "{}");
