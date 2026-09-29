@@ -9,7 +9,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "krea2",
   DEFAULT_MODEL: "Krea2_Turbo_convrot_int8mixed.safetensors",
-  N: {UNET:"1",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100",SAVE_IMAGE:"100"},
+  N: {UNET:"1",ATTN_BACKEND:"2",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100",SAVE_IMAGE:"100"},
   loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -89,6 +89,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
 CONFIG.variantMeta = function(){
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
+    ["Atención", $("attentionBackend")?.value || "comfy kitchen attention"],
     ["MP", parseFloat($("mpSlider")?.value || 0).toFixed(2)],
     ["Aspecto", $("aspectRatio")?.value || ""],
     ["Steps", $("steps")?.value || ""],
@@ -553,6 +554,12 @@ function applyWorkflow(workflow){
     }
   }
 
+  const kitchenNode = g[N.ATTN_BACKEND] || Object.values(g).find(node => node && (node.class_type === "ModelAttentionBackend" || node.class_type?.includes("AttentionBackend")));
+  if(kitchenNode && kitchenNode.inputs && kitchenNode.inputs.attention){
+    if($("attentionBackend")) $("attentionBackend").value = kitchenNode.inputs.attention;
+    saveKrea2AttnBackend(kitchenNode.inputs.attention);
+  }
+
   if(g[N.RES_SELECTOR]){
     const ar = g[N.RES_SELECTOR].inputs.aspect_ratio;
     if(ar) $("aspectRatio").value = ar;
@@ -999,6 +1006,21 @@ $("filenamePrefix")?.addEventListener("input", (e) => {
   localStorage.setItem("krea2_filename_prefix", e.target.value.trim());
 });
 
+const KREA2_ATTN_KEY = 'krea2_attention_backend';
+function loadKrea2AttnBackend(){
+  try {
+    return localStorage.getItem(KREA2_ATTN_KEY) || "comfy kitchen attention";
+  } catch(_) { return "comfy kitchen attention"; }
+}
+function saveKrea2AttnBackend(val){
+  try { localStorage.setItem(KREA2_ATTN_KEY, val); } catch(_) {}
+}
+const savedKrea2Attn = loadKrea2AttnBackend();
+if($("attentionBackend")) $("attentionBackend").value = savedKrea2Attn;
+$("attentionBackend")?.addEventListener("change", (e) => {
+  saveKrea2AttnBackend(e.target.value);
+});
+
 let jobQueue = [];
 let activeJob = null;
 let jobCounter = 0;
@@ -1095,6 +1117,7 @@ function snapshotJob(){
     id: ++jobCounter,
     prompt: $("prompt").value,
     model: $("modelSelect")?.value,
+    attentionBackend: $("attentionBackend")?.value || "comfy kitchen attention",
     megapixels: parseFloat($("mpSlider")?.value || "1.0"),
     aspectRatio: $("aspectRatio")?.value,
     projectorPreset: $("projectorPreset")?.value,
@@ -1125,6 +1148,25 @@ function buildGraph(job){
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
   const modelChoice = (j ? j.model : $("modelSelect")?.value) || "";
   g[N.UNET].inputs.unet_name = "flux2/" + modelChoice;
+
+  // Backend de atención (Comfy Kitchen INT8 / PyTorch)
+  const attnChoice = (j ? j.attentionBackend : $("attentionBackend")?.value) || "comfy kitchen attention";
+  let currentModelNode = N.UNET;
+  if(attnChoice && attnChoice !== "none"){
+    g[N.ATTN_BACKEND] = {
+      inputs: {
+        attention: attnChoice,
+        model: [N.UNET, 0]
+      },
+      class_type: "ModelAttentionBackend",
+      _meta: {
+        title: "Model Attention Backend (Kitchen)"
+      }
+    };
+    currentModelNode = N.ATTN_BACKEND;
+  }
+  g[N.PROJECTOR].inputs.model = [currentModelNode, 0];
+
   g[N.PROMPT].inputs.string = ((j ? j.prompt : $("prompt").value) || "").trim();
   g[N.RES_SELECTOR].inputs.megapixels = j ? j.megapixels : parseFloat($("mpSlider").value);
   g[N.RES_SELECTOR].inputs.aspect_ratio = j ? j.aspectRatio : $("aspectRatio").value;
