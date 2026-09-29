@@ -17,6 +17,7 @@ const CONFIG = {
     LORA1:"145", LORA2:"145_2",
     SPARSE_ATTN:"158", SIGMA_SHIFT:"159", MEM_OPT:"164", SPECTRUM:"162",
     ATTN_BACKEND:"147", BLOCK_SPARSE:"190", AIMDO:"191",
+    SOL_H3:"166",
     NOISE:"129", DURATION:"132", MATH:"131",
     SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
     SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
@@ -568,6 +569,112 @@ $("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").t
 $("segBootstrapOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("segBootstrapOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); scheduleSaveH3Settings(); });
+
+// --- SOL-H3 ATTENTION (SM120 Blackwell) ---
+const SOL_H3_KEY = "minimaxh3_sol_h3_state";
+const SOL_H3_DEFAULTS = { enabled: false, exact_fusion: true, dense_evaluations: 1, dense_layers: 2, tau: 1.0 };
+function loadSolH3(){
+  try { return Object.assign({}, SOL_H3_DEFAULTS, JSON.parse(localStorage.getItem(SOL_H3_KEY) || "{}")); }
+  catch(_) { return {...SOL_H3_DEFAULTS}; }
+}
+function saveSolH3(s){ try { localStorage.setItem(SOL_H3_KEY, JSON.stringify(s)); } catch(_){} }
+function getSolH3State(){
+  return {
+    enabled: $("segSolH3On")?.classList.contains("on") ?? false,
+    exact_fusion: $("segSolExactOn")?.classList.contains("on") ?? true,
+    dense_evaluations: parseInt($("solDenseEvalSlider")?.value || "1", 10),
+    dense_layers: parseInt($("solDenseLayersSlider")?.value || "2", 10),
+    tau: parseFloat($("solTauSlider")?.value || "1.0")
+  };
+}
+function setSolH3UI(s){
+  const on = $("segSolH3On"), off = $("segSolH3Off");
+  const panel = $("solH3Controls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  const exactOn = $("segSolExactOn"), exactOff = $("segSolExactOff");
+  if(s.exact_fusion !== false){
+    exactOn?.classList.add("on"); exactOff?.classList.remove("on");
+  } else {
+    exactOff?.classList.add("on"); exactOn?.classList.remove("on");
+  }
+  if($("solDenseEvalSlider")){
+    const de = (s.dense_evaluations != null) ? parseInt(s.dense_evaluations, 10) : 1;
+    $("solDenseEvalSlider").value = de;
+    if($("solDenseEvalVal")) $("solDenseEvalVal").textContent = de;
+    if($("solDenseEvalHint")) $("solDenseEvalHint").textContent = (de === 0) ? "(0 = turbo, posible inestabilidad)" : `(${de} = estable)`;
+  }
+  if($("solDenseLayersSlider")){
+    const dl = (s.dense_layers != null) ? parseInt(s.dense_layers, 10) : 2;
+    $("solDenseLayersSlider").value = dl;
+    if($("solDenseLayersVal")) $("solDenseLayersVal").textContent = dl;
+  }
+  if($("solTauSlider")){
+    const tau = (s.tau != null) ? parseFloat(s.tau) : 1.0;
+    $("solTauSlider").value = tau;
+    if($("solTauVal")) $("solTauVal").textContent = tau.toFixed(1);
+  }
+}
+const _solH3State = loadSolH3();
+setSolH3UI(_solH3State);
+$("segSolH3On")?.addEventListener("click", () => {
+  const s = getSolH3State();
+  s.enabled = true;
+  setSolH3UI(s);
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("segSolH3Off")?.addEventListener("click", () => {
+  const s = getSolH3State();
+  s.enabled = false;
+  setSolH3UI(s);
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("segSolExactOn")?.addEventListener("click", () => {
+  const s = getSolH3State();
+  s.exact_fusion = true;
+  setSolH3UI(s);
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("segSolExactOff")?.addEventListener("click", () => {
+  const s = getSolH3State();
+  s.exact_fusion = false;
+  setSolH3UI(s);
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("solDenseEvalSlider")?.addEventListener("input", (e) => {
+  const de = parseInt(e.target.value, 10) || 0;
+  if($("solDenseEvalVal")) $("solDenseEvalVal").textContent = de;
+  if($("solDenseEvalHint")) $("solDenseEvalHint").textContent = (de === 0) ? "(0 = turbo, posible inestabilidad)" : `(${de} = estable)`;
+  const s = getSolH3State();
+  s.dense_evaluations = de;
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("solDenseLayersSlider")?.addEventListener("input", (e) => {
+  const dl = parseInt(e.target.value, 10) || 0;
+  if($("solDenseLayersVal")) $("solDenseLayersVal").textContent = dl;
+  const s = getSolH3State();
+  s.dense_layers = dl;
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("solTauSlider")?.addEventListener("input", (e) => {
+  const tau = parseFloat(e.target.value) || 1.0;
+  if($("solTauVal")) $("solTauVal").textContent = tau.toFixed(1);
+  const s = getSolH3State();
+  s.tau = tau;
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
 
 // --- LATENT UPSCALER 3D (MiniMax H3) ---
 const LATENT_UPSCALE_KEY = "minimaxh3_latent_upscale_state";
@@ -1589,6 +1696,7 @@ function snapshotJob(){
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
+    solH3: getSolH3State(),
     latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
     attentionBackend: getAttentionBackendState(),
@@ -1636,6 +1744,7 @@ function restoreJob(job){
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
   if(job.spectrum){ setSpectrumUI(job.spectrum); saveSpectrum(job.spectrum); }
+  if(job.solH3){ setSolH3UI(job.solH3); saveSolH3(job.solH3); }
   if(job.latentUpscale){ setLatentUpscaleUI(job.latentUpscale); saveLatentUpscale(job.latentUpscale); }
   if(job.rife){ setRifeUI(job.rife); saveRife(job.rife); }
   if(job.attentionBackend){ setAttentionBackendUI(job.attentionBackend); saveAttentionBackend(job.attentionBackend); }
@@ -2240,6 +2349,26 @@ async function applyWorkflow(workflow, opts={}){
   } else if(spectrumNode === null){
     // Sin nodo Spectrum en el workflow: no tocar el estado guardado.
     setMissing("spectrum");
+  }
+
+  // Sol-H3 (SM120 Blackwell)
+  const solNode = findByClass("SolH3Experimental");
+  if(solNode && solNode.inputs){
+    const s = {
+      enabled: true,
+      exact_fusion: solNode.inputs.exact_fusion !== false,
+      dense_evaluations: typeof solNode.inputs.dense_evaluations === "number" ? solNode.inputs.dense_evaluations : 1,
+      dense_layers: typeof solNode.inputs.dense_layers === "number" ? solNode.inputs.dense_layers : 2,
+      tau: typeof solNode.inputs.tau === "number" ? solNode.inputs.tau : 1.0,
+    };
+    setSolH3UI(s);
+    saveSolH3(s);
+    setApplied(`Sol-H3 SM120 (${s.dense_evaluations} eval densa, tau=${s.tau})`);
+  } else if(solNode === null){
+    const s = { ...SOL_H3_DEFAULTS, enabled: false };
+    setSolH3UI(s);
+    saveSolH3(s);
+    setMissing("Sol-H3");
   }
 
   // Sampler
@@ -3343,6 +3472,25 @@ function buildGraph(job){
       };
       currentModelNode = nodeKey;
     }
+  }
+
+  // 6c. Sol-H3 SOL Attention (Experimental) — kernel CuTe SM120 para Blackwell
+  const solH3State = j ? j.solH3 : getSolH3State();
+  if(solH3State && solH3State.enabled){
+    g[N.SOL_H3] = {
+      class_type: "SolH3Experimental",
+      inputs: {
+        model: [currentModelNode, 0],
+        exact_fusion: solH3State.exact_fusion !== false,
+        tau: (typeof solH3State.tau === "number") ? solH3State.tau : 1.0,
+        dense_evaluations: (typeof solH3State.dense_evaluations === "number") ? solH3State.dense_evaluations : 1,
+        dense_layers: (typeof solH3State.dense_layers === "number") ? solH3State.dense_layers : 2
+      },
+      _meta: { title: "Sol-H3 SOL Attention (Experimental)" }
+    };
+    currentModelNode = N.SOL_H3;
+  } else {
+    delete g[N.SOL_H3];
   }
 
   // 7. Scheduler y Guider conectados a currentModelNode

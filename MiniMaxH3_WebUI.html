@@ -704,6 +704,38 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         <div class="hint" style="margin-top:4px;font-size:10px;">Ajusta el schedule temporal (flow shifts) del DiT de MiniMax H3. Por defecto: 8.0 vídeo / 3.0 audio.</div>
       </div>
       <div class="panel"><h2>Spectrum (MiniMax H3)</h2><div class="seed-toggle"><div class="seg on" id="segSpectrumOn" data-value="true">Activo</div><div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div></div><div class="row slider-row"><label>Blend weight <span class="hint">(peso espectral)</span></label><input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5"><div class="slider-val" id="spectrumBlendVal">0.50</div></div><div class="row slider-row"><label>Flex window <span class="hint">(ajuste intervalo)</span></label><input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75"><div class="slider-val" id="spectrumFlexVal">0.75</div></div><div class="row slider-row"><label>Warmup steps <span class="hint">(pasos nativos iniciales)</span></label><input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="1"><div class="slider-val" id="spectrumWarmupVal">1</div></div><div class="row" style="margin-top:6px;"><label>Bootstrap primer paso <span class="hint">(pronóstico rápido paso 2)</span></label><div class="seed-toggle" style="margin-top:4px;"><div class="seg on" id="segBootstrapOn" data-value="true">Sí</div><div class="seg" id="segBootstrapOff" data-value="false">No</div></div></div><div class="row"><label>Historial en <span class="hint">(VRAM más rápido, más memoria)</span></label><select id="spectrumHistoryStorage"><option value="system_ram" selected>RAM sistema</option><option value="vram">VRAM</option></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div></div>
+      <div class="panel">
+        <h2>Acelerador Sol-H3 (SM120 Blackwell)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segSolH3On" data-value="true">Activo</div>
+          <div class="seg on" id="segSolH3Off" data-value="false">Desactivado</div>
+        </div>
+        <div id="solH3Controls" style="display:none; margin-top:8px;">
+          <div class="row">
+            <label>Fusión exacta <span class="hint">(exact_fusion)</span></label>
+            <div class="seed-toggle">
+              <div class="seg on" id="segSolExactOn" data-value="true">Sí</div>
+              <div class="seg" id="segSolExactOff" data-value="false">No</div>
+            </div>
+          </div>
+          <div class="row slider-row" style="margin-top:6px;">
+            <label>Evaluaciones densas <span class="hint" id="solDenseEvalHint">(1 = estable)</span></label>
+            <input type="range" id="solDenseEvalSlider" min="0" max="4" step="1" value="1">
+            <div class="slider-val" id="solDenseEvalVal">1</div>
+          </div>
+          <div class="row slider-row" style="margin-top:6px;">
+            <label>Capas densas de inicio <span class="hint">(dense_layers)</span></label>
+            <input type="range" id="solDenseLayersSlider" min="0" max="8" step="1" value="2">
+            <div class="slider-val" id="solDenseLayersVal">2</div>
+          </div>
+          <div class="row slider-row" style="margin-top:6px;">
+            <label>Tau <span class="hint">(umbral de atención)</span></label>
+            <input type="range" id="solTauSlider" min="0.1" max="2.0" step="0.1" value="1.0">
+            <div class="slider-val" id="solTauVal">1.0</div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Acelera la atención de vídeo. 'Evaluaciones densas = 1' garantiza máxima estabilidad visual en el arranque.</div>
+      </div>
       <div class="panel"><h2>Sampler</h2><div class="row"><select id="samplerName"><option value="res_multistep" selected>res_multistep (recomendado H3)</option><option value="res_multistep_cfg_pp">res_multistep_cfg_pp</option><option value="res_multistep_ancestral">res_multistep_ancestral</option><option value="res_multistep_ancestral_cfg_pp">res_multistep_ancestral_cfg_pp</option><option value="res_2m">res_2m</option><option value="res_2m_ode">res_2m_ode</option><option value="res_2s">res_2s</option><option value="res_2s_ode">res_2s_ode</option><option value="res_3m">res_3m</option><option value="res_3m_ode">res_3m_ode</option><option value="res_3s">res_3s</option><option value="res_3s_ode">res_3s_ode</option><option value="res_5s">res_5s</option><option value="res_5s_ode">res_5s_ode</option><option value="res_6s">res_6s</option><option value="res_6s_ode">res_6s_ode</option><option value="euler">euler</option><option value="euler_cfg_pp">euler_cfg_pp</option><option value="euler_ancestral">euler_ancestral</option><option value="euler_ancestral_cfg_pp">euler_ancestral_cfg_pp</option><option value="heun">heun</option><option value="heunpp2">heunpp2</option><option value="exp_heun_2_x0">exp_heun_2_x0</option><option value="exp_heun_2_x0_sde">exp_heun_2_x0_sde</option><option value="dpm_2">dpm_2</option><option value="dpm_2_ancestral">dpm_2_ancestral</option><option value="lms">lms</option><option value="dpm_fast">dpm_fast</option><option value="dpm_adaptive">dpm_adaptive</option><option value="dpmpp_2s_ancestral">dpmpp_2s_ancestral</option><option value="dpmpp_2s_ancestral_cfg_pp">dpmpp_2s_ancestral_cfg_pp</option><option value="dpmpp_sde">dpmpp_sde</option><option value="dpmpp_sde_gpu">dpmpp_sde_gpu</option><option value="dpmpp_2m">dpmpp_2m</option><option value="dpmpp_2m_cfg_pp">dpmpp_2m_cfg_pp</option><option value="dpmpp_2m_sde">dpmpp_2m_sde</option><option value="dpmpp_2m_sde_gpu">dpmpp_2m_sde_gpu</option><option value="dpmpp_2m_sde_heun">dpmpp_2m_sde_heun</option><option value="dpmpp_2m_sde_heun_gpu">dpmpp_2m_sde_heun_gpu</option><option value="dpmpp_3m_sde">dpmpp_3m_sde</option><option value="dpmpp_3m_sde_gpu">dpmpp_3m_sde_gpu</option><option value="ddpm">ddpm</option><option value="lcm">lcm</option><option value="ipndm">ipndm</option><option value="ipndm_v">ipndm_v</option><option value="deis">deis</option><option value="deis_2m">deis_2m</option><option value="deis_2m_ode">deis_2m_ode</option><option value="deis_3m">deis_3m</option><option value="deis_3m_ode">deis_3m_ode</option><option value="cfgpp_ud10_ab">cfgpp_ud10_ab</option><option value="gradient_estimation">gradient_estimation</option><option value="gradient_estimation_cfg_pp">gradient_estimation_cfg_pp</option><option value="er_sde">er_sde</option><option value="seeds_2">seeds_2</option><option value="seeds_3">seeds_3</option><option value="sa_solver">sa_solver</option><option value="sa_solver_pece">sa_solver_pece</option><option value="ddim">ddim</option><option value="uni_pc">uni_pc</option><option value="uni_pc_bh2">uni_pc_bh2</option><option value="legacy_rk">legacy_rk</option><option value="rk">rk</option><option value="rk_beta">rk_beta</option></select></div></div>
       <div class="panel"><h2>Scheduler</h2><div class="row"><select id="schedulerName"><option value="simple" selected>simple (recomendado H3)</option><option value="sgm_uniform">sgm_uniform</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="ddim_uniform">ddim_uniform</option><option value="beta">beta</option><option value="normal">normal</option><option value="linear_quadratic">linear_quadratic</option><option value="kl_optimal">kl_optimal</option><option value="capitanZiT">capitanZiT</option><option value="bong_tangent">bong_tangent</option><option value="beta57">beta57</option><option value="beta_33">beta_33</option><option value="beta_44">beta_44</option><option value="beta_53">beta_53</option><option value="beta_54">beta_54</option><option value="beta_57">beta_57</option><option value="beta_32">beta_32</option><option value="beta_43">beta_43</option><option value="beta_42">beta_42</option><option value="power_shift">power_shift</option><option value="radiance_shift">radiance_shift</option><option value="sigma_curve_from_points">sigma_curve_from_points</option><option value="sigma_curve_pchip">sigma_curve_pchip</option><option value="sigmoid_offset">sigmoid_offset</option></select></div></div>
       <div class="panel"><h2>Steps</h2><div class="row slider-row"><input type="range" id="stepsSlider" min="1" max="50" step="1" value="20"><div class="slider-val" id="stepsVal">20</div></div></div>
@@ -1411,6 +1443,22 @@ const BASE_GRAPH = {
     "class_type": "MinimaxH3LatentUpscaler3D",
     "_meta": {
       "title": "MiniMax H3 Latent Upscaler (3D)"
+    }
+  },
+  "166": {
+    "inputs": {
+      "model": [
+        "145",
+        0
+      ],
+      "exact_fusion": true,
+      "tau": 1.0,
+      "dense_evaluations": 1,
+      "dense_layers": 2
+    },
+    "class_type": "SolH3Experimental",
+    "_meta": {
+      "title": "Sol-H3 SOL Attention (Experimental)"
     }
   }
 };
@@ -3592,6 +3640,7 @@ const CONFIG = {
     LORA1:"145", LORA2:"145_2",
     SPARSE_ATTN:"158", SIGMA_SHIFT:"159", MEM_OPT:"164", SPECTRUM:"162",
     ATTN_BACKEND:"147", BLOCK_SPARSE:"190", AIMDO:"191",
+    SOL_H3:"166",
     NOISE:"129", DURATION:"132", MATH:"131",
     SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
     SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
@@ -4143,6 +4192,112 @@ $("spectrumWarmup")?.addEventListener("input", (e) => { $("spectrumWarmupVal").t
 $("segBootstrapOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("segBootstrapOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.bootstrapFirstForecast = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveH3Settings(); });
 $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSpectrumState(); s.historyStorage = e.target.value; saveSpectrum(s); scheduleSaveH3Settings(); });
+
+// --- SOL-H3 ATTENTION (SM120 Blackwell) ---
+const SOL_H3_KEY = "minimaxh3_sol_h3_state";
+const SOL_H3_DEFAULTS = { enabled: false, exact_fusion: true, dense_evaluations: 1, dense_layers: 2, tau: 1.0 };
+function loadSolH3(){
+  try { return Object.assign({}, SOL_H3_DEFAULTS, JSON.parse(localStorage.getItem(SOL_H3_KEY) || "{}")); }
+  catch(_) { return {...SOL_H3_DEFAULTS}; }
+}
+function saveSolH3(s){ try { localStorage.setItem(SOL_H3_KEY, JSON.stringify(s)); } catch(_){} }
+function getSolH3State(){
+  return {
+    enabled: $("segSolH3On")?.classList.contains("on") ?? false,
+    exact_fusion: $("segSolExactOn")?.classList.contains("on") ?? true,
+    dense_evaluations: parseInt($("solDenseEvalSlider")?.value || "1", 10),
+    dense_layers: parseInt($("solDenseLayersSlider")?.value || "2", 10),
+    tau: parseFloat($("solTauSlider")?.value || "1.0")
+  };
+}
+function setSolH3UI(s){
+  const on = $("segSolH3On"), off = $("segSolH3Off");
+  const panel = $("solH3Controls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  const exactOn = $("segSolExactOn"), exactOff = $("segSolExactOff");
+  if(s.exact_fusion !== false){
+    exactOn?.classList.add("on"); exactOff?.classList.remove("on");
+  } else {
+    exactOff?.classList.add("on"); exactOn?.classList.remove("on");
+  }
+  if($("solDenseEvalSlider")){
+    const de = (s.dense_evaluations != null) ? parseInt(s.dense_evaluations, 10) : 1;
+    $("solDenseEvalSlider").value = de;
+    if($("solDenseEvalVal")) $("solDenseEvalVal").textContent = de;
+    if($("solDenseEvalHint")) $("solDenseEvalHint").textContent = (de === 0) ? "(0 = turbo, posible inestabilidad)" : `(${de} = estable)`;
+  }
+  if($("solDenseLayersSlider")){
+    const dl = (s.dense_layers != null) ? parseInt(s.dense_layers, 10) : 2;
+    $("solDenseLayersSlider").value = dl;
+    if($("solDenseLayersVal")) $("solDenseLayersVal").textContent = dl;
+  }
+  if($("solTauSlider")){
+    const tau = (s.tau != null) ? parseFloat(s.tau) : 1.0;
+    $("solTauSlider").value = tau;
+    if($("solTauVal")) $("solTauVal").textContent = tau.toFixed(1);
+  }
+}
+const _solH3State = loadSolH3();
+setSolH3UI(_solH3State);
+$("segSolH3On")?.addEventListener("click", () => {
+  const s = getSolH3State();
+  s.enabled = true;
+  setSolH3UI(s);
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("segSolH3Off")?.addEventListener("click", () => {
+  const s = getSolH3State();
+  s.enabled = false;
+  setSolH3UI(s);
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("segSolExactOn")?.addEventListener("click", () => {
+  const s = getSolH3State();
+  s.exact_fusion = true;
+  setSolH3UI(s);
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("segSolExactOff")?.addEventListener("click", () => {
+  const s = getSolH3State();
+  s.exact_fusion = false;
+  setSolH3UI(s);
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("solDenseEvalSlider")?.addEventListener("input", (e) => {
+  const de = parseInt(e.target.value, 10) || 0;
+  if($("solDenseEvalVal")) $("solDenseEvalVal").textContent = de;
+  if($("solDenseEvalHint")) $("solDenseEvalHint").textContent = (de === 0) ? "(0 = turbo, posible inestabilidad)" : `(${de} = estable)`;
+  const s = getSolH3State();
+  s.dense_evaluations = de;
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("solDenseLayersSlider")?.addEventListener("input", (e) => {
+  const dl = parseInt(e.target.value, 10) || 0;
+  if($("solDenseLayersVal")) $("solDenseLayersVal").textContent = dl;
+  const s = getSolH3State();
+  s.dense_layers = dl;
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("solTauSlider")?.addEventListener("input", (e) => {
+  const tau = parseFloat(e.target.value) || 1.0;
+  if($("solTauVal")) $("solTauVal").textContent = tau.toFixed(1);
+  const s = getSolH3State();
+  s.tau = tau;
+  saveSolH3(s);
+  scheduleSaveH3Settings();
+});
 
 // --- LATENT UPSCALER 3D (MiniMax H3) ---
 const LATENT_UPSCALE_KEY = "minimaxh3_latent_upscale_state";
@@ -5164,6 +5319,7 @@ function snapshotJob(){
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
+    solH3: getSolH3State(),
     latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
     attentionBackend: getAttentionBackendState(),
@@ -5211,6 +5367,7 @@ function restoreJob(job){
   setBitDepthUI(job.bitDepth);
   saveBitDepth(job.bitDepth);
   if(job.spectrum){ setSpectrumUI(job.spectrum); saveSpectrum(job.spectrum); }
+  if(job.solH3){ setSolH3UI(job.solH3); saveSolH3(job.solH3); }
   if(job.latentUpscale){ setLatentUpscaleUI(job.latentUpscale); saveLatentUpscale(job.latentUpscale); }
   if(job.rife){ setRifeUI(job.rife); saveRife(job.rife); }
   if(job.attentionBackend){ setAttentionBackendUI(job.attentionBackend); saveAttentionBackend(job.attentionBackend); }
@@ -5815,6 +5972,26 @@ async function applyWorkflow(workflow, opts={}){
   } else if(spectrumNode === null){
     // Sin nodo Spectrum en el workflow: no tocar el estado guardado.
     setMissing("spectrum");
+  }
+
+  // Sol-H3 (SM120 Blackwell)
+  const solNode = findByClass("SolH3Experimental");
+  if(solNode && solNode.inputs){
+    const s = {
+      enabled: true,
+      exact_fusion: solNode.inputs.exact_fusion !== false,
+      dense_evaluations: typeof solNode.inputs.dense_evaluations === "number" ? solNode.inputs.dense_evaluations : 1,
+      dense_layers: typeof solNode.inputs.dense_layers === "number" ? solNode.inputs.dense_layers : 2,
+      tau: typeof solNode.inputs.tau === "number" ? solNode.inputs.tau : 1.0,
+    };
+    setSolH3UI(s);
+    saveSolH3(s);
+    setApplied(`Sol-H3 SM120 (${s.dense_evaluations} eval densa, tau=${s.tau})`);
+  } else if(solNode === null){
+    const s = { ...SOL_H3_DEFAULTS, enabled: false };
+    setSolH3UI(s);
+    saveSolH3(s);
+    setMissing("Sol-H3");
   }
 
   // Sampler
@@ -6918,6 +7095,25 @@ function buildGraph(job){
       };
       currentModelNode = nodeKey;
     }
+  }
+
+  // 6c. Sol-H3 SOL Attention (Experimental) — kernel CuTe SM120 para Blackwell
+  const solH3State = j ? j.solH3 : getSolH3State();
+  if(solH3State && solH3State.enabled){
+    g[N.SOL_H3] = {
+      class_type: "SolH3Experimental",
+      inputs: {
+        model: [currentModelNode, 0],
+        exact_fusion: solH3State.exact_fusion !== false,
+        tau: (typeof solH3State.tau === "number") ? solH3State.tau : 1.0,
+        dense_evaluations: (typeof solH3State.dense_evaluations === "number") ? solH3State.dense_evaluations : 1,
+        dense_layers: (typeof solH3State.dense_layers === "number") ? solH3State.dense_layers : 2
+      },
+      _meta: { title: "Sol-H3 SOL Attention (Experimental)" }
+    };
+    currentModelNode = N.SOL_H3;
+  } else {
+    delete g[N.SOL_H3];
   }
 
   // 7. Scheduler y Guider conectados a currentModelNode
