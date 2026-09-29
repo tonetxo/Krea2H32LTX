@@ -3945,7 +3945,18 @@ $("segAr169")?.addEventListener("click", () => { arMode = "16:9"; saveArMode(arM
 $("prompt")?.addEventListener("input", () => scheduleSaveH3Settings());
 $("segAttnNone")?.addEventListener("click", () => { setAttentionOptimizerUI("none"); saveAttentionOptimizer({mode:"none"}); scheduleSaveH3Settings(); });
 $("segAttnH3")?.addEventListener("click", () => { setAttentionOptimizerUI("h3-optimizations"); saveAttentionOptimizer({mode:"h3-optimizations"}); scheduleSaveH3Settings(); });
-$("segAttnBlockSparse")?.addEventListener("click", () => { setAttentionOptimizerUI("block-sparse"); saveAttentionOptimizer({mode:"block-sparse"}); scheduleSaveH3Settings(); });
+$("segAttnBlockSparse")?.addEventListener("click", () => {
+  setAttentionOptimizerUI("block-sparse");
+  saveAttentionOptimizer({mode:"block-sparse"});
+  if(typeof getSolH3State === "function" && getSolH3State().enabled){
+    const s = getSolH3State();
+    s.enabled = false;
+    setSolH3UI(s);
+    saveSolH3(s);
+    if(typeof log === "function") log("ℹ️ Block Sparse activado: Sol-H3 desactivado automáticamente para evitar colisión de atención", "l-info");
+  }
+  scheduleSaveH3Settings();
+});
 $("h3SparseBackend")?.addEventListener("change", () => { saveH3Opt(getH3OptState()); scheduleSaveH3Settings(); });
 $("h3VideoBudget")?.addEventListener("input", (e) => {
   const val = parseFloat(e.target.value);
@@ -4250,6 +4261,11 @@ $("segSolH3On")?.addEventListener("click", () => {
   s.enabled = true;
   setSolH3UI(s);
   saveSolH3(s);
+  if(typeof getAttentionOptimizerState === "function" && getAttentionOptimizerState().mode === "block-sparse"){
+    setAttentionOptimizerUI("none");
+    saveAttentionOptimizer({ mode: "none" });
+    if(typeof log === "function") log("ℹ️ Sol-H3 activado: Block Sparse desactivado automáticamente para evitar colisión de atención", "l-info");
+  }
   scheduleSaveH3Settings();
 });
 $("segSolH3Off")?.addEventListener("click", () => {
@@ -6967,34 +6983,40 @@ function buildGraph(job){
     }
 
   } else if(optimizerState.mode === "block-sparse"){
-    const bs = j ? j.blockSparse : getBlockSparseState();
-    const mode = BLOCK_SPARSE_MODES[bs.selection] || "sol-attn";
-    const isSolAttn = mode === "sol-attn";
-    const isVsa = mode === "vsa";
-    // Formato plano V3: la key del DynamicCombo es el modo interno; los sub-inputs se envían con punto.
-    const blockSparseInputs = {
-      model: [currentModelNode, 0],
-      selection: mode,
-      start_percent: bs.startPercent,
-      end_percent: bs.endPercent,
-      dense_blocks: "",
-      min_tokens: 12288,
-      extra_tokens: isVsa ? 0 : 256,
-      sink_conditioning: "exact_kv_and_rows",
-      verbose: false
-    };
-    if(isSolAttn) blockSparseInputs["selection.tau"] = bs.tau ?? 1.3;
-    else blockSparseInputs["selection.keep_percent"] = 10.0;
-    g[N.BLOCK_SPARSE] = {
-      class_type: "BlockSparseAttention",
-      inputs: blockSparseInputs,
-      _meta: { title: "Block Sparse Attention" }
-    };
-    currentModelNode = N.BLOCK_SPARSE;
+    const solH3Check = j ? j.solH3 : getSolH3State();
+    if(solH3Check && solH3Check.enabled){
+      delete g[N.BLOCK_SPARSE];
+      if(typeof log === "function") log("⚠️ Sol-H3 activo: omitiendo Block Sparse para priorizar kernel nativo SM120 y evitar conflicto de atención", "l-warn");
+    } else {
+      const bs = j ? j.blockSparse : getBlockSparseState();
+      const mode = BLOCK_SPARSE_MODES[bs.selection] || "sol-attn";
+      const isSolAttn = mode === "sol-attn";
+      const isVsa = mode === "vsa";
+      // Formato plano V3: la key del DynamicCombo es el modo interno; los sub-inputs se envían con punto.
+      const blockSparseInputs = {
+        model: [currentModelNode, 0],
+        selection: mode,
+        start_percent: bs.startPercent,
+        end_percent: bs.endPercent,
+        dense_blocks: "",
+        min_tokens: 12288,
+        extra_tokens: isVsa ? 0 : 256,
+        sink_conditioning: "exact_kv_and_rows",
+        verbose: false
+      };
+      if(isSolAttn) blockSparseInputs["selection.tau"] = bs.tau ?? 1.3;
+      else blockSparseInputs["selection.keep_percent"] = 10.0;
+      g[N.BLOCK_SPARSE] = {
+        class_type: "BlockSparseAttention",
+        inputs: blockSparseInputs,
+        _meta: { title: "Block Sparse Attention" }
+      };
+      currentModelNode = N.BLOCK_SPARSE;
 
-    // En flf2v, AIMDO entra en conflicto con BlockSparseAttention + 2 frames
-    if(currentMode === "flf2v" && aimdo.residency !== "stock"){
-      log("⚠️ flf2v + Block Sparse: AIMDO desactivado automáticamente para evitar aimdo memory compile error", "l-warn");
+      // En flf2v, AIMDO entra en conflicto con BlockSparseAttention + 2 frames
+      if(currentMode === "flf2v" && aimdo.residency !== "stock"){
+        log("⚠️ flf2v + Block Sparse: AIMDO desactivado automáticamente para evitar aimdo memory compile error", "l-warn");
+      }
     }
   }
 
