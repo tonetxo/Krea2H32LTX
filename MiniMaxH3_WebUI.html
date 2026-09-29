@@ -782,6 +782,33 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes de RTX Super Resolution para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
       </div>
+      <div class="panel">
+        <h2>Refinado facial (H3 FaceRefine)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segFaceRefineOn" data-value="true">Activo</div>
+          <div class="seg on" id="segFaceRefineOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="faceRefineControls" style="display:none; margin-top:8px;">
+          <div class="row slider-row">
+            <label>Denoise base <span class="hint" id="faceRefineDenoiseHint">(0.35)</span></label>
+            <input type="range" id="faceRefineDenoiseSlider" min="0.15" max="0.55" step="0.05" value="0.35">
+            <div class="slider-val" id="faceRefineDenoiseVal">0.35</div>
+          </div>
+          <div class="row slider-row">
+            <label>Suavizado de borde (Feather) <span class="hint" id="faceRefineFeatherHint">(16 px)</span></label>
+            <input type="range" id="faceRefineFeatherSlider" min="4" max="32" step="2" value="16">
+            <div class="slider-val" id="faceRefineFeatherVal">16 px</div>
+          </div>
+          <div class="row">
+            <label>Selección de rostro</label>
+            <select id="faceRefineSelectMode">
+              <option value="largest_face" selected>Rostro principal (más grande)</option>
+              <option value="centre_most">Rostro más centrado</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera los rostros en alta escala con Denoise adaptativo por fotograma, recomponiéndolos mediante recorte y fundido suave.</div>
+      </div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
       <div class="panel"><h2>Megapíxeles &amp; resolución</h2>
         <div class="row">
@@ -807,6 +834,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           <div class="vid-actions">
             <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
             <button class="vid-action-btn" id="btnSaveFrame1" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnFaceRefine1" title="Refinar los rostros del clip actual con H3 FaceRefine" style="display:none;" type="button">Refinar rostro</button>
             <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
         </div>
@@ -3645,6 +3673,9 @@ const CONFIG = {
     SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
     SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
     RIFE_LOADER:"180", RIFE_INTERP:"181",
+    FACE_CROP:"301", FACE_REF2V:"302", FACE_INJECT:"303", FACE_PERFRAME_DENOISE:"305",
+    FACE_SCHEDULER:"306", FACE_GUIDER:"307", FACE_NOISE:"308", FACE_SAMPLER:"309",
+    FACE_DECODE:"310", FACE_STITCH:"311", FACE_LOAD_VIDEO:"312", FACE_COMPONENTS:"313",
     RTX_SR:"148", CREATE_VIDEO:"130", SAVE:"92",
   },
   loras: [
@@ -4412,6 +4443,95 @@ $("rifeMultiplier")?.addEventListener("change", (e) => {
 });
 $("rifeModel")?.addEventListener("change", (e) => { const r = getRifeState(); r.model = e.target.value; saveRife(r); scheduleSaveH3Settings(); });
 
+// --- FACE REFINE (ComfyUI-H3-FaceRefine) ---
+const FACEREFINE_KEY = "minimaxh3_facerefine_state";
+const FACEREFINE_DEFAULTS = {
+  enabled: false,
+  denoise: 0.35,
+  feather: 16,
+  select: "largest_face"
+};
+function loadFaceRefine(){
+  try { return Object.assign({}, FACEREFINE_DEFAULTS, JSON.parse(localStorage.getItem(FACEREFINE_KEY) || "{}")); }
+  catch(_) { return {...FACEREFINE_DEFAULTS}; }
+}
+function saveFaceRefine(s){ try { localStorage.setItem(FACEREFINE_KEY, JSON.stringify(s)); } catch(_){} }
+function getFaceRefineState(){
+  return {
+    enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
+    denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.35"),
+    feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
+    select: $("faceRefineSelectMode")?.value || "largest_face"
+  };
+}
+function setFaceRefineUI(s){
+  if(!s) return;
+  const on = $("segFaceRefineOn"), off = $("segFaceRefineOff");
+  const panel = $("faceRefineControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("faceRefineDenoiseSlider")){
+    const d = parseFloat(s.denoise != null ? s.denoise : 0.35);
+    $("faceRefineDenoiseSlider").value = d;
+    if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+    if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+  }
+  if($("faceRefineFeatherSlider")){
+    const f = parseInt(s.feather != null ? s.feather : 16, 10);
+    $("faceRefineFeatherSlider").value = f;
+    if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+    if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  }
+  if($("faceRefineSelectMode") && s.select){
+    $("faceRefineSelectMode").value = s.select;
+  }
+}
+const _faceRefineState = loadFaceRefine();
+setFaceRefineUI(_faceRefineState);
+$("segFaceRefineOn")?.addEventListener("click", () => {
+  const s = getFaceRefineState();
+  s.enabled = true;
+  setFaceRefineUI(s);
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+$("segFaceRefineOff")?.addEventListener("click", () => {
+  const s = getFaceRefineState();
+  s.enabled = false;
+  setFaceRefineUI(s);
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+$("faceRefineDenoiseSlider")?.addEventListener("input", (e) => {
+  const d = parseFloat(e.target.value) || 0.35;
+  if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+  if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+  const s = getFaceRefineState();
+  s.denoise = d;
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+$("faceRefineFeatherSlider")?.addEventListener("input", (e) => {
+  const f = parseInt(e.target.value, 10) || 16;
+  if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+  if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  const s = getFaceRefineState();
+  s.feather = f;
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+$("faceRefineSelectMode")?.addEventListener("change", (e) => {
+  const s = getFaceRefineState();
+  s.select = e.target.value;
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+
 // --- MODO i2v / flf2v / r2v ---
 function setModeUI(mode){
   currentMode = mode;
@@ -5163,7 +5283,10 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
   const isNewGallery = !displayedGalleryFiles.has(key);
 
   if(allowShow){
-    showVideo(slot, media, { variantIndex: varIndex });
+    const badgeText = activeJob?.isFaceRefineOnly
+      ? "FaceRefined"
+      : (activeJob?.faceRefine?.enabled ? `Var ${varIndex} · FaceRefined` : `Var ${varIndex}`);
+    showVideo(slot, media, { variantIndex: varIndex, badge: badgeText });
   }
   if(isNewGallery){
     displayedGalleryFiles.add(key);
@@ -5338,6 +5461,7 @@ function snapshotJob(){
     solH3: getSolH3State(),
     latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
+    faceRefine: getFaceRefineState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
     aimdo: getAimdoState(),
@@ -5386,6 +5510,7 @@ function restoreJob(job){
   if(job.solH3){ setSolH3UI(job.solH3); saveSolH3(job.solH3); }
   if(job.latentUpscale){ setLatentUpscaleUI(job.latentUpscale); saveLatentUpscale(job.latentUpscale); }
   if(job.rife){ setRifeUI(job.rife); saveRife(job.rife); }
+  if(job.faceRefine){ setFaceRefineUI(job.faceRefine); saveFaceRefine(job.faceRefine); }
   if(job.attentionBackend){ setAttentionBackendUI(job.attentionBackend); saveAttentionBackend(job.attentionBackend); }
   if(job.attentionOptimizer){ setAttentionOptimizerUI(job.attentionOptimizer.mode); saveAttentionOptimizer(job.attentionOptimizer); }
   if(job.h3opt){ setH3OptUI(job.h3opt); saveH3Opt(job.h3opt); }
@@ -6101,6 +6226,24 @@ async function applyWorkflow(workflow, opts={}){
     saveLatentUpscale(lu);
   }
 
+  // Refinado facial (H3 FaceRefine)
+  const faceCropNode = findByClass("H3FaceTrackCrop");
+  const faceStitchNode = findByClass("H3FaceStitch");
+  const faceDenoiseNode = findByClass("H3PerFrameDenoise");
+  if(faceCropNode || faceStitchNode){
+    const d = (faceDenoiseNode && faceDenoiseNode.inputs && typeof faceDenoiseNode.inputs.denoise_multiplier_large_face === "number")
+      ? faceDenoiseNode.inputs.denoise_multiplier_large_face
+      : 0.35;
+    const f = (faceStitchNode && faceStitchNode.inputs && typeof faceStitchNode.inputs.feather === "number")
+      ? faceStitchNode.inputs.feather
+      : 16;
+    const sel = (faceCropNode && faceCropNode.inputs && faceCropNode.inputs.select) || "largest_face";
+    const fr = { enabled: true, denoise: d, feather: f, select: sel };
+    setFaceRefineUI(fr);
+    saveFaceRefine(fr);
+    setApplied(`refinado facial (denoise ${d.toFixed(2)}, feather ${f}px)`);
+  }
+
   updateDurationHints();
 
   if(opts.silent) return { applied, missing };
@@ -6654,6 +6797,7 @@ async function ensureImagesUploaded(){
 }
 
 async function ensureJobImagesUploaded(job){
+  if(job.isFaceRefineOnly) return;
   if(job.mode === "r2v"){
     const rImages = job.refImages || refImages;
     for(let i=0; i<rImages.length; i++){
@@ -7138,6 +7282,215 @@ function buildGraph(job){
     delete g[N.SOL_H3];
   }
 
+  // MODO ON-DEMAND: Refinar rostro del clip actual sin re-muestrear el vídeo principal
+  if(j && j.isFaceRefineOnly){
+    const frState = j.faceRefine || getFaceRefineState();
+    const sourceMedia = j.sourceMedia || currentMedia[1];
+    const videoFilePath = (sourceMedia && sourceMedia.subfolder ? sourceMedia.subfolder + "/" : "") + (sourceMedia ? sourceMedia.filename : "") + " [output]";
+
+    // Carga y demux nativos de ComfyUI (cero dependencias externas)
+    g[N.FACE_LOAD_VIDEO] = {
+      class_type: "LoadVideo",
+      inputs: { file: videoFilePath },
+      _meta: { title: "Load Video (Native)" }
+    };
+    g[N.FACE_COMPONENTS] = {
+      class_type: "GetVideoComponents",
+      inputs: { video: [N.FACE_LOAD_VIDEO, 0] },
+      _meta: { title: "Get Video Components (Native)" }
+    };
+
+    // Sub-grafo FaceRefine
+    g[N.FACE_CROP] = {
+      class_type: "H3FaceTrackCrop",
+      inputs: {
+        images: [N.FACE_COMPONENTS, 0],
+        detector: "face_yolov8m.pt",
+        confidence: 0.35,
+        crop_factor: 3.0,
+        canvas_width: 768,
+        canvas_height: 768,
+        canvas_mode: "auto_capped_768",
+        smooth_window: 21,
+        size_smooth_window: 51,
+        smooth_method: "gaussian",
+        size_mode: "per_frame",
+        identity_track: false,
+        identity_threshold: 0.28,
+        select: frState.select || "largest_face",
+        fallback_detector: "none",
+        fallback_head_frac: 0.5,
+        select_index: 0,
+        identity_model: "insightface",
+        cut_detection: "none",
+        cut_threshold: 3.0,
+        absent_shots: "off",
+        X: 0,
+        Y: 0,
+        frame_index: 0
+      },
+      _meta: { title: "Face Track Crop" }
+    };
+
+    const frPrompt = pVal || "cinematic face, natural expression, ultra high detail, sharp focus, 8k";
+    const frRef2vInputs = {
+      clip: [N.CLIP, 0],
+      vae: [N.VAE_VIDEO, 0],
+      audio_vae: [N.VAE_AUDIO, 0],
+      prompt: frPrompt,
+      width: [N.FACE_CROP, 4],
+      height: [N.FACE_CROP, 5],
+      length: [N.FACE_CROP, 6],
+      ref_image_size: "match",
+      "ref_audios.ref_audio_0": [N.FACE_COMPONENTS, 1]
+    };
+    if(g[N.IMAGE_FIRST]){
+      frRef2vInputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+    }
+    g[N.FACE_REF2V] = {
+      class_type: "MiniMaxH3ReferenceToVideo",
+      inputs: frRef2vInputs,
+      _meta: { title: "Face Conditioning & AV Latent" }
+    };
+
+    g[N.FACE_INJECT] = {
+      class_type: "H3InjectVideoLatent",
+      inputs: {
+        av_latent: [N.FACE_REF2V, 1],
+        images: [N.FACE_CROP, 0],
+        vae: [N.VAE_VIDEO, 0]
+      },
+      _meta: { title: "Inject Face Video Latent" }
+    };
+
+    g[N.FACE_PERFRAME_DENOISE] = {
+      class_type: "H3PerFrameDenoise",
+      inputs: {
+        model: [currentModelNode, 0],
+        av_latent: [N.FACE_INJECT, 0],
+        transform: [N.FACE_CROP, 1],
+        denoise_multiplier_small_face: 1.0,
+        denoise_multiplier_large_face: frState.denoise || 0.35,
+        scale_mode: "absolute_px",
+        face_px_small: 30.0,
+        face_px_large: 120.0,
+        gamma: 1.0,
+        smooth_frames: 9
+      },
+      _meta: { title: "Per-Frame Face Denoise" }
+    };
+
+    g[N.FACE_SCHEDULER] = {
+      class_type: "BasicScheduler",
+      inputs: {
+        model: [N.FACE_PERFRAME_DENOISE, 2],
+        scheduler: "simple",
+        steps: 8,
+        denoise: frState.denoise || 0.35
+      },
+      _meta: { title: "Face Basic Scheduler" }
+    };
+
+    g[N.FACE_GUIDER] = {
+      class_type: "BasicGuider",
+      inputs: {
+        model: [N.FACE_PERFRAME_DENOISE, 2],
+        conditioning: [N.FACE_REF2V, 0]
+      },
+      _meta: { title: "Face Guider" }
+    };
+
+    g[N.FACE_NOISE] = {
+      class_type: "RandomNoise",
+      inputs: {
+        noise_seed: Math.floor(Math.random() * 100000000)
+      },
+      _meta: { title: "Face Noise" }
+    };
+
+    g[N.FACE_SAMPLER] = {
+      class_type: "SamplerCustomAdvanced",
+      inputs: {
+        noise: [N.FACE_NOISE, 0],
+        guider: [N.FACE_GUIDER, 0],
+        sampler: [N.SAMPLER_SELECT, 0],
+        sigmas: [N.FACE_SCHEDULER, 0],
+        latent_image: [N.FACE_PERFRAME_DENOISE, 0]
+      },
+      _meta: { title: "Sample Face Latent" }
+    };
+
+    g[N.FACE_DECODE] = {
+      class_type: "VAEDecode",
+      inputs: {
+        samples: [N.FACE_SAMPLER, 0],
+        vae: [N.VAE_VIDEO, 0]
+      },
+      _meta: { title: "Decode Face Crops" }
+    };
+
+    g[N.FACE_STITCH] = {
+      class_type: "H3FaceStitch",
+      inputs: {
+        base_images: [N.FACE_COMPONENTS, 0],
+        refined_crops: [N.FACE_DECODE, 0],
+        transform: [N.FACE_CROP, 1],
+        paste_region: "face_only",
+        mask_dilation: 16,
+        feather: frState.feather || 16,
+        colour_match: 1.0,
+        blend: 1.0,
+        undetected_frames: "fade_out",
+        feather_scales_with_crop: false
+      },
+      _meta: { title: "Stitch Face" }
+    };
+
+    // Reempaquetar vídeo final nativo
+    g[N.CREATE_VIDEO] = {
+      class_type: "CreateVideo",
+      inputs: {
+        fps: 24,
+        bit_depth: 8,
+        color_space: "sRGB",
+        images: [N.FACE_STITCH, 0],
+        audio: [N.FACE_COMPONENTS, 1]
+      },
+      _meta: { title: "Create Video (Native)" }
+    };
+    g[N.SAVE] = {
+      class_type: "SaveVideo",
+      inputs: {
+        filename_prefix: "video/MiniMax_H3_FaceRefined",
+        format: "auto",
+        "format.codec": "auto",
+        codec: "auto",
+        video: [N.CREATE_VIDEO, 0]
+      },
+      _meta: { title: "Save Video (Native)" }
+    };
+
+    // Descartar nodos del flujo de generación base
+    delete g[N.SAMPLER];
+    delete g[N.SCHEDULER];
+    delete g[N.GUIDER];
+    delete g[N.NOISE];
+    delete g[N.DURATION];
+    delete g[N.MATH];
+    delete g[N.RES_SELECTOR];
+    delete g[N.REF2V];
+    delete g[N.LATENT_UPSCALE];
+    delete g[N.DECODE_VIDEO];
+    delete g[N.DECODE_AUDIO];
+    delete g[N.AUDIO_FIRST];
+    delete g[N.AUDIO_VOL];
+    delete g[N.RTX_SR];
+    delete g[N.RIFE_LOADER];
+    delete g[N.RIFE_INTERP];
+
+    return g;
+  }
+
   // 7. Scheduler y Guider conectados a currentModelNode
   if(g[N.SCHEDULER] && g[N.SCHEDULER].inputs){
     g[N.SCHEDULER].inputs.model = [currentModelNode, 0];
@@ -7202,7 +7555,179 @@ function buildGraph(job){
     }
   }
 
-  // 10. Frame Interpolation (RIFE) — se conecta ANTES de RTXVideoSuperResolution
+  // 10. Refinado facial (H3 FaceRefine) — intercalado tras DECODE_VIDEO y antes de RIFE / RTX_SR
+  const frState = j ? j.faceRefine : getFaceRefineState();
+  const faceRefineEnabled = frState ? frState.enabled : false;
+  let currentVideoImages = [N.DECODE_VIDEO, 0];
+
+  if(faceRefineEnabled){
+    g[N.FACE_CROP] = {
+      class_type: "H3FaceTrackCrop",
+      inputs: {
+        images: [N.DECODE_VIDEO, 0],
+        detector: "face_yolov8m.pt",
+        confidence: 0.35,
+        crop_factor: 3.0,
+        canvas_width: 768,
+        canvas_height: 768,
+        canvas_mode: "auto_capped_768",
+        smooth_window: 21,
+        size_smooth_window: 51,
+        smooth_method: "gaussian",
+        size_mode: "per_frame",
+        identity_track: false,
+        identity_threshold: 0.28,
+        select: frState.select || "largest_face",
+        fallback_detector: "none",
+        fallback_head_frac: 0.5,
+        select_index: 0,
+        identity_model: "insightface",
+        cut_detection: "none",
+        cut_threshold: 3.0,
+        absent_shots: "off",
+        X: 0,
+        Y: 0,
+        frame_index: 0
+      },
+      _meta: { title: "Face Track Crop" }
+    };
+
+    const frPrompt = pVal || "cinematic face, natural expression, ultra high detail, sharp focus, 8k";
+    const frRef2vInputs = {
+      clip: [N.CLIP, 0],
+      vae: [N.VAE_VIDEO, 0],
+      audio_vae: [N.VAE_AUDIO, 0],
+      prompt: frPrompt,
+      width: [N.FACE_CROP, 4],
+      height: [N.FACE_CROP, 5],
+      length: [N.FACE_CROP, 6],
+      ref_image_size: "match"
+    };
+    if(g[N.IMAGE_FIRST]){
+      frRef2vInputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
+    }
+    if(g[N.AUDIO_VOL]){
+      frRef2vInputs["ref_audios.ref_audio_0"] = [N.AUDIO_VOL, 0];
+    } else if(g[N.AUDIO_FIRST]){
+      frRef2vInputs["ref_audios.ref_audio_0"] = [N.AUDIO_FIRST, 0];
+    }
+
+    g[N.FACE_REF2V] = {
+      class_type: "MiniMaxH3ReferenceToVideo",
+      inputs: frRef2vInputs,
+      _meta: { title: "Face Conditioning & AV Latent" }
+    };
+
+    g[N.FACE_INJECT] = {
+      class_type: "H3InjectVideoLatent",
+      inputs: {
+        av_latent: [N.FACE_REF2V, 1],
+        images: [N.FACE_CROP, 0],
+        vae: [N.VAE_VIDEO, 0]
+      },
+      _meta: { title: "Inject Face Video Latent" }
+    };
+
+    g[N.FACE_PERFRAME_DENOISE] = {
+      class_type: "H3PerFrameDenoise",
+      inputs: {
+        model: [currentModelNode, 0],
+        av_latent: [N.FACE_INJECT, 0],
+        transform: [N.FACE_CROP, 1],
+        denoise_multiplier_small_face: 1.0,
+        denoise_multiplier_large_face: frState.denoise || 0.35,
+        scale_mode: "absolute_px",
+        face_px_small: 30.0,
+        face_px_large: 120.0,
+        gamma: 1.0,
+        smooth_frames: 9
+      },
+      _meta: { title: "Per-Frame Face Denoise" }
+    };
+
+    g[N.FACE_SCHEDULER] = {
+      class_type: "BasicScheduler",
+      inputs: {
+        model: [N.FACE_PERFRAME_DENOISE, 2],
+        scheduler: "simple",
+        steps: 8,
+        denoise: frState.denoise || 0.35
+      },
+      _meta: { title: "Face Basic Scheduler" }
+    };
+
+    g[N.FACE_GUIDER] = {
+      class_type: "BasicGuider",
+      inputs: {
+        model: [N.FACE_PERFRAME_DENOISE, 2],
+        conditioning: [N.FACE_REF2V, 0]
+      },
+      _meta: { title: "Face Guider" }
+    };
+
+    const sMode = j ? j.seedMode : seedMode;
+    const sVal = j ? j.seedValue : parseInt($("seedVal")?.value || "12345", 10);
+    g[N.FACE_NOISE] = {
+      class_type: "RandomNoise",
+      inputs: {
+        noise_seed: (sMode === "random") ? Math.floor(Math.random() * 100000000) : sVal
+      },
+      _meta: { title: "Face Noise" }
+    };
+
+    g[N.FACE_SAMPLER] = {
+      class_type: "SamplerCustomAdvanced",
+      inputs: {
+        noise: [N.FACE_NOISE, 0],
+        guider: [N.FACE_GUIDER, 0],
+        sampler: [N.SAMPLER_SELECT, 0],
+        sigmas: [N.FACE_SCHEDULER, 0],
+        latent_image: [N.FACE_PERFRAME_DENOISE, 0]
+      },
+      _meta: { title: "Sample Face Latent" }
+    };
+
+    g[N.FACE_DECODE] = {
+      class_type: "VAEDecode",
+      inputs: {
+        samples: [N.FACE_SAMPLER, 0],
+        vae: [N.VAE_VIDEO, 0]
+      },
+      _meta: { title: "Decode Face Crops" }
+    };
+
+    g[N.FACE_STITCH] = {
+      class_type: "H3FaceStitch",
+      inputs: {
+        base_images: [N.DECODE_VIDEO, 0],
+        refined_crops: [N.FACE_DECODE, 0],
+        transform: [N.FACE_CROP, 1],
+        paste_region: "face_only",
+        mask_dilation: 16,
+        feather: frState.feather || 16,
+        colour_match: 1.0,
+        blend: 1.0,
+        undetected_frames: "fade_out",
+        feather_scales_with_crop: false
+      },
+      _meta: { title: "Stitch Face" }
+    };
+
+    currentVideoImages = [N.FACE_STITCH, 0];
+  } else {
+    delete g[N.FACE_CROP];
+    delete g[N.FACE_REF2V];
+    delete g[N.FACE_INJECT];
+    delete g[N.FACE_PERFRAME_DENOISE];
+    delete g[N.FACE_SCHEDULER];
+    delete g[N.FACE_GUIDER];
+    delete g[N.FACE_NOISE];
+    delete g[N.FACE_SAMPLER];
+    delete g[N.FACE_DECODE];
+    delete g[N.FACE_STITCH];
+  }
+
+  // 11. Frame Interpolation (RIFE) — se conecta después de FaceRefine y ANTES de RTXVideoSuperResolution
   const rifeState = j ? j.rife : getRifeState();
   const rifeEnabled = rifeState ? rifeState.enabled : true;
   const rifeMultiplier = rifeState ? parseInt(rifeState.multiplier || "2", 10) : 2;
@@ -7221,7 +7746,7 @@ function buildGraph(job){
     g[N.RIFE_INTERP] = {
       inputs: {
         multiplier: rifeMultiplier,
-        images: [N.DECODE_VIDEO, 0],
+        images: currentVideoImages,
         interp_model: [N.RIFE_LOADER, 0]
       },
       class_type: "FrameInterpolate",
@@ -7239,7 +7764,7 @@ function buildGraph(job){
     delete g[N.RIFE_LOADER];
     delete g[N.RIFE_INTERP];
     if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
-      g[N.RTX_SR].inputs.images = [N.DECODE_VIDEO, 0];
+      g[N.RTX_SR].inputs.images = currentVideoImages;
     }
     if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
       g[N.CREATE_VIDEO].inputs.fps = 24;
@@ -7253,6 +7778,7 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
+  const frBtn = $("btnFaceRefine"+slot);
   const prev=$("previewImg"+slot), wrap=$("previewWrap"+slot), step=$("previewStep"+slot);
   if(prev) prev.style.display="none";
   if(wrap) wrap.style.display="none";
@@ -7265,6 +7791,7 @@ function showVideo(slot, media, options={}){
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
+  if(frBtn) frBtn.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   if(badge){
     if(options.badge != null){
@@ -7422,6 +7949,32 @@ function captureFrameFromPlayer(){
 const btnSaveFrame1 = $("btnSaveFrame1");
 if(btnSaveFrame1){
   btnSaveFrame1.addEventListener("click", captureFrameFromPlayer);
+}
+
+// --- Refinar rostro del clip actual (On-Demand) ---
+async function enqueueFaceRefineCurrent(){
+  const media = currentMedia[1];
+  if(!media || !media.filename){
+    log("No hay ningún vídeo en el reproductor para refinar.", "l-warn");
+    return;
+  }
+  const job = snapshotJob();
+  job.id = ++jobCounter;
+  job.isFaceRefineOnly = true;
+  job.sourceMedia = { ...media };
+  job.batchSize = 1;
+  log(`Añadido refinado facial para ${media.filename} a la cola.`, "l-info");
+  if(activeJob){
+    jobQueue.push(job);
+    updateQueueUI();
+  } else {
+    await startJob(job);
+  }
+}
+
+const btnFaceRefine1 = $("btnFaceRefine1");
+if(btnFaceRefine1){
+  btnFaceRefine1.addEventListener("click", enqueueFaceRefineCurrent);
 }
 
 const vidbox1 = document.querySelector("#video1")?.closest(".vidbox");
@@ -7804,7 +8357,8 @@ async function runSingleGeneration(index) {
         const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
         const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
         const seedUsed = (jobSeedMode === "random") ? randomSeed() : (jobSeedMode === "evolve" ? activeJob.seedValue + index : jobSeedValue);
-        graph[N.NOISE].inputs.noise_seed = seedUsed;
+        if(graph[N.NOISE] && graph[N.NOISE].inputs) graph[N.NOISE].inputs.noise_seed = seedUsed;
+        if(graph[N.FACE_NOISE] && graph[N.FACE_NOISE].inputs) graph[N.FACE_NOISE].inputs.noise_seed = seedUsed;
 
         // Reservamos un índice de variante global al inicio de cada flujo nuevo.
         if(activeJob && activeJob.currentVariantIndex == null){
@@ -7813,7 +8367,11 @@ async function runSingleGeneration(index) {
         }
         const varIndex = activeJob?.currentVariantIndex || (variantCounter + 1);
 
-        log(`🚀 Procesando Var ${varIndex} (seed ${seedUsed})...`);
+        if(activeJob && activeJob.isFaceRefineOnly){
+          log(`Refinando rostro de ${activeJob.sourceMedia?.filename || "clip actual"}...`);
+        } else {
+          log(`Procesando Var ${varIndex} (seed ${seedUsed})...`);
+        }
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
@@ -7842,7 +8400,7 @@ async function runSingleGeneration(index) {
         startTimer(data.prompt_id, 1);
         pollFallback(data.prompt_id);
     } catch(err) {
-        log(`❌ No se pudo encolar: ${err.message || err}`, "l-err");
+        log(`No se pudo encolar: ${err.message || err}`, "l-err");
         finishCurrentJob();
     }
 }
@@ -7861,11 +8419,11 @@ async function startJob(job){
     job.currentVariantIndex = null;
     $("time1").textContent = "";
     $("time1").classList.remove("live");
-    setRun("busy", `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
+    setRun("busy", job.isFaceRefineOnly ? `Refinando rostro de ${job.sourceMedia?.filename || "clip"}...` : `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
     enableStopButtons(true);
     await runSingleGeneration(0);
   } catch(err) {
-    log(`❌ Error al iniciar Job #${job.id}: ${err.message || err}`, "l-err");
+    log(`Error al iniciar Job #${job.id}: ${err.message || err}`, "l-err");
     setRun("bad", "Error");
     finishCurrentJob();
   }
