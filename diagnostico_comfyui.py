@@ -67,6 +67,27 @@ REQUIRED_PACKAGES = [
         "workflows": ["Krea2", "LTXV"],
     },
     {
+        "name": "ComfyUI-H3-FaceRefine",
+        "repo": "https://github.com/Carasibana/ComfyUI-H3-FaceRefine.git",
+        "nodes": ["H3FaceTrackCrop", "H3FaceStitch", "H3PerFrameDenoise"],
+        "critical": False,
+        "workflows": ["MiniMaxH3 (Refinado Facial)"],
+    },
+    {
+        "name": "ComfyUI-Sol-H3",
+        "repo": "https://github.com/xmarre/ComfyUI-Sol-H3.git",
+        "nodes": ["SolH3Experimental"],
+        "critical": False,
+        "workflows": ["MiniMaxH3 (Sol-H3 SM120 Blackwell)"],
+    },
+    {
+        "name": "Comfyui_Minimax_h3_latent_Upscaler",
+        "repo": "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler.git",
+        "nodes": ["MinimaxH3LatentUpscaler3D"],
+        "critical": False,
+        "workflows": ["MiniMaxH3 (Latent Upscaler 3D)"],
+    },
+    {
         "name": "MiniMax-H3 / Sparse Attention",
         "repo": "Nativo en ComfyUI / ComfyUI-PromptStudio",
         "nodes": ["MiniMaxH3ReferenceToVideo", "MiniMaxH3SigmaShift", "ModelAttentionBackend"],

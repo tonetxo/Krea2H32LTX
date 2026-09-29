@@ -16,7 +16,7 @@ The project provides four standalone, zero-dependency web applications designed 
 | WebUI | Generated File | Default Port | Model / Architecture | Core Purpose & Modes |
 |---|---|---|---|---|
 | **MMH3X2** | `MMH3X2_WebUI.html` | `:8003` | **MiniMax H3 (2 Segments)** | **Continuous narrative video (up to 30s+)**: 2 chained segments, up to 4 reference images + 1 video, visual continuity powered by Ollama (with real-time fused prompt inspection), audio crossfade, and flexible attention/optimization pipelines (Standard & BlockATT with AIMDO / Spectrum). |
-| **MiniMaxH3** | `MiniMaxH3_WebUI.html` | `:8002` | **MiniMax H3** | **Single-segment video generation**: **i2v** (image-to-video), **flf2v** (first-and-last frame), and **r2v** (multi-reference: up to 6 images, 3 videos, 3 audio tracks). |
+| **MiniMaxH3** | `MiniMaxH3_WebUI.html` | `:8002` | **MiniMax H3** | **Single-segment video generation**: **i2v** (image-to-video), **flf2v** (first-and-last frame), and **r2v** (multi-reference: up to 6 images, 3 videos, 3 audio tracks). Includes **Dual-Mode H3 FaceRefine** (inline toggle & on-demand player button), **Sol-H3 SM120 Blackwell Attention**, **3D Latent Upscaler**, and RIFE frame interpolation. |
 | **LTXV** | `LTXV_WebUI.html` | `:8000` | **LTX-Video / LTX-2.5** | **Ultra-fast video generation**: First Pass & Full Pass pipelines with SageAttention, DMD LoRA, custom VAE selectors, and high-speed distilled transformers. |
 | **Krea2** | `Krea2_WebUI.html` | `:8001` | **Krea2 / Flux2** | **First-frame generation**: High-fidelity text-to-image pipeline for Flux2 / Krea2 with RGB variance control and a direct "Send to Video" handoff button. |
 
@@ -104,6 +104,9 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | **ComfyUI-KJNodes** | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `GetImageSize`, `ImageResizeKJv2` | MMH3X2, MiniMaxH3, LTXV |
 | **VideoHelperSuite (VHS)** | [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite) | `VHS_LoadVideo` | MMH3X2 (Video reference), LTXV |
 | **Frame-Interpolation** | [ComfyUI-Frame-Interpolation](https://github.com/Fannovel16/ComfyUI-Frame-Interpolation) | `FrameInterpolate`, `FrameInterpolationModelLoader` | MMH3X2 (RIFE), MiniMaxH3, LTXV |
+| **ComfyUI-H3-FaceRefine** *(optional)* | [ComfyUI-H3-FaceRefine](https://github.com/Carasibana/ComfyUI-H3-FaceRefine.git) | `H3FaceTrackCrop`, `H3FaceStitch`, `H3PerFrameDenoise`, `H3InjectVideoLatent` | MiniMaxH3 (Dual-mode face refine: inline toggle & on-demand player button) |
+| **ComfyUI-Sol-H3** *(optional)* | [ComfyUI-Sol-H3](https://github.com/xmarre/ComfyUI-Sol-H3.git) | `SolH3Experimental` | MiniMaxH3 (SM120 Blackwell fast attention acceleration with mutual exclusion fail-safe) |
+| **Comfyui_Minimax_h3_latent_Upscaler** *(optional)* | [Comfyui_Minimax_h3_latent_Upscaler](https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler.git) | `MinimaxH3LatentUpscaler3D` | MiniMaxH3 (3D temporal latent upscaler with VRAM dynamic chunking) |
 | **Spectrum** *(optional)* | [ComfyUI-Spectrum](https://github.com/MinusZoneAI/ComfyUI-Spectrum) | `SpectrumApplyMiniMaxH3` | MMH3X2 (Spectrum), MiniMaxH3 |
 | **rgthree-comfy** *(optional)* | [rgthree-comfy](https://github.com/rgthree/rgthree-comfy) | `Power Lora Loader`, `Seed` | Krea2, LTXV |
 | **MiniMax-H3 / Sparse Attention** | Native in ComfyUI / PromptStudio | `MiniMaxH3ReferenceToVideo`, `MiniMaxH3SigmaShift`, `ModelAttentionBackend` | MMH3X2, MiniMaxH3 |
