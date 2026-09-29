@@ -175,9 +175,23 @@ def generate_html(config):
         interp_files = []
     interp_js_array = json.dumps(interp_files)
 
+    if config.get('upscale_dirs'):
+        raw_upscale = get_file_list(config['upscale_dirs'], ext=('.pth', '.safetensors'), fallback=config.get('upscale_fallback', '4xPurePhoto-Span.pth'))
+    elif config.get('upscale_dir'):
+        raw_upscale = get_file_list([(config['upscale_dir'], '')], ext=('.pth', '.safetensors'), fallback=config.get('upscale_fallback', '4xPurePhoto-Span.pth'))
+    else:
+        raw_upscale = []
+    clean_upscale = []
+    for u in raw_upscale:
+        cu = u.replace('Ligazón para upscale_models/', '').replace('Ligazón para upscale_models\\', '')
+        if cu not in clean_upscale:
+            clean_upscale.append(cu)
+    upscale_js_array = json.dumps(clean_upscale)
+
     ltxv_ui_port = config.get('ltxv_ui_port', '8000')
     minimaxh3_ui_port = config.get('minimaxh3_ui_port', '8002')
     mmh3x2_ui_port = config.get('mmh3x2_ui_port', '8003')
+    kreaqwen_ui_port = config.get('kreaqwen_ui_port', '8004')
 
     # --- Assemble CSS ---
     css = _read_template('base.css') + '\n' + _read_template(config['ui_css'])
@@ -201,9 +215,11 @@ def generate_html(config):
         "const AVAILABLE_UNETS = __UNET_LIST__;\n"
         "const AVAILABLE_CLIPS = __CLIP_LIST__;\n"
         "const AVAILABLE_INTERP_MODELS = __INTERP_LIST__;\n"
+        "const AVAILABLE_UPSCALE_MODELS = __UPSCALE_LIST__;\n"
         "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
         "const MINIMAXH3_UI_PORT = __MINIMAXH3_UI_PORT__;\n"
         "const MMH3X2_UI_PORT = __MMH3X2_UI_PORT__;\n"
+        "const KREAQWEN_UI_PORT = __KREAQWEN_UI_PORT__;\n"
         + common_js + "\n"
         + ui_js
     )
@@ -259,6 +275,8 @@ def generate_html(config):
     html = html.replace('__LTXV_UI_PORT__', json.dumps(ltxv_ui_port))
     html = html.replace('__MINIMAXH3_UI_PORT__', json.dumps(minimaxh3_ui_port))
     html = html.replace('__MMH3X2_UI_PORT__', json.dumps(mmh3x2_ui_port))
+    html = html.replace('__KREAQWEN_UI_PORT__', json.dumps(kreaqwen_ui_port))
+    html = html.replace('__UPSCALE_LIST__', upscale_js_array)
 
     # --- Write output ---
     with open(config['output_html'], 'w', encoding='utf-8') as f:

@@ -1,0 +1,325 @@
+{
+  "4": {
+    "inputs": {
+      "unet_name": "flux2/jibMixKrea2_v40Habanero.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNET Base"
+    }
+  },
+  "102": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "Attention Backend Base (Kitchen)"
+    }
+  },
+  "100": {
+    "inputs": {
+      "clip_name": "qwen3vl_4b.safetensors",
+      "type": "krea2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIP Base"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "100",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Prompt Positivo (Base)"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "100",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Prompt Negativo (Base)"
+    }
+  },
+  "5": {
+    "inputs": {
+      "width": 1344,
+      "height": 768,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent (Base)"
+    }
+  },
+  "10": {
+    "inputs": {
+      "seed": 1062442950133633,
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": [
+        "102",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler Base"
+    }
+  },
+  "101": {
+    "inputs": {
+      "vae_name": "QwenImage/qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE Base"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "10",
+        0
+      ],
+      "vae": [
+        "101",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode Base"
+    }
+  },
+  "50": {
+    "inputs": {
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Base"
+    }
+  },
+  "27": {
+    "inputs": {
+      "model_name": "4xPurePhoto-Span.pth"
+    },
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "Load Upscale Model"
+    }
+  },
+  "28": {
+    "inputs": {
+      "upscale_model": [
+        "27",
+        0
+      ],
+      "image": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "ImageUpscaleWithModel",
+    "_meta": {
+      "title": "Upscale Image with Model"
+    }
+  },
+  "26": {
+    "inputs": {
+      "upscale_method": "bicubic",
+      "width": 2016,
+      "height": 1152,
+      "crop": "disabled",
+      "image": [
+        "28",
+        0
+      ]
+    },
+    "class_type": "ImageScale",
+    "_meta": {
+      "title": "Scale to Target Resolution"
+    }
+  },
+  "20": {
+    "inputs": {
+      "unet_name": "qwen/qwen_image_2.1_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNET Refiner"
+    }
+  },
+  "107": {
+    "inputs": {
+      "attention": "comfy kitchen attention",
+      "model": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "ModelAttentionBackend",
+    "_meta": {
+      "title": "Attention Backend Refiner (Kitchen)"
+    }
+  },
+  "105": {
+    "inputs": {
+      "clip_name": "qwen3vl_8b_int8_convrot.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIP Refiner"
+    }
+  },
+  "109": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "105",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Prompt Positivo (Refiner)"
+    }
+  },
+  "110": {
+    "inputs": {
+      "text": "",
+      "clip": [
+        "105",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Prompt Negativo (Refiner)"
+    }
+  },
+  "106": {
+    "inputs": {
+      "vae_name": "QwenImage/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE Refiner"
+    }
+  },
+  "25": {
+    "inputs": {
+      "pixels": [
+        "26",
+        0
+      ],
+      "vae": [
+        "106",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode for Refiner"
+    }
+  },
+  "23": {
+    "inputs": {
+      "seed": 1062442950133633,
+      "steps": 6,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 0.35,
+      "model": [
+        "107",
+        0
+      ],
+      "positive": [
+        "109",
+        0
+      ],
+      "negative": [
+        "110",
+        0
+      ],
+      "latent_image": [
+        "25",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler Refiner"
+    }
+  },
+  "24": {
+    "inputs": {
+      "samples": [
+        "23",
+        0
+      ],
+      "vae": [
+        "106",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode Refiner"
+    }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "kreaqwen/imagen",
+      "images": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Final Image"
+    }
+  }
+}

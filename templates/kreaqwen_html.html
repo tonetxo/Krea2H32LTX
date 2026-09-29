@@ -1,0 +1,417 @@
+  <div class="grid">
+    <!-- COLUMNA 1 (IZQUIERDA): SERVIDOR, MODO COMBINADO, PROMPTS, REFERENCIAS -->
+    <div class="controls-col">
+      __SERVER_PANEL__
+
+      <!-- SELECTOR DE MODO Y ARQUITECTURA -->
+      <div class="panel">
+        <h2>Arquitectura de Generación (2 Etapas)</h2>
+        <div class="row">
+          <label>Modo de combinación</label>
+          <select id="comboMode" style="margin-top:4px;">
+            <option value="krea_qwen" selected>Krea2 (Base) → Qwen 2.1 (Refiner)</option>
+            <option value="qwen_krea">Qwen 2.1 (Base) → Krea2 (Refiner)</option>
+            <option value="krea_krea">Krea2 (Base) → Krea2 (Refiner)</option>
+            <option value="qwen_qwen">Qwen 2.1 (Base) → Qwen 2.1 (Refiner)</option>
+            <option value="base_only">Solo Etapa Base (Sin Refiner)</option>
+          </select>
+        </div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button id="btnInvertOrder" type="button" class="ghost btn-mini" style="flex:1;" title="Intercambiar el modelo Base por el Refiner y viceversa">⇄ Invertir orden Base / Refiner</button>
+        </div>
+        <div class="hint" id="comboHint" style="font-size:10px;margin-top:6px;">
+          Krea2 compone la escena cinematográfica con iluminación rica; Qwen 2.1 refina microtexturas, detalles anatómicos y nitidez tras el reescalado.
+        </div>
+      </div>
+
+      <!-- PROMPT POSITIVO + ENHANCER OLLAMA -->
+      __PROMPT_PANELS__
+
+      <!-- PROMPT NEGATIVO -->
+      <div class="panel">
+        <div class="collapsible-header" id="negPromptToggle">
+          <span class="arrow">▶</span> Prompt Negativo <span class="hint" style="font-size:10px;">(útil para Qwen 2.1)</span>
+        </div>
+        <div class="collapsible-body" id="negPromptBody">
+          <div class="row">
+            <textarea id="negPrompt" rows="3" placeholder="ugly, blurry, distorted, low quality, oversaturated, deformed hands, extra limbs..."></textarea>
+          </div>
+          <div class="btn-row" style="margin-top:4px;">
+            <button id="btnClearNegPrompt" class="ghost btn-mini">✕ Limpiar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMAGEN DE REFERENCIA (dropzone) -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
+          <div class="img-header-actions">
+            <button id="btnResetZoomRef" title="Tamaño original">⊡</button>
+            <button id="btnFullscreenRef" title="Pantalla completa">⛶</button>
+          </div>
+        </div>
+        <div class="dropzone" id="refDropzone" style="padding:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input type="file" id="refFileInput" accept="image/*">
+          <div class="seg" id="btnBrowseRef" style="flex:0;padding:5px 12px;font-size:10px;cursor:pointer;user-select:none;">Navegar...</div>
+          <div class="ph" id="refPlaceholder" style="flex:1;min-width:120px;font-size:10.5px;color:var(--muted-2);padding:0;text-align:left;">arrastra imagen o clic en Navegar</div>
+        </div>
+        <div class="img-wrap" id="refWrap" style="visibility:hidden;background:var(--panel-2);margin-top:10px;">
+          <img id="refImg" style="display:none;width:100%;height:auto;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true">
+        </div>
+        <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
+        <div class="ref-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="btnCaption" class="ghost" style="flex:1;min-width:140px;">Caption (Qwen VLM)</button>
+          <button id="btnSendRefLtxv" class="ghost" style="flex:1;min-width:140px;">→ LTXV</button>
+          <button id="btnSendRefH3" class="ghost" style="flex:1;min-width:140px;">→ MiniMax H3</button>
+          <button id="btnSendRefX2" class="ghost" style="flex:1;min-width:140px;">→ MMH3X2</button>
+          <button id="btnLoadMeta" class="ghost" style="flex:1;min-width:140px;">Cargar metadatos</button>
+        </div>
+      </div>
+
+      <!-- EVOLVE / TRANSMUTAR PROMPT -->
+      <div class="panel">
+        <div class="collapsible-header" id="evolveToggle">
+          <span class="arrow">▶</span> Evolve / Transmutar prompt
+        </div>
+        <div class="collapsible-body" id="evolveBody">
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="evolveMode"><option value="words">Palabras</option><option value="internal">Palabras del prompt</option><option value="synonyms">Sinónimos cinematográficos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Probabilidad <span class="hint">(% de tokens cambiados)</span></label>
+            <div class="slider-row"><input type="range" id="evolveStrength" min="0" max="100" step="1" value="10"><div class="slider-val" id="evolveStrengthVal">10%</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Variantes</label>
+            <input type="number" id="evolveCount" value="4" min="1" max="16" step="1">
+          </div>
+          <div class="btn-row">
+            <button id="btnEvolve" class="primary" style="flex:1">Transmutar</button>
+            <button id="btnEvolveUse" class="ghost" style="flex:1">Usar #1</button>
+          </div>
+          <div class="enhancer-row">
+            <textarea class="enhancer-output" id="evolveOutput" readonly placeholder="Las variantes aparecerán aquí..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 2 (CENTRO): ETAPA BASE, UPSCALE, REFINER, AJUSTES -->
+    <div class="settings-col">
+      <!-- ETAPA 1: MODELO BASE -->
+      <div class="panel">
+        <h2>Etapa 1 · Modelo Base (Estructura y Composición)</h2>
+        <div class="row">
+          <label>Modelo UNET Base</label>
+          <select id="baseUnetSelect"></select>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label>CLIP / Text Encoder Base</label>
+          <select id="baseClipSelect"></select>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label>VAE Base</label>
+          <select id="baseVaeSelect"></select>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label>Backend de atención Base</label>
+          <select id="baseAttentionBackend">
+            <option value="comfy kitchen attention" selected>Comfy Kitchen Attention (INT8)</option>
+            <option value="pytorch attention">PyTorch Attention</option>
+            <option value="none">Sin parche (Nativo)</option>
+          </select>
+        </div>
+        <div class="row two-col" style="margin-top:8px;">
+          <div>
+            <label>Pasos Base</label>
+            <input type="number" id="baseSteps" value="8" min="1" max="100" step="1">
+          </div>
+          <div>
+            <label>CFG Base</label>
+            <input type="number" id="baseCfg" value="1.0" min="0.5" max="20" step="0.1">
+          </div>
+        </div>
+        <div class="row two-col" style="margin-top:6px;">
+          <div>
+            <label>Sampler Base</label>
+            <select id="baseSamplerName">
+              <option value="euler" selected>euler</option>
+              <option value="euler_ancestral">euler_ancestral</option>
+              <option value="dpmpp_2m">dpmpp_2m</option>
+              <option value="dpmpp_sde">dpmpp_sde</option>
+              <option value="res_2m">res_2m</option>
+              <option value="ddim">ddim</option>
+              <option value="uni_pc">uni_pc</option>
+            </select>
+          </div>
+          <div>
+            <label>Scheduler Base</label>
+            <select id="baseSchedulerName">
+              <option value="simple" selected>simple</option>
+              <option value="sgm_uniform">sgm_uniform</option>
+              <option value="karras">karras</option>
+              <option value="beta">beta</option>
+              <option value="exponential">exponential</option>
+              <option value="normal">normal</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Semilla</label>
+          <div class="seed-toggle">
+            <div class="seg on" id="segSamplerRandom">Aleatoria</div>
+            <div class="seg" id="segSamplerFixed">Fija</div>
+          </div>
+          <input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label>Batch Size (Variantes)</label>
+          <input type="number" id="batchSize" value="1" min="1" max="16" step="1">
+        </div>
+      </div>
+
+      <!-- RESOLUCIÓN Y ASPECT RATIO (BASE) -->
+      <div class="panel">
+        <h2>Resolución de Inicio (Base)</h2>
+        <div class="row slider-row">
+          <label>Megapíxeles</label>
+          <input type="range" id="mpSlider" min="0.1" max="4.0" step="0.1" value="1.0">
+          <div class="slider-val" id="mpVal">1.00</div>
+        </div>
+        <div class="row">
+          <label>Aspect Ratio</label>
+          <select id="aspectRatio">
+            <option value="1:1 (Square)">1:1 (Square)</option>
+            <option value="2:3 (Portrait Photo)">2:3 (Portrait Photo)</option>
+            <option value="3:2 (Photo)">3:2 (Photo)</option>
+            <option value="3:4 (Portrait Standard)">3:4 (Portrait Standard)</option>
+            <option value="4:3 (Standard)">4:3 (Standard)</option>
+            <option value="9:16 (Portrait Widescreen)">9:16 (Portrait Widescreen)</option>
+            <option value="16:9 (Widescreen)" selected>16:9 (Widescreen)</option>
+            <option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option>
+          </select>
+        </div>
+        <div class="hint" id="resHint" style="font-size:10px;margin-top:4px;">Dimensiones base estimadas: 1344 x 768 px</div>
+      </div>
+
+      <!-- INTER-ETAPA: ESCALADO NEURONAL (UPSCALE) -->
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2 style="margin:0;">Inter-Etapa · Upscale Neuronal</h2>
+          <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
+            <input type="checkbox" id="upscaleEnabled" checked>
+            <span>Activar</span>
+          </label>
+        </div>
+        <div id="upscaleControls" style="margin-top:8px;">
+          <div class="row">
+            <label>Modelo de Escalado (Upscale Model)</label>
+            <select id="upscaleModelSelect"></select>
+          </div>
+          <div class="row slider-row" style="margin-top:6px;">
+            <label>Factor de escala final</label>
+            <input type="range" id="upscaleFactor" min="1.0" max="3.0" step="0.25" value="1.5">
+            <div class="slider-val" id="upscaleFactorVal">1.50x</div>
+          </div>
+          <div class="hint" id="targetResHint" style="font-size:10px;margin-top:2px;">Resolución tras upscale: ~2016 x 1152 px</div>
+        </div>
+      </div>
+
+      <!-- ETAPA 2: MODELO REFINER -->
+      <div class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <h2 style="margin:0;">Etapa 2 · Modelo Refiner (Detalle y Textura)</h2>
+          <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
+            <input type="checkbox" id="refinerEnabled" checked>
+            <span>Activar Refiner</span>
+          </label>
+        </div>
+        <div id="refinerControls" style="margin-top:8px;">
+          <div class="row">
+            <label>Modelo UNET Refiner</label>
+            <select id="refinerUnetSelect"></select>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>CLIP / Text Encoder Refiner</label>
+            <select id="refinerClipSelect"></select>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>VAE Refiner</label>
+            <select id="refinerVaeSelect"></select>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Backend de atención Refiner</label>
+            <select id="refinerAttentionBackend">
+              <option value="comfy kitchen attention" selected>Comfy Kitchen Attention (INT8)</option>
+              <option value="pytorch attention">PyTorch Attention</option>
+              <option value="none">Sin parche (Nativo)</option>
+            </select>
+          </div>
+          <div class="row slider-row" style="margin-top:8px;">
+            <label>Denoise del Refiner <span class="hint">(Fuerza de refinado)</span></label>
+            <input type="range" id="refinerDenoise" min="0.05" max="0.75" step="0.05" value="0.35">
+            <div class="slider-val" id="refinerDenoiseVal">0.35</div>
+          </div>
+          <div class="row two-col" style="margin-top:6px;">
+            <div>
+              <label>Pasos Refiner</label>
+              <input type="number" id="refinerSteps" value="6" min="1" max="40" step="1">
+            </div>
+            <div>
+              <label>CFG Refiner</label>
+              <input type="number" id="refinerCfg" value="1.0" min="0.5" max="20" step="0.1">
+            </div>
+          </div>
+          <div class="row two-col" style="margin-top:6px;">
+            <div>
+              <label>Sampler Refiner</label>
+              <select id="refinerSamplerName">
+                <option value="euler" selected>euler</option>
+                <option value="euler_ancestral">euler_ancestral</option>
+                <option value="dpmpp_2m">dpmpp_2m</option>
+                <option value="res_2m">res_2m</option>
+              </select>
+            </div>
+            <div>
+              <label>Scheduler Refiner</label>
+              <select id="refinerSchedulerName">
+                <option value="simple" selected>simple</option>
+                <option value="sgm_uniform">sgm_uniform</option>
+                <option value="karras">karras</option>
+                <option value="beta">beta</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPECTRUM (ACELERACIÓN ESPECTRAL) -->
+      <div class="panel">
+        <div class="collapsible-header" id="spectrumToggle">
+          <span class="arrow">▶</span> Spectrum (Aceleración de Atención)
+        </div>
+        <div class="collapsible-body" id="spectrumBody">
+          <div class="row" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="spectrumEnabled" style="margin:0;">
+            <label for="spectrumEnabled" style="margin:0;font-size:11px;cursor:pointer;">Activar SwarmSpectrum en la generación</label>
+          </div>
+          <div class="row slider-row" style="margin-top:6px;">
+            <label>Weight (w)</label>
+            <input type="range" id="spectrumW" min="0.0" max="1.0" step="0.05" value="0.3">
+            <div class="slider-val" id="spectrumWVal">0.30</div>
+          </div>
+          <div class="row slider-row" style="margin-top:6px;">
+            <label>Lambda (lam)</label>
+            <input type="range" id="spectrumLam" min="0.0" max="1.0" step="0.05" value="0.1">
+            <div class="slider-val" id="spectrumLamVal">0.10</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GESTIÓN DE MEMORIA Y OFFLOAD -->
+      <div class="panel">
+        <h2>Gestión de Memoria y Offload</h2>
+        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
+            <input type="checkbox" id="keepModelInRam" checked>
+            <span>Mantener modelos en RAM (offload rápido)</span>
+          </label>
+          <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descargar modelos de VRAM/RAM bajo demanda">Liberar RAM/VRAM</button>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:4px;">
+          Con 96 GB de RAM, mantener ambos modelos (Base y Refiner) en memoria elimina por completo la espera de lectura de disco entre variantes.
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, VISOR DUAL Y RESULTADOS -->
+    <div class="results-col">
+      <!-- PANEL DE EJECUCIÓN Y COLAS -->
+      <div class="panel" style="margin-bottom:0;">
+        <h2>Ejecución</h2>
+        <div class="row" style="margin-bottom:8px;">
+          <label>Prefijo de archivo <span class="hint">(ej: kreaqwen/imagen)</span></label>
+          <input type="text" id="filenamePrefix" value="kreaqwen/imagen" placeholder="kreaqwen/imagen">
+        </div>
+        <div class="btn-row">
+          <button id="btnGenerate" class="primary" style="flex:2;">⚡ Generar Completo (Base + Upscale + Refiner)</button>
+          <button id="btnGenerateBaseOnly" class="ghost" style="flex:1;" title="Generar solo la etapa Base">Solo Base</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button id="btnStopVideo" disabled>Parar imagen</button>
+          <button id="btnStopAll" class="danger" disabled>Parar todo</button>
+          <button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
+        </div>
+        <div class="queue-status-box">
+          <div class="queue-status-row">
+            <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
+            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
+          </div>
+          <div class="queue-splits">
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div>
+              <div class="queue-split-main" id="queueWebuiSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueWebuiDetail">En reposo</div>
+            </div>
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div>
+              <div class="queue-split-main" id="queueServerSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div>
+            </div>
+          </div>
+          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
+            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
+            <div class="queue-items-body" id="queueItemsList"></div>
+          </div>
+        </div>
+        <div class="log" id="log">listo.</div>
+      </div>
+
+      <!-- TABS DE VISOR: REFINADA (FINAL) VS BASE (BORRADOR) -->
+      <div class="vid-view-tabs" style="margin-top:4px;">
+        <div class="vid-view-tab active" id="tabViewFinal" data-view="final">Imagen Final (Refinada)</div>
+        <div class="vid-view-tab" id="tabViewBase" data-view="base">Imagen Base (Borrador)</div>
+      </div>
+
+      <!-- VISOR DE IMAGEN PRINCIPAL -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3 id="lblViewerTitle">Imagen <em style="color:var(--accent)">final refinada</em></h3>
+          <div class="img-header-actions">
+            <button id="btnResetZoom" title="Tamaño original">⊡</button>
+            <button id="btnFullscreenImg" title="Pantalla completa">⛶</button>
+            <button id="btnSendLtxv" title="Enviar a LTXV">→ LTXV</button>
+            <button id="btnSendH3" title="Enviar a MiniMax H3">→ H3</button>
+            <button id="btnSendX2" title="Enviar a MMH3X2">→ X2</button>
+          </div>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <div class="img-wrap" id="imgWrap">
+          <img class="output" id="outputImg" style="display:none" draggable="true">
+        </div>
+        <div class="img-footer">
+          <span class="time-tag" id="time1"></span>
+          <span class="hint" id="imgInfo" style="font-size:10.5px;font-family:var(--mono);color:var(--muted-2);"></span>
+          <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
+        </div>
+      </div>
+
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="imgbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+
+      <!-- HISTORIAL DE IMÁGENES -->
+      <div class="imgbox">
+        <div class="collapsible-header" id="galleryToggle">
+          <span class="arrow">▶</span> Historial de Imágenes <button id="btnClearGallery" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();">Vaciar</button>
+        </div>
+        <div class="collapsible-body" id="galleryBody">
+          <div class="gallery-grid" id="galleryGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>

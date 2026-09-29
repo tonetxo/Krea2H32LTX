@@ -148,6 +148,10 @@ def get_model_subdirs(model_type):
             os.path.join(base_models, "Stable-Diffusion"),
             os.path.join(comfy_root, "models", "checkpoints"),
         ],
+        "upscale_models": [
+            os.path.join(base_models, "upscale_models"),
+            os.path.join(comfy_root, "models", "upscale_models"),
+        ],
     }
 
     candidates = variations.get(model_type, [os.path.join(base_models, model_type)])
