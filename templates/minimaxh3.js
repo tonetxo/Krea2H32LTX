@@ -3444,9 +3444,14 @@ function buildGraph(job){
         class_type: "H3SparseAttentionAdvanced",
         inputs: {
           model: [currentModelNode, 0],
-          video_budget: h3opt.videoBudget,
-          denser_early_late_steps: h3opt.denserEarlyLate,
-          backend: h3opt.sparseBackend
+          video_budget: (typeof h3opt.videoBudget === "number") ? h3opt.videoBudget : 0.3,
+          early_steps: h3opt.denserEarlyLate ? 8 : 0,
+          early_kv: 0.6833,
+          late_steps: 0,
+          late_kv: 0.6833,
+          backend: h3opt.sparseBackend,
+          early_schedule: "ramp",
+          video_token_order: "1x8x8"
         },
         _meta: { title: "H3 Sparse Attention Advanced" }
       };

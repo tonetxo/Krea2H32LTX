@@ -7571,11 +7571,12 @@ function buildGraph(j){
   delete g["84"];
   delete g["85"];
 
+  const isFaceRefineOnly = !!(j && j.isFaceRefineOnly);
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
-  if(seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
+  if(!isFaceRefineOnly && seg2Mode === "direct" && g[N.REF2V_SEG2]?.inputs){
     g[N.REF2V_SEG2].inputs.prompt = [N.PROMPT_2, 0];
     [N.OLLAMA_CONN, "52", N.OLLAMA_CHAT_1, N.OLLAMA_CHAT_2, "57", "59", "86"].forEach(id => { delete g[id]; });
-  } else if(seg2Mode === "ollama" && g[N.OLLAMA_CONN]?.inputs){
+  } else if(!isFaceRefineOnly && seg2Mode === "ollama" && g[N.OLLAMA_CONN]?.inputs){
     const ollamaModel = $("seg2OllamaModel")?.value || $("enhancerModel")?.value;
     if(ollamaModel){
       if(ollamaModel.startsWith("llamacpp:")){
@@ -7586,7 +7587,7 @@ function buildGraph(j){
         g[N.OLLAMA_CONN].inputs.model = ollamaModel.replace(/^ollama:/, "");
       }
     } else {
-      log("⚠️ Modo Asistido requiere un modelo en Ollama / llama.cpp. Se usa el del workflow.", "l-warn");
+      log("Modo Asistido requiere un modelo en Ollama / llama.cpp. Se usa el del workflow.", "l-warn");
     }
 
     // Inyectar nodo nativo SaveText para capturar y devolver el prompt final generado por Ollama
@@ -7599,6 +7600,8 @@ function buildGraph(j){
       class_type: "SaveText",
       _meta: { title: "Save Prompt Seg 2 (Ollama)" }
     };
+  } else {
+    delete g["99_savetext_prompt2"];
   }
 
   // 2. Duración y Megapíxeles
@@ -7731,9 +7734,14 @@ function buildGraph(j){
       class_type: "H3SparseAttentionAdvanced",
       inputs: {
         model: [N.ATTN, 0],
-        video_budget: h3opt.videoBudget,
-        denser_early_late_steps: h3opt.denserEarlyLate,
-        backend: backend
+        video_budget: (typeof h3opt.videoBudget === "number") ? h3opt.videoBudget : 0.3,
+        early_steps: h3opt.denserEarlyLate ? 8 : 0,
+        early_kv: 0.6833,
+        late_steps: 0,
+        late_kv: 0.6833,
+        backend: backend,
+        early_schedule: "ramp",
+        video_token_order: "1x8x8"
       },
       _meta: { title: "H3 Sparse Attention Advanced" }
     };
@@ -7907,6 +7915,7 @@ function buildGraph(j){
       N.IMAGE_BATCH, N.AUDIO_CONCAT, N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.SEED,
       "12_seg2", "13_seg2", "61", "64", "65", "25", "26", "27", "28", "29", "54", "57", "59",
       "51", "52", "53", "55", "86", "77", "78", "79", "12", "13", "75", "76", "11",
+      "99_savetext_prompt2", "84", "85", N.OLLAMA_CONN, N.OLLAMA_CHAT_1, N.OLLAMA_CHAT_2,
       "190_load_audio1", "191_load_audio2", "192_trim_final_audio", "193_trim_audio1", "194_trim_audio2",
       "195_concat_direct_audio", "198_ia_boost_seg1", "198_ia_vol_seg1", "199_ia_trim_seg1",
       "199_ia_boost_seg2", "199_ia_vol_seg2", "199_ia_trim_seg2", "199_ia_boost_final", "199_user_vol_final",
