@@ -215,7 +215,7 @@ function updateServerHint(){
 // --- PREVIEWS (TAE VAE / TAESD / Latent2RGB) ---
 function getPreviewMethod(){
   const sel = $("previewMethod");
-  return sel ? sel.value : "taesd";
+  return sel ? sel.value : "latent2rgb";
 }
 
 let currentPreviewUrl = null;

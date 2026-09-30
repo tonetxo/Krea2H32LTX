@@ -308,29 +308,90 @@ function invertOrder(){
   log("⇄ Orden de modelos invertido.", "l-ok");
 }
 
+// Cálculo preciso de aspect ratio y dimensiones de imagen
+function getAspectRatioString(w, h){
+  if(!w || !h) return "";
+  const r = w / h;
+  const known = [
+    { ratio: 1.0, label: "1:1" },
+    { ratio: 16 / 9, label: "16:9" },
+    { ratio: 9 / 16, label: "9:16" },
+    { ratio: 3 / 2, label: "3:2" },
+    { ratio: 2 / 3, label: "2:3" },
+    { ratio: 4 / 3, label: "4:3" },
+    { ratio: 3 / 4, label: "3:4" },
+    { ratio: 21 / 9, label: "21:9" },
+    { ratio: 9 / 21, label: "9:21" }
+  ];
+  for(const k of known){
+    if(Math.abs(r - k.ratio) < 0.08) return k.label;
+  }
+  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+  const d = gcd(w, h) || 1;
+  const rw = Math.round(w / d);
+  const rh = Math.round(h / d);
+  return (rw < 100 && rh < 100) ? `${rw}:${rh}` : `${r.toFixed(2)}:1`;
+}
+
+function updateViewerDimensions(){
+  const imgEl = $("outputImg");
+  const infoEl = $("imgInfo");
+  const badgeEl = $("imgDimBadge");
+  if(!imgEl || !imgEl.naturalWidth || !imgEl.naturalHeight){
+    if(badgeEl) badgeEl.style.display = "none";
+    return;
+  }
+  const w = imgEl.naturalWidth;
+  const h = imgEl.naturalHeight;
+  const ratioStr = getAspectRatioString(w, h);
+  const textFull = `${w}×${h} · ${ratioStr}`;
+  if(infoEl) infoEl.textContent = textFull;
+  if(badgeEl){
+    badgeEl.textContent = `${w}×${h} (${ratioStr})`;
+    badgeEl.style.display = "block";
+  }
+}
+
 // Visor dual (Final vs Base)
 function showImageView(mode){
   currentViewMode = mode;
   const tabFinal = $("tabViewFinal"), tabBase = $("tabViewBase");
-  const imgEl = $("outputImg"), titleEl = $("lblViewerTitle");
+  const imgEl = $("outputImg"), titleEl = $("lblViewerTitle"), dl = $("dl1");
+  const mediaObj = (mode === "final") ? currentFinalMedia : currentBaseMedia;
+
   if(mode === "final"){
     tabFinal?.classList.add("active");
     tabBase?.classList.remove("active");
     if(titleEl) titleEl.innerHTML = 'Imagen <em style="color:var(--accent)">final refinada</em>';
-    if(currentFinalMedia){
-      imgEl.src = currentFinalMedia.url;
-      imgEl.style.display = "block";
-      if($("empty1")) $("empty1").style.display = "none";
-    }
   } else {
     tabBase?.classList.add("active");
     tabFinal?.classList.remove("active");
     if(titleEl) titleEl.innerHTML = 'Imagen <em style="color:var(--accent)">base borrador</em>';
-    if(currentBaseMedia){
-      imgEl.src = currentBaseMedia.url;
-      imgEl.style.display = "block";
-      if($("empty1")) $("empty1").style.display = "none";
+  }
+
+  if(mediaObj && mediaObj.url){
+    imgEl.src = mediaObj.url;
+    imgEl.style.display = "block";
+    if($("empty1")) $("empty1").style.display = "none";
+    if(dl){
+      dl.href = mediaObj.url;
+      dl.download = `kreaqwen_${mode}_${mediaObj.media?.filename || 'imagen.png'}`;
+      dl.style.display = "inline";
     }
+    imgEl.onload = () => {
+      updateViewerDimensions();
+      if(window.outputZoom) window.outputZoom.resetZoom();
+    };
+    if(imgEl.complete && imgEl.naturalWidth){
+      updateViewerDimensions();
+      if(window.outputZoom) window.outputZoom.resetZoom();
+    }
+  } else {
+    imgEl.style.display = "none";
+    if($("empty1")) $("empty1").style.display = "flex";
+    if(dl) dl.style.display = "none";
+    if($("imgDimBadge")) $("imgDimBadge").style.display = "none";
+    if($("imgInfo")) $("imgInfo").textContent = "";
   }
 }
 
@@ -821,6 +882,70 @@ CONFIG.findMedia = function(nodeOutput){
   return null;
 };
 
+let currentBatchStage = "base";
+
+// Monitoreo de nodo en ejecución para feedback en vivo
+CONFIG.onNodeExecuting = function(nodeId){
+  if(nodeId === N.SAMPLER_BASE){
+    currentBatchStage = "base";
+    setRun("busy", "Generando etapa Base...");
+  } else if(nodeId === N.UPSCALE_MODEL || nodeId === N.IMAGE_SCALE){
+    currentBatchStage = "upscale";
+    setRun("busy", "Reescalando imagen (Upscale)...");
+  } else if(nodeId === N.SAMPLER_REFINER){
+    currentBatchStage = "refiner";
+    setRun("busy", "Refinando imagen (Etapa Refiner)...");
+  } else if(nodeId === N.DECODE_BASE || nodeId === N.DECODE_REFINER){
+    setRun("busy", "Decodificando VAE...");
+  }
+};
+
+// Captura de nodos ejecutados (ej. PreviewImage de Base)
+CONFIG.onNodeExecuted = function(data){
+  if(!data || !data.output) return;
+  if(data.node === N.PREVIEW_BASE || data.node === N.DECODE_BASE){
+    const media = CONFIG.findMedia(data.output);
+    if(media){
+      const url = mediaUrl(media);
+      currentBaseMedia = { media, url };
+      if(currentViewMode === "base" || !currentFinalMedia){
+        showImageView("base");
+      }
+    }
+  }
+};
+
+// Renderizado de previews en vivo (Latent2RGB / TAESD por WebSocket)
+CONFIG.onPreview = function(url, meta){
+  const img = $("outputImg"), empty = $("empty1"), dl = $("dl1"), badge = $("imgDimBadge");
+  if(img && empty){
+    img.src = url;
+    img.style.display = "block";
+    empty.style.display = "none";
+    if(dl) dl.style.display = "none";
+    if(badge) badge.style.display = "none";
+    const info = $("imgInfo");
+    if(info){
+      const stageName = (currentBatchStage === "refiner") ? "Refiner" : "Base";
+      const stepStr = (meta && meta.step != null && meta.max_steps) ? ` (${meta.step}/${meta.max_steps})` : "";
+      info.textContent = `⚡ Muestreando ${stageName}${stepStr}`;
+    }
+  }
+};
+
+// Limpieza de preview
+CONFIG.onClearPreview = function(){
+  if(!currentFinalMedia && !currentBaseMedia){
+    const img = $("outputImg"), empty = $("empty1"), dl = $("dl1"), badge = $("imgDimBadge");
+    if(img){ img.style.display = "none"; img.removeAttribute("src"); }
+    if(empty) empty.style.display = "flex";
+    if(dl) dl.style.display = "none";
+    if(badge) badge.style.display = "none";
+    const info = $("imgInfo");
+    if(info) info.textContent = "";
+  }
+};
+
 CONFIG.showMedia = function(slot, media, options){
   const url = mediaUrl(media);
   if(options?.node === N.PREVIEW_BASE || options?.node === N.DECODE_BASE){
@@ -884,6 +1009,26 @@ function addToVariantGallery(media, seedValue, timeText) {
         type: card.dataset.type,
       }, grid, box, "Variante", updateCount, updateCount);
     });
+  }
+
+  const thumbImg = card.querySelector("img");
+  if(thumbImg){
+    const applyDimTag = () => {
+      const w = thumbImg.naturalWidth, h = thumbImg.naturalHeight;
+      if(w && h){
+        const ratio = getAspectRatioString(w, h);
+        let tag = card.querySelector(".variant-dim-tag");
+        if(!tag){
+          tag = document.createElement("span");
+          tag.className = "variant-dim-tag";
+          const footer = card.querySelector(".variant-footer") || card.querySelector(".variant-icons") || card;
+          if(footer) footer.appendChild(tag);
+        }
+        tag.textContent = `${w}×${h} (${ratio})`;
+      }
+    };
+    thumbImg.onload = applyDimTag;
+    if(thumbImg.complete && thumbImg.naturalWidth) applyDimTag();
   }
 
   card.addEventListener("click", (e) => {
