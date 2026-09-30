@@ -240,7 +240,7 @@ function applyComboMode(mode){
   if(mode === "krea_qwen"){
     selectByKw(selBaseU, "flux2");
     selectByKw(selBaseC, "qwen3vl_4b");
-    selectByKw(selBaseV, "qwen_image_vae");
+    selectByKw(selBaseV, "wan");
     selectByKw(selRefU, "qwen");
     selectByKw(selRefC, "qwen3vl_8b");
     selectByKw(selRefV, "qwen_image_2.1_vae");
@@ -253,17 +253,17 @@ function applyComboMode(mode){
     selectByKw(selBaseV, "qwen_image_2.1_vae");
     selectByKw(selRefU, "flux2");
     selectByKw(selRefC, "qwen3vl_4b");
-    selectByKw(selRefV, "qwen_image_vae");
+    selectByKw(selRefV, "wan");
     if(hint) hint.textContent = "Qwen 2.1 genera la composición con adherencia profunda al prompt; Krea2 aporta riqueza tonal y grano en la pasada de refinamiento.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "krea_krea"){
     selectByKw(selBaseU, "flux2");
     selectByKw(selBaseC, "qwen3vl_4b");
-    selectByKw(selBaseV, "qwen_image_vae");
+    selectByKw(selBaseV, "wan");
     selectByKw(selRefU, "flux2");
     selectByKw(selRefC, "qwen3vl_4b");
-    selectByKw(selRefV, "qwen_image_vae");
+    selectByKw(selRefV, "wan");
     if(hint) hint.textContent = "Pipeline homogéneo Krea2: generación inicial y refinado en superresolución dentro del modelo Flux2.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
@@ -524,15 +524,19 @@ function buildGraph(job){
   const j = job || activeJob || snapshotJob();
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
 
+  // Detección estricta de arquitectura por el modelo UNET (difusión).
+  // ComfyUI exige que el tipo de CLIPLoader ('krea2' vs 'qwen_image') coincida exactamente
+  // con la arquitectura del UNET receptor:
+  // - Krea2 / Flux2 requiere type: 'krea2' (12 capas Qwen3-VL, 30720 features).
+  // - QwenImage requiere type: 'qwen_image' (2560 features).
+  // NO debe verificarse el nombre del CLIP, ya que ambos usan encoders qwen3vl.
   const unetBaseLower = (j.baseUnet || "").toLowerCase();
-  const clipBaseLower = (j.baseClip || "").toLowerCase();
-  const isQwenBase = unetBaseLower.includes("qwen") || clipBaseLower.includes("qwen");
-  const isKreaBase = unetBaseLower.includes("flux") || unetBaseLower.includes("krea") || clipBaseLower.includes("flux") || clipBaseLower.includes("krea") || !isQwenBase;
+  const isQwenBase = unetBaseLower.includes("qwen");
+  const isKreaBase = !isQwenBase;
 
   const unetRefLower = (j.refinerUnet || "").toLowerCase();
-  const clipRefLower = (j.refinerClip || "").toLowerCase();
-  const isQwenRefiner = unetRefLower.includes("qwen") || clipRefLower.includes("qwen");
-  const isKreaRefiner = unetRefLower.includes("flux") || unetRefLower.includes("krea") || clipRefLower.includes("flux") || clipRefLower.includes("krea") || !isQwenRefiner;
+  const isQwenRefiner = unetRefLower.includes("qwen");
+  const isKreaRefiner = !isQwenRefiner;
 
   // --- ETAPA 1 (BASE) ---
   g[N.UNET_BASE].inputs.unet_name = j.baseUnet;

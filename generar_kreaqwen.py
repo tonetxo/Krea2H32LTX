@@ -51,7 +51,7 @@ def main():
         'clip_exclude': ('AceStep', 'ViT-L-14', 'byt5', 'clip_g', 'clip_l', 'gemma', 't5xxl'),
         'vae_dir': VAE_DIR,
         'vae_fallback': 'QwenImage/qwen_image_2.1_vae_bf16.safetensors',
-        'vae_include': ('qwen', 'flux'),
+        'vae_include': ('qwen', 'flux', 'wan'),
         'vae_exclude': ('audio', 'video'),
         'upscale_dir': UPSCALE_DIR,
         'upscale_fallback': '4xPurePhoto-Span.pth',
