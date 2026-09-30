@@ -536,6 +536,17 @@ CONFIG.variantMeta = function(){
   return { title: "Parámetros KreaQwen", rows, loras: [] };
 };
 
+// Helper URL y medios
+function getServerUrl(){
+  return (typeof server === "function") ? server() : (CONFIG.serverUrl || "http://127.0.0.1:7821");
+}
+
+function mediaUrl(media){
+  if(!media) return "";
+  const srv = getServerUrl();
+  return `${srv}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
+}
+
 // Captura de medios devueltos
 CONFIG.findMedia = function(nodeOutput){
   for(const k of ["images", "videos", "gifs"]){
@@ -546,7 +557,6 @@ CONFIG.findMedia = function(nodeOutput){
 
 CONFIG.showMedia = function(slot, media, options){
   const url = mediaUrl(media);
-  // Si viene del nodo de preview base (50 o 8)
   if(options?.node === N.PREVIEW_BASE || options?.node === N.DECODE_BASE){
     currentBaseMedia = { media, url };
   } else {
@@ -558,6 +568,167 @@ CONFIG.showMedia = function(slot, media, options){
 CONFIG.renderVariantMedia = function(card, url, media){
   return `<img src="${url}">`;
 };
+
+// Galería de variantes
+let variantCounter = 0;
+function addToVariantGallery(media, seedValue, timeText) {
+  if(!media || !media.filename) return;
+  const box = $("variantGalleryBox");
+  const grid = $("variantGrid");
+  if(!box || !grid) return;
+  box.style.display = "block";
+
+  const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
+  const card = buildVariantCard(grid, box, media, seedValue, timeText, null, null, "var", meta);
+  const url = mediaUrl(media);
+
+  const icons = card.querySelector(".variant-icons");
+  if(icons){
+    const dl = document.createElement("a");
+    dl.href = url;
+    dl.download = "";
+    dl.style.cssText = "color:var(--accent);text-decoration:none";
+    dl.textContent = "Descargar";
+    dl.addEventListener("click", (e) => e.stopPropagation());
+    icons.insertBefore(dl, icons.firstChild);
+  }
+
+  const hasSeed = seedValue !== null && seedValue !== undefined;
+  if(hasSeed) {
+    const seedSpan = card.querySelector('.variant-seed-display');
+    if(seedSpan){
+      seedSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copySeedToClipboard(seedSpan, seedValue);
+      });
+    }
+  }
+
+  const delBtn = card.querySelector(".variant-del-btn");
+  if(delBtn){
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const updateCount = (g, b) => {
+        const remaining = g.querySelectorAll(".variant-card").length;
+        if($("variantCount")) $("variantCount").textContent = `(${remaining})`;
+        if(remaining === 0) b.style.display = "none";
+      };
+      deleteMediaFile(card, delBtn, {
+        filename: card.dataset.filename,
+        subfolder: card.dataset.subfolder,
+        type: card.dataset.type,
+      }, grid, box, "Variante", updateCount, updateCount);
+    });
+  }
+
+  card.addEventListener("click", (e) => {
+    if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
+    currentFinalMedia = { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type, url };
+    showImageView("final");
+  });
+
+  variantCounter++;
+  if($("variantCount")) $("variantCount").textContent = `(${variantCounter})`;
+}
+
+// Callback displayResult de ComfyUI
+CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
+  const timeText = tTotal || "";
+  const outNodeFinal = entry.outputs[N.SAVE_IMAGE] || entry.outputs[N.DECODE_REFINER];
+  const outNodeBase = entry.outputs[N.PREVIEW_BASE] || entry.outputs[N.DECODE_BASE];
+
+  if(outNodeBase){
+    const baseMedia = CONFIG.findMedia(outNodeBase);
+    if(baseMedia){
+      const url = mediaUrl(baseMedia);
+      currentBaseMedia = { media: baseMedia, url };
+    }
+  }
+
+  const outNode = outNodeFinal || outNodeBase;
+  if(!outNode) return { foundOutput: false };
+
+  const media = CONFIG.findMedia(outNode);
+  if(!media) return { foundOutput: false };
+
+  const url = mediaUrl(media);
+  if(outNodeFinal){
+    currentFinalMedia = { media, url };
+    showImageView("final");
+  } else {
+    currentBaseMedia = { media, url };
+    showImageView("base");
+  }
+
+  const t1 = $("time1");
+  if(t1 && timeText){ t1.textContent = timeText; t1.classList.remove("live"); }
+  addToVariantGallery(media, realSeed, timeText);
+  return { foundOutput: true };
+};
+
+// Callbacks de ciclo de vida
+CONFIG.startNextVariant = function(index){ runSingleGeneration(index); };
+CONFIG.onBatchComplete = function(){
+  finishCurrentJob();
+  if(jobQueue.length > 0){
+    const next = jobQueue.shift();
+    startJob(next);
+  }
+};
+CONFIG.onStopCurrent = function(pid){};
+CONFIG.onStopAll = function(){
+  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
+  pendingSeeds = {};
+  handledPrompts.clear();
+  processingPrompts.clear();
+  currentPromptId = null;
+  currentBatchIndex = totalBatchSize;
+  const t1 = $("time1");
+  if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
+  jobQueue = [];
+  activeJob = null;
+  updateQueueUI();
+  enableStopButtons(false);
+};
+
+// Carga de imagen de referencia
+function loadRefImage(url){
+  const img = $("refImg"), wrap = $("refWrap"), ph = $("refPlaceholder"), dz = $("refDropzone"), info = $("refInfo");
+  if(!img || !wrap) return;
+  const newImg = document.createElement("img");
+  newImg.id = "refImg";
+  newImg.style.cssText = "display:block;max-width:100%;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;";
+  img.parentNode.replaceChild(newImg, img);
+  if(window.refZoom) window.refZoom.resetZoom();
+  newImg.src = url;
+  newImg.style.display = "block";
+  wrap.style.visibility = "visible";
+  if(ph) ph.style.display = "none";
+  if(dz){
+    dz.style.display = "flex";
+    dz.style.padding = "4px 8px";
+    dz.style.minHeight = "auto";
+    const phEl = dz.querySelector(".ph");
+    if(phEl) phEl.textContent = "arrastra otra imagen para reemplazar";
+  }
+  newImg.onload = () => {
+    const w = newImg.naturalWidth, h = newImg.naturalHeight;
+    if(w && h){
+      function gcd(a,b){ return b ? gcd(b, a % b) : a; }
+      const d = gcd(w, h) || 1;
+      if(info) info.textContent = `${w}x${h} · ${w/d}:${h/d}`;
+    }
+  };
+}
+
+function handleRefFile(f){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    if(typeof addToGallery === "function") addToGallery(e.target.result);
+    loadRefImage(e.target.result);
+  };
+  reader.readAsDataURL(f);
+}
 
 // Generación individual
 async function runSingleGeneration(index){
@@ -592,7 +763,7 @@ async function runSingleGeneration(index){
     startTimer(data.prompt_id, 1);
     pollFallback(data.prompt_id);
   } catch(err){
-    log(`❌ Error en variante ${index + 1}: ${err.message}`, "l-err");
+    log(`Error en variante ${index + 1}: ${err.message}`, "l-err");
     finishCurrentJob();
   }
 }
@@ -608,7 +779,7 @@ async function startJob(job){
     enableStopButtons(true);
     await runSingleGeneration(0);
   } catch(err){
-    log(`❌ Error al iniciar KreaQwen #${job.id}: ${err.message || err}`, "l-err");
+    log(`Error al iniciar KreaQwen #${job.id}: ${err.message || err}`, "l-err");
     setRun("bad", "Error");
     finishCurrentJob();
   }
@@ -619,7 +790,7 @@ function enqueueGeneration(isBaseOnly = false){
   if(activeJob){
     jobQueue.push(job);
     updateQueueUI();
-    log(`📥 Job KreaQwen #${job.id} encolado (${jobQueue.length} pendientes).`, "l-info");
+    log(`Job KreaQwen #${job.id} encolado (${jobQueue.length} pendientes).`, "l-info");
   } else {
     startJob(job);
   }
@@ -643,6 +814,35 @@ function finishCurrentJob(){
 document.addEventListener("DOMContentLoaded", () => {
   populateModelSelects();
   updateDimensionHints();
+
+  window.outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
+  window.refZoom = setupZoomPan("refWrap", "refImg", "btnResetZoomRef", "btnFullscreenRef");
+
+  // Dropzone de referencia
+  const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef"), wrap = $("refWrap");
+  if(dz && input && btn){
+    btn.addEventListener("click", (e) => { e.stopPropagation(); input.click(); });
+    const onDragEnter = (e) => { e.preventDefault(); dz.classList.add("drag"); };
+    const onDragOver = (e) => { e.preventDefault(); dz.classList.add("drag"); };
+    const onDragLeave = () => { dz.classList.remove("drag"); };
+    const onDrop = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      dz.classList.remove("drag");
+      const files = e.dataTransfer?.files;
+      if(files && files.length > 0) handleRefFile(files[0]);
+    };
+    dz.addEventListener("dragenter", onDragEnter);
+    dz.addEventListener("dragover", onDragOver);
+    dz.addEventListener("dragleave", onDragLeave);
+    dz.addEventListener("drop", onDrop);
+    if(wrap){
+      wrap.addEventListener("dragenter", onDragEnter);
+      wrap.addEventListener("dragover", onDragOver);
+      wrap.addEventListener("dragleave", onDragLeave);
+      wrap.addEventListener("drop", onDrop);
+    }
+    input.addEventListener("change", e => { if(e.target.files[0]) handleRefFile(e.target.files[0]); });
+  }
 
   $("comboMode")?.addEventListener("change", (e) => applyComboMode(e.target.value));
   $("btnInvertOrder")?.addEventListener("click", invertOrder);
@@ -670,6 +870,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if($("negPrompt")) $("negPrompt").value = "";
   });
 
+  $("btnClearQueue")?.addEventListener("click", () => {
+    jobQueue = [];
+    updateQueueUI();
+    log("Cola de trabajos vaciada.", "l-info");
+  });
+
   $("btnFreeMemory")?.addEventListener("click", async () => {
     try {
       const srv = getServerUrl();
@@ -678,9 +884,9 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ unload_models: true, free_memory: true })
       });
-      log("🧹 Memoria VRAM y modelos liberados en ComfyUI.", "l-ok");
+      log("Memoria VRAM y modelos liberados en ComfyUI.", "l-ok");
     } catch(e){
-      log("⚠️ Error liberando memoria: " + e.message, "l-err");
+      log("Error liberando memoria: " + e.message, "l-err");
     }
   });
 });
