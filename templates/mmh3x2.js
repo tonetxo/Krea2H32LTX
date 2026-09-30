@@ -426,8 +426,11 @@ const FACEREFINE_KEY = "mmh3x2_facerefine_state";
 const FACEREFINE_DEFAULTS = {
   enabled: false,
   denoise: 0.35,
+  steps: 4,
+  canvasSize: 512,
   feather: 16,
-  select: "largest_face"
+  select: "largest_face",
+  postproc: false
 };
 function loadFaceRefine(){
   try { return Object.assign({}, FACEREFINE_DEFAULTS, JSON.parse(localStorage.getItem(FACEREFINE_KEY) || "{}")); }
@@ -438,8 +441,11 @@ function getFaceRefineState(){
   return {
     enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
     denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.35"),
+    steps: parseInt($("faceRefineStepsSlider")?.value || "4", 10),
+    canvasSize: parseInt($("faceRefineCanvasMode")?.value || "512", 10),
     feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
-    select: $("faceRefineSelectMode")?.value || "largest_face"
+    select: $("faceRefineSelectMode")?.value || "largest_face",
+    postproc: $("faceRefinePostprocToggle")?.checked ?? false
   };
 }
 function setFaceRefineUI(s){
@@ -452,6 +458,15 @@ function setFaceRefineUI(s){
   } else {
     off?.classList.add("on"); on?.classList.remove("on");
     if(panel) panel.style.display = "none";
+  }
+  if($("faceRefineStepsSlider")){
+    const st = parseInt(s.steps != null ? s.steps : 4, 10);
+    $("faceRefineStepsSlider").value = st;
+    if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+    if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+  }
+  if($("faceRefineCanvasMode") && s.canvasSize){
+    $("faceRefineCanvasMode").value = String(s.canvasSize);
   }
   if($("faceRefineDenoiseSlider")){
     const d = parseFloat(s.denoise != null ? s.denoise : 0.35);
@@ -467,6 +482,9 @@ function setFaceRefineUI(s){
   }
   if($("faceRefineSelectMode") && s.select){
     $("faceRefineSelectMode").value = s.select;
+  }
+  if($("faceRefinePostprocToggle")){
+    $("faceRefinePostprocToggle").checked = !!s.postproc;
   }
 }
 const _faceRefineState = loadFaceRefine();
@@ -613,6 +631,21 @@ function attachAttentionOptimizerListeners(){
     saveFaceRefine(s);
     scheduleSaveSettings();
   });
+  $("faceRefineStepsSlider")?.addEventListener("input", (e) => {
+    const st = parseInt(e.target.value, 10) || 4;
+    if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+    if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+    const s = getFaceRefineState();
+    s.steps = st;
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
+  $("faceRefineCanvasMode")?.addEventListener("change", (e) => {
+    const s = getFaceRefineState();
+    s.canvasSize = parseInt(e.target.value, 10) || 512;
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
   $("faceRefineDenoiseSlider")?.addEventListener("input", (e) => {
     const d = parseFloat(e.target.value) || 0.35;
     if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
@@ -634,6 +667,12 @@ function attachAttentionOptimizerListeners(){
   $("faceRefineSelectMode")?.addEventListener("change", (e) => {
     const s = getFaceRefineState();
     s.select = e.target.value;
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
+  $("faceRefinePostprocToggle")?.addEventListener("change", (e) => {
+    const s = getFaceRefineState();
+    s.postproc = e.target.checked;
     saveFaceRefine(s);
     scheduleSaveSettings();
   });
@@ -3186,6 +3225,8 @@ function buildGraph(j){
   // MODO ON-DEMAND: Refinar rostro del clip final sin re-muestrear los dos segmentos principales
   if(j && j.isFaceRefineOnly){
     const frState = j.faceRefine || getFaceRefineState();
+    const frCanvasSize = frState.canvasSize || 512;
+    const frSteps = frState.steps || 4;
     const sourceMedia = j.sourceMedia || currentMedia[3];
     const videoFilePath = (sourceMedia && sourceMedia.subfolder ? sourceMedia.subfolder + "/" : "") + (sourceMedia ? sourceMedia.filename : "") + " [output]";
 
@@ -3225,9 +3266,9 @@ function buildGraph(j){
         detector: "face_yolov8m.pt",
         confidence: 0.35,
         crop_factor: 3.0,
-        canvas_width: 768,
-        canvas_height: 768,
-        canvas_mode: "auto_capped_768",
+        canvas_width: frCanvasSize,
+        canvas_height: frCanvasSize,
+        canvas_mode: frCanvasSize >= 768 ? "auto_capped_768" : "auto",
         smooth_window: 21,
         size_smooth_window: 51,
         smooth_method: "gaussian",
@@ -3305,7 +3346,7 @@ function buildGraph(j){
       inputs: {
         model: [N.FACE_PERFRAME_DENOISE, 2],
         scheduler: "simple",
-        steps: 8,
+        steps: frSteps,
         denoise: frState.denoise || 0.35
       },
       _meta: { title: "Face Basic Scheduler" }
@@ -3376,8 +3417,9 @@ function buildGraph(j){
     };
 
     let faceFinalImages = [N.FACE_STITCH, 0];
-    const rtxOn = $("rtxToggle") ? $("rtxToggle").checked : true;
-    const rifeOn = $("rifeToggle") ? $("rifeToggle").checked : true;
+    const frPostproc = frState.postproc !== undefined ? frState.postproc : false;
+    const rtxOn = frPostproc && ($("rtxToggle") ? $("rtxToggle").checked : false);
+    const rifeOn = frPostproc && ($("rifeToggle") ? $("rifeToggle").checked : false);
 
     if(rtxOn && g[N.RTX]?.inputs){
       g[N.RTX].inputs.images = faceFinalImages;
@@ -3845,6 +3887,8 @@ function buildGraph(j){
   // 13a. Refinado facial (ComfyUI-H3-FaceRefine) sobre el vídeo continuo unificado
   const frState = j ? j.faceRefine : getFaceRefineState();
   const faceRefineEnabled = frState ? frState.enabled : false;
+  const frCanvasSize = frState?.canvasSize || 512;
+  const frSteps = frState?.steps || 4;
 
   if(faceRefineEnabled){
     g[N.FACE_CROP] = {
@@ -3854,9 +3898,9 @@ function buildGraph(j){
         detector: "face_yolov8m.pt",
         confidence: 0.35,
         crop_factor: 3.0,
-        canvas_width: 768,
-        canvas_height: 768,
-        canvas_mode: "auto_capped_768",
+        canvas_width: frCanvasSize,
+        canvas_height: frCanvasSize,
+        canvas_mode: frCanvasSize >= 768 ? "auto_capped_768" : "auto",
         smooth_window: 21,
         size_smooth_window: 51,
         smooth_method: "gaussian",
@@ -3930,7 +3974,7 @@ function buildGraph(j){
       inputs: {
         model: [N.FACE_PERFRAME_DENOISE, 2],
         scheduler: "simple",
-        steps: 8,
+        steps: frSteps,
         denoise: frState.denoise || 0.35
       },
       _meta: { title: "Face Basic Scheduler" }

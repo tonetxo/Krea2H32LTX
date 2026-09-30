@@ -601,6 +601,18 @@
         </div>
         <div id="faceRefineControls" style="display:none; margin-top:8px;">
           <div class="row slider-row">
+            <label>Pasos DiT (Steps) <span class="hint" id="faceRefineStepsHint">(4)</span></label>
+            <input type="range" id="faceRefineStepsSlider" min="2" max="16" step="1" value="4">
+            <div class="slider-val" id="faceRefineStepsVal">4</div>
+          </div>
+          <div class="row">
+            <label>Resolución de recorte</label>
+            <select id="faceRefineCanvasMode">
+              <option value="512" selected>512x512 (Ultra rápido · 2x velocidad)</option>
+              <option value="768">768x768 (Alta resolución · nativo H3)</option>
+            </select>
+          </div>
+          <div class="row slider-row">
             <label>Denoise base <span class="hint" id="faceRefineDenoiseHint">(0.35)</span></label>
             <input type="range" id="faceRefineDenoiseSlider" min="0.15" max="0.55" step="0.05" value="0.35">
             <div class="slider-val" id="faceRefineDenoiseVal">0.35</div>
@@ -616,6 +628,12 @@
               <option value="largest_face" selected>Rostro principal (más grande)</option>
               <option value="centre_most">Rostro más centrado</option>
             </select>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:11px; text-transform:none;">
+              <input type="checkbox" id="faceRefinePostprocToggle">
+              <span>Re-aplicar RTX y RIFE al clip refinado</span>
+            </label>
           </div>
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera los rostros del vídeo continuo en alta escala con Denoise adaptativo por fotograma, recomponiéndolos mediante recorte y fundido suave.</div>
