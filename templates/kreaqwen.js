@@ -570,7 +570,6 @@ CONFIG.renderVariantMedia = function(card, url, media){
 };
 
 // Galería de variantes
-let variantCounter = 0;
 function addToVariantGallery(media, seedValue, timeText) {
   if(!media || !media.filename) return;
   const box = $("variantGalleryBox");
@@ -810,8 +809,8 @@ function finishCurrentJob(){
   setRun("idle", "en reposo");
 }
 
-// Inicialización de Listeners
-document.addEventListener("DOMContentLoaded", () => {
+// Inicialización de Listeners y Componentes
+function initKreaQwenUI() {
   populateModelSelects();
   updateDimensionHints();
 
@@ -860,6 +859,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if($("refinerDenoiseVal")) $("refinerDenoiseVal").textContent = parseFloat(e.target.value).toFixed(2);
   });
 
+  $("segSamplerRandom")?.addEventListener("click", () => {
+    $("segSamplerRandom")?.classList.add("on");
+    $("segSamplerFixed")?.classList.remove("on");
+    if($("samplerSeed")) $("samplerSeed").disabled = true;
+  });
+  $("segSamplerFixed")?.addEventListener("click", () => {
+    $("segSamplerFixed")?.classList.add("on");
+    $("segSamplerRandom")?.classList.remove("on");
+    if($("samplerSeed")) $("samplerSeed").disabled = false;
+  });
+
   $("tabViewFinal")?.addEventListener("click", () => showImageView("final"));
   $("tabViewBase")?.addEventListener("click", () => showImageView("base"));
 
@@ -889,4 +899,10 @@ document.addEventListener("DOMContentLoaded", () => {
       log("Error liberando memoria: " + e.message, "l-err");
     }
   });
-});
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initKreaQwenUI);
+} else {
+  initKreaQwenUI();
+}
