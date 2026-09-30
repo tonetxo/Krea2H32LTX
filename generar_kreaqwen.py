@@ -15,6 +15,9 @@ UNET_DIRS = [
     (_diff_qwen, "qwen") if os.path.isdir(_diff_qwen) else (_diff_base, "")
 ]
 
+_loras_base = config_loader.get_model_subdirs("loras")
+LORAS_DIR = os.environ.get("KREAQWEN_LORAS_DIR", _loras_base)
+
 CLIP_DIR = os.environ.get("KREAQWEN_CLIP_DIR", config_loader.get_model_subdirs("text_encoders"))
 VAE_DIR = os.environ.get("KREAQWEN_VAE_DIR", config_loader.get_model_subdirs("vae"))
 UPSCALE_DIR = os.environ.get("KREAQWEN_UPSCALE_DIR", config_loader.get_model_subdirs("upscale_models"))
@@ -34,9 +37,11 @@ def main():
         'ui_html': 'kreaqwen_html.html',
         'ui_css': 'kreaqwen.css',
         'ui_js': 'kreaqwen.js',
-        'model_dirs': None,
-        'model_fallback': '',
-        'model_exclude': (),
+        'model_dirs': UNET_DIRS,
+        'model_fallback': 'flux2/jibMixKrea2_v40Habanero.safetensors',
+        'model_exclude': ('/boogu/', '/ernie/', '/nunchaku/', '/zimage/'),
+        'lora_dir': LORAS_DIR,
+        'lora_fallback': 'K2/realism_engine_krea2_v2.safetensors',
         'unet_dirs': UNET_DIRS,
         'unet_fallback': 'flux2/jibMixKrea2_v40Habanero.safetensors',
         'unet_exclude': ('/boogu/', '/ernie/', '/nunchaku/', '/zimage/'),

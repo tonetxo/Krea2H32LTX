@@ -632,11 +632,157 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
             <select id="baseSamplerName">
               <option value="euler" selected>euler</option>
               <option value="euler_ancestral">euler_ancestral</option>
-              <option value="dpmpp_2m">dpmpp_2m</option>
+              <option value="heun">heun</option>
+              <option value="heunpp2">heunpp2</option>
+              <option value="dpm_2">dpm_2</option>
+              <option value="dpm_2_ancestral">dpm_2_ancestral</option>
+              <option value="lms">lms</option>
+              <option value="dpm_fast">dpm_fast</option>
+              <option value="dpm_adaptive">dpm_adaptive</option>
+              <option value="dpmpp_2s_ancestral">dpmpp_2s_ancestral</option>
               <option value="dpmpp_sde">dpmpp_sde</option>
-              <option value="res_2m">res_2m</option>
+              <option value="dpmpp_sde_gpu">dpmpp_sde_gpu</option>
+              <option value="dpmpp_2m">dpmpp_2m</option>
+              <option value="dpmpp_2m_sde">dpmpp_2m_sde</option>
+              <option value="dpmpp_2m_sde_gpu">dpmpp_2m_sde_gpu</option>
+              <option value="dpmpp_3m_sde">dpmpp_3m_sde</option>
+              <option value="dpmpp_3m_sde_gpu">dpmpp_3m_sde_gpu</option>
+              <option value="ddpm">ddpm</option>
+              <option value="lcm">lcm</option>
               <option value="ddim">ddim</option>
               <option value="uni_pc">uni_pc</option>
+              <option value="uni_pc_bh2">uni_pc_bh2</option>
+              <option value="none">none</option>
+              <optgroup label="multistep/">
+                <option value="multistep/res_2m">multistep/res_2m</option>
+                <option value="multistep/res_3m">multistep/res_3m</option>
+                <option value="multistep/dpmpp_2m">multistep/dpmpp_2m</option>
+                <option value="multistep/dpmpp_3m">multistep/dpmpp_3m</option>
+                <option value="multistep/abnorsett_2m">multistep/abnorsett_2m</option>
+                <option value="multistep/abnorsett_3m">multistep/abnorsett_3m</option>
+                <option value="multistep/abnorsett_4m">multistep/abnorsett_4m</option>
+                <option value="multistep/deis_2m">multistep/deis_2m</option>
+                <option value="multistep/deis_3m">multistep/deis_3m</option>
+                <option value="multistep/deis_4m">multistep/deis_4m</option>
+              </optgroup>
+              <optgroup label="exponential/">
+                <option value="exponential/res_2s_rkmk2e">exponential/res_2s_rkmk2e</option>
+                <option value="exponential/res_2s">exponential/res_2s</option>
+                <option value="exponential/res_2s_stable">exponential/res_2s_stable</option>
+                <option value="exponential/res_3s">exponential/res_3s</option>
+                <option value="exponential/res_3s_non-monotonic">exponential/res_3s_non-monotonic</option>
+                <option value="exponential/res_3s_alt">exponential/res_3s_alt</option>
+                <option value="exponential/res_3s_cox_matthews">exponential/res_3s_cox_matthews</option>
+                <option value="exponential/res_3s_lie">exponential/res_3s_lie</option>
+                <option value="exponential/res_3s_sunstar">exponential/res_3s_sunstar</option>
+                <option value="exponential/res_3s_strehmel_weiner">exponential/res_3s_strehmel_weiner</option>
+                <option value="exponential/res_4s_krogstad">exponential/res_4s_krogstad</option>
+                <option value="exponential/res_4s_krogstad_alt">exponential/res_4s_krogstad_alt</option>
+                <option value="exponential/res_4s_strehmel_weiner">exponential/res_4s_strehmel_weiner</option>
+                <option value="exponential/res_4s_strehmel_weiner_alt">exponential/res_4s_strehmel_weiner_alt</option>
+                <option value="exponential/res_4s_cox_matthews">exponential/res_4s_cox_matthews</option>
+                <option value="exponential/res_4s_cfree4">exponential/res_4s_cfree4</option>
+                <option value="exponential/res_4s_friedli">exponential/res_4s_friedli</option>
+                <option value="exponential/res_4s_minchev">exponential/res_4s_minchev</option>
+                <option value="exponential/res_4s_munthe-kaas">exponential/res_4s_munthe-kaas</option>
+                <option value="exponential/res_5s">exponential/res_5s</option>
+                <option value="exponential/res_5s_hochbruck-ostermann">exponential/res_5s_hochbruck-ostermann</option>
+                <option value="exponential/res_6s">exponential/res_6s</option>
+                <option value="exponential/res_8s">exponential/res_8s</option>
+                <option value="exponential/res_8s_alt">exponential/res_8s_alt</option>
+                <option value="exponential/res_10s">exponential/res_10s</option>
+                <option value="exponential/res_15s">exponential/res_15s</option>
+                <option value="exponential/res_16s">exponential/res_16s</option>
+                <option value="exponential/etdrk2_2s">exponential/etdrk2_2s</option>
+                <option value="exponential/etdrk3_a_3s">exponential/etdrk3_a_3s</option>
+                <option value="exponential/etdrk3_b_3s">exponential/etdrk3_b_3s</option>
+                <option value="exponential/etdrk4_4s">exponential/etdrk4_4s</option>
+                <option value="exponential/etdrk4_4s_alt">exponential/etdrk4_4s_alt</option>
+                <option value="exponential/dpmpp_2s">exponential/dpmpp_2s</option>
+                <option value="exponential/dpmpp_sde_2s">exponential/dpmpp_sde_2s</option>
+                <option value="exponential/dpmpp_3s">exponential/dpmpp_3s</option>
+                <option value="exponential/lawson2a_2s">exponential/lawson2a_2s</option>
+                <option value="exponential/lawson2b_2s">exponential/lawson2b_2s</option>
+                <option value="exponential/lawson4_4s">exponential/lawson4_4s</option>
+                <option value="exponential/lawson41-gen_4s">exponential/lawson41-gen_4s</option>
+                <option value="exponential/lawson41-gen-mod_4s">exponential/lawson41-gen-mod_4s</option>
+                <option value="exponential/ddim">exponential/ddim</option>
+              </optgroup>
+              <optgroup label="hybrid/">
+                <option value="hybrid/pec423_2h2s">hybrid/pec423_2h2s</option>
+                <option value="hybrid/pec433_2h3s">hybrid/pec433_2h3s</option>
+                <option value="hybrid/abnorsett2_1h2s">hybrid/abnorsett2_1h2s</option>
+                <option value="hybrid/abnorsett3_2h2s">hybrid/abnorsett3_2h2s</option>
+                <option value="hybrid/abnorsett4_3h2s">hybrid/abnorsett4_3h2s</option>
+                <option value="hybrid/lawson42-gen-mod_1h4s">hybrid/lawson42-gen-mod_1h4s</option>
+                <option value="hybrid/lawson43-gen-mod_2h4s">hybrid/lawson43-gen-mod_2h4s</option>
+                <option value="hybrid/lawson44-gen-mod_3h4s">hybrid/lawson44-gen-mod_3h4s</option>
+                <option value="hybrid/lawson45-gen-mod_4h4s">hybrid/lawson45-gen-mod_4h4s</option>
+              </optgroup>
+              <optgroup label="linear/">
+                <option value="linear/ralston_2s">linear/ralston_2s</option>
+                <option value="linear/ralston_3s">linear/ralston_3s</option>
+                <option value="linear/ralston_4s">linear/ralston_4s</option>
+                <option value="linear/midpoint_2s">linear/midpoint_2s</option>
+                <option value="linear/heun_2s">linear/heun_2s</option>
+                <option value="linear/heun_3s">linear/heun_3s</option>
+                <option value="linear/houwen-wray_3s">linear/houwen-wray_3s</option>
+                <option value="linear/kutta_3s">linear/kutta_3s</option>
+                <option value="linear/ssprk3_3s">linear/ssprk3_3s</option>
+                <option value="linear/ssprk4_4s">linear/ssprk4_4s</option>
+                <option value="linear/rk38_4s">linear/rk38_4s</option>
+                <option value="linear/rk4_4s">linear/rk4_4s</option>
+                <option value="linear/rk5_7s">linear/rk5_7s</option>
+                <option value="linear/rk6_7s">linear/rk6_7s</option>
+                <option value="linear/bogacki-shampine_4s">linear/bogacki-shampine_4s</option>
+                <option value="linear/bogacki-shampine_7s">linear/bogacki-shampine_7s</option>
+                <option value="linear/dormand-prince_6s">linear/dormand-prince_6s</option>
+                <option value="linear/dormand-prince_13s">linear/dormand-prince_13s</option>
+                <option value="linear/tsi_7s">linear/tsi_7s</option>
+                <option value="linear/euler">linear/euler</option>
+              </optgroup>
+              <optgroup label="diag_implicit/">
+                <option value="diag_implicit/irk_exp_diag_2s">diag_implicit/irk_exp_diag_2s</option>
+                <option value="diag_implicit/kraaijevanger_spijker_2s">diag_implicit/kraaijevanger_spijker_2s</option>
+                <option value="diag_implicit/qin_zhang_2s">diag_implicit/qin_zhang_2s</option>
+                <option value="diag_implicit/pareschi_russo_2s">diag_implicit/pareschi_russo_2s</option>
+                <option value="diag_implicit/pareschi_russo_alt_2s">diag_implicit/pareschi_russo_alt_2s</option>
+                <option value="diag_implicit/crouzeix_2s">diag_implicit/crouzeix_2s</option>
+                <option value="diag_implicit/crouzeix_3s">diag_implicit/crouzeix_3s</option>
+                <option value="diag_implicit/crouzeix_3s_alt">diag_implicit/crouzeix_3s_alt</option>
+              </optgroup>
+              <optgroup label="fully_implicit/">
+                <option value="fully_implicit/gauss-legendre_2s">fully_implicit/gauss-legendre_2s</option>
+                <option value="fully_implicit/gauss-legendre_3s">fully_implicit/gauss-legendre_3s</option>
+                <option value="fully_implicit/gauss-legendre_4s">fully_implicit/gauss-legendre_4s</option>
+                <option value="fully_implicit/gauss-legendre_4s_alternating_a">fully_implicit/gauss-legendre_4s_alternating_a</option>
+                <option value="fully_implicit/gauss-legendre_4s_ascending_a">fully_implicit/gauss-legendre_4s_ascending_a</option>
+                <option value="fully_implicit/gauss-legendre_4s_alt">fully_implicit/gauss-legendre_4s_alt</option>
+                <option value="fully_implicit/gauss-legendre_5s">fully_implicit/gauss-legendre_5s</option>
+                <option value="fully_implicit/gauss-legendre_5s_ascending">fully_implicit/gauss-legendre_5s_ascending</option>
+                <option value="fully_implicit/radau_ia_2s">fully_implicit/radau_ia_2s</option>
+                <option value="fully_implicit/radau_ia_3s">fully_implicit/radau_ia_3s</option>
+                <option value="fully_implicit/radau_iia_2s">fully_implicit/radau_iia_2s</option>
+                <option value="fully_implicit/radau_iia_3s">fully_implicit/radau_iia_3s</option>
+                <option value="fully_implicit/radau_iia_3s_alt">fully_implicit/radau_iia_3s_alt</option>
+                <option value="fully_implicit/radau_iia_5s">fully_implicit/radau_iia_5s</option>
+                <option value="fully_implicit/radau_iia_7s">fully_implicit/radau_iia_7s</option>
+                <option value="fully_implicit/radau_iia_9s">fully_implicit/radau_iia_9s</option>
+                <option value="fully_implicit/radau_iia_11s">fully_implicit/radau_iia_11s</option>
+                <option value="fully_implicit/lobatto_iiia_2s">fully_implicit/lobatto_iiia_2s</option>
+                <option value="fully_implicit/lobatto_iiia_3s">fully_implicit/lobatto_iiia_3s</option>
+                <option value="fully_implicit/lobatto_iiia_4s">fully_implicit/lobatto_iiia_4s</option>
+                <option value="fully_implicit/lobatto_iiib_2s">fully_implicit/lobatto_iiib_2s</option>
+                <option value="fully_implicit/lobatto_iiib_3s">fully_implicit/lobatto_iiib_3s</option>
+                <option value="fully_implicit/lobatto_iiib_4s">fully_implicit/lobatto_iiib_4s</option>
+                <option value="fully_implicit/lobatto_iiic_2s">fully_implicit/lobatto_iiic_2s</option>
+                <option value="fully_implicit/lobatto_iiic_3s">fully_implicit/lobatto_iiic_3s</option>
+                <option value="fully_implicit/lobatto_iiic_4s">fully_implicit/lobatto_iiic_4s</option>
+                <option value="fully_implicit/lobatto_iiic_star_2s">fully_implicit/lobatto_iiic_star_2s</option>
+                <option value="fully_implicit/lobatto_iiic_star_3s">fully_implicit/lobatto_iiic_star_3s</option>
+                <option value="fully_implicit/lobatto_iiid_2s">fully_implicit/lobatto_iiid_2s</option>
+                <option value="fully_implicit/lobatto_iiid_3s">fully_implicit/lobatto_iiid_3s</option>
+              </optgroup>
             </select>
           </div>
           <div>
@@ -645,9 +791,28 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
               <option value="simple" selected>simple</option>
               <option value="sgm_uniform">sgm_uniform</option>
               <option value="karras">karras</option>
-              <option value="beta">beta</option>
               <option value="exponential">exponential</option>
+              <option value="ddim_uniform">ddim_uniform</option>
+              <option value="beta">beta</option>
               <option value="normal">normal</option>
+              <option value="linear_quadratic">linear_quadratic</option>
+              <option value="kl_optimal">kl_optimal</option>
+              <option value="capitanZiT">capitanZiT</option>
+              <option value="bong_tangent">bong_tangent</option>
+              <option value="beta57">beta57</option>
+              <option value="beta_33">beta_33</option>
+              <option value="beta_44">beta_44</option>
+              <option value="beta_53">beta_53</option>
+              <option value="beta_54">beta_54</option>
+              <option value="beta_57">beta_57</option>
+              <option value="beta_32">beta_32</option>
+              <option value="beta_43">beta_43</option>
+              <option value="beta_42">beta_42</option>
+              <option value="power_shift">power_shift</option>
+              <option value="radiance_shift">radiance_shift</option>
+              <option value="sigma_curve_from_points">sigma_curve_from_points</option>
+              <option value="sigma_curve_pchip">sigma_curve_pchip</option>
+              <option value="sigmoid_offset">sigmoid_offset</option>
             </select>
           </div>
         </div>
@@ -662,6 +827,60 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
         <div class="row" style="margin-top:6px;">
           <label>Batch Size (Variantes)</label>
           <input type="number" id="batchSize" value="1" min="1" max="16" step="1">
+        </div>
+      </div>
+
+      <!-- LORAS MODELO BASE (4 CARGADORES REPLEGABLE) -->
+      <div class="panel">
+        <div class="collapsible-header" id="baseLorasToggle">
+          <span class="arrow">▶</span> LoRAs Modelo Base (4)
+        </div>
+        <div class="collapsible-body" id="baseLorasBody">
+          <div id="baseLoraList"></div>
+        </div>
+      </div>
+
+      <!-- RBG SMART SEED VARIANCE (SOLO ASOCIADO A KREA2) -->
+      <div class="panel">
+        <div class="collapsible-header" id="varianceToggle">
+          <span class="arrow">▶</span> RBG Smart Seed Variance (Krea2)
+        </div>
+        <div class="collapsible-body" id="varianceBody">
+          <div class="row">
+            <label>Variance Preset</label>
+            <select id="variancePreset">
+              <option value="❌ Disabled" selected>❌ Disabled</option>
+              <option value="🌱 Subtle">🌱 Subtle</option>
+              <option value="🌿 Balanced">🌿 Balanced</option>
+              <option value="🪴 Creative">🪴 Creative</option>
+              <option value="🌳 Bold">🌳 Bold</option>
+              <option value="🌴 Wild">🌴 Wild</option>
+              <option value="⚙️ Custom">⚙️ Custom</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Protect Mode</label>
+            <select id="protectMode">
+              <option value="🚫 None">🚫 None</option>
+              <option value="First Quarter">First Quarter</option>
+              <option value="First Half">First Half</option>
+              <option value="Last Quarter">Last Quarter</option>
+              <option value="Last Half" selected>Last Half</option>
+              <option value="⚙️ Custom Regions">⚙️ Custom Regions</option>
+              <option value="🎲 Random Regions">🎲 Random Regions</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <label>Semilla de Varianza</label>
+            <div class="seed-toggle">
+              <div class="seg on" id="segVarianceRandom">Aleatoria</div>
+              <div class="seg" id="segVarianceFixed">Fija</div>
+            </div>
+            <input type="number" id="varianceSeed" value="315489554057974" step="1" disabled>
+          </div>
+          <div class="hint" style="font-size:10px;margin-top:4px;">
+            Solo activo si la etapa contiene Krea2 (SingleStream). Inyecta diversidad controlada en las primeras iteraciones de muestreo.
+          </div>
         </div>
       </div>
 
@@ -763,8 +982,157 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
               <select id="refinerSamplerName">
                 <option value="euler" selected>euler</option>
                 <option value="euler_ancestral">euler_ancestral</option>
+                <option value="heun">heun</option>
+                <option value="heunpp2">heunpp2</option>
+                <option value="dpm_2">dpm_2</option>
+                <option value="dpm_2_ancestral">dpm_2_ancestral</option>
+                <option value="lms">lms</option>
+                <option value="dpm_fast">dpm_fast</option>
+                <option value="dpm_adaptive">dpm_adaptive</option>
+                <option value="dpmpp_2s_ancestral">dpmpp_2s_ancestral</option>
+                <option value="dpmpp_sde">dpmpp_sde</option>
+                <option value="dpmpp_sde_gpu">dpmpp_sde_gpu</option>
                 <option value="dpmpp_2m">dpmpp_2m</option>
-                <option value="res_2m">res_2m</option>
+                <option value="dpmpp_2m_sde">dpmpp_2m_sde</option>
+                <option value="dpmpp_2m_sde_gpu">dpmpp_2m_sde_gpu</option>
+                <option value="dpmpp_3m_sde">dpmpp_3m_sde</option>
+                <option value="dpmpp_3m_sde_gpu">dpmpp_3m_sde_gpu</option>
+                <option value="ddpm">ddpm</option>
+                <option value="lcm">lcm</option>
+                <option value="ddim">ddim</option>
+                <option value="uni_pc">uni_pc</option>
+                <option value="uni_pc_bh2">uni_pc_bh2</option>
+                <option value="none">none</option>
+                <optgroup label="multistep/">
+                  <option value="multistep/res_2m">multistep/res_2m</option>
+                  <option value="multistep/res_3m">multistep/res_3m</option>
+                  <option value="multistep/dpmpp_2m">multistep/dpmpp_2m</option>
+                  <option value="multistep/dpmpp_3m">multistep/dpmpp_3m</option>
+                  <option value="multistep/abnorsett_2m">multistep/abnorsett_2m</option>
+                  <option value="multistep/abnorsett_3m">multistep/abnorsett_3m</option>
+                  <option value="multistep/abnorsett_4m">multistep/abnorsett_4m</option>
+                  <option value="multistep/deis_2m">multistep/deis_2m</option>
+                  <option value="multistep/deis_3m">multistep/deis_3m</option>
+                  <option value="multistep/deis_4m">multistep/deis_4m</option>
+                </optgroup>
+                <optgroup label="exponential/">
+                  <option value="exponential/res_2s_rkmk2e">exponential/res_2s_rkmk2e</option>
+                  <option value="exponential/res_2s">exponential/res_2s</option>
+                  <option value="exponential/res_2s_stable">exponential/res_2s_stable</option>
+                  <option value="exponential/res_3s">exponential/res_3s</option>
+                  <option value="exponential/res_3s_non-monotonic">exponential/res_3s_non-monotonic</option>
+                  <option value="exponential/res_3s_alt">exponential/res_3s_alt</option>
+                  <option value="exponential/res_3s_cox_matthews">exponential/res_3s_cox_matthews</option>
+                  <option value="exponential/res_3s_lie">exponential/res_3s_lie</option>
+                  <option value="exponential/res_3s_sunstar">exponential/res_3s_sunstar</option>
+                  <option value="exponential/res_3s_strehmel_weiner">exponential/res_3s_strehmel_weiner</option>
+                  <option value="exponential/res_4s_krogstad">exponential/res_4s_krogstad</option>
+                  <option value="exponential/res_4s_krogstad_alt">exponential/res_4s_krogstad_alt</option>
+                  <option value="exponential/res_4s_strehmel_weiner">exponential/res_4s_strehmel_weiner</option>
+                  <option value="exponential/res_4s_strehmel_weiner_alt">exponential/res_4s_strehmel_weiner_alt</option>
+                  <option value="exponential/res_4s_cox_matthews">exponential/res_4s_cox_matthews</option>
+                  <option value="exponential/res_4s_cfree4">exponential/res_4s_cfree4</option>
+                  <option value="exponential/res_4s_friedli">exponential/res_4s_friedli</option>
+                  <option value="exponential/res_4s_minchev">exponential/res_4s_minchev</option>
+                  <option value="exponential/res_4s_munthe-kaas">exponential/res_4s_munthe-kaas</option>
+                  <option value="exponential/res_5s">exponential/res_5s</option>
+                  <option value="exponential/res_5s_hochbruck-ostermann">exponential/res_5s_hochbruck-ostermann</option>
+                  <option value="exponential/res_6s">exponential/res_6s</option>
+                  <option value="exponential/res_8s">exponential/res_8s</option>
+                  <option value="exponential/res_8s_alt">exponential/res_8s_alt</option>
+                  <option value="exponential/res_10s">exponential/res_10s</option>
+                  <option value="exponential/res_15s">exponential/res_15s</option>
+                  <option value="exponential/res_16s">exponential/res_16s</option>
+                  <option value="exponential/etdrk2_2s">exponential/etdrk2_2s</option>
+                  <option value="exponential/etdrk3_a_3s">exponential/etdrk3_a_3s</option>
+                  <option value="exponential/etdrk3_b_3s">exponential/etdrk3_b_3s</option>
+                  <option value="exponential/etdrk4_4s">exponential/etdrk4_4s</option>
+                  <option value="exponential/etdrk4_4s_alt">exponential/etdrk4_4s_alt</option>
+                  <option value="exponential/dpmpp_2s">exponential/dpmpp_2s</option>
+                  <option value="exponential/dpmpp_sde_2s">exponential/dpmpp_sde_2s</option>
+                  <option value="exponential/dpmpp_3s">exponential/dpmpp_3s</option>
+                  <option value="exponential/lawson2a_2s">exponential/lawson2a_2s</option>
+                  <option value="exponential/lawson2b_2s">exponential/lawson2b_2s</option>
+                  <option value="exponential/lawson4_4s">exponential/lawson4_4s</option>
+                  <option value="exponential/lawson41-gen_4s">exponential/lawson41-gen_4s</option>
+                  <option value="exponential/lawson41-gen-mod_4s">exponential/lawson41-gen-mod_4s</option>
+                  <option value="exponential/ddim">exponential/ddim</option>
+                </optgroup>
+                <optgroup label="hybrid/">
+                  <option value="hybrid/pec423_2h2s">hybrid/pec423_2h2s</option>
+                  <option value="hybrid/pec433_2h3s">hybrid/pec433_2h3s</option>
+                  <option value="hybrid/abnorsett2_1h2s">hybrid/abnorsett2_1h2s</option>
+                  <option value="hybrid/abnorsett3_2h2s">hybrid/abnorsett3_2h2s</option>
+                  <option value="hybrid/abnorsett4_3h2s">hybrid/abnorsett4_3h2s</option>
+                  <option value="hybrid/lawson42-gen-mod_1h4s">hybrid/lawson42-gen-mod_1h4s</option>
+                  <option value="hybrid/lawson43-gen-mod_2h4s">hybrid/lawson43-gen-mod_2h4s</option>
+                  <option value="hybrid/lawson44-gen-mod_3h4s">hybrid/lawson44-gen-mod_3h4s</option>
+                  <option value="hybrid/lawson45-gen-mod_4h4s">hybrid/lawson45-gen-mod_4h4s</option>
+                </optgroup>
+                <optgroup label="linear/">
+                  <option value="linear/ralston_2s">linear/ralston_2s</option>
+                  <option value="linear/ralston_3s">linear/ralston_3s</option>
+                  <option value="linear/ralston_4s">linear/ralston_4s</option>
+                  <option value="linear/midpoint_2s">linear/midpoint_2s</option>
+                  <option value="linear/heun_2s">linear/heun_2s</option>
+                  <option value="linear/heun_3s">linear/heun_3s</option>
+                  <option value="linear/houwen-wray_3s">linear/houwen-wray_3s</option>
+                  <option value="linear/kutta_3s">linear/kutta_3s</option>
+                  <option value="linear/ssprk3_3s">linear/ssprk3_3s</option>
+                  <option value="linear/ssprk4_4s">linear/ssprk4_4s</option>
+                  <option value="linear/rk38_4s">linear/rk38_4s</option>
+                  <option value="linear/rk4_4s">linear/rk4_4s</option>
+                  <option value="linear/rk5_7s">linear/rk5_7s</option>
+                  <option value="linear/rk6_7s">linear/rk6_7s</option>
+                  <option value="linear/bogacki-shampine_4s">linear/bogacki-shampine_4s</option>
+                  <option value="linear/bogacki-shampine_7s">linear/bogacki-shampine_7s</option>
+                  <option value="linear/dormand-prince_6s">linear/dormand-prince_6s</option>
+                  <option value="linear/dormand-prince_13s">linear/dormand-prince_13s</option>
+                  <option value="linear/tsi_7s">linear/tsi_7s</option>
+                  <option value="linear/euler">linear/euler</option>
+                </optgroup>
+                <optgroup label="diag_implicit/">
+                  <option value="diag_implicit/irk_exp_diag_2s">diag_implicit/irk_exp_diag_2s</option>
+                  <option value="diag_implicit/kraaijevanger_spijker_2s">diag_implicit/kraaijevanger_spijker_2s</option>
+                  <option value="diag_implicit/qin_zhang_2s">diag_implicit/qin_zhang_2s</option>
+                  <option value="diag_implicit/pareschi_russo_2s">diag_implicit/pareschi_russo_2s</option>
+                  <option value="diag_implicit/pareschi_russo_alt_2s">diag_implicit/pareschi_russo_alt_2s</option>
+                  <option value="diag_implicit/crouzeix_2s">diag_implicit/crouzeix_2s</option>
+                  <option value="diag_implicit/crouzeix_3s">diag_implicit/crouzeix_3s</option>
+                  <option value="diag_implicit/crouzeix_3s_alt">diag_implicit/crouzeix_3s_alt</option>
+                </optgroup>
+                <optgroup label="fully_implicit/">
+                  <option value="fully_implicit/gauss-legendre_2s">fully_implicit/gauss-legendre_2s</option>
+                  <option value="fully_implicit/gauss-legendre_3s">fully_implicit/gauss-legendre_3s</option>
+                  <option value="fully_implicit/gauss-legendre_4s">fully_implicit/gauss-legendre_4s</option>
+                  <option value="fully_implicit/gauss-legendre_4s_alternating_a">fully_implicit/gauss-legendre_4s_alternating_a</option>
+                  <option value="fully_implicit/gauss-legendre_4s_ascending_a">fully_implicit/gauss-legendre_4s_ascending_a</option>
+                  <option value="fully_implicit/gauss-legendre_4s_alt">fully_implicit/gauss-legendre_4s_alt</option>
+                  <option value="fully_implicit/gauss-legendre_5s">fully_implicit/gauss-legendre_5s</option>
+                  <option value="fully_implicit/gauss-legendre_5s_ascending">fully_implicit/gauss-legendre_5s_ascending</option>
+                  <option value="fully_implicit/radau_ia_2s">fully_implicit/radau_ia_2s</option>
+                  <option value="fully_implicit/radau_ia_3s">fully_implicit/radau_ia_3s</option>
+                  <option value="fully_implicit/radau_iia_2s">fully_implicit/radau_iia_2s</option>
+                  <option value="fully_implicit/radau_iia_3s">fully_implicit/radau_iia_3s</option>
+                  <option value="fully_implicit/radau_iia_3s_alt">fully_implicit/radau_iia_3s_alt</option>
+                  <option value="fully_implicit/radau_iia_5s">fully_implicit/radau_iia_5s</option>
+                  <option value="fully_implicit/radau_iia_7s">fully_implicit/radau_iia_7s</option>
+                  <option value="fully_implicit/radau_iia_9s">fully_implicit/radau_iia_9s</option>
+                  <option value="fully_implicit/radau_iia_11s">fully_implicit/radau_iia_11s</option>
+                  <option value="fully_implicit/lobatto_iiia_2s">fully_implicit/lobatto_iiia_2s</option>
+                  <option value="fully_implicit/lobatto_iiia_3s">fully_implicit/lobatto_iiia_3s</option>
+                  <option value="fully_implicit/lobatto_iiia_4s">fully_implicit/lobatto_iiia_4s</option>
+                  <option value="fully_implicit/lobatto_iiib_2s">fully_implicit/lobatto_iiib_2s</option>
+                  <option value="fully_implicit/lobatto_iiib_3s">fully_implicit/lobatto_iiib_3s</option>
+                  <option value="fully_implicit/lobatto_iiib_4s">fully_implicit/lobatto_iiib_4s</option>
+                  <option value="fully_implicit/lobatto_iiic_2s">fully_implicit/lobatto_iiic_2s</option>
+                  <option value="fully_implicit/lobatto_iiic_3s">fully_implicit/lobatto_iiic_3s</option>
+                  <option value="fully_implicit/lobatto_iiic_4s">fully_implicit/lobatto_iiic_4s</option>
+                  <option value="fully_implicit/lobatto_iiic_star_2s">fully_implicit/lobatto_iiic_star_2s</option>
+                  <option value="fully_implicit/lobatto_iiic_star_3s">fully_implicit/lobatto_iiic_star_3s</option>
+                  <option value="fully_implicit/lobatto_iiid_2s">fully_implicit/lobatto_iiid_2s</option>
+                  <option value="fully_implicit/lobatto_iiid_3s">fully_implicit/lobatto_iiid_3s</option>
+                </optgroup>
               </select>
             </div>
             <div>
@@ -773,22 +1141,53 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
                 <option value="simple" selected>simple</option>
                 <option value="sgm_uniform">sgm_uniform</option>
                 <option value="karras">karras</option>
+                <option value="exponential">exponential</option>
+                <option value="ddim_uniform">ddim_uniform</option>
                 <option value="beta">beta</option>
+                <option value="normal">normal</option>
+                <option value="linear_quadratic">linear_quadratic</option>
+                <option value="kl_optimal">kl_optimal</option>
+                <option value="capitanZiT">capitanZiT</option>
+                <option value="bong_tangent">bong_tangent</option>
+                <option value="beta57">beta57</option>
+                <option value="beta_33">beta_33</option>
+                <option value="beta_44">beta_44</option>
+                <option value="beta_53">beta_53</option>
+                <option value="beta_54">beta_54</option>
+                <option value="beta_57">beta_57</option>
+                <option value="beta_32">beta_32</option>
+                <option value="beta_43">beta_43</option>
+                <option value="beta_42">beta_42</option>
+                <option value="power_shift">power_shift</option>
+                <option value="radiance_shift">radiance_shift</option>
+                <option value="sigma_curve_from_points">sigma_curve_from_points</option>
+                <option value="sigma_curve_pchip">sigma_curve_pchip</option>
+                <option value="sigmoid_offset">sigmoid_offset</option>
               </select>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- SPECTRUM (ACELERACIÓN ESPECTRAL) -->
+      <!-- LORAS MODELO REFINER (4 CARGADORES REPLEGABLE) -->
+      <div class="panel">
+        <div class="collapsible-header" id="refinerLorasToggle">
+          <span class="arrow">▶</span> LoRAs Modelo Refiner (4)
+        </div>
+        <div class="collapsible-body" id="refinerLorasBody">
+          <div id="refinerLoraList"></div>
+        </div>
+      </div>
+
+      <!-- SPECTRUM (ACELERACIÓN DE ATENCIÓN - SOLO QWEN) -->
       <div class="panel">
         <div class="collapsible-header" id="spectrumToggle">
-          <span class="arrow">▶</span> Spectrum (Aceleración de Atención)
+          <span class="arrow">▶</span> Spectrum (Aceleración de Atención · Solo Qwen)
         </div>
         <div class="collapsible-body" id="spectrumBody">
           <div class="row" style="display:flex;align-items:center;gap:8px;">
             <input type="checkbox" id="spectrumEnabled" style="margin:0;">
-            <label for="spectrumEnabled" style="margin:0;font-size:11px;cursor:pointer;">Activar SwarmSpectrum en la generación</label>
+            <label for="spectrumEnabled" style="margin:0;font-size:11px;cursor:pointer;">Activar SwarmSpectrum (exclusivo para etapas con Qwen)</label>
           </div>
           <div class="row slider-row" style="margin-top:6px;">
             <label>Weight (w)</label>
@@ -799,6 +1198,9 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
             <label>Lambda (lam)</label>
             <input type="range" id="spectrumLam" min="0.0" max="1.0" step="0.05" value="0.1">
             <div class="slider-val" id="spectrumLamVal">0.10</div>
+          </div>
+          <div class="hint" style="font-size:10px;margin-top:4px;">
+            Acelera la atención espectral en modelos Qwen reutilizando estados de atención entre pasos. Solo se aplica en etapas Qwen.
           </div>
         </div>
       </div>
@@ -1237,8 +1639,8 @@ const BASE_GRAPH = {
   }
 }
 ;
-const AVAILABLE_MODELS = [];
-const AVAILABLE_LORAS = [];
+const AVAILABLE_MODELS = ["flux2/DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "flux2/Krea2_Turbo_convrot_int8mixed.safetensors", "flux2/flux-2-klein-9b-kv-fp8.safetensors", "flux2/flux-2-klein-9b.safetensors", "flux2/jibMixKrea2_v40Habanero.safetensors", "qwen/qwen_image_2.1_int8_convrot.safetensors", "qwen/qwen_image_2512_fp8_e4m3fn_scaled_comfyui_4steps_v1.0.safetensors", "qwen/qwen_image_edit_2511_int8_convrot.safetensors"];
+const AVAILABLE_LORAS = ["AceStep/MiMusicAce.safetensors", "AceStep/mimusica.safetensors", "AceStep/mimusica_XL.safetensors", "AceStep/mimusica_XL_2.safetensors", "AceStep/mimusica_XL_3.safetensors", "AceStep/mymusic.safetensors", "AceStep/mymusic_000001000.safetensors", "AceStep/mymusic_000002000.safetensors", "Flux/Anal_Gape_-_Flux.safetensors", "Flux/anus.safetensors", "Flux/anus2.safetensors", "K2/(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "K2/(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "K2/(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "K2/Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "K2/Detailer-KREA2.safetensors", "K2/Economic_Capital_v1.safetensors", "K2/GalKrea.safetensors", "K2/GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "K2/IvoryKrea.safetensors", "K2/KNPV4.1_pre.safetensors", "K2/Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "K2/Krea2_HMNSFW_AIO.safetensors", "K2/Krea2_TextFusion_Refusal_Reduction.safetensors", "K2/MysticXXX_KREA2_v1.safetensors", "K2/MysticXXX_KREA2_v2.safetensors", "K2/PussyHM_krea2_epoch10.safetensors", "K2/SummerVibesHM_krea2_epoch8.safetensors", "K2/VBVR_H3_attn_only.safetensors", "K2/Wayne_Barlowe_Krea2.safetensors", "K2/YFG-Asak-Krea2_1.8k-v1.safetensors", "K2/YFG-FutureIsDark-Krea2_1k-v1.safetensors", "K2/bfs_head_swap_v1.1_krea2.safetensors", "K2/fedor_bypass.safetensors", "K2/glock_pistol_v1_krea_2.safetensors", "K2/kali/AliKrea.safetensors", "K2/kali/AliKrea100.safetensors", "K2/kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "K2/kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "K2/kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "K2/kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "K2/kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "K2/kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "K2/kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "K2/kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "K2/kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "K2/keva/evaK2_copy.safetensors", "K2/keva/evaK2_copy_000000500.safetensors", "K2/keva/evaK2_copy_000001750.safetensors", "K2/keva/evaK2_copy_merged.safetensors", "K2/keva/kreaEva.safetensors", "K2/keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "K2/keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "K2/kliz/lizK2_copy_copy_000001000.safetensors", "K2/kliz/lizK2_copy_copy_000001250.safetensors", "K2/kliz/lizK2_copy_copy_000001500.safetensors", "K2/kliz/lizK2_copy_copy_merged.safetensors", "K2/kliz/lizK2_copy_copy_merged_merged.safetensors", "K2/krea2_Enhancer.safetensors", "K2/krea2_identity_edit_v1_2.safetensors", "K2/krea2_nud3.safetensors", "K2/krea2_turbo_lora_rank_64_bf16.safetensors", "K2/krea2_turbo_sda_v1.0_comfy.safetensors", "K2/krea2_warmpastel.safetensors", "K2/krea2filterbypass3.safetensors", "K2/ksab/sabK2.safetensors", "K2/ksab/sabK2_000000500.safetensors", "K2/ksab/sabK2_000001000.safetensors", "K2/ksab/sabK2_000001250.safetensors", "K2/ksab/sabK2_merged.safetensors", "K2/kuxi/K2uxi2.safetensors", "K2/kuxi/K2uxi2_000000750.safetensors", "K2/kuxi/K2uxi2_000001500.safetensors", "K2/kuxi/K2uxi2_merged.safetensors", "K2/kuxi/K2uxi_000001000.safetensors", "K2/kuxi/K2uxi_merged.safetensors", "K2/kuxi/UxiKrea.safetensors", "K2/kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "K2/kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "K2/kuxi/uxiK2_000000750.safetensors", "K2/kuxi/uxiK2_merged.safetensors", "K2/kyo/YoKrea.safetensors", "K2/kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "K2/kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "K2/kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "K2/kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "K2/kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "K2/kyol/yolK2_000000500.safetensors", "K2/kyol/yolK2_000001250.safetensors", "K2/kyol/yolK2_merged3.safetensors", "K2/kyol/yolK2_merged4.safetensors", "K2/realism_engine_krea2_v2.safetensors", "K2/shes_merged.safetensors", "K2/skc3vo.safetensors", "K2/sliders/Decay_slider_v1_krea2.safetensors", "K2/sliders/RealismSlider-v1.safetensors", "K2/sliders/WarmLightSlider-KREA2_v1.safetensors", "K2/sliders/WeightSlider-KREA2_v2.safetensors", "K2/sliders/anal_helper_krea2_loraholic.safetensors", "K2/sliders/brightness_krea2_loraholic.safetensors", "K2/sliders/color_temp_krea2_loraholic.safetensors", "K2/sliders/crowd_slider_v1_krea2.safetensors", "K2/sliders/detail_slider_krea2_loraholic.safetensors", "K2/sliders/ethnicity_krea2_loraholic.safetensors", "K2/sliders/hair_length_krea2_loraholic.safetensors", "K2/sliders/head_size_krea2_loraholic.safetensors", "K2/sliders/height_krea2_loraholic.safetensors", "K2/sliders/light_krea2_loraholic.safetensors", "K2/sliders/skindetails_krea2_loraholic.safetensors", "K2/sliders/wetness_krea2_loraholic.safetensors", "K2/z0jglf.safetensors", "anima/anima-turbo-lora-v0.2.safetensors", "ernie/2026-06-11_16-41-40-save-4500-10-0.safetensors", "ernie/2026-06-11_20-51-52-save-9000-20-0.safetensors", "ernie/2026-06-12_16-04-50-save-13500-30-0.safetensors", "ernie/ERNIE-Image_Futanari_Penis_Erect_(Degenerator123).safetensors", "ernie/uxiernie.safetensors", "flux/Anal_Gape_-_Flux.safetensors", "flux/FLUX_FD-AnusHelper-R4.safetensors", "flux/Flux_Turbo_Alpha.safetensors", "flux/Skintastic_Flux_v1.safetensors", "flux/Surprise_Anal_FLUX.safetensors", "flux/aidmaHyperrealism-FLUX-v0.3.safetensors", "flux/flux_realism.safetensors", "flux/roundassv16_FLUX.safetensors", "flux/shes/2uxiextract.safetensors", "flux/shes/UxI_warmup_rank64_bf16-step00600.safetensors", "flux/shes/uXi_rank64_bf16-step00600.safetensors", "flux/shes/uxi.safetensors", "flux/shes/uxi64_2000.safetensors", "flux/shes/uxi_2_rank64_bf16-step00600.safetensors", "flux/shes/uxiextract.safetensors", "flux/shes/uxiflux_rank32_bf16-step01000.safetensors", "flux/xentes/AliYo_rank16_bf16-step00750.safetensors", "flux/xentes/AliYo_rank16_bf16-step03000.safetensors", "flux/xentes/ali_polynomial_rank64_bf16-step00300.safetensors", "flux/xentes/ali_polynomial_rank64_bf16-step00400.safetensors", "flux/xentes/catedral_rank32_bf16-step00150.safetensors", "flux/xentes/horreo2_rank64_bf16-step00300.safetensors", "flux/xentes/pedras_cosine_rank64_bf16.safetensors", "flux/xentes/yo_ali_rank64_bf16-step00400.safetensors", "flux2/liz.safetensors", "flux2/shushi2026-03-28_07-28-26-save-3500-250-0.safetensors", "flux2/shushi2026-03-28_08-24-02-save-7000-500-0.safetensors", "flux2/shushi2026-03-28_10-33-58-save-11088-750-0.safetensors", "flux2/shushi2026-03-28_11-41-20-save-15338-1000-0.safetensors", "flux2/shushi2026-03-28_14-08-47-save-21764-1250-0.safetensors", "fluxklein/Amateur_Nudes_2.5_Z-Image-Turbo.safetensors", "fluxklein/BubbleButt.safetensors", "fluxklein/Buttocks_Slider_V4-KLEIN_000000550.safetensors", "fluxklein/FK_analdoggystylebbc.safetensors", "fluxklein/FK_analonside.safetensors", "fluxklein/FK_piledriver.safetensors", "fluxklein/FLUX2K_Vintage_Beauties_v2.safetensors", "fluxklein/Flux Klein - NSFW v2.safetensors", "fluxklein/Flux2_Klein_9B_Futanari_Penis_(Degenerator123).safetensors", "fluxklein/HugeGape_Klein_V1.safetensors", "fluxklein/Kisa9B.safetensors", "fluxklein/Kisa9B_000000500.safetensors", "fluxklein/Mia_Pussy_epoch_10.safetensors", "fluxklein/RealSkin.safetensors", "fluxklein/Realistic Nipples.safetensors", "fluxklein/SEXGOD_ImprovedNudity_Klein9b_v4.safetensors", "fluxklein/bfs_head_v1_flux-klein_9b_step3500_rank128.safetensors", "fluxklein/bfs_head_v1_flux-klein_9b_step3750_rank64.safetensors", "fluxklein/eva/Keva9B_000000750.safetensors", "fluxklein/eva/Keva9B_000001500.safetensors", "fluxklein/eva/evaklein2.safetensors", "fluxklein/eva/evaklein22026-04-25_23-22-08-save-1400-100-0.safetensors", "fluxklein/eva/evaklein3.safetensors", "fluxklein/eva/evuxi_FluxK_9B_000001250.safetensors", "fluxklein/eva/evuxi_FluxK_9B_000002500.safetensors", "fluxklein/eva/fluxeva9B.safetensors", "fluxklein/eva/fluxeva9b2026-02-22_00-05-43-save-1500-100-0.safetensors", "fluxklein/femboy_lora_v5_LoKr16_000030000.safetensors", "fluxklein/klein-pov-anal-11epoc-k3nk.safetensors", "fluxklein/klein_slider_bodyweight_50.safetensors", "fluxklein/klein_snofs_v1_4.safetensors", "fluxklein/liz/Kliz9B_copy_000001750.safetensors", "fluxklein/liz/fluxliz9b2026-02-22_00-29-25-save-450-150-0.safetensors", "fluxklein/liz/fluxlz9B.safetensors", "fluxklein/liz/kleinliz.safetensors", "fluxklein/liz/kleinliz_000001000.safetensors", "fluxklein/liz/lizklein.safetensors", "fluxklein/liz/lizklein2026-04-25_10-03-57-save-225-75-0.safetensors", "fluxklein/model_9B.safetensors", "fluxklein/party_time_v1.0_klein4b.safetensors", "fluxklein/party_time_v1.0_klein9b.safetensors", "fluxklein/pedras.safetensors", "fluxklein/pedrasKlein2026-02-25_11-58-15-save-1825-25-0.safetensors", "fluxklein/pedrasKlein2026-02-25_12-33-47-save-3650-50-0.safetensors", "fluxklein/pedrasKlein2026-02-25_13-01-21-save-5475-75-0.safetensors", "fluxklein/perfect eyes v2.1.safetensors", "fluxklein/sweaty_glistening_skin.safetensors", "fluxklein/traxegalKlein.safetensors", "fluxklein/traxegalKlein_000000600.safetensors", "fluxklein/traxegalKlein_000001200.safetensors", "fluxklein/traxegalKlein_000001800.safetensors", "fluxklein/traxegalKlein_000002400.safetensors", "fluxklein/traxegalKlein_000002700.safetensors", "fluxklein/uxi/Fluxi9Ba.safetensors", "fluxklein/uxi/Fluxi9Bc.safetensors", "fluxklein/uxi/Kuxi9B_000001750.safetensors", "fluxklein/uxi/fluxi9b2026-02-21_22-45-02-save-1050-150-0.safetensors", "fluxklein/uxi/kleinShe2026-02-22_21-15-32-save-1200-150-0.safetensors", "fluxklein/uxi/kleinuxi2.safetensors", "fluxklein/uxi/kleinuxi22026-02-22_10-03-16-save-750-150-0.safetensors", "fluxklein/uxi/shee.safetensors", "fluxklein/uxi/sheklein.safetensors", "fluxklein/uxi/sheklein2026-02-25_00-01-37-save-1200-150-0.safetensors", "fluxklein/uxi/shezit.safetensors", "fluxklein/uxi/shezit2026-04-23_15-47-56-save-6600-200-0.safetensors", "fluxklein/uxi/shezit2026-04-23_16-28-16-save-9075-275-0.safetensors", "fluxklein/uxi/uxi_Klein_4B.safetensors", "fluxklein/uxi/uxi_Klein_4B_2_000000500.safetensors", "fluxklein/uxi/uxiklein.safetensors", "fluxklein/uxi/uxiklein2026-02-25_00-32-56-save-1200-100-0.safetensors", "h3/H3-PK-Parasyte-Turbo.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-3step-ComfyUI.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_taomate_3step_lora_avg_rank_19_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors", "hidream/hidream_o1_dev_lora_rank_64_bf16_pruned_v1.safetensors", "ideogram/ID_Vintage_Beauties_v1.safetensors", "ideogram/Realism_Engine_Ideogram_V5.safetensors", "ideogram/ideogramSnofsV1.safetensors", "ideogram/ideogram_4_turbotime_v1.safetensors", "ideogram/ideogram_4_unconditional_lora_r16.safetensors", "ideogram/lenovo_ideogram4.safetensors", "ideogram/uxideogram.safetensors", "ideogram/uxideogram_000000750.safetensors", "ideogram/uxideogram_000002500.safetensors", "ideogram/uxideogram_merged_1.safetensors", "ideogram/uxideogram_merged_2.safetensors", "ideogram/yolideogram_000001750.safetensors", "ideogram/yolideogram_merged.safetensors", "ideogram/yolideogram_merged_2.safetensors", "ltxv/Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "ltxv/DR34ML4Y_LTXXX_V2.safetensors", "ltxv/HeroCam_LTX2_bucket113_step_02000.safetensors", "ltxv/IvoriLTX_000000250.safetensors", "ltxv/IvoriLTX_000000750.safetensors", "ltxv/IvoriLTX_000001000.safetensors", "ltxv/IvoriLTX_000001250.safetensors", "ltxv/IvoriLTX_000001500.safetensors", "ltxv/LTX-2 - She Struts.safetensors", "ltxv/LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "ltxv/LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "ltxv/LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "ltxv/LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "ltxv/LTX-2.3-RL-Lora.safetensors", "ltxv/LTX2-i2v-SexThrust.safetensors", "ltxv/LTX2.3-MysticXXX.safetensors", "ltxv/LTX2.3Animated.safetensors", "ltxv/LTX2.3_666asslick.safetensors", "ltxv/LTX2.3_Crisp_Enhance.safetensors", "ltxv/LTX2.3_DMD_reshaped_r256.safetensors", "ltxv/LTX2.3_Soft_Enhance.safetensors", "ltxv/LTX23_Multipurpose_NSFW_v2.safetensors", "ltxv/LTX23_SexFromBehind_v0_1.safetensors", "ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "ltxv/Post_Apocalyptic.safetensors", "ltxv/anal-insertion-i2v.safetensors", "ltxv/beauty_of_rain_ltx23.safetensors", "ltxv/cowgirl-ride-withfuta.safetensors", "ltxv/cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "ltxv/doggystyle_ltx_000004200.safetensors", "ltxv/full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "ltxv/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "ltxv/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltxv/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltxv/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltxv/ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltxv/ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltxv/ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltxv/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltxv/ltx2.3-transition.safetensors", "ltxv/ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltxv/ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltxv/ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltxv/ltx23_srx_scififilm_lora.safetensors", "ltxv/ltx2_fnelson-5000steps.k3nk.safetensors", "ltxv/nsfw_anal_insertion_ltx23_v1.0.safetensors", "ltxv/phool-realism-ltx-2.3-v1.0.safetensors", "ltxv/plora_sulfer_v1.2-step00008500.safetensors", "ltxv/realisdance_ltx2.3_ic-lora_step_02000.safetensors", "ltxv/sulphur_experimental_lora_v1.safetensors", "ltxv/traxegal/traxegalltxv.safetensors", "ltxv/traxegal/traxegalltxv_000002100.safetensors", "ltxv/traxegal/traxegalltxv_000003300.safetensors", "ltxv/uxiltxv2.3_UP_merged.safetensors", "ltxv/vbvr-ltx2.3.safetensors", "ltxv/xaliyo/aliyo.safetensors", "ltxv/xaliyo/aliyo_000001800.safetensors", "ltxv/xaliyo/aliyo_000003900.safetensors", "ltxv/xaliyo/aliyo_000005700.safetensors", "ltxv/xgeva/evaltxv.safetensors", "ltxv/xgeva/evaltxv2.safetensors", "ltxv/xgeva/evaltxv3.safetensors", "ltxv/xgisa/isaltxv_000001500.safetensors", "ltxv/xgliz/lizltxv.safetensors", "ltxv/xgliz/lizltxv2.safetensors", "ltxv/xgliz/lizltxv3.safetensors", "ltxv/xguxi/sheltxv2.safetensors", "ltxv/xguxi/uxi3ltxv.safetensors", "ltxv/xguxi/uxiltxv.safetensors", "ltxv/xguxi/uxiltxv2.3.safetensors", "ltxv/xgvir/virltxv_000001000.safetensors", "ltxv/xsab/latxSab.safetensors", "ltxv/xsab/latxSab_000001000.safetensors", "ltxv/xsab/latxSab_000001500.safetensors", "ltxv/xsab/latxSab_merged.safetensors", "ltxv/xyol/yoltx.safetensors", "ltxv/xyol/yoltx_merged.safetensors", "qwen/QWen2512-Portrait.safetensors", "qwen/Qwen-Image-2.1 NSFW Image Edit.safetensors", "qwen/Qwen-Image-2512-Lightning-8steps-V1.0-bf16.safetensors", "qwen/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors", "qwen/bfs_head_v1.1_alternative_qwen_2.1.safetensors", "qwen/elusarcas-qwen2-1-detailer-v1.safetensors", "qwen/lora.safetensors", "qwen/nsfw_qwen_21.safetensors", "qwen/p_qwen_image_2.1_5step_v0.1_comfyui.safetensors", "qwen/p_qwen_image_2.1_8step_v0.1_comfyui.safetensors", "qwen/qwen-image_nsfw_adv_v1.0.safetensors", "qwen/qwen_image_nsfw.safetensors", "qwen/shes/diegoqwen.safetensors", "qwen/shes/eva_qwen_000001000.safetensors", "qwen/shes/evaqwen.safetensors", "qwen/shes/isaqwen.safetensors", "qwen/shes/laraqwen.safetensors", "qwen/shes/liz_qwen_000001000.safetensors", "qwen/shes/lizqwen.safetensors", "qwen/shes/qwenliz.safetensors", "qwen/shes/qwenliz2026-02-22_01-41-42-save-150-50-0.safetensors", "qwen/shes/sheqwen.safetensors", "qwen/shes/uxiqwen.safetensors", "qwen/shes/uxiqwen2026-02-24_22-33-58-save-900-75-0.safetensors", "qwen/shes/uxiqwen2026-02-24_23-12-18-save-1200-100-0.safetensors", "qwen/shes/uxiqwen_fin.safetensors", "qwen/shes/virqwen.safetensors", "qwen/shes/xui_qwen_000001000.safetensors", "qwen/turbo8_lora_step2500.safetensors", "qwen/xente/aliyoqwen.safetensors", "qwen/xente/aliyoqwen_000001200.safetensors", "qwen/xente/pedrasqwen.safetensors", "qwen/xente/pedrasqwen2026-02-25_15-34-58-save-1825-25-0.safetensors", "qwen/xente/traxegalqwen.safetensors", "qwen/xente/traxegalqwen_000001500.safetensors", "qwen/xente/traxegalqwen_000005100.safetensors", "sd3.5/uxisd3.safetensors", "sdxl/69_ass_focus_v1_Illustrious.safetensors", "sdxl/All_Anal_Art-000011.safetensors", "sdxl/FC-000013.TA_trained.safetensors", "sdxl/Happy anal - Illustrious.safetensors", "sdxl/Huge erect.safetensors", "sdxl/LoRASexAndAnalFingering.safetensors", "sdxl/NaturalBodyV2.0.safetensors", "sdxl/PainCraft_XL_Anal_Lora_v1.safetensors", "sdxl/Skin color slider - Illustrious_alpha1.0_rank4_noxattn_last.safetensors", "sdxl/TransexQuiron_v1_ilus.safetensors", "sdxl/add-detail-xl.safetensors", "sdxl/aidmaRealisticSkin-IL-v0.1.safetensors", "sdxl/anal_beads_full_insertion_v1_Illustrious.safetensors", "sdxl/anal_cross-section_v1_Illustrious.safetensors", "sdxl/anal_large_insertion_v1_Illustrious.safetensors", "sdxl/anal_slime_v1_Illustrious.safetensors", "sdxl/anal_stomach_bulge_v1_Illustrious.safetensors", "sdxl/analhugger_v1_Illustrious.safetensors", "sdxl/bulldog-000007.safetensors", "sdxl/female_orgasm_outstretched_legs_v1_Illustrious.safetensors", "sdxl/gaping_anus_v5_Illustrious.safetensors", "sdxl/hugeAnusGapeQuiron_ilus.safetensors", "sdxl/il_mountedanal.safetensors", "sdxl/multiple_anal_v1_Illustrious.safetensors", "sdxl/spread_anus_by_self_v1_Illustrious.safetensors", "sdxl/subtle-analsex-xl3.safetensors", "sdxl/tateware_anus_v2_Illustrious.safetensors", "sdxl/ux/sdxlux.safetensors", "sdxl/ux/sdxlux_000000750.safetensors", "sdxl/ux/sdxlux_000001250.safetensors", "sdxl/ux/sdxlux_000002500.safetensors", "sdxl/ux/sdxlux_merged.safetensors", "sdxl/ux/uxillus.safetensors", "sdxl/ux/uxillus2.safetensors", "sdxl/ux/uxillus2026-06-09_18-25-31-save-1120-5-0.safetensors", "sdxl/ux/uxillus2026-06-09_19-02-07-save-2240-10-0.safetensors", "sdxl/ux/uxillus2026-06-09_23-27-31-save-3360-15-0.safetensors", "sdxl/ux/uxillus2026-06-10_00-00-28-save-4480-20-0.safetensors", "sdxl/ux/uxillus2026-06-10_04-09-25-save-5600-25-0.safetensors", "sdxl/ux/uxillus22026-06-10_14-20-21-save-1120-5-0.safetensors", "sdxl/ux/uxillus22026-06-10_14-52-36-save-2240-10-0.safetensors", "sdxl/ux/uxillus22026-06-10_16-00-56-save-3360-15-0.safetensors", "sdxl/ux/uxillus22026-06-10_16-33-11-save-4480-20-0.safetensors", "sdxl/ux/uxillus22026-06-10_17-05-46-save-5600-25-0.safetensors", "sdxl/ux/uxisd.safetensors", "sdxl/ux/uxisd2026-05-31_06-38-42-save-700-100-0.safetensors", "sdxl/ux/uxisd2026-05-31_06-49-10-save-1050-150-0.safetensors", "sdxl/ux/uxisd2026-05-31_07-10-18-save-1750-250-0.safetensors", "sdxl/ux/uxisd2026-05-31_10-46-29-save-2100-300-0.safetensors", "sdxl/ux/uxisd2026-05-31_10-57-31-save-2450-350-0.safetensors", "sdxl/ux/uxisd2026-06-01_01-46-55-save-2800-400-0.safetensors", "sdxl/ux/uxisd2026-06-01_01-57-29-save-3150-450-0.safetensors", "sdxl/ux/uxisd2026-06-01_04-36-04-save-8400-1200-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-07-46-save-9450-1350-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-18-19-save-9800-1400-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-50-08-save-10850-1550-0.safetensors", "sdxl/ux/uxisd2026-06-01_06-00-42-save-11200-1600-0.safetensors", "sdxl/ux/uxisdfin.safetensors", "sdxl/ux/uxisdxllora1000.safetensors", "sdxl/ux/uxisdxllora300.safetensors", "sdxl/ux/uxisdxllora525.safetensors", "sdxl/zy_Skin_Enhancer_v1.safetensors", "wan/uxi/uxi5b.safetensors", "wan/uxi/uxi5b_000001250.safetensors", "wan/uxi/uxi5b_000003250.safetensors", "wan/uxi/uxi5b_000004000.safetensors", "wan/uxi/uxi5b_000004500.safetensors", "wan/uxi/uxi_wan5B.safetensors", "wan/uxi/uxi_wan5B_000000300.safetensors", "wan/uxi/uxi_wan5B_000000500.safetensors", "wan/uxi/uxi_wan_5B.safetensors", "zit/Detailed_Nipples_Z.safetensors", "zit/Mystic-XXX-ZIT-V5.safetensors", "zit/NSFW_master_ZIT_000008766.safetensors", "zit/NSFW_master_ZIT_000017532.safetensors", "zit/NakedErectFutaZit.safetensors", "zit/Nsfw Anal Doggystyle.safetensors", "zit/Nsfw Doggystyle.safetensors", "zit/Nsfw Reverse Cowgirl Anal.safetensors", "zit/Nsfw_Standing_Anal.safetensors", "zit/OiledSkin_Zit_Turbo_V1.safetensors", "zit/Oily shiny glossy skin style v2.1.safetensors", "zit/Pedras/pedras_zit.safetensors", "zit/Pedras/pedras_zit_000000500.safetensors", "zit/Pedras/pedras_zit_000001250.safetensors", "zit/Pedras/pedras_zit_000002250.safetensors", "zit/Pedras/pedras_zit_000002750.safetensors", "zit/RealisticSnapshot-Zimage-Turbov5.safetensors", "zit/Z-Image Turbo Radiant v2.0.safetensors", "zit/Z-TURBO_Photography_35mmPhoto_1536.safetensors", "zit/ZIT_Vintage_Beauties_1.0.safetensors", "zit/ZPenisv2.safetensors", "zit/adazwsr_v1_110.safetensors", "zit/b3tternud3s_v3.safetensors", "zit/diego/diegozit.safetensors", "zit/eva/evaZimage_000000250.safetensors", "zit/eva/evaZimage_000000750.safetensors", "zit/eva/eva_zit_32_000000250.safetensors", "zit/eva/eva_zit_32_000000750.safetensors", "zit/eva/eva_zit_32_000001000.safetensors", "zit/faceforwardLookbackZ_2_6000.safetensors", "zit/isa/isa_zit_32_000000500.safetensors", "zit/isa/isa_zit_32_000001000.safetensors", "zit/lara_ZIT_000000750.safetensors", "zit/lara_ZIT_000001001.safetensors", "zit/liz/liZimage_000001250.safetensors", "zit/liz/liZimage_000002750.safetensors", "zit/liz/liz_000000350.safetensors", "zit/liz/liz_000000550.safetensors", "zit/liz/lizimgt.safetensors", "zit/liz/lizimgt2026-02-22_02-40-45-save-450-150-0.safetensors", "zit/liz/lizimgtfin.safetensors", "zit/liz/lizit2026-04-24_00-05-30-save-750-250-0.safetensors", "zit/liz/lizit2026-04-24_00-27-00-save-1350-450-0.safetensors", "zit/liz/lizitDD_copy.safetensors", "zit/liz/lizitDD_copy_000002000.safetensors", "zit/liz/lizitTA_copy.safetensors", "zit/liz/lizitTA_copy_000000500.safetensors", "zit/liz/lizitTA_copy_000001000.safetensors", "zit/liz/lizitTA_copy_000001750.safetensors", "zit/liz/zitliz.safetensors", "zit/liz/zitliz2026-04-24_01-46-34-save-100-50-0.safetensors", "zit/liz/zitliz2026-04-24_01-50-13-save-200-100-0.safetensors", "zit/liz/zitliz2026-04-24_01-53-49-save-300-150-0.safetensors", "zit/liz/zitliz2026-04-24_01-57-28-save-400-200-0.safetensors", "zit/liz/zitliz2026-04-24_02-01-08-save-500-250-0.safetensors", "zit/nsfwv2-zit.safetensors", "zit/skin texture Photorealistic style v4.5.safetensors", "zit/traxegal/traxegal2026-05-02_19-09-46-save-2000-50-0.safetensors", "zit/traxegal/traxegal2026-05-02_19-35-38-save-4000-100-0.safetensors", "zit/traxegal/traxegal2026-05-02_20-05-34-save-6000-150-0.safetensors", "zit/traxegal/traxegalzit.safetensors", "zit/traxegal/traxegalzitTA.safetensors", "zit/traxegal/traxegalzitTA_000000300.safetensors", "zit/traxegal/traxegalzitTA_000000900.safetensors", "zit/traxegal/traxegalzitTA_000001500.safetensors", "zit/traxegal/traxegalzitTA_000002100.safetensors", "zit/traxegal/traxegalzitTA_000002700.safetensors", "zit/traxegal/traxegalzit_000001200.safetensors", "zit/traxegal/traxegalzit_000002400.safetensors", "zit/traxegalzitTA_000000900.safetensors", "zit/uxi/2uxizitTA_000001000.safetensors", "zit/uxi/2uxizitTA_000001500.safetensors", "zit/uxi/she_zit_000000750.safetensors", "zit/uxi/she_zit_000000750_16.safetensors", "zit/uxi/she_zit_000001000.safetensors", "zit/uxi/shezit.safetensors", "zit/uxi/shezit2026-04-23_12-34-22-save-4125-125-0.safetensors", "zit/uxi/shezit2026-04-23_14-40-27-save-2475-75-0.safetensors", "zit/uxi/shezit2026-04-23_16-01-27-save-7425-225-0.safetensors", "zit/uxi/uxi2_zit_32_ok_000001250.safetensors", "zit/uxi/uxi3zitwt.safetensors", "zit/uxi/uxi3zitwt_000000600.safetensors", "zit/uxi/uxi3zitwt_000001200.safetensors", "zit/uxi/uxi3zitwt_000001800.safetensors", "zit/uxi/uxi3zitwt_000002700.safetensors", "zit/uxi/uxiZimage_000002750.safetensors", "zit/uxi/uxi_zit_000001000.safetensors", "zit/uxi/uxi_zit_32_ok_000001750.safetensors", "zit/uxi/uxizit.safetensors", "zit/vir_zit_000000750.safetensors", "zit/yol_zit_000000250.safetensors", "zit/zitCyberrealisticpC9.bj9E.safetensors", "zit/zit_stage1_masked_dpo_11100.safetensors"];
 const AVAILABLE_VAES = ["Flux/ae.safetensors", "Flux/flux2-vae.safetensors", "Flux/ultra_flux1.safetensors", "QwenImage/REPA-E_qwen.safetensors", "QwenImage/qwen_image_2.1_vae_bf16.safetensors", "QwenImage/qwen_image_vae.safetensors", "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors", "flux2-vae.safetensors", "qwenImageVAESharpKrea2_sharpFp32.safetensors", "qwen_image_vae.safetensors"];
 const AVAILABLE_UNETS = ["flux2/DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "flux2/Krea2_Turbo_convrot_int8mixed.safetensors", "flux2/flux-2-klein-9b-kv-fp8.safetensors", "flux2/flux-2-klein-9b.safetensors", "flux2/jibMixKrea2_v40Habanero.safetensors", "qwen/qwen_image_2.1_int8_convrot.safetensors", "qwen/qwen_image_2512_fp8_e4m3fn_scaled_comfyui_4steps_v1.0.safetensors", "qwen/qwen_image_edit_2511_int8_convrot.safetensors"];
 const AVAILABLE_CLIPS = ["mistral_3_small_flux2.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "qwen3vl_4b.safetensors", "qwen3vl_4b_fp8_scaled.safetensors", "qwen3vl_8b.safetensors", "qwen3vl_8b_fp8_scaled.safetensors", "qwen3vl_8b_int8_convrot.safetensors", "qwen3vl_8b_nvfp4_heretic.safetensors", "qwen_0.6b_ace15.safetensors", "qwen_1.7b_ace15.safetensors", "qwen_2.5_vl_7b_fp8_scaled.safetensors", "qwen_3_06b_base.safetensors", "qwen_3_4b.safetensors", "qwen_3_600m.safetensors", "qwen_3_8b.safetensors", "sulphur_prompt_enhancer_qwen3.5_9b_int8tensormixed_learned.safetensors"];
@@ -3774,6 +4176,95 @@ $("btnEnhanceUse")?.addEventListener("click", () => {
   if(out) handleEnhancerResult(out);
 });
 
+// Gestión de LoRAs (4 por modelo)
+let baseLoras = [
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false }
+];
+
+let refinerLoras = [
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false }
+];
+
+function loadLoraStates(){
+  try {
+    const b = localStorage.getItem("kreaqwen_base_loras");
+    if(b) baseLoras = JSON.parse(b);
+  } catch(e){}
+  try {
+    const r = localStorage.getItem("kreaqwen_refiner_loras");
+    if(r) refinerLoras = JSON.parse(r);
+  } catch(e){}
+}
+
+function saveLoraStates(){
+  try {
+    localStorage.setItem("kreaqwen_base_loras", JSON.stringify(baseLoras));
+    localStorage.setItem("kreaqwen_refiner_loras", JSON.stringify(refinerLoras));
+  } catch(e){}
+}
+
+function renderLoraGroup(containerId, list, labelPrefix, onChange){
+  const wrap = $(containerId);
+  if(!wrap) return;
+  wrap.innerHTML = "";
+  const loraOptions = (typeof AVAILABLE_LORAS !== "undefined" && Array.isArray(AVAILABLE_LORAS)) ? AVAILABLE_LORAS : [];
+
+  list.forEach((l, i) => {
+    const box = document.createElement("div");
+    box.className = "lora" + (l.on ? "" : " off");
+    box.style.marginBottom = "8px";
+
+    let opts = '<option value="">-- Ninguno --</option>';
+    loraOptions.forEach(path => {
+      const selected = (path === l.lora) ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      opts += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+    });
+
+    box.innerHTML = `
+      <div class="lora-top">
+        <div class="switch ${l.on ? 'on' : ''}" data-idx="${i}"><i></i></div>
+        <div class="lname">${labelPrefix} ${i + 1}</div>
+      </div>
+      <div class="row" style="margin-bottom:6px;">
+        <select data-field="lora" data-idx="${i}">${opts}</select>
+      </div>
+      <div class="slider-row">
+        <input type="range" min="-2" max="2" step="0.05" value="${l.strength}" data-field="strength" data-idx="${i}">
+        <div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div>
+      </div>
+    `;
+    wrap.appendChild(box);
+  });
+
+  wrap.querySelectorAll(".switch").forEach(sw => sw.addEventListener("click", () => {
+    const idx = +sw.dataset.idx;
+    list[idx].on = !list[idx].on;
+    renderLoraGroup(containerId, list, labelPrefix, onChange);
+    onChange();
+  }));
+
+  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel => sel.addEventListener("change", () => {
+    const idx = +sel.dataset.idx;
+    list[idx].lora = sel.value;
+    onChange();
+  }));
+
+  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp => inp.addEventListener("input", () => {
+    const idx = +inp.dataset.idx;
+    list[idx].strength = parseFloat(inp.value);
+    const valEl = wrap.querySelector(`[data-val="${idx}"]`);
+    if(valEl) valEl.textContent = list[idx].strength.toFixed(2);
+    onChange();
+  }));
+}
+
 // Snapshot de Job
 function snapshotJob(isBaseOnly = false){
   const mp = parseFloat($("mpSlider")?.value || "1.0");
@@ -3800,6 +4291,11 @@ function snapshotJob(isBaseOnly = false){
     seedValue: parseInt($("samplerSeed")?.value || "1062442950133633", 10),
     baseW: baseDim.w,
     baseH: baseDim.h,
+    baseLoras: JSON.parse(JSON.stringify(baseLoras)),
+    variancePreset: $("variancePreset")?.value || "❌ Disabled",
+    protectMode: $("protectMode")?.value || "Last Half",
+    varianceSeedMode: $("segVarianceRandom")?.classList.contains("on") ? "random" : "fixed",
+    varianceSeedValue: parseInt($("varianceSeed")?.value || "315489554057974", 10),
     upscaleEnabled: isBaseOnly ? false : $("upscaleEnabled")?.checked,
     upscaleModel: $("upscaleModelSelect")?.value || "4xPurePhoto-Span.pth",
     targetW: upW,
@@ -3814,6 +4310,7 @@ function snapshotJob(isBaseOnly = false){
     refinerCfg: parseFloat($("refinerCfg")?.value || "1.0"),
     refinerSampler: $("refinerSamplerName")?.value || "euler",
     refinerScheduler: $("refinerSchedulerName")?.value || "simple",
+    refinerLoras: JSON.parse(JSON.stringify(refinerLoras)),
     spectrumEnabled: $("spectrumEnabled")?.checked,
     spectrumW: parseFloat($("spectrumW")?.value || "0.3"),
     spectrumLam: parseFloat($("spectrumLam")?.value || "0.1"),
@@ -3829,23 +4326,107 @@ function buildGraph(job){
   const j = job || activeJob || snapshotJob();
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
 
+  const unetBaseLower = (j.baseUnet || "").toLowerCase();
+  const clipBaseLower = (j.baseClip || "").toLowerCase();
+  const isQwenBase = unetBaseLower.includes("qwen") || clipBaseLower.includes("qwen");
+  const isKreaBase = unetBaseLower.includes("flux") || unetBaseLower.includes("krea") || clipBaseLower.includes("flux") || clipBaseLower.includes("krea") || !isQwenBase;
+
+  const unetRefLower = (j.refinerUnet || "").toLowerCase();
+  const clipRefLower = (j.refinerClip || "").toLowerCase();
+  const isQwenRefiner = unetRefLower.includes("qwen") || clipRefLower.includes("qwen");
+  const isKreaRefiner = unetRefLower.includes("flux") || unetRefLower.includes("krea") || clipRefLower.includes("flux") || clipRefLower.includes("krea") || !isQwenRefiner;
+
   // --- ETAPA 1 (BASE) ---
   g[N.UNET_BASE].inputs.unet_name = j.baseUnet;
+
+  let curBaseModel = [N.UNET_BASE, 0];
   if(j.baseAttn && j.baseAttn !== "none"){
     g[N.ATTN_BASE].inputs.attention = j.baseAttn;
+    g[N.ATTN_BASE].inputs.model = curBaseModel;
+    curBaseModel = [N.ATTN_BASE, 0];
   } else {
-    // Bypassear nodo de atención si se elige nativo
-    g[N.SAMPLER_BASE].inputs.model = [N.UNET_BASE, 0];
     delete g[N.ATTN_BASE];
   }
 
-  // CLIP Base: autodetección de tipo
-  const isQwenBase = (j.baseClip || "").toLowerCase().includes("qwen") && !(j.baseClip || "").toLowerCase().includes("4b");
+  // Encadenar LoRAs Base (hasta 4)
+  if(Array.isArray(j.baseLoras)){
+    j.baseLoras.forEach((l, i) => {
+      if(l.on && l.lora){
+        const loraNodeId = `base_lora_${i + 1}`;
+        g[loraNodeId] = {
+          class_type: "LoraLoaderModelOnly",
+          inputs: {
+            lora_name: l.lora,
+            strength_model: l.strength,
+            model: curBaseModel
+          },
+          _meta: { title: `LoRA Base ${i + 1}` }
+        };
+        curBaseModel = [loraNodeId, 0];
+      }
+    });
+  }
+
+  // Spectrum Base (exclusivo para Qwen)
+  if(isQwenBase && j.spectrumEnabled){
+    g["swarm_spectrum_base"] = {
+      class_type: "SwarmSpectrum",
+      inputs: {
+        w: j.spectrumW,
+        m: 3,
+        lam: j.spectrumLam,
+        window_size: 2,
+        flex_window: 0.25,
+        warmup_steps: Math.min(6, j.baseSteps),
+        stop_caching_step: -1,
+        steps: j.baseSteps,
+        calibrated: false,
+        calibration_strength: 0.5,
+        model: curBaseModel
+      },
+      _meta: { title: "SwarmSpectrum (Base Qwen)" }
+    };
+    curBaseModel = ["swarm_spectrum_base", 0];
+  }
+
+  g[N.SAMPLER_BASE].inputs.model = curBaseModel;
+
+  // CLIP Base
   g[N.CLIP_BASE].inputs.clip_name = j.baseClip;
   g[N.CLIP_BASE].inputs.type = isQwenBase ? "qwen_image" : "krea2";
 
   g[N.POS_BASE].inputs.text = (j.prompt || "").trim();
   g[N.NEG_BASE].inputs.text = (j.negPrompt || "").trim();
+
+  // RBG Smart Seed Variance Base (solo si la etapa contiene Krea2)
+  const varianceActive = j.variancePreset && !j.variancePreset.includes("Disabled");
+  if(isKreaBase && varianceActive){
+    g["rbg_variance_base"] = {
+      class_type: "RBG_Smart_Seed_Variance",
+      inputs: {
+        variance_preset: j.variancePreset,
+        fine_tune_variance: 46,
+        model_type: "📸 Krea2 (SingleStream)",
+        fade_curve: "Instant",
+        noise_injection: "Beginning Steps",
+        protect_mode: j.protectMode,
+        protect_regions: "",
+        direction_shift: "🚫 None",
+        shift_strength: 116,
+        variance_schedule: "constant",
+        cutoff_step: 8,
+        total_steps: j.baseSteps,
+        cutoff_strength: 0.1,
+        seed: (j.varianceSeedMode === "random") ? -1 : j.varianceSeedValue,
+        vibe_blend: 0.59,
+        conditioning: [N.POS_BASE, 0]
+      },
+      _meta: { title: "RBG Smart Seed Variance (Base Krea2)" }
+    };
+    g[N.SAMPLER_BASE].inputs.positive = ["rbg_variance_base", 0];
+  } else {
+    g[N.SAMPLER_BASE].inputs.positive = [N.POS_BASE, 0];
+  }
 
   g[N.LATENT_BASE].inputs.width = j.baseW;
   g[N.LATENT_BASE].inputs.height = j.baseH;
@@ -3884,7 +4465,6 @@ function buildGraph(job){
     g[N.IMAGE_SCALE].inputs.width = j.targetW;
     g[N.IMAGE_SCALE].inputs.height = j.targetH;
   } else {
-    // Upscale desactivado: pasar imagen base directamente a codificar
     delete g[N.UPSCALE_LOADER];
     delete g[N.UPSCALE_MODEL];
     g[N.IMAGE_SCALE].inputs.image = [N.DECODE_BASE, 0];
@@ -3894,19 +4474,93 @@ function buildGraph(job){
 
   // --- ETAPA 2 (REFINER) ---
   g[N.UNET_REFINER].inputs.unet_name = j.refinerUnet;
+
+  let curRefinerModel = [N.UNET_REFINER, 0];
   if(j.refinerAttn && j.refinerAttn !== "none"){
     g[N.ATTN_REFINER].inputs.attention = j.refinerAttn;
+    g[N.ATTN_REFINER].inputs.model = curRefinerModel;
+    curRefinerModel = [N.ATTN_REFINER, 0];
   } else {
-    g[N.SAMPLER_REFINER].inputs.model = [N.UNET_REFINER, 0];
     delete g[N.ATTN_REFINER];
   }
 
-  const isQwenRefiner = (j.refinerClip || "").toLowerCase().includes("qwen") && !(j.refinerClip || "").toLowerCase().includes("4b");
+  // Encadenar LoRAs Refiner (hasta 4)
+  if(Array.isArray(j.refinerLoras)){
+    j.refinerLoras.forEach((l, i) => {
+      if(l.on && l.lora){
+        const loraNodeId = `refiner_lora_${i + 1}`;
+        g[loraNodeId] = {
+          class_type: "LoraLoaderModelOnly",
+          inputs: {
+            lora_name: l.lora,
+            strength_model: l.strength,
+            model: curRefinerModel
+          },
+          _meta: { title: `LoRA Refiner ${i + 1}` }
+        };
+        curRefinerModel = [loraNodeId, 0];
+      }
+    });
+  }
+
+  // Spectrum Refiner (exclusivo para Qwen)
+  if(isQwenRefiner && j.spectrumEnabled){
+    g["swarm_spectrum_refiner"] = {
+      class_type: "SwarmSpectrum",
+      inputs: {
+        w: j.spectrumW,
+        m: 3,
+        lam: j.spectrumLam,
+        window_size: 2,
+        flex_window: 0.25,
+        warmup_steps: Math.min(6, j.refinerSteps),
+        stop_caching_step: -1,
+        steps: j.refinerSteps,
+        calibrated: false,
+        calibration_strength: 0.5,
+        model: curRefinerModel
+      },
+      _meta: { title: "SwarmSpectrum (Refiner Qwen)" }
+    };
+    curRefinerModel = ["swarm_spectrum_refiner", 0];
+  }
+
+  g[N.SAMPLER_REFINER].inputs.model = curRefinerModel;
+
   g[N.CLIP_REFINER].inputs.clip_name = j.refinerClip;
   g[N.CLIP_REFINER].inputs.type = isQwenRefiner ? "qwen_image" : "krea2";
 
   g[N.POS_REFINER].inputs.text = (j.prompt || "").trim();
   g[N.NEG_REFINER].inputs.text = (j.negPrompt || "").trim();
+
+  // RBG Smart Seed Variance Refiner (solo si Krea2 está en Refiner y no en Base)
+  if(!isKreaBase && isKreaRefiner && varianceActive){
+    g["rbg_variance_refiner"] = {
+      class_type: "RBG_Smart_Seed_Variance",
+      inputs: {
+        variance_preset: j.variancePreset,
+        fine_tune_variance: 46,
+        model_type: "📸 Krea2 (SingleStream)",
+        fade_curve: "Instant",
+        noise_injection: "Beginning Steps",
+        protect_mode: j.protectMode,
+        protect_regions: "",
+        direction_shift: "🚫 None",
+        shift_strength: 116,
+        variance_schedule: "constant",
+        cutoff_step: 4,
+        total_steps: j.refinerSteps,
+        cutoff_strength: 0.1,
+        seed: (j.varianceSeedMode === "random") ? -1 : j.varianceSeedValue,
+        vibe_blend: 0.59,
+        conditioning: [N.POS_REFINER, 0]
+      },
+      _meta: { title: "RBG Smart Seed Variance (Refiner Krea2)" }
+    };
+    g[N.SAMPLER_REFINER].inputs.positive = ["rbg_variance_refiner", 0];
+  } else {
+    g[N.SAMPLER_REFINER].inputs.positive = [N.POS_REFINER, 0];
+  }
 
   g[N.VAE_REFINER].inputs.vae_name = j.refinerVae;
 
@@ -3915,7 +4569,7 @@ function buildGraph(job){
   g[N.SAMPLER_REFINER].inputs.sampler_name = j.refinerSampler;
   g[N.SAMPLER_REFINER].inputs.scheduler = j.refinerScheduler;
   g[N.SAMPLER_REFINER].inputs.denoise = j.refinerDenoise;
-  g[N.SAMPLER_REFINER].inputs.seed = j.seedValue + 1; // seed desplazada para el refiner
+  g[N.SAMPLER_REFINER].inputs.seed = j.seedValue + 1;
 
   g[N.SAVE_IMAGE].inputs.filename_prefix = j.filenamePrefix;
 
@@ -3933,7 +4587,17 @@ CONFIG.variantMeta = function(){
     ["Factor Escala", `${$("upscaleFactor")?.value || "1.5"}x`],
     ["Pasos Base/Ref", `${$("baseSteps")?.value || "8"} / ${$("refinerSteps")?.value || "6"}`],
   ];
-  return { title: "Parámetros KreaQwen", rows, loras: [] };
+  if($("variancePreset") && !$("variancePreset").value.includes("Disabled")){
+    rows.push(["Variance", `${$("variancePreset").value} (${$("protectMode")?.value || ""})`]);
+  }
+  const activeLoras = [];
+  baseLoras.forEach((l, i) => {
+    if(l.on && l.lora) activeLoras.push({ name: `Base: ${l.lora.split('/').pop()}`, strength: Number(l.strength).toFixed(2), on: true });
+  });
+  refinerLoras.forEach((l, i) => {
+    if(l.on && l.lora) activeLoras.push({ name: `Ref: ${l.lora.split('/').pop()}`, strength: Number(l.strength).toFixed(2), on: true });
+  });
+  return { title: "Parámetros KreaQwen", rows, loras: activeLoras };
 };
 
 // Helper URL y medios
@@ -4214,6 +4878,22 @@ function initKreaQwenUI() {
   populateModelSelects();
   updateDimensionHints();
 
+  // Carga y renderizado de LoRAs (Base y Refiner)
+  loadLoraStates();
+  renderLoraGroup("baseLoraList", baseLoras, "LoRA Base", saveLoraStates);
+  renderLoraGroup("refinerLoraList", refinerLoras, "LoRA Refiner", saveLoraStates);
+
+  // Activación de paneles desplegables (collapsible)
+  if(typeof makeCollapsible === "function"){
+    makeCollapsible("negPromptToggle", "negPromptBody");
+    makeCollapsible("evolveToggle", "evolveBody");
+    makeCollapsible("baseLorasToggle", "baseLorasBody");
+    makeCollapsible("varianceToggle", "varianceBody");
+    makeCollapsible("refinerLorasToggle", "refinerLorasBody");
+    makeCollapsible("spectrumToggle", "spectrumBody");
+    makeCollapsible("galleryToggle", "galleryBody");
+  }
+
   window.outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
   window.refZoom = setupZoomPan("refWrap", "refImg", "btnResetZoomRef", "btnFullscreenRef");
 
@@ -4258,7 +4938,14 @@ function initKreaQwenUI() {
   $("refinerDenoise")?.addEventListener("input", (e) => {
     if($("refinerDenoiseVal")) $("refinerDenoiseVal").textContent = parseFloat(e.target.value).toFixed(2);
   });
+  $("spectrumW")?.addEventListener("input", (e) => {
+    if($("spectrumWVal")) $("spectrumWVal").textContent = parseFloat(e.target.value).toFixed(2);
+  });
+  $("spectrumLam")?.addEventListener("input", (e) => {
+    if($("spectrumLamVal")) $("spectrumLamVal").textContent = parseFloat(e.target.value).toFixed(2);
+  });
 
+  // Semilla de Sampler
   $("segSamplerRandom")?.addEventListener("click", () => {
     $("segSamplerRandom")?.classList.add("on");
     $("segSamplerFixed")?.classList.remove("on");
@@ -4268,6 +4955,18 @@ function initKreaQwenUI() {
     $("segSamplerFixed")?.classList.add("on");
     $("segSamplerRandom")?.classList.remove("on");
     if($("samplerSeed")) $("samplerSeed").disabled = false;
+  });
+
+  // Semilla de Varianza (Krea2)
+  $("segVarianceRandom")?.addEventListener("click", () => {
+    $("segVarianceRandom")?.classList.add("on");
+    $("segVarianceFixed")?.classList.remove("on");
+    if($("varianceSeed")) $("varianceSeed").disabled = true;
+  });
+  $("segVarianceFixed")?.addEventListener("click", () => {
+    $("segVarianceFixed")?.classList.add("on");
+    $("segVarianceRandom")?.classList.remove("on");
+    if($("varianceSeed")) $("varianceSeed").disabled = false;
   });
 
   $("tabViewFinal")?.addEventListener("click", () => showImageView("final"));

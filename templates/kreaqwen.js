@@ -374,6 +374,95 @@ $("btnEnhanceUse")?.addEventListener("click", () => {
   if(out) handleEnhancerResult(out);
 });
 
+// Gestión de LoRAs (4 por modelo)
+let baseLoras = [
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false }
+];
+
+let refinerLoras = [
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false }
+];
+
+function loadLoraStates(){
+  try {
+    const b = localStorage.getItem("kreaqwen_base_loras");
+    if(b) baseLoras = JSON.parse(b);
+  } catch(e){}
+  try {
+    const r = localStorage.getItem("kreaqwen_refiner_loras");
+    if(r) refinerLoras = JSON.parse(r);
+  } catch(e){}
+}
+
+function saveLoraStates(){
+  try {
+    localStorage.setItem("kreaqwen_base_loras", JSON.stringify(baseLoras));
+    localStorage.setItem("kreaqwen_refiner_loras", JSON.stringify(refinerLoras));
+  } catch(e){}
+}
+
+function renderLoraGroup(containerId, list, labelPrefix, onChange){
+  const wrap = $(containerId);
+  if(!wrap) return;
+  wrap.innerHTML = "";
+  const loraOptions = (typeof AVAILABLE_LORAS !== "undefined" && Array.isArray(AVAILABLE_LORAS)) ? AVAILABLE_LORAS : [];
+
+  list.forEach((l, i) => {
+    const box = document.createElement("div");
+    box.className = "lora" + (l.on ? "" : " off");
+    box.style.marginBottom = "8px";
+
+    let opts = '<option value="">-- Ninguno --</option>';
+    loraOptions.forEach(path => {
+      const selected = (path === l.lora) ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      opts += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+    });
+
+    box.innerHTML = `
+      <div class="lora-top">
+        <div class="switch ${l.on ? 'on' : ''}" data-idx="${i}"><i></i></div>
+        <div class="lname">${labelPrefix} ${i + 1}</div>
+      </div>
+      <div class="row" style="margin-bottom:6px;">
+        <select data-field="lora" data-idx="${i}">${opts}</select>
+      </div>
+      <div class="slider-row">
+        <input type="range" min="-2" max="2" step="0.05" value="${l.strength}" data-field="strength" data-idx="${i}">
+        <div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div>
+      </div>
+    `;
+    wrap.appendChild(box);
+  });
+
+  wrap.querySelectorAll(".switch").forEach(sw => sw.addEventListener("click", () => {
+    const idx = +sw.dataset.idx;
+    list[idx].on = !list[idx].on;
+    renderLoraGroup(containerId, list, labelPrefix, onChange);
+    onChange();
+  }));
+
+  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel => sel.addEventListener("change", () => {
+    const idx = +sel.dataset.idx;
+    list[idx].lora = sel.value;
+    onChange();
+  }));
+
+  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp => inp.addEventListener("input", () => {
+    const idx = +inp.dataset.idx;
+    list[idx].strength = parseFloat(inp.value);
+    const valEl = wrap.querySelector(`[data-val="${idx}"]`);
+    if(valEl) valEl.textContent = list[idx].strength.toFixed(2);
+    onChange();
+  }));
+}
+
 // Snapshot de Job
 function snapshotJob(isBaseOnly = false){
   const mp = parseFloat($("mpSlider")?.value || "1.0");
@@ -400,6 +489,11 @@ function snapshotJob(isBaseOnly = false){
     seedValue: parseInt($("samplerSeed")?.value || "1062442950133633", 10),
     baseW: baseDim.w,
     baseH: baseDim.h,
+    baseLoras: JSON.parse(JSON.stringify(baseLoras)),
+    variancePreset: $("variancePreset")?.value || "❌ Disabled",
+    protectMode: $("protectMode")?.value || "Last Half",
+    varianceSeedMode: $("segVarianceRandom")?.classList.contains("on") ? "random" : "fixed",
+    varianceSeedValue: parseInt($("varianceSeed")?.value || "315489554057974", 10),
     upscaleEnabled: isBaseOnly ? false : $("upscaleEnabled")?.checked,
     upscaleModel: $("upscaleModelSelect")?.value || "4xPurePhoto-Span.pth",
     targetW: upW,
@@ -414,6 +508,7 @@ function snapshotJob(isBaseOnly = false){
     refinerCfg: parseFloat($("refinerCfg")?.value || "1.0"),
     refinerSampler: $("refinerSamplerName")?.value || "euler",
     refinerScheduler: $("refinerSchedulerName")?.value || "simple",
+    refinerLoras: JSON.parse(JSON.stringify(refinerLoras)),
     spectrumEnabled: $("spectrumEnabled")?.checked,
     spectrumW: parseFloat($("spectrumW")?.value || "0.3"),
     spectrumLam: parseFloat($("spectrumLam")?.value || "0.1"),
@@ -429,23 +524,107 @@ function buildGraph(job){
   const j = job || activeJob || snapshotJob();
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
 
+  const unetBaseLower = (j.baseUnet || "").toLowerCase();
+  const clipBaseLower = (j.baseClip || "").toLowerCase();
+  const isQwenBase = unetBaseLower.includes("qwen") || clipBaseLower.includes("qwen");
+  const isKreaBase = unetBaseLower.includes("flux") || unetBaseLower.includes("krea") || clipBaseLower.includes("flux") || clipBaseLower.includes("krea") || !isQwenBase;
+
+  const unetRefLower = (j.refinerUnet || "").toLowerCase();
+  const clipRefLower = (j.refinerClip || "").toLowerCase();
+  const isQwenRefiner = unetRefLower.includes("qwen") || clipRefLower.includes("qwen");
+  const isKreaRefiner = unetRefLower.includes("flux") || unetRefLower.includes("krea") || clipRefLower.includes("flux") || clipRefLower.includes("krea") || !isQwenRefiner;
+
   // --- ETAPA 1 (BASE) ---
   g[N.UNET_BASE].inputs.unet_name = j.baseUnet;
+
+  let curBaseModel = [N.UNET_BASE, 0];
   if(j.baseAttn && j.baseAttn !== "none"){
     g[N.ATTN_BASE].inputs.attention = j.baseAttn;
+    g[N.ATTN_BASE].inputs.model = curBaseModel;
+    curBaseModel = [N.ATTN_BASE, 0];
   } else {
-    // Bypassear nodo de atención si se elige nativo
-    g[N.SAMPLER_BASE].inputs.model = [N.UNET_BASE, 0];
     delete g[N.ATTN_BASE];
   }
 
-  // CLIP Base: autodetección de tipo
-  const isQwenBase = (j.baseClip || "").toLowerCase().includes("qwen") && !(j.baseClip || "").toLowerCase().includes("4b");
+  // Encadenar LoRAs Base (hasta 4)
+  if(Array.isArray(j.baseLoras)){
+    j.baseLoras.forEach((l, i) => {
+      if(l.on && l.lora){
+        const loraNodeId = `base_lora_${i + 1}`;
+        g[loraNodeId] = {
+          class_type: "LoraLoaderModelOnly",
+          inputs: {
+            lora_name: l.lora,
+            strength_model: l.strength,
+            model: curBaseModel
+          },
+          _meta: { title: `LoRA Base ${i + 1}` }
+        };
+        curBaseModel = [loraNodeId, 0];
+      }
+    });
+  }
+
+  // Spectrum Base (exclusivo para Qwen)
+  if(isQwenBase && j.spectrumEnabled){
+    g["swarm_spectrum_base"] = {
+      class_type: "SwarmSpectrum",
+      inputs: {
+        w: j.spectrumW,
+        m: 3,
+        lam: j.spectrumLam,
+        window_size: 2,
+        flex_window: 0.25,
+        warmup_steps: Math.min(6, j.baseSteps),
+        stop_caching_step: -1,
+        steps: j.baseSteps,
+        calibrated: false,
+        calibration_strength: 0.5,
+        model: curBaseModel
+      },
+      _meta: { title: "SwarmSpectrum (Base Qwen)" }
+    };
+    curBaseModel = ["swarm_spectrum_base", 0];
+  }
+
+  g[N.SAMPLER_BASE].inputs.model = curBaseModel;
+
+  // CLIP Base
   g[N.CLIP_BASE].inputs.clip_name = j.baseClip;
   g[N.CLIP_BASE].inputs.type = isQwenBase ? "qwen_image" : "krea2";
 
   g[N.POS_BASE].inputs.text = (j.prompt || "").trim();
   g[N.NEG_BASE].inputs.text = (j.negPrompt || "").trim();
+
+  // RBG Smart Seed Variance Base (solo si la etapa contiene Krea2)
+  const varianceActive = j.variancePreset && !j.variancePreset.includes("Disabled");
+  if(isKreaBase && varianceActive){
+    g["rbg_variance_base"] = {
+      class_type: "RBG_Smart_Seed_Variance",
+      inputs: {
+        variance_preset: j.variancePreset,
+        fine_tune_variance: 46,
+        model_type: "📸 Krea2 (SingleStream)",
+        fade_curve: "Instant",
+        noise_injection: "Beginning Steps",
+        protect_mode: j.protectMode,
+        protect_regions: "",
+        direction_shift: "🚫 None",
+        shift_strength: 116,
+        variance_schedule: "constant",
+        cutoff_step: 8,
+        total_steps: j.baseSteps,
+        cutoff_strength: 0.1,
+        seed: (j.varianceSeedMode === "random") ? -1 : j.varianceSeedValue,
+        vibe_blend: 0.59,
+        conditioning: [N.POS_BASE, 0]
+      },
+      _meta: { title: "RBG Smart Seed Variance (Base Krea2)" }
+    };
+    g[N.SAMPLER_BASE].inputs.positive = ["rbg_variance_base", 0];
+  } else {
+    g[N.SAMPLER_BASE].inputs.positive = [N.POS_BASE, 0];
+  }
 
   g[N.LATENT_BASE].inputs.width = j.baseW;
   g[N.LATENT_BASE].inputs.height = j.baseH;
@@ -484,7 +663,6 @@ function buildGraph(job){
     g[N.IMAGE_SCALE].inputs.width = j.targetW;
     g[N.IMAGE_SCALE].inputs.height = j.targetH;
   } else {
-    // Upscale desactivado: pasar imagen base directamente a codificar
     delete g[N.UPSCALE_LOADER];
     delete g[N.UPSCALE_MODEL];
     g[N.IMAGE_SCALE].inputs.image = [N.DECODE_BASE, 0];
@@ -494,19 +672,93 @@ function buildGraph(job){
 
   // --- ETAPA 2 (REFINER) ---
   g[N.UNET_REFINER].inputs.unet_name = j.refinerUnet;
+
+  let curRefinerModel = [N.UNET_REFINER, 0];
   if(j.refinerAttn && j.refinerAttn !== "none"){
     g[N.ATTN_REFINER].inputs.attention = j.refinerAttn;
+    g[N.ATTN_REFINER].inputs.model = curRefinerModel;
+    curRefinerModel = [N.ATTN_REFINER, 0];
   } else {
-    g[N.SAMPLER_REFINER].inputs.model = [N.UNET_REFINER, 0];
     delete g[N.ATTN_REFINER];
   }
 
-  const isQwenRefiner = (j.refinerClip || "").toLowerCase().includes("qwen") && !(j.refinerClip || "").toLowerCase().includes("4b");
+  // Encadenar LoRAs Refiner (hasta 4)
+  if(Array.isArray(j.refinerLoras)){
+    j.refinerLoras.forEach((l, i) => {
+      if(l.on && l.lora){
+        const loraNodeId = `refiner_lora_${i + 1}`;
+        g[loraNodeId] = {
+          class_type: "LoraLoaderModelOnly",
+          inputs: {
+            lora_name: l.lora,
+            strength_model: l.strength,
+            model: curRefinerModel
+          },
+          _meta: { title: `LoRA Refiner ${i + 1}` }
+        };
+        curRefinerModel = [loraNodeId, 0];
+      }
+    });
+  }
+
+  // Spectrum Refiner (exclusivo para Qwen)
+  if(isQwenRefiner && j.spectrumEnabled){
+    g["swarm_spectrum_refiner"] = {
+      class_type: "SwarmSpectrum",
+      inputs: {
+        w: j.spectrumW,
+        m: 3,
+        lam: j.spectrumLam,
+        window_size: 2,
+        flex_window: 0.25,
+        warmup_steps: Math.min(6, j.refinerSteps),
+        stop_caching_step: -1,
+        steps: j.refinerSteps,
+        calibrated: false,
+        calibration_strength: 0.5,
+        model: curRefinerModel
+      },
+      _meta: { title: "SwarmSpectrum (Refiner Qwen)" }
+    };
+    curRefinerModel = ["swarm_spectrum_refiner", 0];
+  }
+
+  g[N.SAMPLER_REFINER].inputs.model = curRefinerModel;
+
   g[N.CLIP_REFINER].inputs.clip_name = j.refinerClip;
   g[N.CLIP_REFINER].inputs.type = isQwenRefiner ? "qwen_image" : "krea2";
 
   g[N.POS_REFINER].inputs.text = (j.prompt || "").trim();
   g[N.NEG_REFINER].inputs.text = (j.negPrompt || "").trim();
+
+  // RBG Smart Seed Variance Refiner (solo si Krea2 está en Refiner y no en Base)
+  if(!isKreaBase && isKreaRefiner && varianceActive){
+    g["rbg_variance_refiner"] = {
+      class_type: "RBG_Smart_Seed_Variance",
+      inputs: {
+        variance_preset: j.variancePreset,
+        fine_tune_variance: 46,
+        model_type: "📸 Krea2 (SingleStream)",
+        fade_curve: "Instant",
+        noise_injection: "Beginning Steps",
+        protect_mode: j.protectMode,
+        protect_regions: "",
+        direction_shift: "🚫 None",
+        shift_strength: 116,
+        variance_schedule: "constant",
+        cutoff_step: 4,
+        total_steps: j.refinerSteps,
+        cutoff_strength: 0.1,
+        seed: (j.varianceSeedMode === "random") ? -1 : j.varianceSeedValue,
+        vibe_blend: 0.59,
+        conditioning: [N.POS_REFINER, 0]
+      },
+      _meta: { title: "RBG Smart Seed Variance (Refiner Krea2)" }
+    };
+    g[N.SAMPLER_REFINER].inputs.positive = ["rbg_variance_refiner", 0];
+  } else {
+    g[N.SAMPLER_REFINER].inputs.positive = [N.POS_REFINER, 0];
+  }
 
   g[N.VAE_REFINER].inputs.vae_name = j.refinerVae;
 
@@ -515,7 +767,7 @@ function buildGraph(job){
   g[N.SAMPLER_REFINER].inputs.sampler_name = j.refinerSampler;
   g[N.SAMPLER_REFINER].inputs.scheduler = j.refinerScheduler;
   g[N.SAMPLER_REFINER].inputs.denoise = j.refinerDenoise;
-  g[N.SAMPLER_REFINER].inputs.seed = j.seedValue + 1; // seed desplazada para el refiner
+  g[N.SAMPLER_REFINER].inputs.seed = j.seedValue + 1;
 
   g[N.SAVE_IMAGE].inputs.filename_prefix = j.filenamePrefix;
 
@@ -533,7 +785,17 @@ CONFIG.variantMeta = function(){
     ["Factor Escala", `${$("upscaleFactor")?.value || "1.5"}x`],
     ["Pasos Base/Ref", `${$("baseSteps")?.value || "8"} / ${$("refinerSteps")?.value || "6"}`],
   ];
-  return { title: "Parámetros KreaQwen", rows, loras: [] };
+  if($("variancePreset") && !$("variancePreset").value.includes("Disabled")){
+    rows.push(["Variance", `${$("variancePreset").value} (${$("protectMode")?.value || ""})`]);
+  }
+  const activeLoras = [];
+  baseLoras.forEach((l, i) => {
+    if(l.on && l.lora) activeLoras.push({ name: `Base: ${l.lora.split('/').pop()}`, strength: Number(l.strength).toFixed(2), on: true });
+  });
+  refinerLoras.forEach((l, i) => {
+    if(l.on && l.lora) activeLoras.push({ name: `Ref: ${l.lora.split('/').pop()}`, strength: Number(l.strength).toFixed(2), on: true });
+  });
+  return { title: "Parámetros KreaQwen", rows, loras: activeLoras };
 };
 
 // Helper URL y medios
@@ -814,6 +1076,22 @@ function initKreaQwenUI() {
   populateModelSelects();
   updateDimensionHints();
 
+  // Carga y renderizado de LoRAs (Base y Refiner)
+  loadLoraStates();
+  renderLoraGroup("baseLoraList", baseLoras, "LoRA Base", saveLoraStates);
+  renderLoraGroup("refinerLoraList", refinerLoras, "LoRA Refiner", saveLoraStates);
+
+  // Activación de paneles desplegables (collapsible)
+  if(typeof makeCollapsible === "function"){
+    makeCollapsible("negPromptToggle", "negPromptBody");
+    makeCollapsible("evolveToggle", "evolveBody");
+    makeCollapsible("baseLorasToggle", "baseLorasBody");
+    makeCollapsible("varianceToggle", "varianceBody");
+    makeCollapsible("refinerLorasToggle", "refinerLorasBody");
+    makeCollapsible("spectrumToggle", "spectrumBody");
+    makeCollapsible("galleryToggle", "galleryBody");
+  }
+
   window.outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
   window.refZoom = setupZoomPan("refWrap", "refImg", "btnResetZoomRef", "btnFullscreenRef");
 
@@ -858,7 +1136,14 @@ function initKreaQwenUI() {
   $("refinerDenoise")?.addEventListener("input", (e) => {
     if($("refinerDenoiseVal")) $("refinerDenoiseVal").textContent = parseFloat(e.target.value).toFixed(2);
   });
+  $("spectrumW")?.addEventListener("input", (e) => {
+    if($("spectrumWVal")) $("spectrumWVal").textContent = parseFloat(e.target.value).toFixed(2);
+  });
+  $("spectrumLam")?.addEventListener("input", (e) => {
+    if($("spectrumLamVal")) $("spectrumLamVal").textContent = parseFloat(e.target.value).toFixed(2);
+  });
 
+  // Semilla de Sampler
   $("segSamplerRandom")?.addEventListener("click", () => {
     $("segSamplerRandom")?.classList.add("on");
     $("segSamplerFixed")?.classList.remove("on");
@@ -868,6 +1153,18 @@ function initKreaQwenUI() {
     $("segSamplerFixed")?.classList.add("on");
     $("segSamplerRandom")?.classList.remove("on");
     if($("samplerSeed")) $("samplerSeed").disabled = false;
+  });
+
+  // Semilla de Varianza (Krea2)
+  $("segVarianceRandom")?.addEventListener("click", () => {
+    $("segVarianceRandom")?.classList.add("on");
+    $("segVarianceFixed")?.classList.remove("on");
+    if($("varianceSeed")) $("varianceSeed").disabled = true;
+  });
+  $("segVarianceFixed")?.addEventListener("click", () => {
+    $("segVarianceFixed")?.classList.add("on");
+    $("segVarianceRandom")?.classList.remove("on");
+    if($("varianceSeed")) $("varianceSeed").disabled = false;
   });
 
   $("tabViewFinal")?.addEventListener("click", () => showImageView("final"));
