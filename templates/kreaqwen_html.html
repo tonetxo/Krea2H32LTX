@@ -69,6 +69,55 @@
         </div>
       </div>
 
+      <!-- EDICIÓN CON QWEN 2.1 -->
+      <div class="panel">
+        <div class="collapsible-header" id="qwenEditToggle">
+          <span class="arrow">▶</span> Edición con Qwen 2.1 <span class="hint" style="font-size:10px;">(img2img / faceswap)</span>
+        </div>
+        <div class="collapsible-body" id="qwenEditBody">
+          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <input type="checkbox" id="qwenEditEnabled" style="margin:0;">
+            <label for="qwenEditEnabled" style="margin:0;font-size:11px;cursor:pointer;">Usar la imagen de referencia como guía de edición (Qwen 2.1)</label>
+          </div>
+          <div class="row" style="margin-bottom:8px;">
+            <label>Etapa de edición</label>
+            <select id="qwenEditStage" style="margin-top:4px;">
+              <option value="refiner" selected>Refiner (recomendado: conserva composición del Base)</option>
+              <option value="base">Base (edición desde la referencia)</option>
+              <option value="both">Ambas etapas</option>
+            </select>
+          </div>
+          <div class="row" style="margin-bottom:8px;">
+            <label>Instrucción de edición <span class="hint">(qué cambiar)</span></label>
+            <textarea id="qwenEditPrompt" rows="3" placeholder="Face swap: sustituye el rostro por el de la imagen de referencia, mantén el resto igual..."></textarea>
+          </div>
+          <div class="row slider-row" style="margin-bottom:6px;">
+            <label style="min-width:110px;">Resolución referencia</label>
+            <input type="range" id="qwenEditResolution" min="0" max="2048" step="32" value="1024" style="flex:1;">
+            <div class="slider-val" id="qwenEditResolutionVal">1024</div>
+          </div>
+          <div class="hint" style="font-size:10px;margin-bottom:6px;">
+            Solo aplica a etapas con Qwen 2.1. En modo refiner la edición se ancla al borrador del Base; en modo base/ambas la salida adopta la resolución de la referencia.
+          </div>
+          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <label>Referencias</label>
+            <span class="hint" id="qwenEditRefStatus" style="font-size:10px;">sin imagen de referencia</span>
+          </div>
+          <div class="row" style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="btnQwenEditUseRef" class="ghost btn-mini" style="flex:1;min-width:120px;">Usar imagen de referencia</button>
+            <button id="btnQwenEditClearRef" class="ghost btn-mini" style="flex:1;min-width:120px;">Quitar referencia</button>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <label>Referencias extra (hasta 2)</label>
+            <div class="ref-actions" style="margin-top:4px;">
+              <button id="btnQwenEditAddRef" class="ghost btn-mini" style="flex:1;">+ Añadir referencia</button>
+              <button id="btnQwenEditClearExtra" class="ghost btn-mini" style="flex:1;">Limpiar extras</button>
+            </div>
+            <div class="hint" id="qwenEditExtraStatus" style="font-size:10px;margin-top:4px;">sin referencias extra</div>
+          </div>
+        </div>
+      </div>
+
       <!-- EVOLVE / TRANSMUTAR PROMPT -->
       <div class="panel">
         <div class="collapsible-header" id="evolveToggle">
@@ -108,6 +157,15 @@
           <select id="baseUnetSelect"></select>
         </div>
         <div class="row" style="margin-top:6px;">
+          <label>Precisión de carga Base (Weight Dtype)</label>
+          <select id="baseWeightDtype">
+            <option value="auto" selected>Auto (FP8 Rápido en RTX 5070 Ti / Default si INT8)</option>
+            <option value="fp8_e4m3fn_fast">fp8_e4m3fn_fast (Aceleración FP8)</option>
+            <option value="fp8_e4m3fn">fp8_e4m3fn</option>
+            <option value="default">default (FP16 / Nativo del archivo)</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:6px;">
           <label>CLIP / Text Encoder Base</label>
           <select id="baseClipSelect"></select>
         </div>
@@ -118,9 +176,9 @@
         <div class="row" style="margin-top:6px;">
           <label>Backend de atención Base</label>
           <select id="baseAttentionBackend">
-            <option value="comfy kitchen attention" selected>Comfy Kitchen Attention (INT8)</option>
+            <option value="none" selected>SageAttention / Nativo ComfyUI (--use-sage-attention)</option>
+            <option value="comfy kitchen attention">Comfy Kitchen Attention (INT8)</option>
             <option value="pytorch attention">PyTorch Attention</option>
-            <option value="none">Sin parche (Nativo)</option>
           </select>
         </div>
         <div class="row two-col" style="margin-top:8px;">
@@ -366,15 +424,65 @@
             </select>
           </div>
           <div class="row" style="margin-top:6px;">
+            <label>Fine-tune <span class="hint">(solo preset Custom, %)</span></label>
+            <div class="slider-row">
+              <input type="range" id="varianceFineTune" min="0" max="100" step="1" value="100">
+              <div class="slider-val" id="varianceFineTuneVal">100</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Dirección <span class="hint">(sesgo estructural)</span></label>
+            <select id="varianceDirection">
+              <option value="🚫 None">🚫 None (ruido puro)</option>
+              <option value="🌎 Diversity" selected>🌎 Diversity (variedad general)</option>
+              <option value="🌀 Chaos">🌀 Chaos</option>
+              <option value="🖼️ Composition">🖼️ Composition (encuadre)</option>
+              <option value="🎭 Dynamic Pose">🎭 Dynamic Pose (pose)</option>
+              <option value="🎭 Expression Variance">🎭 Expression Variance</option>
+              <option value="🧬 Face-Variance Expansion">🧬 Face-Variance Expansion</option>
+              <option value="🤪 Facial Dynamics & Asymmetry (Krea2)">🤪 Facial Dynamics (Krea2)</option>
+              <option value="🗿 Visceral Expression & Grit (Krea2)">🗿 Visceral Grit (Krea2)</option>
+              <option value="🧠 Identity Stretch">🧠 Identity Stretch</option>
+              <option value="🌌 Cosmic">🌌 Cosmic</option>
+              <option value="🏞️ Landscape Depth">🏞️ Landscape Depth</option>
+            </select>
+          </div>
+          <div class="row slider-row" style="margin-top:6px;">
+            <label style="min-width:110px;">Fuerza dirección</label>
+            <input type="range" id="varianceShiftStrength" min="0" max="200" step="1" value="150" style="flex:1;">
+            <div class="slider-val" id="varianceShiftStrengthVal">150</div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Inyección de ruido</label>
+            <select id="varianceNoiseInjection">
+              <option value="🚫 None" selected>🚫 None (todos los pasos · más variedad)</option>
+              <option value="Beginning Steps">Beginning Steps (composición)</option>
+              <option value="Ending Steps">Ending Steps (detalle)</option>
+              <option value="All Steps">All Steps</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:6px;">
             <label>Protect Mode</label>
             <select id="protectMode">
-              <option value="🚫 None">🚫 None</option>
+              <option value="🚫 None" selected>🚫 None (sin protección · más variedad)</option>
               <option value="First Quarter">First Quarter</option>
               <option value="First Half">First Half</option>
               <option value="Last Quarter">Last Quarter</option>
-              <option value="Last Half" selected>Last Half</option>
+              <option value="Last Half">Last Half</option>
               <option value="⚙️ Custom Regions">⚙️ Custom Regions</option>
               <option value="🎲 Random Regions">🎲 Random Regions</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Fade curve</label>
+            <select id="varianceFadeCurve">
+              <option value="Instant" selected>Instant</option>
+              <option value="Linear">Linear</option>
+              <option value="Ease-Out">Ease-Out</option>
+              <option value="Ease-In">Ease-In</option>
+              <option value="Ease-In-Out">Ease-In-Out</option>
+              <option value="Smooth Step">Smooth Step</option>
+              <option value="Burst">Burst</option>
             </select>
           </div>
           <div class="row" style="margin-top:8px;">
@@ -386,7 +494,7 @@
             <input type="number" id="varianceSeed" value="315489554057974" step="1" disabled>
           </div>
           <div class="hint" style="font-size:10px;margin-top:4px;">
-            Solo activo si la etapa contiene Krea2 (SingleStream). Inyecta diversidad controlada en las primeras iteraciones de muestreo.
+            Solo activo si la etapa contiene Krea2 (SingleStream). Para variedad perceptible usa preset Creative/Bold + Dirección Diversity + Inyección None + Protect None. La composición cambia según Fuerza dirección y preset.
           </div>
         </div>
       </div>
@@ -453,6 +561,15 @@
             <select id="refinerUnetSelect"></select>
           </div>
           <div class="row" style="margin-top:6px;">
+            <label>Precisión de carga Refiner (Weight Dtype)</label>
+            <select id="refinerWeightDtype">
+              <option value="auto" selected>Auto (FP8 Rápido en RTX 5070 Ti / Default si INT8)</option>
+              <option value="fp8_e4m3fn_fast">fp8_e4m3fn_fast (Aceleración FP8)</option>
+              <option value="fp8_e4m3fn">fp8_e4m3fn</option>
+              <option value="default">default (FP16 / Nativo del archivo)</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:6px;">
             <label>CLIP / Text Encoder Refiner</label>
             <select id="refinerClipSelect"></select>
           </div>
@@ -463,9 +580,9 @@
           <div class="row" style="margin-top:6px;">
             <label>Backend de atención Refiner</label>
             <select id="refinerAttentionBackend">
-              <option value="comfy kitchen attention" selected>Comfy Kitchen Attention (INT8)</option>
+              <option value="none" selected>SageAttention / Nativo ComfyUI (--use-sage-attention)</option>
+              <option value="comfy kitchen attention">Comfy Kitchen Attention (INT8)</option>
               <option value="pytorch attention">PyTorch Attention</option>
-              <option value="none">Sin parche (Nativo)</option>
             </select>
           </div>
           <div class="row slider-row" style="margin-top:8px;">
@@ -686,15 +803,15 @@
         </div>
       </div>
 
-      <!-- SPECTRUM (ACELERACIÓN DE ATENCIÓN - SOLO QWEN) -->
+      <!-- SPECTRUM (ACELERACIÓN DE DIFUSIÓN · KREA2 Y QWEN) -->
       <div class="panel">
         <div class="collapsible-header" id="spectrumToggle">
-          <span class="arrow">▶</span> Spectrum (Aceleración de Atención · Solo Qwen)
+          <span class="arrow">▶</span> Spectrum (Aceleración de Difusión · Krea2 y Qwen)
         </div>
         <div class="collapsible-body" id="spectrumBody">
           <div class="row" style="display:flex;align-items:center;gap:8px;">
             <input type="checkbox" id="spectrumEnabled" style="margin:0;">
-            <label for="spectrumEnabled" style="margin:0;font-size:11px;cursor:pointer;">Activar SwarmSpectrum (exclusivo para etapas con Qwen)</label>
+            <label for="spectrumEnabled" style="margin:0;font-size:11px;cursor:pointer;">Activar SwarmSpectrum (aceleración por polinomios de Chebyshev)</label>
           </div>
           <div class="row slider-row" style="margin-top:6px;">
             <label>Weight (w)</label>
@@ -707,7 +824,111 @@
             <div class="slider-val" id="spectrumLamVal">0.10</div>
           </div>
           <div class="hint" style="font-size:10px;margin-top:4px;">
-            Acelera la atención espectral en modelos Qwen reutilizando estados de atención entre pasos. Solo se aplica en etapas Qwen.
+            Acelera el muestreo de difusión reutilizando estados predichos mediante polinomios de Chebyshev. Reduce el tiempo de cómputo en un 25-35%.
+          </div>
+        </div>
+      </div>
+
+      <!-- POST-PROCESADO (POST RENDER TORCHED) -->
+      <div class="panel">
+        <div class="collapsible-header" id="postfxToggle">
+          <span class="arrow">▶</span> Efectos Post-Render (ProPost Torched)
+        </div>
+        <div class="collapsible-body" id="postfxBody">
+          <div class="hint" style="font-size:10px;margin-bottom:6px;">
+            Se aplican a la imagen final, tras el refiner y el upscale. Requiere los nodos ProPost Torched en ComfyUI.
+          </div>
+
+          <!-- VIGNETTE -->
+          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin:0;cursor:pointer;">
+              <input type="checkbox" id="vigEnabled" style="margin:0;"> Vignette
+            </label>
+            <span class="hint" id="vigVal" style="font-size:10px;">1.00</span>
+          </div>
+          <div class="row slider-row" style="margin-bottom:8px;">
+            <label style="font-size:10px;min-width:70px;">Intensidad</label>
+            <input type="range" id="vigIntensity" min="0" max="3" step="0.05" value="1.0" style="flex:1;">
+          </div>
+          <div class="two-col" style="margin-bottom:10px;">
+            <div class="slider-row"><label style="font-size:10px;">Centro X</label><input type="range" id="vigCX" min="0" max="1" step="0.01" value="0.5" style="flex:1;"></div>
+            <div class="slider-row"><label style="font-size:10px;">Centro Y</label><input type="range" id="vigCY" min="0" max="1" step="0.01" value="0.5" style="flex:1;"></div>
+          </div>
+
+          <!-- FILM GRAIN -->
+          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;border-top:1px solid var(--border);padding-top:8px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin:0;cursor:pointer;">
+              <input type="checkbox" id="grainEnabled" style="margin:0;"> Film Grain
+            </label>
+          </div>
+          <div class="row" style="margin-bottom:6px;">
+            <label style="font-size:10px;">Tipo</label>
+            <select id="grainType" style="width:100%;margin-top:3px;">
+              <option value="Fine">Fine</option>
+              <option value="Fine Simple" selected>Fine Simple</option>
+              <option value="Coarse">Coarse</option>
+              <option value="Coarser">Coarser</option>
+            </select>
+          </div>
+          <div class="two-col" style="margin-bottom:6px;">
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Sat</label><input type="range" id="grainSat" min="0" max="1" step="0.01" value="0.3" style="flex:1;"></div>
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Power</label><input type="range" id="grainPower" min="0" max="1" step="0.01" value="0.3" style="flex:1;"></div>
+          </div>
+          <div class="two-col" style="margin-bottom:6px;">
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Shadows</label><input type="range" id="grainShadows" min="0" max="1" step="0.01" value="0.35" style="flex:1;"></div>
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Highs</label><input type="range" id="grainHighs" min="0" max="1" step="0.01" value="0.1" style="flex:1;"></div>
+          </div>
+          <div class="two-col" style="margin-bottom:10px;">
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Scale</label><input type="range" id="grainScale" min="0.5" max="4" step="0.1" value="1" style="flex:1;"></div>
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Sharpen</label><input type="number" id="grainSharpen" min="0" max="10" step="1" value="0" style="width:100%;"></div>
+          </div>
+          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;margin:0;cursor:pointer;">
+              <input type="checkbox" id="grainGray" style="margin:0;"> Escala de grises
+            </label>
+          </div>
+
+          <!-- RADIAL BLUR -->
+          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;border-top:1px solid var(--border);padding-top:8px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin:0;cursor:pointer;">
+              <input type="checkbox" id="radialEnabled" style="margin:0;"> Radial Blur
+            </label>
+            <span class="hint" id="radialVal" style="font-size:10px;">64</span>
+          </div>
+          <div class="row slider-row" style="margin-bottom:6px;">
+            <label style="font-size:10px;min-width:70px;">Fuerza</label>
+            <input type="range" id="radialStrength" min="0" max="256" step="1" value="64" style="flex:1;">
+          </div>
+          <div class="two-col" style="margin-bottom:6px;">
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Centro X</label><input type="range" id="radialCX" min="0" max="1" step="0.01" value="0.5" style="flex:1;"></div>
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Centro Y</label><input type="range" id="radialCY" min="0" max="1" step="0.01" value="0.5" style="flex:1;"></div>
+          </div>
+          <div class="two-col" style="margin-bottom:10px;">
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Foco</label><input type="range" id="radialSpread" min="0.1" max="8" step="0.1" value="1" style="flex:1;"></div>
+            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Steps</label><input type="number" id="radialSteps" min="1" max="32" step="1" value="5" style="width:100%;"></div>
+          </div>
+
+          <!-- LUT -->
+          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;border-top:1px solid var(--border);padding-top:8px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin:0;cursor:pointer;">
+              <input type="checkbox" id="lutEnabled" style="margin:0;"> LUT (Color Grading)
+            </label>
+            <span class="hint" id="lutVal" style="font-size:10px;">0.80</span>
+          </div>
+          <div class="row" style="margin-bottom:6px;">
+            <label style="font-size:10px;">LUT</label>
+            <select id="lutName" style="width:100%;margin-top:3px;">
+              <option value="">Cargando LUTs...</option>
+            </select>
+          </div>
+          <div class="row slider-row" style="margin-bottom:6px;">
+            <label style="font-size:10px;min-width:70px;">Strength</label>
+            <input type="range" id="lutStrength" min="0" max="1" step="0.01" value="0.8" style="flex:1;">
+          </div>
+          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;margin:0;cursor:pointer;">
+              <input type="checkbox" id="lutLog" style="margin:0;"> LOG space
+            </label>
           </div>
         </div>
       </div>

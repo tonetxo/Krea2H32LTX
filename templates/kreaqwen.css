@@ -25,6 +25,15 @@
 .img-dim-badge{position:absolute;bottom:10px;right:10px;background:rgba(12,16,22,0.85);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,0.18);color:var(--accent);font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.04em;padding:3px 8px;border-radius:4px;pointer-events:none;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.5);}
 .variant-dim-tag{font-family:var(--mono);font-size:9.5px;color:var(--accent);font-weight:600;margin-left:auto;}
 
+/* Overlay de pantalla completa para variantes */
+.variant-fs-overlay{position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,0.96);display:flex;align-items:center;justify-content:center;cursor:grab;}
+.variant-fs-overlay.dragging{cursor:grabbing;}
+.variant-fs-overlay img{max-width:100vw;max-height:100vh;width:auto;height:auto;object-fit:contain;user-select:none;-webkit-user-drag:none;transform-origin:center center;}
+.variant-fs-close{position:fixed;top:14px;right:16px;background:rgba(12,16,22,0.85);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:18px;line-height:1;width:38px;height:38px;border-radius:8px;cursor:pointer;z-index:2147483647;}
+.variant-fs-close:hover{border-color:var(--accent);color:var(--accent);}
+.variant-fs-dl{position:fixed;top:14px;left:16px;background:rgba(12,16,22,0.85);border:1px solid rgba(255,255,255,0.25);color:var(--accent);font-family:var(--mono);font-size:11px;padding:8px 12px;border-radius:8px;text-decoration:none;z-index:2147483647;}
+.variant-fs-dl:hover{border-color:var(--accent);}
+
 /* Dropzone de referencia (#refDropzone) y wrap de referencia */
 #refDropzone{min-height:80px;}
 #refWrap{background:var(--panel-2);border:1px solid var(--border);border-radius:5px;min-height:120px;max-height:45vh;display:flex;align-items:center;justify-content:center;}

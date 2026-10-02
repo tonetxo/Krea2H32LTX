@@ -200,3 +200,34 @@ def get_llamacpp_url():
     """Devuelve la URL de llama.cpp / llama-server."""
     cfg = load_config()
     return cfg.get("llamacpp", {}).get("url") or os.environ.get("LLAMACPP_URL", "http://127.0.0.1:8080")
+
+
+def get_lut_dirs():
+    """Devuelve los directorios de LUTs (.cube) que ComfyUI expone.
+
+    SwarmUI reenvía a ComfyUI tanto el directorio de la extensión
+    SwarmUI-PostRenderTorched como la carpeta de modelos `luts`. Se devuelven
+    ambos (los existentes) para poder embeber la lista en el HTML sin depender
+    del endpoint /object_info (que el proxy local no reenvía).
+    """
+    candidates = []
+    cfg = load_config()
+    cfg_luts = cfg.get("comfyui", {}).get("luts_dir")
+    if cfg_luts and os.path.isdir(os.path.expanduser(cfg_luts)):
+        candidates.append(os.path.realpath(os.path.expanduser(cfg_luts)))
+
+    # Carpeta de modelos luts (p.ej. ~/SwarmUI/Models/luts)
+    models_dir = get_models_dir()
+    candidates.append(os.path.join(models_dir, "luts"))
+
+    # Directorio de la extensión PostRenderTorched (relativo a la raíz de SwarmUI)
+    swarm_root = os.path.dirname(models_dir)
+    candidates.append(os.path.join(
+        swarm_root, "src", "Extensions", "SwarmUI-PostRenderTorched", "luts"))
+
+    out = []
+    for c in candidates:
+        r = os.path.realpath(os.path.expanduser(c))
+        if os.path.isdir(r) and r not in out:
+            out.append(r)
+    return out

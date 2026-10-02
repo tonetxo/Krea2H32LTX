@@ -55,6 +55,7 @@ def main():
         'vae_exclude': ('audio', 'video'),
         'upscale_dir': UPSCALE_DIR,
         'upscale_fallback': '4xPurePhoto-Span.pth',
+        'lut_dirs': config_loader.get_lut_dirs(),
         'header_title': 'KreaQwen',
         'header_sub': 'grafo: KreaQwen_Native · 2-Stage Diffusion & Refiner',
         'model_count_label': 'modelos diffusion',
