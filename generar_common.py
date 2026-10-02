@@ -28,7 +28,11 @@ def get_file_list(directory, ext='.safetensors', fallback=None):
     for d, prefix in entries:
         if not os.path.exists(d):
             continue
-        for root, _, file_list in os.walk(d):
+        # followlinks=True: ComfyUI (SwarmUI) organiza modelos con symlinks a
+        # otros discos (p.ej. Stable-Diffusion/ltxv -> /media/.../ltxv). Sin
+        # seguirlos, esos modelos no llegan a AVAILABLE_MODELS mientras que el
+        # COMBO del backend sí los ve.
+        for root, _, file_list in os.walk(d, followlinks=True):
             for f in file_list:
                 if f.endswith(ext):
                     rel = os.path.relpath(os.path.join(root, f), d)
@@ -53,7 +57,7 @@ def get_lora_list(directory, fallback="ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safet
     loras = []
     if not directory or not os.path.exists(directory):
         return [fallback] if fallback else []
-    for root, _, files in os.walk(directory):
+    for root, _, files in os.walk(directory, followlinks=True):
         for file in files:
             if file.endswith('.safetensors'):
                 rel_path = os.path.relpath(os.path.join(root, file), directory)
@@ -196,7 +200,7 @@ def generate_html(config):
     # --- LUTs (.cube) para el post-procesado ProPost (opcional) ---
     lut_files = []
     for d in config.get('lut_dirs', []) or []:
-        for root, _, file_list in os.walk(d):
+        for root, _, file_list in os.walk(d, followlinks=True):
             for f in file_list:
                 if f.lower().endswith('.cube'):
                     rel = os.path.relpath(os.path.join(root, f), d)

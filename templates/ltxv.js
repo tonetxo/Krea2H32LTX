@@ -8,7 +8,7 @@ const CONFIG = {
   SERVERURL_KEY: 'ltxv_serverUrl',
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
-  DEFAULT_MODEL: "diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+  DEFAULT_MODEL: "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
   DEFAULT_VAE: "Checkpoint",
   N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740"},
   loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
@@ -1479,7 +1479,17 @@ function buildGraph(mode, job){
     };
     // Helper para obtener un checkpoint base LTXV disponible para el Text Encoder y Audio VAE
     const availableLtxvModels = (typeof AVAILABLE_MODELS !== "undefined" && Array.isArray(AVAILABLE_MODELS)) ? AVAILABLE_MODELS : [];
-    const baseCkpt = availableLtxvModels.find(m => !m.includes("diffusion_models") && (m.includes("ltxv/") || m.includes("ltx-2") || m.includes("sulphur"))) || "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors";
+    // ckpt_name se resuelve contra la carpeta 'checkpoints' de ComfyUI: excluir
+    // el modelo diffusion elegido (UNETLoader) y cualquier variante del mismo
+    // basename (con/sin prefijo diffusion_models/). "ltxv/" como subcadena
+    // colaba audio-separación (ltxv/MelBandRoformer...) → FileNotFoundError.
+    const diffBase = unetName.split("/").pop().toLowerCase();
+    const looksLikeLtxCkpt = (m) => {
+      const base = m.split("/").pop().toLowerCase();
+      if (base === diffBase) return false;
+      return !m.includes("diffusion_models") && (base.includes("ltx-") || base.includes("ltx_") || base.includes("sulphur"));
+    };
+    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt) || "ltxv/sulphur_distil_bf16.safetensors";
 
     const textEncoderChoice = (j ? j.textEncoder : $("textEncoderSelect")?.value) || "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors";
     if(g[N.LTXAV_TEXT_ENCODER] && g[N.LTXAV_TEXT_ENCODER].inputs){
@@ -1537,7 +1547,13 @@ function buildGraph(mode, job){
     };
   } else if(g["617"] && g["617"].inputs){
     const availableLtxvModels = (typeof AVAILABLE_MODELS !== "undefined" && Array.isArray(AVAILABLE_MODELS)) ? AVAILABLE_MODELS : [];
-    const baseCkpt = availableLtxvModels.find(m => !m.includes("diffusion_models") && (m.includes("ltxv/") || m.includes("ltx-2") || m.includes("sulphur"))) || "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors";
+    const diffBase2 = (isDiffusionModel ? modelChoice : "").split("/").pop().toLowerCase();
+    const looksLikeLtxCkpt2 = (m) => {
+      const base = m.split("/").pop().toLowerCase();
+      if (base === diffBase2) return false;
+      return !m.includes("diffusion_models") && (base.includes("ltx-") || base.includes("ltx_") || base.includes("sulphur"));
+    };
+    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt2) || "ltxv/sulphur_distil_bf16.safetensors";
     g["617"].class_type = "LTXVAudioVAELoader";
     g["617"].inputs.ckpt_name = isDiffusionModel ? baseCkpt : modelChoice;
   }

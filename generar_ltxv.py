@@ -16,6 +16,10 @@ _ltxv_models = os.path.join(_diff_models, "ltxv")
 MODELS_DIR = os.environ.get("LTXV_MODELS_DIR", _ltxv_models if os.path.isdir(_ltxv_models) else _diff_models)
 SD_MODELS_DIR = os.environ.get("LTXV_SD_MODELS_DIR", _checkpoints)
 DIFFUSION_MODELS_DIR = os.environ.get("LTXV_DIFFUSION_MODELS_DIR", _diff_models)
+# Prefijo solo si MODELS_DIR es la subcarpeta real 'ltxv'; sobre la raíz
+# diffusion_models el prefijo renombraba TODO (ltxv/MelBandRoformer...) a
+# nombres que ComfyUI no ve en su COMBO.
+MODELS_PREFIX = "ltxv" if os.path.basename(os.path.normpath(MODELS_DIR)) == "ltxv" else ""
 
 VAE_DIR = os.environ.get("LTXV_VAE_DIR", config_loader.get_model_subdirs("vae"))
 VAE_PREFIX = os.environ.get("LTXV_VAE_PREFIX", "")
@@ -37,11 +41,11 @@ def main():
         'ui_css': 'ltxv.css',
         'ui_js': 'ltxv.js',
         'model_dirs': [
-            (MODELS_DIR, 'ltxv'),
             (SD_MODELS_DIR, ''),
             (DIFFUSION_MODELS_DIR, 'diffusion_models'),
+            (MODELS_DIR, MODELS_PREFIX),
         ],
-        'model_fallback': 'diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors',
+        'model_fallback': 'ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors',
         'model_include': ('ltx', 'sulphur'),
         'model_exclude': ('StableAudio/', 'HiDream/', 'sam3.1_multiplex_fp16', 'lens_turbo_bf16', 'sd3.5/', 'sdxl/', 'diffusion_models/minimaxh3/'),
         'clip_dirs': [(CLIP_DIR, '')],
