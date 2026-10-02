@@ -543,7 +543,7 @@ $("sigmaShiftAudio")?.addEventListener("input", (e) => {
 });
 
 // --- SPECTRUM (MiniMax H3) ---
-const SPECTRUM_DEFAULTS = { enabled: true, blend: 0.5, flex: 0.75, warmup: 1, bootstrapFirstForecast: true, historyStorage: "system_ram" };
+const SPECTRUM_DEFAULTS = { enabled: true, blend: 0.5, flex: 0.75, warmup: 1, bootstrapFirstForecast: true, historyStorage: "vram" };
 function loadSpectrum(){
   try { return Object.assign({}, SPECTRUM_DEFAULTS, JSON.parse(localStorage.getItem(SPECTRUM_KEY) || "{}")); }
   catch(_) { return {...SPECTRUM_DEFAULTS}; }
@@ -570,7 +570,7 @@ function getSpectrumState(){
     flex: parseFloat($("spectrumFlex")?.value ?? "0.75"),
     warmup: parseInt($("spectrumWarmup")?.value ?? "1", 10),
     bootstrapFirstForecast: $("segBootstrapOn")?.classList.contains("on") ?? true,
-    historyStorage: $("spectrumHistoryStorage")?.value || "system_ram",
+    historyStorage: $("spectrumHistoryStorage")?.value || "vram",
   };
 }
 const _spectrumState = loadSpectrum();
@@ -951,17 +951,6 @@ for(let i = 0; i < R2V_MAX_VIDEOS; i++) refVideos.push(refVideoState(i));
 for(let i = 0; i < R2V_MAX_AUDIOS; i++) refAudios.push(refAudioState(i));
 
 renderR2V();
-
-function _r2vInputFile(id, accept, onFile){
-  const inp = $(id);
-  if(!inp) return;
-  inp.accept = accept || "";
-  inp.onchange = () => {
-    const f = inp.files && inp.files[0];
-    if(f) onFile(f);
-    inp.value = "";
-  };
-}
 
 // --- RENDER de la malla de imágenes de referencia ---
 function updateR2VAspectFromFirstRef(){
@@ -1350,37 +1339,6 @@ async function prepareRefVideo(i){
   }
 }
 
-// --- Preparar audio de referencia (mitigación OOM VAE de audio) ---
-// El encode tiled del backend falla con audios largos (tuple index out of
-// range), así que acortamos el audio a la duración del clip con ffmpeg antes
-// de subirlo. Menos muestras = menos VRAM por encode.
-async function prepareRefAudio(i, force = false){
-  const ref = refAudios[i];
-  if(!ref || !ref.local) return;
-  if(ref.uploaded && !force) return;
-  const duration = parseFloat($("duration")?.value || "0");
-  const fd = new FormData();
-  fd.append("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
-  if(duration > 0) fd.append("trim_end", String(duration));
-  if(ref.volume !== 1.0){
-    fd.append("volume", String(ref.volume));
-    fd.append("use_audio","true");
-  }
-  try {
-    const r = await fetch("/api/video_preprocess", { method: "POST", body: fd });
-    if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,150)); }
-    const d = await r.json();
-    ref.uploaded = d.audio || null;
-    if(ref.uploaded){
-      log(`🎵 Audio de referencia ${i+1} recortado a ${duration.toFixed(1)}s: ${ref.uploaded.name}`, "l-ok");
-    } else {
-      throw new Error("ffmpeg no devolvió audio");
-    }
-  } catch(err){
-    log(`❌ Error recortando audio ref ${i+1}: ${err.message}`, "l-err");
-  }
-}
-
 // --- ASPECT RATIO MODE (Auto vs Forzar 16:9) ---
 const AR_MODE_KEY = "minimaxh3_ar_mode";
 
@@ -1431,7 +1389,7 @@ CONFIG.findMedia = function(nodeOutput){
 CONFIG.showMedia = showVideo;
 CONFIG.addToVariantGallery = addToVariantGallery;
 CONFIG.renderVariantMedia = function(card, url, media){
-  return `<video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
+  return `<video src="${escapeHtml(url)}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
 };
 CONFIG.variantMeta = function(){
   const s = getSpectrumState();
@@ -1449,7 +1407,7 @@ CONFIG.variantMeta = function(){
     ["CLIP", clip],
     ["VAE Vídeo", vae],
     ["LoRAs", activeLoras.length ? activeLoras.join(", ") : "ninguna"],
-    ["H3 Sparse Attn", h.sparseEnabled ? `on (${Math.round(h.videoBudget * 100)}% budget)` : "off"],
+    ["H3 Sparse Attn", `on (${h.sparseBackend} · ${Math.round(h.videoBudget * 100)}% budget)`],
     ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
     ["Sigma Shift", `Vídeo ${ss.shiftVideo.toFixed(1)} / Audio ${ss.shiftAudio.toFixed(1)}`],
     ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup}${s.bootstrapFirstForecast ? ' · boot' : ''} · ${s.historyStorage}` : "off"],
@@ -1551,14 +1509,22 @@ CONFIG.onClearPreview = function(){
 };
 
 CONFIG.onPromptError = function(pid){
-  delete pendingSeeds[pid];
+  // No avanzar la cola aquí: common.js ya hace currentBatchIndex++ +
+  // processNextBatch tras este callback; llamar a finishCurrentJob() desde
+  // aquí arranca el siguiente job mientras processNextBatch dispara una
+  // variante del job ANTIGUO (race de batch/variantCounter).
   delete promptVariantMap[pid];
   delete displayedSlots[pid];
-  finishCurrentJob();
+  const grid = $("variantGrid");
+  if(grid){
+    const card = grid.querySelector('.variant-card-generating');
+    if(card) card.remove();
+  }
 };
 CONFIG.startNextVariant = async function(index){
   // common.js pide la siguiente variante del batch activo
-  if(activeJob) activeJob.currentVariantIndex = null;
+  if(!activeJob) return;
+  activeJob.currentVariantIndex = null;
   await runSingleGeneration(index);
 };
 CONFIG.onBatchComplete = function(){
@@ -1572,18 +1538,13 @@ CONFIG.onStopCurrent = function(pid){
   delete displayedSlots[pid];
 };
 CONFIG.onStopAll = function(){
-  for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);
   if(currentPromptId) handledPrompts.add(currentPromptId);
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
-  pendingSeeds = {};
   promptVariantMap = {};
-  displayedGalleryFiles.clear();
   for(const k of Object.keys(displayedSlots)) delete displayedSlots[k];
-  processingPrompts.clear();
   currentPromptId = null;
   jobQueue = [];
-  updateQueueUI();
   activeJob = null;
+  updateQueueUI();
   enableStopButtons(false);
   $("btnGenerate").disabled=false;
   // Reset del batch para evitar que processNextBatch resucite variantes tras stop.
@@ -1758,7 +1719,7 @@ function updateQueueUI(){
     jobQueue.forEach((job, idx) => {
       const row = document.createElement("div");
       row.className = "queue-item-row";
-      const pText = (job.prompt || "sin prompt").trim();
+      const pText = escapeHtml((job.prompt || "sin prompt").trim());
       const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
       const modeLabel = job.mode || "i2v";
       row.innerHTML = `
@@ -1828,77 +1789,6 @@ function snapshotJob(){
     createdAt: Date.now(),
   };
 }
-
-function restoreJob(job){
-  $("prompt").value = job.prompt || "";
-  seedMode = job.seedMode || "random";
-  if(seedMode === "random"){
-    $("segRandom")?.classList.add("on");
-    $("segFixed")?.classList.remove("on");
-    $("seedVal").disabled = true;
-  } else {
-    $("segFixed")?.classList.add("on");
-    $("segRandom")?.classList.remove("on");
-    $("seedVal").disabled = false;
-    $("seedVal").value = job.seedValue;
-  }
-  $("width").value = job.width;
-  $("height").value = job.height;
-  $("duration").value = job.duration;
-  $("mpSlider").value = job.mp;
-  $("mpVal").textContent = parseFloat(job.mp).toFixed(2);
-  if($("unetSelect") && job.unet) $("unetSelect").value = job.unet;
-  if($("clipSelect") && job.clip) $("clipSelect").value = job.clip;
-  if($("vaeSelect") && job.vae) $("vaeSelect").value = job.vae;
-  if($("samplerName") && job.samplerName) $("samplerName").value = job.samplerName;
-  if($("schedulerName") && job.schedulerName) $("schedulerName").value = job.schedulerName;
-  if($("stepsSlider") && job.steps){ $("stepsSlider").value = job.steps; $("stepsVal").textContent = job.steps; }
-  setBitDepthUI(job.bitDepth);
-  saveBitDepth(job.bitDepth);
-  if(job.spectrum){ setSpectrumUI(job.spectrum); saveSpectrum(job.spectrum); }
-  if(job.solH3){ setSolH3UI(job.solH3); saveSolH3(job.solH3); }
-  if(job.latentUpscale){ setLatentUpscaleUI(job.latentUpscale); saveLatentUpscale(job.latentUpscale); }
-  if(job.rife){ setRifeUI(job.rife); saveRife(job.rife); }
-  if(job.faceRefine){ setFaceRefineUI(job.faceRefine); saveFaceRefine(job.faceRefine); }
-  if(job.attentionBackend){ setAttentionBackendUI(job.attentionBackend); saveAttentionBackend(job.attentionBackend); }
-  if(job.attentionOptimizer){ setAttentionOptimizerUI(job.attentionOptimizer.mode); saveAttentionOptimizer(job.attentionOptimizer); }
-  if(job.h3opt){ setH3OptUI(job.h3opt); saveH3Opt(job.h3opt); }
-  if(job.aimdo){ setAimdoUI(job.aimdo); saveAimdo(job.aimdo); }
-  if(job.blockSparse){ setBlockSparseUI(job.blockSparse); saveBlockSparse(job.blockSparse); }
-  setModeUI(job.mode || "i2v");
-  $("batchSize").value = job.batchSize;
-  uploadedFirstImage = job.uploadedFirstImage;
-  uploadedLastImage = job.uploadedLastImage;
-  localFirstFile = job.localFirstFile;
-  localLastFile = job.localLastFile;
-  // Restaurar referencias r2v
-  if(Array.isArray(job.refImages)){
-    refImages.forEach((r, i) => { if(job.refImages[i]){ r.local = job.refImages[i].local; r.uploaded = job.refImages[i].uploaded; } });
-  }
-  if(Array.isArray(job.refVideos)){
-    refVideos.forEach((r, i) => { if(job.refVideos[i]){ r.file = job.refVideos[i].file; r.local = job.refVideos[i].local; r.uploaded = job.refVideos[i].uploaded; r.audioUploaded = job.refVideos[i].audioUploaded; r.useAudio = job.refVideos[i].useAudio; r.volume = job.refVideos[i].volume; r.settings = {...job.refVideos[i].settings}; } });
-  }
-  if(Array.isArray(job.refAudios)){
-    refAudios.forEach((r, i) => { if(job.refAudios[i]){ r.local = job.refAudios[i].local; r.uploaded = job.refAudios[i].uploaded; r.volume = job.refAudios[i].volume; } });
-  }
-  renderR2V();
-  currentAspectRatio = job.aspectRatio || (job.width / job.height) || 16/9;
-  if(localFirstFile){
-    const reader = new FileReader();
-    reader.onload = (e) => showInputImage(e.target.result);
-    reader.readAsDataURL(localFirstFile);
-  }
-  if(localLastFile && currentMode === "flf2v"){
-    const reader = new FileReader();
-    reader.onload = (e) => showLastFrameImage(e.target.result);
-    reader.readAsDataURL(localLastFile);
-  }
-  updateDurationHints();
-}
-
-// --- CHAIN ---
-function setChainActive(keys){document.querySelectorAll(".chain .node").forEach(n=>n.classList.toggle("active",keys.includes(n.dataset.n)));}
-
 // --- UPDATE SEED UI ---
 function updateSeedUI(seedValue) {
     $("seedVal").value = seedValue;
@@ -2009,7 +1899,7 @@ async function loadKrea2Recent(){
       const sizeKB = Math.round(it.size/1024);
       const div = document.createElement("div");
       div.className = "gallery-item";
-      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${tsTxt} · ${sizeKB}KB</div>`;
+      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${escapeHtml(tsTxt)} · ${sizeKB}KB</div>`;
       div.addEventListener("click", () => {
         const items = Array.from(grid.querySelectorAll(".gallery-item"));
         krea2RecentIndex = items.indexOf(div);
@@ -2385,13 +2275,14 @@ async function applyWorkflow(workflow, opts={}){
     if(sel && typeof sel === "object" && !Array.isArray(sel) && sel.selection){
       bs.selection = mapBlockSparseSelection(sel.selection);
       if(sel.tau != null) bs.tau = sel.tau;
-      if(sel.keep_percent != null) bs.tau = 1.3;
+      // keep_percent es un parámetro distinto de tau: no lo pisa con 1.3.
+      if(sel.keep_percent != null) bs.keepPercent = sel.keep_percent;
     } else if(sel && Array.isArray(sel) && sel.length >= 2){
       // Formato antiguo (por compatibilidad)
       bs.selection = mapBlockSparseSelection(sel[0]) || bs.selection;
       const sub = sel[1] || {};
       if(typeof sub.tau === "number") bs.tau = sub.tau;
-      if(typeof sub.keep_percent === "number") bs.tau = 1.3;
+      if(typeof sub.keep_percent === "number") bs.keepPercent = sub.keep_percent;
     } else if(sel && typeof sel === "string"){
       bs.selection = mapBlockSparseSelection(sel) || bs.selection;
       if(typeof blockSparseNode.inputs["selection.tau"] === "number") bs.tau = blockSparseNode.inputs["selection.tau"];
@@ -2454,7 +2345,7 @@ async function applyWorkflow(workflow, opts={}){
       flex: typeof spectrumNode.inputs.flex_window === "number" ? spectrumNode.inputs.flex_window : 0.75,
       warmup: typeof spectrumNode.inputs.warmup_steps === "number" ? spectrumNode.inputs.warmup_steps : 1,
       bootstrapFirstForecast: spectrumNode.inputs.bootstrap_first_forecast !== false,
-      historyStorage: spectrumNode.inputs.history_storage || "system_ram",
+      historyStorage: spectrumNode.inputs.history_storage || "vram",
     };
     setSpectrumUI(s);
     saveSpectrum(s);
@@ -2821,7 +2712,6 @@ $("lastFrameWrap")?.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handl
 function clearFirstFrame(){
   uploadedFirstImage = null;
   localFirstFile = null;
-  currentVideoFile = null;
   dbDeleteMedia("firstImage").catch(()=>{});
   dbDeleteMedia("firstVideo").catch(()=>{});
   const wrap = $("inputWrap"), img = $("inputImg"), actions = $("imgInputActions");
@@ -2954,10 +2844,8 @@ function showLastFrameImage(src){
   $("lastFrameDropzone").style.display = "none";
 }
 
-let currentVideoFile = null;
 
 function handleVideoFile(file, shouldSaveToGallery = true){
-  currentVideoFile = file;
   const videoUrl = URL.createObjectURL(file);
   const vid = document.createElement("video");
   vid.muted = true;
@@ -2971,8 +2859,27 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   });
 
   function extractFrameAt(time, callback){
+    // Si ya estamos en la posición pedida, el navegador NO dispara "seeked"
+    // (no hay seek real): dibujamos directamente para no colgar el callback.
+    if(Math.abs(vid.currentTime - time) < 0.001){
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = vid.videoWidth || 640;
+        canvas.height = vid.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+        callback(null, canvas.toDataURL("image/jpeg", 0.92));
+      } catch(err){ callback(err); }
+      return;
+    }
     vid.currentTime = time;
-    vid.addEventListener("seeked", function onSeeked(){
+    // Timeout de seguridad: un vídeo corrupto no dispara seeked nunca.
+    const timer = setTimeout(() => {
+      vid.removeEventListener("seeked", onSeeked);
+      callback(new Error("timeout esperando el frame"));
+    }, 5000);
+    function onSeeked(){
+      clearTimeout(timer);
       vid.removeEventListener("seeked", onSeeked);
       try {
         const canvas = document.createElement("canvas");
@@ -2983,7 +2890,8 @@ function handleVideoFile(file, shouldSaveToGallery = true){
         const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
         callback(null, dataUrl);
       } catch(err){ callback(err); }
-    }, { once: true });
+    }
+    vid.addEventListener("seeked", onSeeked, { once: true });
   }
 
   function setFrameAsInput(dataUrl, frameLabel){
@@ -3000,7 +2908,7 @@ function handleVideoFile(file, shouldSaveToGallery = true){
       } else {
         log(`ℹ️ ${file.name} no contiene metadatos de workflow.`, "l-warn");
       }
-    });
+    }).catch(e => log("❌ Error convirtiendo el frame: "+e.message, "l-err"));
   }
 
   function showFrameSelector(){
@@ -3063,88 +2971,6 @@ async function _uploadOneHot(_kind, local, name){
   return {name:d.name, subfolder:d.subfolder||"", type:d.type||"input"};
 }
 
-async function ensureImagesUploaded(){
-  setRun("busy","subiendo...");
-
-  if(currentMode === "r2v"){
-    // Referencias: imágenes, vídeos (ya preparados via /api/video_preprocess) y audios
-    for(let i = 0; i < refImages.length; i++){
-      const ref = refImages[i];
-      if(ref.local && !ref.uploaded){
-        try {
-          ref.uploaded = await _uploadOneHot("image", ref.local, "ref_img_"+(i+1)+".png");
-        } catch(e){ throw new Error("fallo subida imagen ref "+(i+1)+": "+e.message); }
-      }
-    }
-    for(let i = 0; i < refVideos.length; i++){
-      const ref = refVideos[i];
-      // El vídeo debe haberse preparado (uploaded) con /api/video_preprocess antes.
-      if(ref.local && !ref.uploaded){
-        throw new Error("Prepara el vídeo de referencia "+(i+1)+" (botón 'Preparar vídeo')");
-      }
-    }
-    for(let i = 0; i < refAudios.length; i++){
-      const ref = refAudios[i];
-      if(ref.local && !ref.uploaded){
-        try {
-          // Siempre vía ffmpeg: recorta el audio a la duración del clip
-          // (mitigación OOM de la VAE de audio) y aplica volumen si != 1.
-          if(true){
-            const fd = new FormData();
-            fd.append("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
-            const dur = parseFloat($("duration")?.value || "0");
-            if(dur > 0) fd.append("trim_end", String(dur));
-            if(ref.volume !== 1.0){
-              fd.append("volume", String(ref.volume));
-            }
-            fd.append("use_audio","true");
-            const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
-            if(!r.ok) throw new Error("fallo ffmpeg audio");
-            const d = await r.json();
-            ref.uploaded = d.audio || null;
-            if(!ref.uploaded) throw new Error("ffmpeg no devolvió audio");
-            if(dur > 0) log(`🎵 Audio ref ${i+1} recortado a ${dur.toFixed(1)}s`, "l-ok");
-          } else {
-            ref.uploaded = await _uploadOneHot("image", ref.local, ref.local.name || ("ref_audio_"+(i+1)));
-          }
-        } catch(e){ throw new Error("fallo subida audio ref "+(i+1)+": "+e.message); }
-      }
-    }
-    log("Referencias subidas.","l-ok");
-    return;
-  }
-
-  if(currentMode !== "r2v"){
-    if(!localFirstFile && (!localLastFile || currentMode !== "flf2v") && !uploadedFirstImage && !uploadedLastImage){
-      throw new Error("Selecciona una imagen de inicio o un último frame.");
-    }
-    // Imagen de inicio
-    if(localFirstFile){
-      const fd1 = new FormData();
-      fd1.append("image", localFirstFile, localFirstFile.name.replace(/^temp_\d+_/, ''));
-      fd1.append("overwrite","true");
-      const r1 = await fetch(server()+"/upload/image",{method:"POST",body:fd1});
-      if(!r1.ok) throw new Error("Fallo al subir imagen de inicio");
-      const d1 = await r1.json();
-      uploadedFirstImage = {name:d1.name, subfolder:d1.subfolder||"", type:d1.type||"input"};
-      log("Imagen de inicio subida: "+uploadedFirstImage.name,"l-ok");
-    }
-
-    // Último frame (solo flf2v)
-    if(currentMode === "flf2v" && localLastFile){
-      const fd2 = new FormData();
-      fd2.append("image", localLastFile, localLastFile.name.replace(/^temp_last_\d+_/, ''));
-      fd2.append("overwrite","true");
-      const r2 = await fetch(server()+"/upload/image",{method:"POST",body:fd2});
-      if(!r2.ok) throw new Error("Fallo al subir último frame");
-      const d2 = await r2.json();
-      uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
-      log("Último frame subido: "+uploadedLastImage.name,"l-ok");
-    }
-    return;
-  }
-}
-
 async function ensureJobImagesUploaded(job){
   if(job.isFaceRefineOnly) return;
   if(job.mode === "r2v"){
@@ -3162,20 +2988,25 @@ async function ensureJobImagesUploaded(job){
       const ref = rVideos[i];
       if(ref.file && !ref.uploaded){
         try{
+          // Contrato de serve.py:_do_video_preprocess: campo "image" + scale/
+          // ar_lock/trim_start/trim_end/skip_frames (el campo "video"/fps/
+          // scale_res no existe en el backend y daba HTTP 400).
           const s = ref.settings || {};
           const fd = new FormData();
-          fd.append("video", ref.file, ref.file.name);
-          fd.append("trim_start", String(s.trimStart || 0));
-          fd.append("trim_end", String(s.trimEnd || 0));
-          fd.append("fps", String(s.fps || 24));
-          fd.append("scale_res", String(s.scaleRes || 720));
-          fd.append("use_audio", String(ref.useAudio !== false));
+          fd.append("image", ref.file, ref.file.name || ("ref_video_"+i+".mp4"));
+          fd.append("scale", String(s.scale != null ? s.scale : 1));
+          fd.append("ar_lock", s.arLock ? "true" : "false");
+          fd.append("trim_start", s.trimStart || "");
+          fd.append("trim_end", s.trimEnd || "");
+          fd.append("skip_frames", String(s.skip != null ? s.skip : 1));
+          fd.append("use_audio", ref.useAudio !== false ? "true" : "false");
           fd.append("volume", String(ref.volume != null ? ref.volume : 1.0));
           const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
-          if(!r.ok) throw new Error("Fallo ffmpeg preprocess");
+          if(!r.ok){ const t = await r.text().catch(()=> ""); throw new Error("HTTP "+r.status+" "+t.slice(0,150)); }
           const d = await r.json();
           ref.uploaded = d.video || null;
           ref.audioUploaded = d.audio || null;
+          if(!ref.uploaded && !ref.audioUploaded) throw new Error(d.error || "sin resultado");
         } catch(e){ throw new Error("Fallo prep vídeo ref "+(i+1)+": "+e.message); }
       }
     }
@@ -3554,8 +3385,9 @@ function buildGraph(job){
     g[N.SPECTRUM].inputs.flex_window = s.flex;
     g[N.SPECTRUM].inputs.warmup_steps = s.warmup;
     g[N.SPECTRUM].inputs.bootstrap_first_forecast = s.bootstrapFirstForecast !== false;
-    g[N.SPECTRUM].inputs.history_storage = s.historyStorage;
+    g[N.SPECTRUM].inputs.history_storage = s.historyStorage || "vram";
     g[N.SPECTRUM].inputs.offline_smoothing_replay = false;
+    g[N.SPECTRUM].inputs.debug = false; // true = logs FORECAST/ACTUAL por consola backend (debug, no default)
     currentModelNode = N.SPECTRUM;
   }
 
@@ -4141,7 +3973,7 @@ function showVideo(slot, media, options={}){
   v.src = url;
   v.style.display = "block";
   empty.style.display = "none";
-  if(options.autoplay !== false) v.play().catch(err => console.log("Autoplay blocked:", err));
+  if(options.autoplay !== false) v.play().catch(err => console.debug("Autoplay bloqueado:", err));
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
@@ -4269,11 +4101,25 @@ function captureFrameFromPlayer(){
       if(!dur || !isFinite(dur)){ throw new Error("duración del vídeo no disponible"); }
       const targetTime = v.currentTime || 0;
       await new Promise((resolve, reject) => {
+        // Si ya estamos en la posición, no hay seek real y "seeked" nunca
+        // dispara: resolvemos directamente (con pequeño delay para asegurar
+        // que el frame está pintado).
+        if(Math.abs(v.currentTime - targetTime) < 0.001){
+          setTimeout(resolve, 50);
+          return;
+        }
         let resolved = false;
         const onSeeked = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; resolve(); } };
         const onError = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; reject(new Error("error durante seek")); } };
-        v.addEventListener("seeked", onSeeked, { once: true });
-        v.addEventListener("error", onError, { once: true });
+        const onTimeout = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; reject(new Error("timeout durante seek")); } };
+        const timer = setTimeout(onTimeout, 5000);
+        const settle = (fn) => { clearTimeout(timer); fn(); };
+        v.removeEventListener("seeked", onSeeked);
+        v.removeEventListener("error", onError);
+        const onSeekedT = () => { settle(onSeeked); };
+        const onErrorT = () => { settle(onError); };
+        v.addEventListener("seeked", onSeekedT, { once: true });
+        v.addEventListener("error", onErrorT, { once: true });
         v.currentTime = targetTime;
       });
       const canvas = document.createElement("canvas");
@@ -4357,14 +4203,14 @@ function createOrUpdatePlaceholderVariantCard(varIdx, seedUsed){
         card.className = "variant-card variant-card-generating";
         card.dataset.variantIndex = String(varIdx);
         card.innerHTML = `
-          <span class="variant-badge">Var ${varIdx} · procesando...</span>
+          <span class="variant-badge">Var ${parseInt(varIdx, 10) || 0} · procesando...</span>
           <span class="variant-progress-badge" style="display:none;"></span>
           <div class="thumb-wrap" style="position:relative;background:#000;min-height:120px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:4px 4px 0 0;">
             <img class="variant-live-thumb" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:0.4;transition:opacity 0.2s;">
           </div>
           <div class="variant-info">
             <span class="variant-seed-display" title="Semilla">
-              <span class="seed-text">${seedUsed}</span>
+              <span class="seed-text">${escapeHtml(String(seedUsed))}</span>
             </span>
             <span class="variant-time" title="Estado">⏳ En curso...</span>
           </div>
@@ -4444,98 +4290,6 @@ $("btnRefreshVideoHistory").addEventListener("click", (e) => {
   e.stopPropagation();
   loadVideoHistory();
 });
-
-// --- VIDEO HISTORY THUMBNAILS ---
-const THUMB_CACHE_PREFIX = "minimaxh3_thumb_";
-const THUMB_WIDTH = 320;
-const THUMB_QUALITY = 0.72;
-
-function _thumbCacheKey(item){
-  return item.filename + "|" + (item.mtime || 0) + "|" + item.subfolder + "|" + item.type;
-}
-function _safeCacheGet(key){
-  try { return localStorage.getItem(THUMB_CACHE_PREFIX + key); } catch(e){ return null; }
-}
-function _safeCacheSet(key, value){
-  try { localStorage.setItem(THUMB_CACHE_PREFIX + key, value); } catch(e){ /* quota/full: ignore */ }
-}
-
-function extractVideoFrame(videoUrl){
-  return new Promise((resolve) => {
-    const v = document.createElement("video");
-    v.crossOrigin = "anonymous";
-    v.muted = true;
-    v.playsInline = true;
-    v.preload = "metadata";
-    let resolved = false;
-    function done(result){
-      if(resolved) return;
-      resolved = true;
-      try { v.pause(); v.src = ""; v.load(); } catch(_){}
-      resolve(result);
-    }
-    v.addEventListener("loadedmetadata", () => {
-      const t = v.duration ? Math.min(0.5, v.duration / 2) : 0.1;
-      v.currentTime = t;
-    }, {once:true});
-    v.addEventListener("seeked", () => {
-      try {
-        const canvas = document.createElement("canvas");
-        const ratio = v.videoHeight / (v.videoWidth || 1);
-        canvas.width = THUMB_WIDTH;
-        canvas.height = Math.max(1, Math.round(THUMB_WIDTH * ratio));
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-        done(canvas.toDataURL("image/jpeg", THUMB_QUALITY));
-      } catch(err){ done(null); }
-    }, {once:true});
-    v.addEventListener("error", () => done(null), {once:true});
-    v.src = videoUrl;
-  });
-}
-
-async function getCachedThumb(item){
-  const key = _thumbCacheKey(item);
-  const cached = _safeCacheGet(key);
-  if(cached) return cached;
-  const url = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}&t=${item.mtime}`;
-  const dataUrl = await extractVideoFrame(url + "#t=0.1");
-  if(dataUrl) _safeCacheSet(key, dataUrl);
-  return dataUrl;
-}
-
-let _thumbObserver = null;
-function observeThumbs(){
-  if(_thumbObserver) _thumbObserver.disconnect();
-  if(!("IntersectionObserver" in window)){
-    document.querySelectorAll(".thumb-img").forEach(async (img) => {
-      if(img.dataset.loaded) return;
-      const item = JSON.parse(img.dataset.item || "{}");
-      if(!item.filename) return;
-      const dataUrl = await getCachedThumb(item);
-      if(dataUrl){ img.src = dataUrl; img.style.opacity = 1; }
-      img.dataset.loaded = "1";
-    });
-    return;
-  }
-  _thumbObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if(!entry.isIntersecting) return;
-      const img = entry.target;
-      if(img.dataset.loaded) return;
-      img.dataset.loaded = "1";
-      const item = JSON.parse(img.dataset.item || "{}");
-      if(!item.filename) return;
-      getCachedThumb(item).then(dataUrl => {
-        if(dataUrl){ img.src = dataUrl; img.style.opacity = 1; }
-      }).catch(() => {});
-    });
-  }, { rootMargin: "50px" });
-  document.querySelectorAll(".thumb-img").forEach(img => _thumbObserver.observe(img));
-}
-
 async function loadVideoHistory(){
   const status = $("videoHistoryStatus");
   const grid = $("videoHistoryGrid");
@@ -4563,7 +4317,7 @@ async function loadVideoHistory(){
         card.innerHTML = `
           <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
           <div class="variant-info">
-            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
+            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</span>
             <span class="variant-icons">
               <button class="variant-meta-btn" title="Copiar workflow" data-action="workflow">📋</button>
               <button class="variant-del-btn" title="Eliminar" data-action="delete">×</button>
@@ -4706,6 +4460,7 @@ async function loadVideoHistory(){
 
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
+    if(!activeJob) return; // guard: stop/error puede dejar la cola vacía entre el setTimeout y la ejecución
     try {
         const graph = buildGraph(activeJob);
         const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
@@ -4724,7 +4479,9 @@ async function runSingleGeneration(index) {
         if(activeJob && activeJob.isFaceRefineOnly){
           log(`Refinando rostro de ${activeJob.sourceMedia?.filename || "clip actual"}...`);
         } else {
-          log(`Procesando Var ${varIndex} (seed ${seedUsed})...`);
+          const spec = activeJob?.spectrum || getSpectrumState();
+          const specInfo = spec.enabled ? `⚡ Spectrum ON [blend ${spec.blend.toFixed(2)}, flex ${spec.flex.toFixed(2)}, ${spec.historyStorage || 'vram'}]` : 'Spectrum OFF';
+          log(`Procesando Var ${varIndex} (seed ${seedUsed}) · ${specInfo}...`);
         }
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
@@ -5165,22 +4922,9 @@ async function restoreMiniMaxH3MediaFromDB(){
       } else if(e.key.startsWith("refImg_") && e.data){
         const idx = parseInt(e.key.replace("refImg_",""),10);
         if(refImages[idx]){ refImages[idx].local = e.data; refImages[idx].uploaded = null; }
-      } else if(e.key.startsWith("refVid_") && e.data){
-        const idx = parseInt(e.key.replace("refVid_",""),10);
-        if(refVideos[idx]){
-          const b = dataUrlToBlob(e.data);
-          refVideos[idx].file = new File([b], e.name || "restored_ref.mp4", { type: e.type || b.type || "video/mp4" });
-          refVideos[idx].local = URL.createObjectURL(refVideos[idx].file);
-          refVideos[idx].uploaded = null;
-        }
-      } else if(e.key.startsWith("refAud_") && e.data){
-        const idx = parseInt(e.key.replace("refAud_",""),10);
-        if(refAudios[idx]){
-          const b = dataUrlToBlob(e.data);
-          refAudios[idx].local = new File([b], e.name || "restored_audio.mp3", { type: e.type || b.type || "audio/mpeg" });
-          refAudios[idx].uploaded = null;
-        }
       }
+      // refVid_/refAud_: no se persisten blobs de vídeo/audio (grandes); solo
+      // metadatos, por lo que NO son restaurables entre sesiones.
     } catch(err){ console.warn("Error restaurando medio", e.key, err); }
   }
   renderR2V();

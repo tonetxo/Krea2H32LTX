@@ -490,7 +490,7 @@
   },
   "162": {
     "inputs": {
-      "enabled": false,
+      "enabled": true,
       "blend_weight": 0.5,
       "degree": 1,
       "ridge_lambda": 0.1,
@@ -499,8 +499,8 @@
       "warmup_steps": 1,
       "tail_actual_steps": 1,
       "max_history": 8,
-      "debug": false,
-      "history_storage": "system_ram",
+      "debug": true,
+      "history_storage": "vram",
       "bootstrap_first_forecast": true,
       "anchor_residual_feedback": false,
       "selective_rollback_correction": false,
