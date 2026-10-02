@@ -430,6 +430,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             return None
         if length > max_body:
             return ("too_large", None)
+        boundary = m.group(1).strip().strip('"').strip("'")
         body = self.rfile.read(length)
         delim = b"--" + boundary.encode()
         parts = body.split(delim)
@@ -700,8 +701,14 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(200, {"video": video_result, "audio": audio_result})
         except subprocess.TimeoutExpired:
             self._send_json(500, {"error": "timeout procesando vídeo"})
+        except RuntimeError as e:
+            # Errores de flujo propios (sin pistas, ffmpeg sin output): respuesta
+            # HTTP correcta en vez de tumbar la conexión sin respuesta.
+            self._send_json(500, {"error": str(e)})
         except OSError as e:
             self._send_json(500, {"error": str(e)})
+        except Exception as e:  # nunca dejar sin respuesta al cliente
+            self._send_json(500, {"error": f"{type(e).__name__}: {e}"})
         finally:
             try:
                 if os.path.exists(src):
