@@ -193,6 +193,19 @@ def generate_html(config):
     mmh3x2_ui_port = config.get('mmh3x2_ui_port', '8003')
     kreaqwen_ui_port = config.get('kreaqwen_ui_port', '8004')
 
+    # --- LUTs (.cube) para el post-procesado ProPost (opcional) ---
+    lut_files = []
+    for d in config.get('lut_dirs', []) or []:
+        for root, _, file_list in os.walk(d):
+            for f in file_list:
+                if f.lower().endswith('.cube'):
+                    rel = os.path.relpath(os.path.join(root, f), d)
+                    rel = rel.replace('\\', '/')
+                    if rel not in lut_files:
+                        lut_files.append(rel)
+    lut_files.sort()
+    lut_js_array = json.dumps(lut_files)
+
     # --- Assemble CSS ---
     css = _read_template('base.css') + '\n' + _read_template(config['ui_css'])
 
@@ -216,6 +229,7 @@ def generate_html(config):
         "const AVAILABLE_CLIPS = __CLIP_LIST__;\n"
         "const AVAILABLE_INTERP_MODELS = __INTERP_LIST__;\n"
         "const AVAILABLE_UPSCALE_MODELS = __UPSCALE_LIST__;\n"
+        "const AVAILABLE_LUTS = __LUT_LIST__;\n"
         "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
         "const MINIMAXH3_UI_PORT = __MINIMAXH3_UI_PORT__;\n"
         "const MMH3X2_UI_PORT = __MMH3X2_UI_PORT__;\n"
@@ -265,7 +279,11 @@ def generate_html(config):
 """
 
     # --- Substitute placeholders ---
-    html = html.replace('__GRAPH_JSON__', graph_json)
+    # El JSON del workflow se incrusta dentro de un <script>: escapamos "</"
+    # para que ningún texto (p.ej. un prompt con "</script>") pueda cerrar el
+    # bloque de script e inyectar HTML. JS parsea "<\\/" igual que "</".
+    safe_graph_json = graph_json.replace('</', '<\\/')
+    html = html.replace('__GRAPH_JSON__', safe_graph_json)
     html = html.replace('__MODEL_LIST__', model_js_array)
     html = html.replace('__LORA_LIST__', lora_js_array)
     html = html.replace('__VAE_LIST__', vae_js_array)
@@ -277,6 +295,7 @@ def generate_html(config):
     html = html.replace('__MMH3X2_UI_PORT__', json.dumps(mmh3x2_ui_port))
     html = html.replace('__KREAQWEN_UI_PORT__', json.dumps(kreaqwen_ui_port))
     html = html.replace('__UPSCALE_LIST__', upscale_js_array)
+    html = html.replace('__LUT_LIST__', lut_js_array)
 
     # --- Write output ---
     with open(config['output_html'], 'w', encoding='utf-8') as f:

@@ -406,8 +406,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         return path == "/api/video_preprocess"
 
-    def _parse_multipart_parts(self):
-        """Parsea un POST multipart/form-data y devuelve un dict {field_name: {...}}."""
+    # Tope de body multipart: validar el Content-Length ANTES de leer el body,
+    # para que un Content-Length arbitrario no OOMee el proceso.
+    MAX_MULTIPART_BODY = 256 * 1024 * 1024  # 256 MB (vídeo preprocesado)
+
+    def _parse_multipart_parts(self, max_body=MAX_MULTIPART_BODY):
+        """Parsea un POST multipart/form-data y devuelve un dict {field_name: {...}}.
+
+        Devuelve None si no es multipart, o ('too_large', None) si el body
+        supera max_body (el llamador decide el error a devolver)."""
         import re
         ctype = self.headers.get("Content-Type", "")
         if not ctype.startswith("multipart/form-data"):
@@ -415,10 +422,14 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         m = re.search(r'boundary=([^;]+)', ctype)
         if not m:
             return None
-        boundary = m.group(1).strip().strip('"').strip("'")
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            return None
         if length <= 0:
             return None
+        if length > max_body:
+            return ("too_large", None)
         body = self.rfile.read(length)
         delim = b"--" + boundary.encode()
         parts = body.split(delim)
@@ -459,6 +470,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(403, {"error": "forbidden: solo same-origin puede subir archivos"})
             return
         parts = self._parse_multipart_parts()
+        if isinstance(parts, tuple) and parts and parts[0] == "too_large":
+            self._send_json(413, {"error": "body demasiado grande (máx 256 MB)"})
+            return
         if not parts or "image" not in parts:
             self._send_json(400, {"error": "falta campo image"})
             return
@@ -521,6 +535,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(403, {"error": "forbidden: solo same-origin puede subir archivos"})
             return
         parts = self._parse_multipart_parts()
+        if isinstance(parts, tuple) and parts and parts[0] == "too_large":
+            self._send_json(413, {"error": "vídeo demasiado grande (máx 256 MB)"})
+            return
         if not parts or "image" not in parts:
             self._send_json(400, {"error": "falta campo image"})
             return
@@ -528,9 +545,6 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         data = img["data"]
         if len(data) == 0:
             self._send_json(400, {"error": "vídeo vacío"})
-            return
-        if len(data) > 256 * 1024 * 1024:
-            self._send_json(413, {"error": "vídeo demasiado grande (máx 256 MB)"})
             return
 
         def field(name, default):
@@ -1163,6 +1177,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             _LIST_CACHE.pop("krea2", None)
             _LIST_CACHE.pop("ltxv", None)
             _LIST_CACHE.pop("minimaxh3", None)
+            _LIST_CACHE.pop("mmh3x2", None)
             self._send_json(200, {"ok": True, "deleted": target})
         except OSError as e:
             self._send_json(500, {"error": str(e)})
