@@ -474,6 +474,30 @@ function updateQueueUI(){
   const clearBtn = $("btnClearQueue");
   if(clearBtn) clearBtn.disabled = count === 0;
 
+  // Auto-recuperación si activeJob quedó huérfano con ComfyUI en reposo
+  // (patrón mmh3x2/minimaxh3): un POST colgado dejaba la cola atascada.
+  if(activeJob && typeof serverQueueState !== "undefined" && serverQueueState.running === 0 && serverQueueState.pending === 0){
+    queueIdleCount = (queueIdleCount || 0) + 1;
+    if(queueIdleCount >= 2){
+      queueIdleCount = 0;
+      console.warn("Liberando activeJob huérfano (ComfyUI está en reposo)");
+      log("🧟 Job activo huérfano liberado (ComfyUI está en reposo); retomando la cola...", "l-warn");
+      activeJob = null;
+      currentPromptId = null;
+      generationStep = 0;
+      enableStopButtons(false);
+      if(jobQueue.length > 0){
+        const next = jobQueue.shift();
+        updateQueueUI();
+        log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
+        startJob(next);
+      }
+      return;
+    }
+  } else {
+    queueIdleCount = 0;
+  }
+
   // Cálculo de variantes/vídeos pendientes
   const activeRemainingVars = activeJob ? Math.max(1, (totalBatchSize - currentBatchIndex)) : 0;
   const queueVariants = jobQueue.reduce((acc, j) => acc + (j.batchSize || 1), 0);
@@ -2241,6 +2265,7 @@ async function runSingleGeneration(index) {
         const stepLabel = (activeJob?.firstPassOnly ? `1er pase · Var ${varIndex}` : `paso 1+2 · Var ${varIndex}`);
         log(`🚀 Procesando ${stepLabel} (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
+          signal: AbortSignal.timeout(60000), // colgado → activeJob fantasma
           method:"POST", headers:{"Content-Type":"application/json"},
           body:JSON.stringify({
             prompt:graph,

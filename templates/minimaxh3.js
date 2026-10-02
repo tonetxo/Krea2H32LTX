@@ -173,6 +173,9 @@ let rawInputImageHeight = 0;
 window.currentBatchMode = false;
 let jobQueue = [];
 let activeJob = null;
+// Indica subida/preprocesado de refs en curso: durante ese tramo el backend
+// puede estar vacío (ffmpeg) y la auto-recuperación NO debe dispararse.
+let jobH3UploadInProgress = false;
 let promptVariantMap = {};
 const displayedGalleryFiles = new Set();
 const displayedSlots = {};
@@ -1326,7 +1329,7 @@ async function prepareRefVideo(i){
   fd.append("use_audio", ref.useAudio ? "true" : "false");
   fd.append("volume", String(ref.volume));
   try {
-    const r = await fetch("/api/video_preprocess", { method: "POST", body: fd });
+    const r = await fetch("/api/video_preprocess", { method: "POST", body: fd, signal: AbortSignal.timeout(600000) });
     if(!r.ok){ const t = await r.text().catch(()=>""); throw new Error("HTTP "+r.status+" "+t.slice(0,150)); }
     const d = await r.json();
     ref.uploaded = d.video || null;
@@ -1670,10 +1673,37 @@ function recalcResolution(){
   updateArLabel(rawInputImageWidth, rawInputImageHeight);
 }
 
+let queueIdleCount = 0;
 function updateQueueUI(){
   const count = jobQueue.length;
   const clearBtn = $("btnClearQueue");
-  if(clearBtn) clearBtn.disabled = count === 0;
+  if(clearBtn) clearBtn.disabled = (count === 0 && !activeJob);
+
+  // Auto-recuperación si activeJob quedó huérfano con ComfyUI en reposo
+  // (mismo mecanismo que mmh3x2: un fetch colgado sin timeout o un POST
+  // perdido dejaba la cola entera atascada detrás de un job fantasma).
+  // Se suspende durante subidas/preprocesado: ahí el backend puede estar
+  // vacío legítimamente durante minutos (ffmpeg).
+  if(activeJob && !jobH3UploadInProgress && typeof serverQueueState !== "undefined" && serverQueueState.running === 0 && serverQueueState.pending === 0){
+    queueIdleCount++;
+    if(queueIdleCount >= 2){
+      queueIdleCount = 0;
+      console.warn("Liberando activeJob huérfano (ComfyUI está en reposo)");
+      log("🧟 Job activo huérfano liberado (ComfyUI está en reposo); retomando la cola...", "l-warn");
+      activeJob = null;
+      currentPromptId = null;
+      enableStopButtons(false);
+      if(jobQueue.length > 0){
+        const nextJob = jobQueue.shift();
+        updateQueueUI();
+        log(`⏭️ Iniciando tarea en cola (${jobQueue.length} restantes)...`, "l-info");
+        startJob(nextJob);
+      }
+      return;
+    }
+  } else {
+    queueIdleCount = 0;
+  }
 
   // Cálculo de variantes/vídeos pendientes
   const activeRemainingVars = activeJob ? Math.max(1, (totalBatchSize - currentBatchIndex)) : 0;
@@ -2979,7 +3009,7 @@ async function _uploadOneHot(_kind, local, name){
   const fd = new FormData();
   fd.append("image", file, file.name.replace(/^temp_\d+_/, '').replace(/^temp_last_\d+_/, ''));
   fd.append("overwrite","true");
-  const r = await fetch(server()+"/upload/image",{method:"POST",body:fd});
+  const r = await fetch(server()+"/upload/image",{method:"POST",body:fd,signal:AbortSignal.timeout(300000)});
   if(!r.ok) throw new Error("fallo subida "+file.name);
   const d = await r.json();
   return {name:d.name, subfolder:d.subfolder||"", type:d.type||"input"};
@@ -3015,7 +3045,7 @@ async function ensureJobImagesUploaded(job){
           fd.append("skip_frames", String(s.skip != null ? s.skip : 1));
           fd.append("use_audio", ref.useAudio !== false ? "true" : "false");
           fd.append("volume", String(ref.volume != null ? ref.volume : 1.0));
-          const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
+          const r = await fetch("/api/video_preprocess",{method:"POST",body:fd,signal:AbortSignal.timeout(600000)});
           if(!r.ok){ const t = await r.text().catch(()=> ""); throw new Error("HTTP "+r.status+" "+t.slice(0,150)); }
           const d = await r.json();
           ref.uploaded = d.video || null;
@@ -3040,7 +3070,7 @@ async function ensureJobImagesUploaded(job){
               fd.append("volume", String(ref.volume));
             }
             fd.append("use_audio","true");
-            const r = await fetch("/api/video_preprocess",{method:"POST",body:fd});
+            const r = await fetch("/api/video_preprocess",{method:"POST",body:fd,signal:AbortSignal.timeout(600000)});
             if(!r.ok) throw new Error("Fallo ffmpeg audio");
             const d = await r.json();
             ref.uploaded = d.audio || null;
@@ -3064,7 +3094,7 @@ async function ensureJobImagesUploaded(job){
       const fd1 = new FormData();
       fd1.append("image", f1, f1.name.replace(/^temp_\d+_/, ''));
       fd1.append("overwrite","true");
-      const r1 = await fetch(server()+"/upload/image",{method:"POST",body:fd1});
+      const r1 = await fetch(server()+"/upload/image",{method:"POST",body:fd1,signal:AbortSignal.timeout(300000)});
       if(!r1.ok) throw new Error("Fallo al subir imagen de inicio");
       const d1 = await r1.json();
       job.uploadedFirstImage = {name:d1.name, subfolder:d1.subfolder||"", type:d1.type||"input"};
@@ -3084,7 +3114,7 @@ async function ensureJobImagesUploaded(job){
       const fd2 = new FormData();
       fd2.append("image", f2, f2.name.replace(/^temp_last_\d+_/, ''));
       fd2.append("overwrite","true");
-      const r2 = await fetch(server()+"/upload/image",{method:"POST",body:fd2});
+      const r2 = await fetch(server()+"/upload/image",{method:"POST",body:fd2,signal:AbortSignal.timeout(300000)});
       if(!r2.ok) throw new Error("Fallo al subir último frame");
       const d2 = await r2.json();
       job.uploadedLastImage = {name:d2.name, subfolder:d2.subfolder||"", type:d2.type||"input"};
@@ -4497,8 +4527,13 @@ async function runSingleGeneration(index) {
           const specInfo = spec.enabled ? `⚡ Spectrum ON [blend ${spec.blend.toFixed(2)}, flex ${spec.flex.toFixed(2)}, ${spec.historyStorage || 'vram'}]` : 'Spectrum OFF';
           log(`Procesando Var ${varIndex} (seed ${seedUsed}) · ${specInfo}...`);
         }
+        // Previene el disparo de la auto-recuperación mientras el POST está en vuelo.
+        jobH3UploadInProgress = true;
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},
+          // Timeout: sin él, una conexión colgada deja activeJob vivo para siempre
+          // y la cola entera atascada detrás ("pendientes" fantasma).
+          signal: AbortSignal.timeout(60000),
           body:JSON.stringify({
             prompt:graph,
             client_id:CLIENT_ID,
@@ -4510,7 +4545,9 @@ async function runSingleGeneration(index) {
               preview_method: (getPreviewMethod() === "none" ? "none" : "latent2rgb")
             }
           })
-        });
+        }).finally(() => { jobH3UploadInProgress = false; });
+        // Durante el POST el backend va vacío: suspender la auto-recuperación
+        // hasta que el prompt esté encolado (o el fetch muera por timeout).
         if(!r.ok){
             const t = await r.text().catch(()=> "");
             throw new Error("HTTP "+r.status+" "+t.slice(0,300));
@@ -4525,7 +4562,8 @@ async function runSingleGeneration(index) {
         startTimer(data.prompt_id, 1);
         pollFallback(data.prompt_id);
     } catch(err) {
-        log(`No se pudo encolar: ${err.message || err}`, "l-err");
+        const isTimeout = (err && (err.name === "TimeoutError" || err.name === "AbortError"));
+        log(`❌ No se pudo encolar${isTimeout ? " (timeout: el backend no respondió en 60s)" : ""}: ${err.message || err}`, "l-err");
         finishCurrentJob();
     }
 }
@@ -4535,7 +4573,12 @@ async function startJob(job){
   updateQueueUI();
   try {
     connectSocket();
-    await ensureJobImagesUploaded(job);
+    jobH3UploadInProgress = true;
+    try {
+      await ensureJobImagesUploaded(job);
+    } finally {
+      jobH3UploadInProgress = false;
+    }
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;
     variantCounter = 0;

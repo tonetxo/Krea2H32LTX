@@ -2292,6 +2292,7 @@ async function runSingleGeneration(index){
 
     const srv = getServerUrl();
     const r = await fetch(`${srv}/prompt`, {
+      signal: AbortSignal.timeout(60000), // colgado → activeJob fantasma
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2359,11 +2360,36 @@ function enqueueGeneration(isBaseOnly = false){
 function updateQueueUI(){
   const count = jobQueue.length;
   if($("btnClearQueue")) $("btnClearQueue").disabled = count === 0;
-  if($("queueWebuiSummary")) $("queueWebuiSummary").textContent = `${count} en espera`;
-  if($("queueWebuiDetail")) $("queueWebuiDetail").textContent = activeJob
-    ? `▶ Job #${activeJob.id} · Var ${currentBatchIndex + 1}/${totalBatchSize}`
+
+  // Auto-recuperación si activeJob quedó huérfano con ComfyUI en reposo
+  // (patrón mmh3x2/minimaxh3): un POST colgado dejaba la cola atascada.
+  if(activeJob && typeof serverQueueState !== "undefined" && serverQueueState.running === 0 && serverQueueState.pending === 0){
+    queueIdleCount = (queueIdleCount || 0) + 1;
+    if(queueIdleCount >= 2){
+      queueIdleCount = 0;
+      console.warn("Liberando activeJob huérfano (ComfyUI está en reposo)");
+      log("🧟 Job activo huérfano liberado (ComfyUI está en reposo); retomando la cola...", "l-warn");
+      activeJob = null;
+      currentPromptId = null;
+      enableStopButtons(false);
+      if(jobQueue.length > 0){
+        const nextJob = jobQueue.shift();
+        updateQueueUI();
+        log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
+        startJob(nextJob);
+      }
+      // cae al render de abajo con el estado ya actualizado
+    }
+  } else {
+    queueIdleCount = 0;
+  }
+
+  const activeNow = activeJob; // puede haber cambiado por la recuperación
+  if($("queueWebuiSummary")) $("queueWebuiSummary").textContent = `${jobQueue.length} en espera`;
+  if($("queueWebuiDetail")) $("queueWebuiDetail").textContent = activeNow
+    ? `▶ Job #${activeNow.id} · Var ${currentBatchIndex + 1}/${totalBatchSize}`
     : "En reposo";
-  if($("queueTotalNum")) $("queueTotalNum").textContent = `${count + (activeJob ? 1 : 0)}`;
+  if($("queueTotalNum")) $("queueTotalNum").textContent = `${jobQueue.length + (activeNow ? 1 : 0)}`;
   // Render del estado del servidor ComfyUI (alimentado por el poll de common.js);
   // sin esto el panel mostraba "0 en espera · 0 en GPU" permanente.
   if($("queueServerSummary")) $("queueServerSummary").textContent = `${serverQueueState.pending} en espera`;

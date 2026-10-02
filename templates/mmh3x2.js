@@ -1377,6 +1377,7 @@ function updateQueueUI(){
     if(queueIdleCount >= 2){
       queueIdleCount = 0;
       console.warn("Liberando activeJob huérfano (ComfyUI está en reposo)");
+      log("🧟 Job activo huérfano liberado (ComfyUI está en reposo); retomando la cola...", "l-warn");
       activeJob = null;
       currentPromptId = null;
       enableStopButtons(false);
