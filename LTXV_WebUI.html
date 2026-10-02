@@ -5115,7 +5115,9 @@ async function applyWorkflow(workflow, opts={}){
       // HEAD: verificar existencia sin descargar (la descarga la hace <img src>).
       const probe = await fetch(viewUrl, { method: "HEAD" });
       if(probe.ok){
-        uploadedImage = media;
+        // name Y filename: buildGraph lee .name (LoadImage) y las helpers de
+        // galería/drag leen .filename — ambos deben estar rellenos.
+        uploadedImage = { name: fname, filename: fname, subfolder: subfolder, type: "input" };
         localFile = null;
         showInputImage(viewUrl);
         setApplied("imagen de entrada (" + fname + ")");
@@ -5533,8 +5535,16 @@ function buildGraph(mode, job){
   const imgObj = j ? j.uploadedImage : uploadedImage;
   // LoadImage acepta "subfolder/name.ext" (necesario para imágenes restauradas
   // desde metadatos, p.ej. "pasted/image (3).png"); una subida fresca vive en
-  // la raíz de input y solo tiene name.
-  if(imgObj) g[N.IMAGE].inputs.image = (imgObj.subfolder ? imgObj.subfolder + "/" : "") + imgObj.name;
+  // la raíz de input y solo tiene name. Guard: un name ausente/inválido mandaría
+  // literalmente "undefined" al backend (FileNotFoundError en ComfyUI).
+  const imgSpecFull = (imgObj && typeof imgObj.name === "string" && imgObj.name)
+    ? (imgObj.subfolder ? imgObj.subfolder + "/" : "") + imgObj.name
+    : null;
+  if(imgSpecFull){
+    g[N.IMAGE].inputs.image = imgSpecFull;
+  } else if(imgObj){
+    log("⚠️ Imagen de entrada sin nombre válido; se mantiene la del grafo base.", "l-warn");
+  }
   const promptText = (j ? j.prompt : $("prompt").value) || "";
   if(promptText.trim()) g[N.PROMPT].inputs.text = promptText.trim();
   const sMode = j ? j.seedMode : seedMode;
