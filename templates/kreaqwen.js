@@ -2375,6 +2375,10 @@ function finishCurrentJob(){
   updateQueueUI();
   enableStopButtons(false);
   setRun("idle", "en reposo");
+  // Preview de muestreo obsoleto al quedar en reposo (final de job, error o stop).
+  // onClearPreview de kreaqwen respeta currentFinalMedia/currentBaseMedia:
+  // solo esconde el preview si no hay imagen final ya cargada.
+  clearPreview();
 }
 
 // --- EVOLVE / TRANSMUTAR PROMPT (portado de krea2.js) ---

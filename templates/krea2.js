@@ -1357,6 +1357,8 @@ function finishCurrentJob(){
     startJob(next);
   } else {
     setRun("ok", "en reposo");
+    // Preview de muestreo obsoleto al quedar en reposo (final de job, error o stop).
+    clearPreview();
     log("🏁 Cola vacía. Todos los jobs completados.", "l-ok");
     enableStopButtons(false);
     updateQueueUI();

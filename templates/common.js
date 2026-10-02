@@ -486,7 +486,11 @@ async function handlePromptDone(promptId) {
     processingPrompts.delete(promptId);
     delete pendingSeeds[promptId];
     currentBatchIndex++;
-    if(currentBatchIndex >= totalBatchSize) setRun("ok", "Batch finalizado");
+    if(currentBatchIndex >= totalBatchSize){
+        setRun("ok", "Batch finalizado");
+        // Preview en vivo obsoleto al terminar todo el batch (ver processNextBatch).
+        clearPreview();
+    }
     processNextBatch();
 }
 
@@ -505,6 +509,11 @@ function processNextBatch() {
         setTimeout(() => CONFIG.startNextVariant(currentBatchIndex), 1000);
     } else {
         setRun("ok", "Batch finalizado");
+        // Al terminar el batch, el preview en vivo (WS binary/kj_preview_override)
+        // queda obsoleto: revoca su objectURL y deja que cada UI oculte sus
+        // paneles vía CONFIG.onClearPreview. Sin esto, la imagen/video previo
+        // permanece pegado en el visor tras acabar la generación.
+        clearPreview();
         log("🏁 Todas las variantes han sido procesadas.", "l-ok");
         CONFIG.onBatchComplete();
     }

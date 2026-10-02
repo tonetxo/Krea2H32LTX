@@ -4442,6 +4442,10 @@ function finishCurrentJob(){
     const nextJob = jobQueue.shift();
     startJob(nextJob);
   } else {
+    // Preview de muestreo obsoleto al quedar en reposo (gestiona su propio
+    // batch: es el único punto de limpieza del camino de éxito). Limpia los
+    // 3 paneles de preview en vivo; los reproductores de resultado no se tocan.
+    clearPreview();
     enableStopButtons(false);
   }
 }
