@@ -204,7 +204,7 @@ const AIMDO_DEFAULTS = { residency: "0 blocks" };
   function mapBlockSparseSelection(sel){
     return BLOCK_SPARSE_MODES[sel] || BLOCK_SPARSE_MODES_REVERSE[sel] || sel;
   }
-  const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0 };
+  const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0, keepPercent: 20 };
 
 
 function loadAttentionBackend(){
@@ -287,6 +287,7 @@ function getBlockSparseState(){
     tau: parseFloat($("blockSparseTau")?.value ?? "1.3"),
     startPercent: parseFloat($("blockSparseStart")?.value ?? "0.2"),
     endPercent: parseFloat($("blockSparseEnd")?.value ?? "1.0"),
+    keepPercent: parseFloat($("vsaKeepPercent")?.value ?? "20"),
   };
 }
 function setBlockSparseUI(s){
@@ -294,6 +295,21 @@ function setBlockSparseUI(s){
   if($("blockSparseTau")){ $("blockSparseTau").value = s.tau; $("blockSparseTauVal").textContent = parseFloat(s.tau).toFixed(2); }
   if($("blockSparseStart")){ $("blockSparseStart").value = s.startPercent; $("blockSparseStartVal").textContent = parseFloat(s.startPercent).toFixed(2); }
   if($("blockSparseEnd")){ $("blockSparseEnd").value = s.endPercent; $("blockSparseEndVal").textContent = parseFloat(s.endPercent).toFixed(2); }
+  if($("vsaKeepPercent") && s.keepPercent != null){
+    $("vsaKeepPercent").value = s.keepPercent;
+    $("vsaKeepPercentVal").textContent = parseFloat(s.keepPercent).toFixed(1);
+  }
+  updateBlockSparseModeRows();
+}
+// Visibilidad de filas del panel según el modo VSA (nodo dedicado) vs Sol-Attn/SLA (combo):
+// VSA solo usa keep_percent; tau/start/end son del DynamicCombo.
+function updateBlockSparseModeRows(){
+  const mode = BLOCK_SPARSE_MODES[$("blockSparseSelection")?.value] || "sol-attn";
+  const isVsa = (mode === "vsa");
+  if($("vsaKeepRow")) $("vsaKeepRow").style.display = isVsa ? "" : "none";
+  if($("vsaTauRow")) $("vsaTauRow").style.display = isVsa ? "none" : "";
+  if($("blockSparseStartRow")) $("blockSparseStartRow").style.display = isVsa ? "none" : "";
+  if($("blockSparseEndRow")) $("blockSparseEndRow").style.display = isVsa ? "none" : "";
 }
 
 const _attentionBackendState = loadAttentionBackend();
@@ -352,7 +368,8 @@ $("segDenserOff")?.addEventListener("click", () => { const s = getH3OptState(); 
 $("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveH3Settings(); });
 $("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveH3Settings(); });
 $("aimdoResidency")?.addEventListener("change", () => { saveAimdo(getAimdoState()); scheduleSaveH3Settings(); });
-$("blockSparseSelection")?.addEventListener("change", () => { saveBlockSparse(getBlockSparseState()); scheduleSaveH3Settings(); });
+$("blockSparseSelection")?.addEventListener("change", () => { saveBlockSparse(getBlockSparseState()); updateBlockSparseModeRows(); scheduleSaveH3Settings(); });
+$("vsaKeepPercent")?.addEventListener("input", (e) => { $("vsaKeepPercentVal").textContent = parseFloat(e.target.value).toFixed(1); saveBlockSparse(getBlockSparseState()); scheduleSaveH3Settings(); });
 $("blockSparseTau")?.addEventListener("input", (e) => { $("blockSparseTauVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveH3Settings(); });
 $("blockSparseStart")?.addEventListener("input", (e) => { $("blockSparseStartVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveH3Settings(); });
 $("blockSparseEnd")?.addEventListener("input", (e) => { $("blockSparseEndVal").textContent = parseFloat(e.target.value).toFixed(2); saveBlockSparse(getBlockSparseState()); scheduleSaveH3Settings(); });
@@ -2308,9 +2325,19 @@ async function applyWorkflow(workflow, opts={}){
   const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
   const memOptNode = findByClass("H3MemoryOptimization");
   const aimdoNode = findByClass("H3AIMDOResidencyLimiter");
+  const vsaNode = findByClass("H3VSAAttention");
   const blockSparseNode = findByClass("BlockSparseAttention");
 
-  if(blockSparseNode){
+  if(vsaNode){
+    // Checkpoint VSA-trained (FastH3): nodo dedicado H3VSAAttention.
+    setAttentionOptimizerUI("block-sparse");
+    saveAttentionOptimizer({ mode: "block-sparse" });
+    const bs = { ...BLOCK_SPARSE_DEFAULTS, selection: "VSA (FastVideo)" };
+    if(typeof vsaNode.inputs?.keep_percent === "number") bs.keepPercent = vsaNode.inputs.keep_percent;
+    setBlockSparseUI(bs);
+    saveBlockSparse(bs);
+    setApplied(`VSA FastH3 (keep ${bs.keepPercent}%)`);
+  } else if(blockSparseNode){
     setAttentionOptimizerUI("block-sparse");
     saveAttentionOptimizer({ mode: "block-sparse" });
     const bs = { ...BLOCK_SPARSE_DEFAULTS };
@@ -3365,26 +3392,48 @@ function buildGraph(job){
       const mode = BLOCK_SPARSE_MODES[bs.selection] || "sol-attn";
       const isSolAttn = mode === "sol-attn";
       const isVsa = mode === "vsa";
-      // Formato plano V3: la key del DynamicCombo es el modo interno; los sub-inputs se envían con punto.
-      const blockSparseInputs = {
-        model: [currentModelNode, 0],
-        selection: mode,
-        start_percent: bs.startPercent,
-        end_percent: bs.endPercent,
-        dense_blocks: "",
-        min_tokens: 12288,
-        extra_tokens: isVsa ? 0 : 256,
-        sink_conditioning: "exact_kv_and_rows",
-        verbose: false
-      };
-      if(isSolAttn) blockSparseInputs["selection.tau"] = bs.tau ?? 1.3;
-      else blockSparseInputs["selection.keep_percent"] = 10.0;
-      g[N.BLOCK_SPARSE] = {
-        class_type: "BlockSparseAttention",
-        inputs: blockSparseInputs,
-        _meta: { title: "Block Sparse Attention" }
-      };
-      currentModelNode = N.BLOCK_SPARSE;
+      if(isVsa){
+        // Checkpoint VSA-trained (FastH3): el pack exige el nodo dedicado, que
+        // reproduce el patrón learnado (tiling 4x4x4, top-k, coarse branch).
+        // El combo BlockSparse/vsa usa otro operating point y no es la ruta.
+        const keep = (typeof bs.keepPercent === "number" && bs.keepPercent > 0) ? bs.keepPercent : 20;
+        g[N.BLOCK_SPARSE] = {
+          class_type: "H3VSAAttention",
+          inputs: {
+            model: [currentModelNode, 0],
+            keep_percent: keep,
+            dense_first_steps: 0,
+            dense_layers: "",
+            backend: "Auto",
+            memory_mode: "Standard",
+            verbose: false
+          },
+          _meta: { title: "H3 VSA Attention (FastH3)" }
+        };
+        currentModelNode = N.BLOCK_SPARSE;
+        log(`⚡ VSA (FastH3): keep_percent ${keep}% (${keep === 20 ? "valor entrenado FastH3 8-Step V2" : keep === 10 ? "valor entrenado Preview v1" : "no trained value, revisa el operando"})`);
+      } else {
+        // Formato plano V3: la key del DynamicCombo es el modo interno; los sub-inputs se envían con punto.
+        const blockSparseInputs = {
+          model: [currentModelNode, 0],
+          selection: mode,
+          start_percent: bs.startPercent,
+          end_percent: bs.endPercent,
+          dense_blocks: "",
+          min_tokens: 12288,
+          extra_tokens: 256,
+          sink_conditioning: "exact_kv_and_rows",
+          verbose: false
+        };
+        if(isSolAttn) blockSparseInputs["selection.tau"] = bs.tau ?? 1.3;
+        else blockSparseInputs["selection.keep_percent"] = 10.0;
+        g[N.BLOCK_SPARSE] = {
+          class_type: "BlockSparseAttention",
+          inputs: blockSparseInputs,
+          _meta: { title: "Block Sparse Attention" }
+        };
+        currentModelNode = N.BLOCK_SPARSE;
+      }
 
       // En flf2v, AIMDO entra en conflicto con BlockSparseAttention + 2 frames
       if(currentMode === "flf2v" && aimdo.residency !== "stock"){

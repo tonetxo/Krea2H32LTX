@@ -207,22 +207,27 @@
               <option value="VSA (FastVideo)">VSA (FastVideo)</option>
             </select>
           </div>
-          <div class="row slider-row">
+          <div class="row slider-row" id="vsaKeepRow" style="display:none;">
+            <label>Video tiles kept (%) <span class="hint">(entrenado: 20 en FastH3 8-Step V2, 10 en Preview v1)</span></label>
+            <input type="range" id="vsaKeepPercent" min="0.5" max="95" step="0.5" value="20">
+            <div class="slider-val" id="vsaKeepPercentVal">20.0</div>
+          </div>
+          <div class="row slider-row" id="vsaTauRow">
             <label>Tau <span class="hint">(mayor = más sparse)</span></label>
             <input type="range" id="blockSparseTau" min="0" max="4" step="0.05" value="1.3">
             <div class="slider-val" id="blockSparseTauVal">1.30</div>
           </div>
-          <div class="row slider-row">
+          <div class="row slider-row" id="blockSparseStartRow">
             <label>Start percent</label>
             <input type="range" id="blockSparseStart" min="0" max="1" step="0.01" value="0.2">
             <div class="slider-val" id="blockSparseStartVal">0.20</div>
           </div>
-          <div class="row slider-row">
+          <div class="row slider-row" id="blockSparseEndRow">
             <label>End percent</label>
             <input type="range" id="blockSparseEnd" min="0" max="1" step="0.01" value="1.0">
             <div class="slider-val" id="blockSparseEndVal">1.00</div>
           </div>
-          <div class="hint" style="margin-top:6px;font-size:10px;">Atención block-sparse nativa de Comfy. Solo Sol-Attn está completamente configurado.</div>
+          <div class="hint" style="margin-top:6px;font-size:10px;">Checkpoint VSA-trained (FastH3): usa el nodo dedicado H3 VSA Attention con su porcentaje entrenado. Sol-Attn/top-k (SLA) usan block-sparse nativo con tau/start/end.</div>
         </div>
       </div>
 
