@@ -32,12 +32,9 @@ let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
 let dmdBypass = false;
-const DMD_LORA_NODE = "906";
 const DMD_MODEL_SOURCE = "868";
-let firstPromptId = null;
 const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk","comfy kitchen attention"];
 let finalVariantIndex = null;
-let promptSteps = {};
 // Mapa prompt_id -> índice de variante, para que tanto WS como fallback
 // sepan a qué variante pertenece cada resultado.
 let promptVariantMap = {};
@@ -47,8 +44,6 @@ const displayedGalleryFiles = new Set();
 // machacar el reproductor y el tiempo cuando llega el fallback).
 const displayedSlots = {};
 const BITDEPTH_KEY = "ltxv_bit_depth";
-// Exposed for common.js WS error handler.
-window.currentBatchMode = false;
 // Cola de jobs pendientes.
 let jobQueue = [];
 let activeJob = null;
@@ -137,7 +132,7 @@ CONFIG.findMedia = function(nodeOutput){
 CONFIG.showMedia = showVideo;
 CONFIG.addToVariantGallery = addToVariantGallery;
 CONFIG.renderVariantMedia = function(card, url, media){
-  return `<video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
+  return `<video src="${escapeHtml(url)}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
 };
 // Metadata para el tooltip de la variant-card: captura los sliders/LoRAs en el
 // momento de crear la tarjeta (no al hacer hover, que podría haber cambiado).
@@ -306,18 +301,19 @@ CONFIG.onClearPreview = function(){
 };
 
 CONFIG.onPromptError = function(pid){
-  delete promptSteps[pid];
-  delete pendingSeeds[pid];
+  // No avanzar la cola aquí: common.js ya hace currentBatchIndex++ +
+  // processNextBatch tras este callback; llamar a finishCurrentJob() desde
+  // aquí arranca el siguiente job mientras processNextBatch dispara una
+  // variante del job ANTIGUO (race de batch/variantCounter).
   delete promptVariantMap[pid];
   delete displayedSlots[pid];
   if(generationStep === 1) generationStep = 0;
-  finishCurrentJob();
 };
 CONFIG.startNextVariant = function(index){
   // LTXV gestiona sus propios pasos; este callback solo se usa por common.js
   // en caso de error o borde. Empezamos siempre en paso 1.
+  if(!activeJob) return;
   generationStep = 1;
-  firstPromptId = null;
   finalVariantIndex = null;
   runSingleGeneration(index);
 };
@@ -325,32 +321,23 @@ CONFIG.onBatchComplete = function(){
   finishCurrentJob();
 };
 CONFIG.onStopCurrent = function(pid){
-  delete promptSteps[pid];
   delete pendingSeeds[pid];
   delete promptVariantMap[pid];
   delete displayedSlots[pid];
   generationStep = 0;
-  firstPromptId = null;
   finalVariantIndex = null;
 };
 CONFIG.onStopAll = function(){
-  for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);
   if(currentPromptId) handledPrompts.add(currentPromptId);
-  if(firstPromptId) handledPrompts.add(firstPromptId);
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
-  pendingSeeds = {};
   promptVariantMap = {};
   displayedGalleryFiles.clear();
   for(const k of Object.keys(displayedSlots)) delete displayedSlots[k];
-  promptSteps = {};
-  processingPrompts.clear();
   currentPromptId = null;
-  firstPromptId = null;
   generationStep = 0;
   // Vaciar cola pendiente al parar todo.
   jobQueue = [];
-  updateQueueUI();
   activeJob = null;
+  updateQueueUI();
   enableStopButtons(false);
   $("btnFirstPass").disabled=false;
   $("btnFull").disabled=false;
@@ -370,7 +357,6 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
     }
   }
 
-  const step = promptSteps[promptId] || "1";
   const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
   const media2 = entry.outputs[N.FINAL_SAVE] ? CONFIG.findMedia(entry.outputs[N.FINAL_SAVE]) : null;
 
@@ -421,12 +407,10 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
     }
   }
 
-  delete promptSteps[promptId];
   delete pendingSeeds[promptId];
   delete promptVariantMap[promptId];
   delete displayedSlots[promptId];
   generationStep = 0;
-  firstPromptId = null;
   finalVariantIndex = null;
   handledPrompts.add(promptId);
 
@@ -524,7 +508,8 @@ function updateQueueUI(){
     jobQueue.forEach((job, idx) => {
       const row = document.createElement("div");
       row.className = "queue-item-row";
-      const pText = (job.prompt || "sin prompt").trim();
+      const pEsc = escapeHtml((job.prompt || "sin prompt").trim());
+      const pText = pEsc;
       const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
       const typeLabel = job.firstPassOnly ? "1er pase" : "completo";
       row.innerHTML = `
@@ -585,66 +570,6 @@ function snapshotJob(firstPassOnly){
     createdAt: Date.now(),
   };
 }
-
-function restoreJob(job){
-  $("prompt").value = job.prompt || "";
-  seedMode = job.seedMode || "random";
-  if(seedMode === "random"){
-    $("segRandom")?.classList.add("on");
-    $("segFixed")?.classList.remove("on");
-    $("seedVal").disabled = true;
-  } else {
-    $("segFixed")?.classList.add("on");
-    $("segRandom")?.classList.remove("on");
-    $("seedVal").disabled = false;
-    $("seedVal").value = job.seedValue;
-  }
-  $("width").value = job.width;
-  $("height").value = job.height;
-  $("frames").value = job.frames;
-  $("mpSlider").value = job.mp;
-  $("mpVal").textContent = parseFloat(job.mp).toFixed(2);
-  $("fidelitySlider").value = job.fidelity;
-  $("fidelityVal").textContent = parseFloat(job.fidelity).toFixed(2);
-  $("motionSlider").value = job.motion;
-  $("motionVal").textContent = parseFloat(job.motion).toFixed(1);
-  $("firstPassSteps").value = job.firstPassSteps;
-  $("firstPassStepsVal").textContent = job.firstPassSteps;
-  if($("modelSelect") && job.model) $("modelSelect").value = job.model;
-  if($("textEncoderSelect") && job.textEncoder) $("textEncoderSelect").value = job.textEncoder;
-  if($("vaeSelect") && job.vae) $("vaeSelect").value = job.vae;
-  if($("sageAttentionType") && job.sageType) $("sageAttentionType").value = job.sageType;
-  if(job.rife){
-    setRifeUI(job.rife);
-    saveRife(job.rife);
-  }
-  setBitDepthUI(job.bitDepth);
-  saveBitDepth(job.bitDepth);
-  loras = job.loras || loras;
-  renderLoras();
-  saveLoraState();
-  dmdBypass = !!job.dmdBypass;
-  $("dmdBypassSwitch")?.classList.toggle("on", !dmdBypass);
-  if($("enhancerChainMode") && job.chainMode) $("enhancerChainMode").value = job.chainMode;
-  if($("ltx2Temperature") && job.ltx2Temperature) $("ltx2Temperature").value = job.ltx2Temperature;
-  if($("ltx2Seed") && job.ltx2Seed) $("ltx2Seed").value = job.ltx2Seed;
-  $("batchSize").value = job.batchSize;
-  uploadedImage = job.uploadedImage;
-  localFile = job.localFile;
-  currentAspectRatio = job.aspectRatio || (job.width / job.height) || 16/9;
-  if(uploadedImage || localFile){
-    // Si hay imagen local, mostramos vista previa si es posible; en caso contrario el job la resubirá.
-    if(localFile){
-      const reader = new FileReader();
-      reader.onload = (e) => showInputImage(e.target.result);
-      reader.readAsDataURL(localFile);
-    }
-  }
-  updateDuration();
-}
-
-// --- CHAIN ---
-function setChainActive(keys){document.querySelectorAll(".chain .node").forEach(n=>n.classList.toggle("active",keys.includes(n.dataset.n)));}
 
 // --- UPDATE SEED UI ---
 function updateSeedUI(seedValue) {
@@ -774,7 +699,7 @@ async function loadKrea2Recent(){
       const sizeKB = Math.round(it.size/1024);
       const div = document.createElement("div");
       div.className = "gallery-item";
-      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${tsTxt} · ${sizeKB}KB</div>`;
+      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${escapeHtml(tsTxt)} · ${sizeKB}KB</div>`;
       div.addEventListener("click", () => {
         const items = Array.from(grid.querySelectorAll(".gallery-item"));
         krea2RecentIndex = items.indexOf(div);
@@ -841,47 +766,6 @@ async function loadKrea2ImageAsInput(url, filename){
   })();
 })();
 
-// --- EXTRACCIÓN Y APLICACIÓN DE WORKFLOW DESDE METADATOS PNG/MP4 ---
-function extractWorkflowFromImage(url){
-  fetch(url).then(r => r.arrayBuffer()).then(buf => {
-    const bytes = new Uint8Array(buf);
-    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return;
-    let pos = 8;
-    let workflowRaw = null;
-    while(pos < bytes.length - 8){
-      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
-      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
-      if(type === "tEXt"){
-        const dataStart = pos + 8;
-        let nullPos = dataStart;
-        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
-        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
-        if(keyword === "prompt"){
-          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
-          break;
-        }
-      }
-      if(type === "IEND") break;
-      pos = pos + 12 + len;
-    }
-    if(workflowRaw == null) return;
-    let workflow;
-    try {
-      workflow = JSON.parse(workflowRaw);
-    } catch(e1){
-      const first = workflowRaw.indexOf("{");
-      const last = workflowRaw.lastIndexOf("}");
-      if(first !== -1 && last > first){
-        try { workflow = JSON.parse(workflowRaw.slice(first, last + 1)); }
-        catch(e2){ console.warn("No se pudo parsear workflow de metadatos:", e2.message); return; }
-      } else {
-        console.warn("No se pudo parsear workflow de metadatos:", e1.message);
-        return;
-      }
-    }
-    applyWorkflow(workflow);
-  }).catch(e => console.warn("No se pudo leer metadatos:", e.message));
-}
 
 function applyWorkflow(workflow, opts={}){
   const applied = [];
@@ -1377,7 +1261,6 @@ dz.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleFile(e.dataTrans
 fileInput.addEventListener("change",e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 
 function handleFile(f, shouldSaveToGallery = true){
-  console.log("[LTXV] handleFile", f.name, f.type, f.size);
   uploadedImage = null;
   localFile = null;
 
@@ -1407,11 +1290,9 @@ function handleFile(f, shouldSaveToGallery = true){
 }
 
 function showInputImage(src){
-  console.log("[LTXV] showInputImage src length:", src ? src.length : 0);
   const wrap = $("inputWrap"), img = $("inputImg"), actions = $("imgInputActions");
   if(!wrap || !img) { console.warn("[LTXV] showInputImage: wrap/img no disponible"); return; }
   img.onload = () => {
-    console.log("[LTXV] inputImg loaded", img.naturalWidth, "x", img.naturalHeight);
     updateDzInfo(img.naturalWidth, img.naturalHeight);
     inputZoom.resetZoom();
   };
@@ -1441,8 +1322,27 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   });
 
   function extractFrameAt(time, callback){
+    // Si ya estamos en la posición pedida, el navegador NO dispara "seeked"
+    // (no hay seek real): dibujamos directamente para no colgar el callback.
+    if(Math.abs(vid.currentTime - time) < 0.001){
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = vid.videoWidth || 640;
+        canvas.height = vid.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+        callback(null, canvas.toDataURL("image/jpeg", 0.92));
+      } catch(err) { callback(err); }
+      return;
+    }
     vid.currentTime = time;
-    vid.addEventListener("seeked", function onSeeked(){
+    // Timeout de seguridad: un vídeo corrupto no dispara seeked nunca.
+    const timer = setTimeout(() => {
+      vid.removeEventListener("seeked", onSeeked);
+      callback(new Error("timeout esperando el frame"));
+    }, 5000);
+    function onSeeked(){
+      clearTimeout(timer);
       vid.removeEventListener("seeked", onSeeked);
       try {
         const canvas = document.createElement("canvas");
@@ -1453,7 +1353,8 @@ function handleVideoFile(file, shouldSaveToGallery = true){
         const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
         callback(null, dataUrl);
       } catch(err) { callback(err); }
-    }, { once: true });
+    }
+    vid.addEventListener("seeked", onSeeked, { once: true });
   }
 
   function setFrameAsInput(dataUrl, frameLabel){
@@ -1471,8 +1372,8 @@ function handleVideoFile(file, shouldSaveToGallery = true){
         } else {
           log(`ℹ️ ${file.name} no contiene metadatos de workflow.`, "l-warn");
         }
-      });
-    });
+      }).catch(e => log("❌ Error aplicando workflow: "+e.message, "l-err"));
+    }).catch(e => log("❌ Error convirtiendo el frame: "+e.message, "l-err"));
   }
 
   function showFrameSelector(){
@@ -1515,19 +1416,6 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   }, { once: true });
 
   vid.src = videoUrl;
-}
-
-async function ensureImageUploaded(){
-  if(!localFile) throw new Error("selecciona imagen");
-  setRun("busy","subiendo...");
-  const fd=new FormData();
-  fd.append("image", localFile, localFile.name.replace(/^temp_\d+_/, ''));
-  fd.append("overwrite","true");
-  const r=await fetch(server()+"/upload/image",{method:"POST",body:fd});
-  if(!r.ok) throw new Error("fallo subida");
-  const data=await r.json();
-  uploadedImage={name:data.name, subfolder:data.subfolder||"", type:data.type||"input"};
-  log("Imagen subida al servidor: "+uploadedImage.name,"l-ok");
 }
 
 async function ensureJobImageUploaded(job){
@@ -1742,8 +1630,13 @@ function buildGraph(mode, job){
     }
   }
 
-  // Prefijo de archivo configurable
-  const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "templo/mensaje_botella";
+  // Prefijo de archivo configurable (validado: sin "..", solo caracteres seguros)
+  let prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "templo/mensaje_botella";
+  prefix = prefix.replace(/\\/g, "/").split("/").filter(seg => seg && seg !== "." && seg !== "..").join("/");
+  if(!prefix || !/^[A-Za-z0-9_\-\/]+$/.test(prefix)){
+    log(`⚠️ filename_prefix inválido ("${prefix || "vacío"}"); usando "ltxv_ui".`, "l-warn");
+    prefix = "ltxv_ui";
+  }
   if(g[N.FINAL_SAVE] && g[N.FINAL_SAVE].inputs){
     g[N.FINAL_SAVE].inputs.filename_prefix = prefix;
   }
@@ -1823,7 +1716,7 @@ function showVideo(slot, media, options={}){
   v.src = url;
   v.style.display = "block";
   empty.style.display = "none";
-  if(options.autoplay !== false) v.play().catch(err => console.log("Autoplay blocked:", err));
+  if(options.autoplay !== false) v.play().catch(err => console.debug("Autoplay bloqueado:", err));
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
@@ -1957,9 +1850,21 @@ function captureFrameFromPlayer(){
       if(!dur || !isFinite(dur)){ throw new Error("duración del vídeo no disponible"); }
       const targetTime = v.currentTime || 0;
       await new Promise((resolve, reject) => {
-        let resolved = false;
-        const onSeeked = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; resolve(); } };
-        const onError = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; reject(new Error("error durante seek")); } };
+        // Si ya estamos en la posición, no hay seek real y "seeked" nunca
+        // dispara: resolvemos directamente (con pequeño delay para asegurar
+        // que el frame está pintado).
+        if(Math.abs(v.currentTime - targetTime) < 0.001){
+          setTimeout(resolve, 50);
+          return;
+        }
+        let settled = false;
+        const timer = setTimeout(() => {
+          if(settled) return; settled = true;
+          v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError);
+          reject(new Error("timeout durante seek"));
+        }, 5000);
+        const onSeeked = () => { if(settled) return; settled = true; clearTimeout(timer); v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); resolve(); };
+        const onError = () => { if(settled) return; settled = true; clearTimeout(timer); v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); reject(new Error("error durante seek")); };
         v.addEventListener("seeked", onSeeked, { once: true });
         v.addEventListener("error", onError, { once: true });
         v.currentTime = targetTime;
@@ -2071,98 +1976,6 @@ $("btnRefreshVideoHistory").addEventListener("click", (e) => {
   loadVideoHistory();
 });
 
-// --- VIDEO HISTORY THUMBNAILS ---
-const THUMB_CACHE_PREFIX = "ltxv_thumb_";
-const THUMB_WIDTH = 320;
-const THUMB_QUALITY = 0.72;
-
-function _thumbCacheKey(item){
-  return item.filename + "|" + (item.mtime || 0) + "|" + item.subfolder + "|" + item.type;
-}
-
-function _safeCacheGet(key){
-  try { return localStorage.getItem(THUMB_CACHE_PREFIX + key); } catch(e){ return null; }
-}
-
-function _safeCacheSet(key, value){
-  try { localStorage.setItem(THUMB_CACHE_PREFIX + key, value); } catch(e){ /* quota/full: ignore */ }
-}
-
-function extractVideoFrame(videoUrl){
-  return new Promise((resolve) => {
-    const v = document.createElement("video");
-    v.crossOrigin = "anonymous";
-    v.muted = true;
-    v.playsInline = true;
-    v.preload = "metadata";
-    let resolved = false;
-    function done(result){
-      if(resolved) return;
-      resolved = true;
-      try { v.pause(); v.src = ""; v.load(); } catch(_){}
-      resolve(result);
-    }
-    v.addEventListener("loadedmetadata", () => {
-      const t = v.duration ? Math.min(0.5, v.duration / 2) : 0.1;
-      v.currentTime = t;
-    }, {once:true});
-    v.addEventListener("seeked", () => {
-      try {
-        const canvas = document.createElement("canvas");
-        const ratio = v.videoHeight / (v.videoWidth || 1);
-        canvas.width = THUMB_WIDTH;
-        canvas.height = Math.max(1, Math.round(THUMB_WIDTH * ratio));
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-        done(canvas.toDataURL("image/jpeg", THUMB_QUALITY));
-      } catch(err){ done(null); }
-    }, {once:true});
-    v.addEventListener("error", () => done(null), {once:true});
-    v.src = videoUrl;
-  });
-}
-
-async function getCachedThumb(item){
-  const key = _thumbCacheKey(item);
-  const cached = _safeCacheGet(key);
-  if(cached) return cached;
-  const url = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}&t=${item.mtime}`;
-  const dataUrl = await extractVideoFrame(url + "#t=0.1");
-  if(dataUrl) _safeCacheSet(key, dataUrl);
-  return dataUrl;
-}
-
-let _thumbObserver = null;
-function observeThumbs(){
-  if(_thumbObserver) _thumbObserver.disconnect();
-  if(!("IntersectionObserver" in window)){
-    document.querySelectorAll(".thumb-img").forEach(async (img) => {
-      if(img.dataset.loaded) return;
-      const item = JSON.parse(img.dataset.item || "{}");
-      if(!item.filename) return;
-      const dataUrl = await getCachedThumb(item);
-      if(dataUrl){ img.src = dataUrl; img.style.opacity = 1; }
-      img.dataset.loaded = "1";
-    });
-    return;
-  }
-  _thumbObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if(!entry.isIntersecting) return;
-      const img = entry.target;
-      if(img.dataset.loaded) return;
-      img.dataset.loaded = "1";
-      const item = JSON.parse(img.dataset.item || "{}");
-      if(!item.filename) return;
-      getCachedThumb(item).then(dataUrl => {
-        if(dataUrl){ img.src = dataUrl; img.style.opacity = 1; }
-      }).catch(() => {});
-    });
-  }, { rootMargin: "50px" });
-  document.querySelectorAll(".thumb-img").forEach(img => _thumbObserver.observe(img));
-}
 
 async function loadVideoHistory(){
   const status = $("videoHistoryStatus");
@@ -2195,7 +2008,7 @@ async function loadVideoHistory(){
           <span class="variant-badge">${typeBadge}</span>
           <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
           <div class="variant-info">
-            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
+            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</span>
             <span class="variant-icons">
               <button class="variant-meta-btn" title="Copiar workflow" data-action="workflow">📋</button>
               <button class="variant-del-btn" title="Eliminar" data-action="delete">×</button>
@@ -2322,6 +2135,7 @@ async function loadVideoHistory(){
 
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
+    if(!activeJob) return; // guard: stop/error puede dejar la cola vacía entre el setTimeout y la ejecución
     try {
         const mode = activeJob ? (activeJob.firstPassOnly ? "first" : "full") : "full";
         const graph = buildGraph(mode, activeJob);
@@ -2363,7 +2177,6 @@ async function runSingleGeneration(index) {
         pendingSeeds[data.prompt_id] = seedUsed;
         promptVariantMap[data.prompt_id] = varIndex;
         currentPromptId = data.prompt_id;
-        promptSteps[data.prompt_id] = "1";
         startTimer(data.prompt_id, 1);
         pollFallback(data.prompt_id);
     } catch(err) {
@@ -2381,11 +2194,8 @@ async function startJob(job){
     await ensureJobImageUploaded(job);
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;
-    batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
-    window.currentBatchMode = false;
     generationStep = 1;
-    firstPromptId = null;
-    job.currentVariantIndex = null;
+      job.currentVariantIndex = null;
     // Limpiamos tiempos de jobs anteriores para evitar confusión visual.
     $("time1").textContent = "";
     $("time1").classList.remove("live");

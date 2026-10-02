@@ -424,7 +424,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
   <div class="grid">
     <!-- COLUMNA 1 (IZQUIERDA): SERVIDOR, PROMPTS, MEDIOS DE REFERENCIA Y EVOLVE -->
     <div class="controls-col">
-      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="latent2rgb" selected>🎨 Latent2RGB (proyección RGB · universal)</option><option value="taesd">⚡ TAE VAE / TAESD (alta velocidad)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
 
       <div class="panel">
         <div class="collapsible-header" id="promptLibToggle">
@@ -989,15 +989,18 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b-kv-fp8.safetensors", "flux-2-klein-9b.safetensors", "jibMixKrea2_v40Habanero.safetensors"];
+const AVAILABLE_MODELS = ["DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "Krea2_Turbo_convrot_int8mixed.safetensors", "flux-2-klein-9b.safetensors", "flux-2-klein-9b_int8_convrot.safetensors", "jibMixKrea2_v40Habanero.safetensors"];
 const AVAILABLE_LORAS = ["(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "Detailer-KREA2.safetensors", "Economic_Capital_v1.safetensors", "GalKrea.safetensors", "GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "IvoryKrea.safetensors", "KNPV4.1_pre.safetensors", "Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "Krea2_HMNSFW_AIO.safetensors", "Krea2_TextFusion_Refusal_Reduction.safetensors", "MysticXXX_KREA2_v1.safetensors", "MysticXXX_KREA2_v2.safetensors", "PussyHM_krea2_epoch10.safetensors", "SummerVibesHM_krea2_epoch8.safetensors", "VBVR_H3_attn_only.safetensors", "Wayne_Barlowe_Krea2.safetensors", "YFG-Asak-Krea2_1.8k-v1.safetensors", "YFG-FutureIsDark-Krea2_1k-v1.safetensors", "bfs_head_swap_v1.1_krea2.safetensors", "fedor_bypass.safetensors", "glock_pistol_v1_krea_2.safetensors", "kali/AliKrea.safetensors", "kali/AliKrea100.safetensors", "kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "keva/evaK2_copy.safetensors", "keva/evaK2_copy_000000500.safetensors", "keva/evaK2_copy_000001750.safetensors", "keva/evaK2_copy_merged.safetensors", "keva/kreaEva.safetensors", "keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "kliz/lizK2_copy_copy_000001000.safetensors", "kliz/lizK2_copy_copy_000001250.safetensors", "kliz/lizK2_copy_copy_000001500.safetensors", "kliz/lizK2_copy_copy_merged.safetensors", "kliz/lizK2_copy_copy_merged_merged.safetensors", "krea2_Enhancer.safetensors", "krea2_identity_edit_v1_2.safetensors", "krea2_nud3.safetensors", "krea2_turbo_lora_rank_64_bf16.safetensors", "krea2_turbo_sda_v1.0_comfy.safetensors", "krea2_warmpastel.safetensors", "krea2filterbypass3.safetensors", "ksab/sabK2.safetensors", "ksab/sabK2_000000500.safetensors", "ksab/sabK2_000001000.safetensors", "ksab/sabK2_000001250.safetensors", "ksab/sabK2_merged.safetensors", "kuxi/K2uxi2.safetensors", "kuxi/K2uxi2_000000750.safetensors", "kuxi/K2uxi2_000001500.safetensors", "kuxi/K2uxi2_merged.safetensors", "kuxi/K2uxi_000001000.safetensors", "kuxi/K2uxi_merged.safetensors", "kuxi/UxiKrea.safetensors", "kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "kuxi/uxiK2_000000750.safetensors", "kuxi/uxiK2_merged.safetensors", "kyo/YoKrea.safetensors", "kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "kyol/yolK2_000000500.safetensors", "kyol/yolK2_000001250.safetensors", "kyol/yolK2_merged3.safetensors", "kyol/yolK2_merged4.safetensors", "realism_engine_krea2_v2.safetensors", "shes_merged.safetensors", "skc3vo.safetensors", "sliders/Decay_slider_v1_krea2.safetensors", "sliders/RealismSlider-v1.safetensors", "sliders/WarmLightSlider-KREA2_v1.safetensors", "sliders/WeightSlider-KREA2_v2.safetensors", "sliders/anal_helper_krea2_loraholic.safetensors", "sliders/brightness_krea2_loraholic.safetensors", "sliders/color_temp_krea2_loraholic.safetensors", "sliders/crowd_slider_v1_krea2.safetensors", "sliders/detail_slider_krea2_loraholic.safetensors", "sliders/ethnicity_krea2_loraholic.safetensors", "sliders/hair_length_krea2_loraholic.safetensors", "sliders/head_size_krea2_loraholic.safetensors", "sliders/height_krea2_loraholic.safetensors", "sliders/light_krea2_loraholic.safetensors", "sliders/skindetails_krea2_loraholic.safetensors", "sliders/wetness_krea2_loraholic.safetensors", "z0jglf.safetensors"];
 const AVAILABLE_VAES = [];
 const AVAILABLE_UNETS = [];
 const AVAILABLE_CLIPS = [];
 const AVAILABLE_INTERP_MODELS = [];
+const AVAILABLE_UPSCALE_MODELS = [];
+const AVAILABLE_LUTS = [];
 const LTXV_UI_PORT = "8000";
 const MINIMAXH3_UI_PORT = "8002";
 const MMH3X2_UI_PORT = "8003";
+const KREAQWEN_UI_PORT = "8004";
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
 //
 // This file is injected BEFORE the UI-specific JS (ltxv.js / krea2.js).
@@ -1037,7 +1040,10 @@ let lastPromptDir = "";
 let sysPromptEditData = null;
 let sysPromptEditMode = "text";
 
-const LEGACY_PORTS = ["7822", "7821"];
+// Puertos legacy que deben limpiarse del localStorage al arrancar. "7821" hoy
+// es el puerto por defecto del backend: si un usuario lo fija explícitamente,
+// NO debe borrarse en cada recarga (bug "el campo de servidor se borra solo").
+const LEGACY_PORTS = ["7822"];
 let DEFAULT_BACKEND_PORT = "7821";
 const $ = (id) => document.getElementById(id);
 
@@ -1215,7 +1221,7 @@ function updateServerHint(){
 // --- PREVIEWS (TAE VAE / TAESD / Latent2RGB) ---
 function getPreviewMethod(){
   const sel = $("previewMethod");
-  return sel ? sel.value : "taesd";
+  return sel ? sel.value : "latent2rgb";
 }
 
 let currentPreviewUrl = null;
@@ -1317,7 +1323,7 @@ function connectSocket() {
           try {
               socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
           } catch(e){ console.warn("WS feature_flags no enviados:", e); }
-          console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)");
+          console.debug("WebSocket conectado"); setConn("ok", "Conectado (WS)");
       };
       socket.onmessage = (event) => {
           if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
@@ -1347,7 +1353,15 @@ function connectSocket() {
           if(msg.type === 'execution_error') {
               const pid = msg.data && msg.data.prompt_id;
               log(`Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
+              // Guard idéntico al de handlePromptDone: si pollFallback ya tiene
+              // este prompt en vuelo, dejar que su rama de error haga el avance
+              // del batch (evita doble currentBatchIndex++ y doble
+              // processNextBatch → variantes fantasma).
+              if(pid && processingPrompts.has(pid)){
+                return;
+              }
               if(pid){
+                processingPrompts.add(pid);
                 handledPrompts.add(pid);
                 delete pendingSeeds[pid];
                 discardTimer(pid);
@@ -1356,6 +1370,7 @@ function connectSocket() {
               clearPreview();
               currentBatchIndex++;
               processNextBatch();
+              if(pid) processingPrompts.delete(pid);
           }
       };
       socket.onerror = (err) => console.error("WS Error", err);
@@ -1758,8 +1773,9 @@ function renderLoras(){
     let optionsHtml = '<option value="">-- Ninguno --</option>';
     AVAILABLE_LORAS.forEach(path => {
       const selected = path === l.lora ? 'selected' : '';
+      const escPath = escapeHtml(path);
       const displayName = path.split('/').pop();
-      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+      optionsHtml += `<option value="${escPath}" ${selected} title="${escPath}">${escapeHtml(displayName)}</option>`;
     });
     box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
     <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
@@ -2727,7 +2743,7 @@ function showVariantTooltip(card){
     const obj = JSON.parse(raw);
     html = formatVariantMeta(obj);
   } catch(_){
-    html = raw; // string preformateado
+    html = `<div class="vt-empty">${escapeHtml(raw)}</div>`; // string preformateado, escapado por seguridad
   }
   el.innerHTML = html;
   el.classList.add("show");
@@ -3159,7 +3175,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "krea2",
   DEFAULT_MODEL: "Krea2_Turbo_convrot_int8mixed.safetensors",
-  N: {UNET:"1",ATTN_BACKEND:"2",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100",SAVE_IMAGE:"100"},
+  N: {UNET:"1",ATTN_BACKEND:"2",PROMPT:"57",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
   loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -3232,7 +3248,7 @@ CONFIG.findMedia = function(nodeOutput){
 CONFIG.showMedia = function(slot, media, options){ showImage(media); };
 CONFIG.addToVariantGallery = addToVariantGallery;
 CONFIG.renderVariantMedia = function(card, url, media){
-  return `<img src="${url}">`;
+  return `<img src="${escapeHtml(url)}">`;
 };
 // Metadata para el tooltip de la variant-card: captura sliders/LoRAs en el
 // momento de crear la tarjeta.
@@ -3271,12 +3287,8 @@ CONFIG.onStopCurrent = function(pid){
   clearPreview();
 };
 CONFIG.onStopAll = function(){
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
-  pendingSeeds = {};
-  handledPrompts.clear();
-  processingPrompts.clear();
+  // common.js ya vació pendingSeeds/handledPrompts/timers; solo estado propio.
   currentPromptId = null;
-  currentBatchIndex = totalBatchSize;
   const t1 = $("time1");
   if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
   clearPreview();
@@ -3340,7 +3352,6 @@ function showImage(media){
   img.onload = () => {
     const w = img.naturalWidth, h = img.naturalHeight;
     if(w && h){
-      function gcd(a,b){ return b ? gcd(b, a % b) : a; }
       const d = gcd(w, h) || 1;
       $("imgInfo").textContent = `${w}×${h} · ${w/d}:${h/d}`;
     }
@@ -3488,12 +3499,12 @@ function addToVariantGallery(media, seedValue, timeText) {
         const reader = new FileReader();
         reader.onload = (ev) => addToGallery(ev.target.result);
         reader.readAsDataURL(blob);
-      });
+      }).catch(e => log("⚠️ No se pudo añadir al historial: "+e.message, "l-warn"));
       currentOutputMedia = { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type };
       currentRefVariantIndex = Array.from(grid.children).indexOf(card);
     });
 
-    $("variantCount").textContent = `(${variantCounter + 1})`;
+    $("variantCount").textContent = `(${grid.querySelectorAll(".variant-card").length})`;
 }
 
 // --- REFERENCE IMAGE ---
@@ -3515,7 +3526,6 @@ function loadRefImage(url){
   newImg.onload = () => {
     const w = newImg.naturalWidth, h = newImg.naturalHeight;
     if(w && h){
-      function gcd(a,b){ return b ? gcd(b, a % b) : a; }
       const d = gcd(w, h) || 1;
       info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
       const ar = w / h;
@@ -3854,7 +3864,6 @@ async function dbClearImages(){
 }
 
 function aspectRatioStr(w, h){
-  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
   const d = gcd(w, h) || 1;
   return `${w / d}:${h / d}`;
 }
@@ -3944,13 +3953,17 @@ async function renderGallery(){
 
     const hasRes = !!(item.width && item.height);
     const infoHtml = hasRes
-      ? `<div class="info-tag">${item.width}×${item.height} · ${aspectRatioStr(item.width, item.height)}</div>`
+      ? `<div class="info-tag">${parseInt(item.width, 10)}×${parseInt(item.height, 10)} · ${escapeHtml(aspectRatioStr(item.width, item.height))}</div>`
       : "";
     const lqBadge = item.legacy
       ? `<div class="lq-badge" title="Guardada antes de la actualización: solo hay disponible en baja resolución">LQ</div>`
       : "";
 
-    div.innerHTML = `<button class="del-btn" title="Eliminar del historial">×</button>${lqBadge}<img src="${item.thumb}">${infoHtml}`;
+    if(!/^data:image\/(png|jpe?g|webp);/.test(item.thumb)){
+      console.warn("Historial: thumbnail inválido descartado", item.hash);
+      return;
+    }
+    div.innerHTML = `<button class="del-btn" title="Eliminar del historial">×</button>${lqBadge}<img src="${item.thumb}" alt="">${infoHtml}`;
 
     div.querySelector(".del-btn").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -4189,7 +4202,7 @@ if($("keepModelInRam")){
 }
 $("btnFreeMemory")?.addEventListener("click", async () => {
   try {
-    const srv = typeof getServerUrl === "function" ? getServerUrl() : (CONFIG.serverUrl || "http://127.0.0.1:7821");
+    const srv = server(); // vacío = proxy local; nunca hardcodear 127.0.0.1 (roto en LAN)
     await fetch(`${srv}/free`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -4200,6 +4213,8 @@ $("btnFreeMemory")?.addEventListener("click", async () => {
     log("⚠️ Error liberando memoria: " + e.message, "l-err");
   }
 });
+
+function gcd(a, b){ return b ? gcd(b, a % b) : a; }
 
 let jobQueue = [];
 let activeJob = null;
@@ -4268,7 +4283,7 @@ function updateQueueUI(){
     jobQueue.forEach((job, idx) => {
       const row = document.createElement("div");
       row.className = "queue-item-row";
-      const pText = (job.prompt || "sin prompt").trim();
+      const pText = escapeHtml((job.prompt || "sin prompt").trim());
       const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
       row.innerHTML = `
         <div class="queue-item-left" title="${pText}">
@@ -4420,7 +4435,7 @@ function buildGraph(job){
   g[N.SAMPLER].inputs.seed = (sampSeedMode === "random") ? -1 : sampSeedVal;
 
   const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "krea2/imagen";
-  const saveNode = g[N.SAVE_IMAGE] || g[N.SAVE];
+  const saveNode = g[N.SAVE];
   if(saveNode && saveNode.inputs){
     saveNode.inputs.filename_prefix = prefix;
   }
@@ -4439,6 +4454,7 @@ function buildGraph(job){
 
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
+    if(!activeJob) return; // guard: stop deja la cola vacía; evita la generación zombi del setTimeout pendiente
     try {
         const graph = buildGraph(activeJob);
         const jobSeedMode = activeJob ? activeJob.samplerSeedMode : (batchSeedMode || "random");
@@ -4446,7 +4462,7 @@ async function runSingleGeneration(index) {
         const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
         graph[N.SAMPLER].inputs.seed = seedUsed;
 
-        const varIndex = variantCounter + 1;
+        const varIndex = ++variantCounter;
         log(`🚀 Procesando variante ${varIndex} (batch ${index + 1}/${totalBatchSize}) (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},

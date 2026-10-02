@@ -37,7 +37,10 @@ let lastPromptDir = "";
 let sysPromptEditData = null;
 let sysPromptEditMode = "text";
 
-const LEGACY_PORTS = ["7822", "7821"];
+// Puertos legacy que deben limpiarse del localStorage al arrancar. "7821" hoy
+// es el puerto por defecto del backend: si un usuario lo fija explícitamente,
+// NO debe borrarse en cada recarga (bug "el campo de servidor se borra solo").
+const LEGACY_PORTS = ["7822"];
 let DEFAULT_BACKEND_PORT = "7821";
 const $ = (id) => document.getElementById(id);
 
@@ -317,7 +320,7 @@ function connectSocket() {
           try {
               socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
           } catch(e){ console.warn("WS feature_flags no enviados:", e); }
-          console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)");
+          console.debug("WebSocket conectado"); setConn("ok", "Conectado (WS)");
       };
       socket.onmessage = (event) => {
           if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
@@ -347,7 +350,15 @@ function connectSocket() {
           if(msg.type === 'execution_error') {
               const pid = msg.data && msg.data.prompt_id;
               log(`Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
+              // Guard idéntico al de handlePromptDone: si pollFallback ya tiene
+              // este prompt en vuelo, dejar que su rama de error haga el avance
+              // del batch (evita doble currentBatchIndex++ y doble
+              // processNextBatch → variantes fantasma).
+              if(pid && processingPrompts.has(pid)){
+                return;
+              }
               if(pid){
+                processingPrompts.add(pid);
                 handledPrompts.add(pid);
                 delete pendingSeeds[pid];
                 discardTimer(pid);
@@ -356,6 +367,7 @@ function connectSocket() {
               clearPreview();
               currentBatchIndex++;
               processNextBatch();
+              if(pid) processingPrompts.delete(pid);
           }
       };
       socket.onerror = (err) => console.error("WS Error", err);
@@ -758,8 +770,9 @@ function renderLoras(){
     let optionsHtml = '<option value="">-- Ninguno --</option>';
     AVAILABLE_LORAS.forEach(path => {
       const selected = path === l.lora ? 'selected' : '';
+      const escPath = escapeHtml(path);
       const displayName = path.split('/').pop();
-      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+      optionsHtml += `<option value="${escPath}" ${selected} title="${escPath}">${escapeHtml(displayName)}</option>`;
     });
     box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
     <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
@@ -1727,7 +1740,7 @@ function showVariantTooltip(card){
     const obj = JSON.parse(raw);
     html = formatVariantMeta(obj);
   } catch(_){
-    html = raw; // string preformateado
+    html = `<div class="vt-empty">${escapeHtml(raw)}</div>`; // string preformateado, escapado por seguridad
   }
   el.innerHTML = html;
   el.classList.add("show");

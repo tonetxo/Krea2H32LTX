@@ -9,7 +9,7 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "krea2",
   DEFAULT_MODEL: "Krea2_Turbo_convrot_int8mixed.safetensors",
-  N: {UNET:"1",ATTN_BACKEND:"2",CLIP:"13",PROMPT:"57",CLIP_ENCODE:"6",NEG:"8",EMPTY_LATENT:"10",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE:"42",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100",SAVE_IMAGE:"100"},
+  N: {UNET:"1",ATTN_BACKEND:"2",PROMPT:"57",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
   loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -82,7 +82,7 @@ CONFIG.findMedia = function(nodeOutput){
 CONFIG.showMedia = function(slot, media, options){ showImage(media); };
 CONFIG.addToVariantGallery = addToVariantGallery;
 CONFIG.renderVariantMedia = function(card, url, media){
-  return `<img src="${url}">`;
+  return `<img src="${escapeHtml(url)}">`;
 };
 // Metadata para el tooltip de la variant-card: captura sliders/LoRAs en el
 // momento de crear la tarjeta.
@@ -121,12 +121,8 @@ CONFIG.onStopCurrent = function(pid){
   clearPreview();
 };
 CONFIG.onStopAll = function(){
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
-  pendingSeeds = {};
-  handledPrompts.clear();
-  processingPrompts.clear();
+  // common.js ya vació pendingSeeds/handledPrompts/timers; solo estado propio.
   currentPromptId = null;
-  currentBatchIndex = totalBatchSize;
   const t1 = $("time1");
   if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
   clearPreview();
@@ -190,7 +186,6 @@ function showImage(media){
   img.onload = () => {
     const w = img.naturalWidth, h = img.naturalHeight;
     if(w && h){
-      function gcd(a,b){ return b ? gcd(b, a % b) : a; }
       const d = gcd(w, h) || 1;
       $("imgInfo").textContent = `${w}×${h} · ${w/d}:${h/d}`;
     }
@@ -338,12 +333,12 @@ function addToVariantGallery(media, seedValue, timeText) {
         const reader = new FileReader();
         reader.onload = (ev) => addToGallery(ev.target.result);
         reader.readAsDataURL(blob);
-      });
+      }).catch(e => log("⚠️ No se pudo añadir al historial: "+e.message, "l-warn"));
       currentOutputMedia = { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type };
       currentRefVariantIndex = Array.from(grid.children).indexOf(card);
     });
 
-    $("variantCount").textContent = `(${variantCounter + 1})`;
+    $("variantCount").textContent = `(${grid.querySelectorAll(".variant-card").length})`;
 }
 
 // --- REFERENCE IMAGE ---
@@ -365,7 +360,6 @@ function loadRefImage(url){
   newImg.onload = () => {
     const w = newImg.naturalWidth, h = newImg.naturalHeight;
     if(w && h){
-      function gcd(a,b){ return b ? gcd(b, a % b) : a; }
       const d = gcd(w, h) || 1;
       info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
       const ar = w / h;
@@ -704,7 +698,6 @@ async function dbClearImages(){
 }
 
 function aspectRatioStr(w, h){
-  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
   const d = gcd(w, h) || 1;
   return `${w / d}:${h / d}`;
 }
@@ -794,13 +787,17 @@ async function renderGallery(){
 
     const hasRes = !!(item.width && item.height);
     const infoHtml = hasRes
-      ? `<div class="info-tag">${item.width}×${item.height} · ${aspectRatioStr(item.width, item.height)}</div>`
+      ? `<div class="info-tag">${parseInt(item.width, 10)}×${parseInt(item.height, 10)} · ${escapeHtml(aspectRatioStr(item.width, item.height))}</div>`
       : "";
     const lqBadge = item.legacy
       ? `<div class="lq-badge" title="Guardada antes de la actualización: solo hay disponible en baja resolución">LQ</div>`
       : "";
 
-    div.innerHTML = `<button class="del-btn" title="Eliminar del historial">×</button>${lqBadge}<img src="${item.thumb}">${infoHtml}`;
+    if(!/^data:image\/(png|jpe?g|webp);/.test(item.thumb)){
+      console.warn("Historial: thumbnail inválido descartado", item.hash);
+      return;
+    }
+    div.innerHTML = `<button class="del-btn" title="Eliminar del historial">×</button>${lqBadge}<img src="${item.thumb}" alt="">${infoHtml}`;
 
     div.querySelector(".del-btn").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -1039,7 +1036,7 @@ if($("keepModelInRam")){
 }
 $("btnFreeMemory")?.addEventListener("click", async () => {
   try {
-    const srv = typeof getServerUrl === "function" ? getServerUrl() : (CONFIG.serverUrl || "http://127.0.0.1:7821");
+    const srv = server(); // vacío = proxy local; nunca hardcodear 127.0.0.1 (roto en LAN)
     await fetch(`${srv}/free`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1050,6 +1047,8 @@ $("btnFreeMemory")?.addEventListener("click", async () => {
     log("⚠️ Error liberando memoria: " + e.message, "l-err");
   }
 });
+
+function gcd(a, b){ return b ? gcd(b, a % b) : a; }
 
 let jobQueue = [];
 let activeJob = null;
@@ -1118,7 +1117,7 @@ function updateQueueUI(){
     jobQueue.forEach((job, idx) => {
       const row = document.createElement("div");
       row.className = "queue-item-row";
-      const pText = (job.prompt || "sin prompt").trim();
+      const pText = escapeHtml((job.prompt || "sin prompt").trim());
       const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
       row.innerHTML = `
         <div class="queue-item-left" title="${pText}">
@@ -1270,7 +1269,7 @@ function buildGraph(job){
   g[N.SAMPLER].inputs.seed = (sampSeedMode === "random") ? -1 : sampSeedVal;
 
   const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "krea2/imagen";
-  const saveNode = g[N.SAVE_IMAGE] || g[N.SAVE];
+  const saveNode = g[N.SAVE];
   if(saveNode && saveNode.inputs){
     saveNode.inputs.filename_prefix = prefix;
   }
@@ -1289,6 +1288,7 @@ function buildGraph(job){
 
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
+    if(!activeJob) return; // guard: stop deja la cola vacía; evita la generación zombi del setTimeout pendiente
     try {
         const graph = buildGraph(activeJob);
         const jobSeedMode = activeJob ? activeJob.samplerSeedMode : (batchSeedMode || "random");
@@ -1296,7 +1296,7 @@ async function runSingleGeneration(index) {
         const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
         graph[N.SAMPLER].inputs.seed = seedUsed;
 
-        const varIndex = variantCounter + 1;
+        const varIndex = ++variantCounter;
         log(`🚀 Procesando variante ${varIndex} (batch ${index + 1}/${totalBatchSize}) (seed ${seedUsed})...`);
         const r = await fetch(server()+"/prompt",{
           method:"POST", headers:{"Content-Type":"application/json"},

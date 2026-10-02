@@ -451,7 +451,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
   <div class="grid">
     <!-- COLUMNA 1 (IZQUIERDA): ENTRADA, PROMPTS Y REFERENCIAS -->
     <div class="controls-col">
-      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="taesd" selected>⚡ TAE VAE / TAESD (alta velocidad)</option><option value="latent2rgb">🎨 Latent2RGB (proyección RGB)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="latent2rgb" selected>🎨 Latent2RGB (proyección RGB · universal)</option><option value="taesd">⚡ TAE VAE / TAESD (alta velocidad)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
 
       <div class="panel"><h2>Imagen entrada</h2><div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*,video/*"><div class="ph" id="dzPlaceholder">arrastra imagen o vídeo, o clic</div></div><div class="dz-info" id="dzInfo"></div><div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa">⛶</button><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕</button></div><div class="img-wrap" id="inputWrap" style="visibility:hidden;"><img id="inputImg" style="display:none;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true"></div><div class="frame-selector" id="frameSelector" style="display:none;margin-top:8px;"><button class="ghost btn-mini" data-frame="first">1er frame</button><button class="ghost btn-mini" data-frame="last">Último frame</button></div></div>
 
@@ -1842,15 +1842,18 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltxv/MelBandRoformer_fp16.safetensors", "ltxv/acestep_v1.5_turbo.safetensors", "ltxv/acestep_v1.5_xl_turbo_bf16.safetensors", "ltxv/boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ltxv/ernie/ernie-image-turbo.safetensors", "ltxv/ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ltxv/ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltxv/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltxv/minimax_music3_dit_int8_convrot.safetensors", "ltxv/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "ltxv/minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "ltxv/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "ltxv/seedvr2_3b_int8_convrot.safetensors", "ltxv/wav2vec2-chinese-base_fp16.safetensors", "ltxv/zimage/z_image_turbo_bf16.safetensors"];
+const AVAILABLE_MODELS = ["diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltxv/MelBandRoformer_fp16.safetensors", "ltxv/acestep_v1.5_turbo.safetensors", "ltxv/acestep_v1.5_xl_turbo_bf16.safetensors", "ltxv/boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ltxv/ernie/ernie-image-turbo.safetensors", "ltxv/ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ltxv/ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltxv/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltxv/minimax_music3_dit_int8_convrot.safetensors", "ltxv/minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "ltxv/minimaxh3/fastvideo_fasth3_8step_v2_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "ltxv/minimaxh3/minimax_h3_ref2va_pruned_int8_convrot.safetensors", "ltxv/minimaxh3/minimax_h3_ref2va_pruned_w6a8.safetensors", "ltxv/seedvr2_3b_int8_convrot.safetensors", "ltxv/wav2vec2-chinese-base_fp16.safetensors", "ltxv/zimage/z_image_turbo_bf16.safetensors"];
 const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "IvoriLTX_000000250.safetensors", "IvoriLTX_000000750.safetensors", "IvoriLTX_000001000.safetensors", "IvoriLTX_000001250.safetensors", "IvoriLTX_000001500.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "Post_Apocalyptic.safetensors", "anal-insertion-i2v.safetensors", "beauty_of_rain_ltx23.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
-const AVAILABLE_VAES = ["AceStep/ace_1.5_vae.safetensors", "Flux/ae.safetensors", "Flux/flux2-vae.safetensors", "Flux/ultra_flux1.safetensors", "LTX-2/LTX23_audio_vae_bf16.safetensors", "LTX-2/LTX23_video_vae_bf16.safetensors", "LTX-2/ltx-2.5-audio-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors", "LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors", "LTX2/LTX23_audio_vae_bf16.safetensors", "LTX2/LTX23_video_vae_bf16.safetensors", "LTX2/LTX2_audio_vae.safetensors", "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors", "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors", "MiniMaxMusic3/minimax_music3_dav.safetensors", "QwenImage/REPA-E_qwen.safetensors", "QwenImage/qwen_image_2.1_vae_bf16.safetensors", "QwenImage/qwen_image_vae.safetensors", "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors", "SeedVR2/seedvr2_ema_vae_fp16.safetensors", "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Wan/wan_2.1_vae.safetensors", "ace_1.5_vae.safetensors", "ema_vae_fp16.safetensors", "flux2-vae.safetensors", "lumina2_vae_fp32.safetensors", "qwenImageVAESharpKrea2_sharpFp32.safetensors", "qwen_image_vae.safetensors", "sd3_vae.safetensors", "sdxl_vae.safetensors", "taeltx2_3.safetensors", "wan/wan_2.1_vae.safetensors"];
+const AVAILABLE_VAES = ["AceStep/ace_1.5_vae.safetensors", "Flux/ae.safetensors", "Flux/flux2-vae.safetensors", "Flux/ultra_flux1.safetensors", "LTX-2/LTX23_audio_vae_bf16.safetensors", "LTX-2/LTX23_video_vae_bf16.safetensors", "LTX-2/ltx-2.5-audio-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors", "LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors", "LTX2/LTX23_audio_vae_bf16.safetensors", "LTX2/LTX23_video_vae_bf16.safetensors", "LTX2/LTX2_audio_vae.safetensors", "MingImage/ming_image_vae_bf16.safetensors", "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors", "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors", "MiniMaxMusic3/minimax_music3_dav.safetensors", "QwenImage/REPA-E_qwen.safetensors", "QwenImage/qwen_image_2.1_vae_bf16.safetensors", "QwenImage/qwen_image_vae.safetensors", "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors", "SeedVR2/seedvr2_ema_vae_fp16.safetensors", "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Wan/wan_2.1_vae.safetensors", "ace_1.5_vae.safetensors", "ema_vae_fp16.safetensors", "flux2-vae.safetensors", "lumina2_vae_fp32.safetensors", "qwenImageVAESharpKrea2_sharpFp32.safetensors", "qwen_image_vae.safetensors", "sd3_vae.safetensors", "sdxl_vae.safetensors", "taeltx2_3.safetensors", "wan/wan_2.1_vae.safetensors"];
 const AVAILABLE_UNETS = [];
 const AVAILABLE_CLIPS = ["LTX-2/gemma4_e2b_it_bf16.safetensors", "gemma-3-12b-it-ablit-norms-biproj-fp8mixed.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors", "gemma4_e4b_it_fp8_scaled.safetensors", "gemma_3_12B_it.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
+const AVAILABLE_UPSCALE_MODELS = [];
+const AVAILABLE_LUTS = [];
 const LTXV_UI_PORT = "8000";
 const MINIMAXH3_UI_PORT = "8002";
 const MMH3X2_UI_PORT = "8003";
+const KREAQWEN_UI_PORT = "8004";
 // common.js — Shared JavaScript for LTXV and Krea2 WebUIs.
 //
 // This file is injected BEFORE the UI-specific JS (ltxv.js / krea2.js).
@@ -1890,7 +1893,10 @@ let lastPromptDir = "";
 let sysPromptEditData = null;
 let sysPromptEditMode = "text";
 
-const LEGACY_PORTS = ["7822", "7821"];
+// Puertos legacy que deben limpiarse del localStorage al arrancar. "7821" hoy
+// es el puerto por defecto del backend: si un usuario lo fija explícitamente,
+// NO debe borrarse en cada recarga (bug "el campo de servidor se borra solo").
+const LEGACY_PORTS = ["7822"];
 let DEFAULT_BACKEND_PORT = "7821";
 const $ = (id) => document.getElementById(id);
 
@@ -2068,7 +2074,7 @@ function updateServerHint(){
 // --- PREVIEWS (TAE VAE / TAESD / Latent2RGB) ---
 function getPreviewMethod(){
   const sel = $("previewMethod");
-  return sel ? sel.value : "taesd";
+  return sel ? sel.value : "latent2rgb";
 }
 
 let currentPreviewUrl = null;
@@ -2170,7 +2176,7 @@ function connectSocket() {
           try {
               socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
           } catch(e){ console.warn("WS feature_flags no enviados:", e); }
-          console.log("WebSocket conectado"); setConn("ok", "Conectado (WS)");
+          console.debug("WebSocket conectado"); setConn("ok", "Conectado (WS)");
       };
       socket.onmessage = (event) => {
           if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
@@ -2200,7 +2206,15 @@ function connectSocket() {
           if(msg.type === 'execution_error') {
               const pid = msg.data && msg.data.prompt_id;
               log(`Error en prompt ${pid || ''}: ${JSON.stringify(msg.data && msg.data.exception_message || msg.data)}`, "l-err");
+              // Guard idéntico al de handlePromptDone: si pollFallback ya tiene
+              // este prompt en vuelo, dejar que su rama de error haga el avance
+              // del batch (evita doble currentBatchIndex++ y doble
+              // processNextBatch → variantes fantasma).
+              if(pid && processingPrompts.has(pid)){
+                return;
+              }
               if(pid){
+                processingPrompts.add(pid);
                 handledPrompts.add(pid);
                 delete pendingSeeds[pid];
                 discardTimer(pid);
@@ -2209,6 +2223,7 @@ function connectSocket() {
               clearPreview();
               currentBatchIndex++;
               processNextBatch();
+              if(pid) processingPrompts.delete(pid);
           }
       };
       socket.onerror = (err) => console.error("WS Error", err);
@@ -2611,8 +2626,9 @@ function renderLoras(){
     let optionsHtml = '<option value="">-- Ninguno --</option>';
     AVAILABLE_LORAS.forEach(path => {
       const selected = path === l.lora ? 'selected' : '';
+      const escPath = escapeHtml(path);
       const displayName = path.split('/').pop();
-      optionsHtml += `<option value="${path}" ${selected} title="${path}">${displayName}</option>`;
+      optionsHtml += `<option value="${escPath}" ${selected} title="${escPath}">${escapeHtml(displayName)}</option>`;
     });
     box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
     <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
@@ -3580,7 +3596,7 @@ function showVariantTooltip(card){
     const obj = JSON.parse(raw);
     html = formatVariantMeta(obj);
   } catch(_){
-    html = raw; // string preformateado
+    html = `<div class="vt-empty">${escapeHtml(raw)}</div>`; // string preformateado, escapado por seguridad
   }
   el.innerHTML = html;
   el.classList.add("show");
@@ -4035,12 +4051,9 @@ let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
 let dmdBypass = false;
-const DMD_LORA_NODE = "906";
 const DMD_MODEL_SOURCE = "868";
-let firstPromptId = null;
 const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk","comfy kitchen attention"];
 let finalVariantIndex = null;
-let promptSteps = {};
 // Mapa prompt_id -> índice de variante, para que tanto WS como fallback
 // sepan a qué variante pertenece cada resultado.
 let promptVariantMap = {};
@@ -4050,8 +4063,6 @@ const displayedGalleryFiles = new Set();
 // machacar el reproductor y el tiempo cuando llega el fallback).
 const displayedSlots = {};
 const BITDEPTH_KEY = "ltxv_bit_depth";
-// Exposed for common.js WS error handler.
-window.currentBatchMode = false;
 // Cola de jobs pendientes.
 let jobQueue = [];
 let activeJob = null;
@@ -4140,7 +4151,7 @@ CONFIG.findMedia = function(nodeOutput){
 CONFIG.showMedia = showVideo;
 CONFIG.addToVariantGallery = addToVariantGallery;
 CONFIG.renderVariantMedia = function(card, url, media){
-  return `<video src="${url}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
+  return `<video src="${escapeHtml(url)}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
 };
 // Metadata para el tooltip de la variant-card: captura los sliders/LoRAs en el
 // momento de crear la tarjeta (no al hacer hover, que podría haber cambiado).
@@ -4309,18 +4320,19 @@ CONFIG.onClearPreview = function(){
 };
 
 CONFIG.onPromptError = function(pid){
-  delete promptSteps[pid];
-  delete pendingSeeds[pid];
+  // No avanzar la cola aquí: common.js ya hace currentBatchIndex++ +
+  // processNextBatch tras este callback; llamar a finishCurrentJob() desde
+  // aquí arranca el siguiente job mientras processNextBatch dispara una
+  // variante del job ANTIGUO (race de batch/variantCounter).
   delete promptVariantMap[pid];
   delete displayedSlots[pid];
   if(generationStep === 1) generationStep = 0;
-  finishCurrentJob();
 };
 CONFIG.startNextVariant = function(index){
   // LTXV gestiona sus propios pasos; este callback solo se usa por common.js
   // en caso de error o borde. Empezamos siempre en paso 1.
+  if(!activeJob) return;
   generationStep = 1;
-  firstPromptId = null;
   finalVariantIndex = null;
   runSingleGeneration(index);
 };
@@ -4328,32 +4340,23 @@ CONFIG.onBatchComplete = function(){
   finishCurrentJob();
 };
 CONFIG.onStopCurrent = function(pid){
-  delete promptSteps[pid];
   delete pendingSeeds[pid];
   delete promptVariantMap[pid];
   delete displayedSlots[pid];
   generationStep = 0;
-  firstPromptId = null;
   finalVariantIndex = null;
 };
 CONFIG.onStopAll = function(){
-  for(const pid of Object.keys(pendingSeeds)) handledPrompts.add(pid);
   if(currentPromptId) handledPrompts.add(currentPromptId);
-  if(firstPromptId) handledPrompts.add(firstPromptId);
-  for(const pid of Object.keys(pendingSeeds)) discardTimer(pid);
-  pendingSeeds = {};
   promptVariantMap = {};
   displayedGalleryFiles.clear();
   for(const k of Object.keys(displayedSlots)) delete displayedSlots[k];
-  promptSteps = {};
-  processingPrompts.clear();
   currentPromptId = null;
-  firstPromptId = null;
   generationStep = 0;
   // Vaciar cola pendiente al parar todo.
   jobQueue = [];
-  updateQueueUI();
   activeJob = null;
+  updateQueueUI();
   enableStopButtons(false);
   $("btnFirstPass").disabled=false;
   $("btnFull").disabled=false;
@@ -4373,7 +4376,6 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
     }
   }
 
-  const step = promptSteps[promptId] || "1";
   const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
   const media2 = entry.outputs[N.FINAL_SAVE] ? CONFIG.findMedia(entry.outputs[N.FINAL_SAVE]) : null;
 
@@ -4424,12 +4426,10 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
     }
   }
 
-  delete promptSteps[promptId];
   delete pendingSeeds[promptId];
   delete promptVariantMap[promptId];
   delete displayedSlots[promptId];
   generationStep = 0;
-  firstPromptId = null;
   finalVariantIndex = null;
   handledPrompts.add(promptId);
 
@@ -4527,7 +4527,8 @@ function updateQueueUI(){
     jobQueue.forEach((job, idx) => {
       const row = document.createElement("div");
       row.className = "queue-item-row";
-      const pText = (job.prompt || "sin prompt").trim();
+      const pEsc = escapeHtml((job.prompt || "sin prompt").trim());
+      const pText = pEsc;
       const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
       const typeLabel = job.firstPassOnly ? "1er pase" : "completo";
       row.innerHTML = `
@@ -4588,66 +4589,6 @@ function snapshotJob(firstPassOnly){
     createdAt: Date.now(),
   };
 }
-
-function restoreJob(job){
-  $("prompt").value = job.prompt || "";
-  seedMode = job.seedMode || "random";
-  if(seedMode === "random"){
-    $("segRandom")?.classList.add("on");
-    $("segFixed")?.classList.remove("on");
-    $("seedVal").disabled = true;
-  } else {
-    $("segFixed")?.classList.add("on");
-    $("segRandom")?.classList.remove("on");
-    $("seedVal").disabled = false;
-    $("seedVal").value = job.seedValue;
-  }
-  $("width").value = job.width;
-  $("height").value = job.height;
-  $("frames").value = job.frames;
-  $("mpSlider").value = job.mp;
-  $("mpVal").textContent = parseFloat(job.mp).toFixed(2);
-  $("fidelitySlider").value = job.fidelity;
-  $("fidelityVal").textContent = parseFloat(job.fidelity).toFixed(2);
-  $("motionSlider").value = job.motion;
-  $("motionVal").textContent = parseFloat(job.motion).toFixed(1);
-  $("firstPassSteps").value = job.firstPassSteps;
-  $("firstPassStepsVal").textContent = job.firstPassSteps;
-  if($("modelSelect") && job.model) $("modelSelect").value = job.model;
-  if($("textEncoderSelect") && job.textEncoder) $("textEncoderSelect").value = job.textEncoder;
-  if($("vaeSelect") && job.vae) $("vaeSelect").value = job.vae;
-  if($("sageAttentionType") && job.sageType) $("sageAttentionType").value = job.sageType;
-  if(job.rife){
-    setRifeUI(job.rife);
-    saveRife(job.rife);
-  }
-  setBitDepthUI(job.bitDepth);
-  saveBitDepth(job.bitDepth);
-  loras = job.loras || loras;
-  renderLoras();
-  saveLoraState();
-  dmdBypass = !!job.dmdBypass;
-  $("dmdBypassSwitch")?.classList.toggle("on", !dmdBypass);
-  if($("enhancerChainMode") && job.chainMode) $("enhancerChainMode").value = job.chainMode;
-  if($("ltx2Temperature") && job.ltx2Temperature) $("ltx2Temperature").value = job.ltx2Temperature;
-  if($("ltx2Seed") && job.ltx2Seed) $("ltx2Seed").value = job.ltx2Seed;
-  $("batchSize").value = job.batchSize;
-  uploadedImage = job.uploadedImage;
-  localFile = job.localFile;
-  currentAspectRatio = job.aspectRatio || (job.width / job.height) || 16/9;
-  if(uploadedImage || localFile){
-    // Si hay imagen local, mostramos vista previa si es posible; en caso contrario el job la resubirá.
-    if(localFile){
-      const reader = new FileReader();
-      reader.onload = (e) => showInputImage(e.target.result);
-      reader.readAsDataURL(localFile);
-    }
-  }
-  updateDuration();
-}
-
-// --- CHAIN ---
-function setChainActive(keys){document.querySelectorAll(".chain .node").forEach(n=>n.classList.toggle("active",keys.includes(n.dataset.n)));}
 
 // --- UPDATE SEED UI ---
 function updateSeedUI(seedValue) {
@@ -4777,7 +4718,7 @@ async function loadKrea2Recent(){
       const sizeKB = Math.round(it.size/1024);
       const div = document.createElement("div");
       div.className = "gallery-item";
-      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${tsTxt} · ${sizeKB}KB</div>`;
+      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${escapeHtml(tsTxt)} · ${sizeKB}KB</div>`;
       div.addEventListener("click", () => {
         const items = Array.from(grid.querySelectorAll(".gallery-item"));
         krea2RecentIndex = items.indexOf(div);
@@ -4844,47 +4785,6 @@ async function loadKrea2ImageAsInput(url, filename){
   })();
 })();
 
-// --- EXTRACCIÓN Y APLICACIÓN DE WORKFLOW DESDE METADATOS PNG/MP4 ---
-function extractWorkflowFromImage(url){
-  fetch(url).then(r => r.arrayBuffer()).then(buf => {
-    const bytes = new Uint8Array(buf);
-    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return;
-    let pos = 8;
-    let workflowRaw = null;
-    while(pos < bytes.length - 8){
-      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
-      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
-      if(type === "tEXt"){
-        const dataStart = pos + 8;
-        let nullPos = dataStart;
-        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
-        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
-        if(keyword === "prompt"){
-          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
-          break;
-        }
-      }
-      if(type === "IEND") break;
-      pos = pos + 12 + len;
-    }
-    if(workflowRaw == null) return;
-    let workflow;
-    try {
-      workflow = JSON.parse(workflowRaw);
-    } catch(e1){
-      const first = workflowRaw.indexOf("{");
-      const last = workflowRaw.lastIndexOf("}");
-      if(first !== -1 && last > first){
-        try { workflow = JSON.parse(workflowRaw.slice(first, last + 1)); }
-        catch(e2){ console.warn("No se pudo parsear workflow de metadatos:", e2.message); return; }
-      } else {
-        console.warn("No se pudo parsear workflow de metadatos:", e1.message);
-        return;
-      }
-    }
-    applyWorkflow(workflow);
-  }).catch(e => console.warn("No se pudo leer metadatos:", e.message));
-}
 
 function applyWorkflow(workflow, opts={}){
   const applied = [];
@@ -5380,7 +5280,6 @@ dz.addEventListener("drop",e=>{if(e.dataTransfer.files[0])handleFile(e.dataTrans
 fileInput.addEventListener("change",e=>{if(e.target.files[0])handleFile(e.target.files[0]);});
 
 function handleFile(f, shouldSaveToGallery = true){
-  console.log("[LTXV] handleFile", f.name, f.type, f.size);
   uploadedImage = null;
   localFile = null;
 
@@ -5410,11 +5309,9 @@ function handleFile(f, shouldSaveToGallery = true){
 }
 
 function showInputImage(src){
-  console.log("[LTXV] showInputImage src length:", src ? src.length : 0);
   const wrap = $("inputWrap"), img = $("inputImg"), actions = $("imgInputActions");
   if(!wrap || !img) { console.warn("[LTXV] showInputImage: wrap/img no disponible"); return; }
   img.onload = () => {
-    console.log("[LTXV] inputImg loaded", img.naturalWidth, "x", img.naturalHeight);
     updateDzInfo(img.naturalWidth, img.naturalHeight);
     inputZoom.resetZoom();
   };
@@ -5444,8 +5341,27 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   });
 
   function extractFrameAt(time, callback){
+    // Si ya estamos en la posición pedida, el navegador NO dispara "seeked"
+    // (no hay seek real): dibujamos directamente para no colgar el callback.
+    if(Math.abs(vid.currentTime - time) < 0.001){
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = vid.videoWidth || 640;
+        canvas.height = vid.videoHeight || 360;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(vid, 0, 0, canvas.width, canvas.height);
+        callback(null, canvas.toDataURL("image/jpeg", 0.92));
+      } catch(err) { callback(err); }
+      return;
+    }
     vid.currentTime = time;
-    vid.addEventListener("seeked", function onSeeked(){
+    // Timeout de seguridad: un vídeo corrupto no dispara seeked nunca.
+    const timer = setTimeout(() => {
+      vid.removeEventListener("seeked", onSeeked);
+      callback(new Error("timeout esperando el frame"));
+    }, 5000);
+    function onSeeked(){
+      clearTimeout(timer);
       vid.removeEventListener("seeked", onSeeked);
       try {
         const canvas = document.createElement("canvas");
@@ -5456,7 +5372,8 @@ function handleVideoFile(file, shouldSaveToGallery = true){
         const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
         callback(null, dataUrl);
       } catch(err) { callback(err); }
-    }, { once: true });
+    }
+    vid.addEventListener("seeked", onSeeked, { once: true });
   }
 
   function setFrameAsInput(dataUrl, frameLabel){
@@ -5474,8 +5391,8 @@ function handleVideoFile(file, shouldSaveToGallery = true){
         } else {
           log(`ℹ️ ${file.name} no contiene metadatos de workflow.`, "l-warn");
         }
-      });
-    });
+      }).catch(e => log("❌ Error aplicando workflow: "+e.message, "l-err"));
+    }).catch(e => log("❌ Error convirtiendo el frame: "+e.message, "l-err"));
   }
 
   function showFrameSelector(){
@@ -5518,19 +5435,6 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   }, { once: true });
 
   vid.src = videoUrl;
-}
-
-async function ensureImageUploaded(){
-  if(!localFile) throw new Error("selecciona imagen");
-  setRun("busy","subiendo...");
-  const fd=new FormData();
-  fd.append("image", localFile, localFile.name.replace(/^temp_\d+_/, ''));
-  fd.append("overwrite","true");
-  const r=await fetch(server()+"/upload/image",{method:"POST",body:fd});
-  if(!r.ok) throw new Error("fallo subida");
-  const data=await r.json();
-  uploadedImage={name:data.name, subfolder:data.subfolder||"", type:data.type||"input"};
-  log("Imagen subida al servidor: "+uploadedImage.name,"l-ok");
 }
 
 async function ensureJobImageUploaded(job){
@@ -5745,8 +5649,13 @@ function buildGraph(mode, job){
     }
   }
 
-  // Prefijo de archivo configurable
-  const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "templo/mensaje_botella";
+  // Prefijo de archivo configurable (validado: sin "..", solo caracteres seguros)
+  let prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "templo/mensaje_botella";
+  prefix = prefix.replace(/\\/g, "/").split("/").filter(seg => seg && seg !== "." && seg !== "..").join("/");
+  if(!prefix || !/^[A-Za-z0-9_\-\/]+$/.test(prefix)){
+    log(`⚠️ filename_prefix inválido ("${prefix || "vacío"}"); usando "ltxv_ui".`, "l-warn");
+    prefix = "ltxv_ui";
+  }
   if(g[N.FINAL_SAVE] && g[N.FINAL_SAVE].inputs){
     g[N.FINAL_SAVE].inputs.filename_prefix = prefix;
   }
@@ -5826,7 +5735,7 @@ function showVideo(slot, media, options={}){
   v.src = url;
   v.style.display = "block";
   empty.style.display = "none";
-  if(options.autoplay !== false) v.play().catch(err => console.log("Autoplay blocked:", err));
+  if(options.autoplay !== false) v.play().catch(err => console.debug("Autoplay bloqueado:", err));
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
@@ -5960,9 +5869,21 @@ function captureFrameFromPlayer(){
       if(!dur || !isFinite(dur)){ throw new Error("duración del vídeo no disponible"); }
       const targetTime = v.currentTime || 0;
       await new Promise((resolve, reject) => {
-        let resolved = false;
-        const onSeeked = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; resolve(); } };
-        const onError = () => { v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); if(!resolved){ resolved = true; reject(new Error("error durante seek")); } };
+        // Si ya estamos en la posición, no hay seek real y "seeked" nunca
+        // dispara: resolvemos directamente (con pequeño delay para asegurar
+        // que el frame está pintado).
+        if(Math.abs(v.currentTime - targetTime) < 0.001){
+          setTimeout(resolve, 50);
+          return;
+        }
+        let settled = false;
+        const timer = setTimeout(() => {
+          if(settled) return; settled = true;
+          v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError);
+          reject(new Error("timeout durante seek"));
+        }, 5000);
+        const onSeeked = () => { if(settled) return; settled = true; clearTimeout(timer); v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); resolve(); };
+        const onError = () => { if(settled) return; settled = true; clearTimeout(timer); v.removeEventListener("seeked", onSeeked); v.removeEventListener("error", onError); reject(new Error("error durante seek")); };
         v.addEventListener("seeked", onSeeked, { once: true });
         v.addEventListener("error", onError, { once: true });
         v.currentTime = targetTime;
@@ -6074,98 +5995,6 @@ $("btnRefreshVideoHistory").addEventListener("click", (e) => {
   loadVideoHistory();
 });
 
-// --- VIDEO HISTORY THUMBNAILS ---
-const THUMB_CACHE_PREFIX = "ltxv_thumb_";
-const THUMB_WIDTH = 320;
-const THUMB_QUALITY = 0.72;
-
-function _thumbCacheKey(item){
-  return item.filename + "|" + (item.mtime || 0) + "|" + item.subfolder + "|" + item.type;
-}
-
-function _safeCacheGet(key){
-  try { return localStorage.getItem(THUMB_CACHE_PREFIX + key); } catch(e){ return null; }
-}
-
-function _safeCacheSet(key, value){
-  try { localStorage.setItem(THUMB_CACHE_PREFIX + key, value); } catch(e){ /* quota/full: ignore */ }
-}
-
-function extractVideoFrame(videoUrl){
-  return new Promise((resolve) => {
-    const v = document.createElement("video");
-    v.crossOrigin = "anonymous";
-    v.muted = true;
-    v.playsInline = true;
-    v.preload = "metadata";
-    let resolved = false;
-    function done(result){
-      if(resolved) return;
-      resolved = true;
-      try { v.pause(); v.src = ""; v.load(); } catch(_){}
-      resolve(result);
-    }
-    v.addEventListener("loadedmetadata", () => {
-      const t = v.duration ? Math.min(0.5, v.duration / 2) : 0.1;
-      v.currentTime = t;
-    }, {once:true});
-    v.addEventListener("seeked", () => {
-      try {
-        const canvas = document.createElement("canvas");
-        const ratio = v.videoHeight / (v.videoWidth || 1);
-        canvas.width = THUMB_WIDTH;
-        canvas.height = Math.max(1, Math.round(THUMB_WIDTH * ratio));
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#000";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-        done(canvas.toDataURL("image/jpeg", THUMB_QUALITY));
-      } catch(err){ done(null); }
-    }, {once:true});
-    v.addEventListener("error", () => done(null), {once:true});
-    v.src = videoUrl;
-  });
-}
-
-async function getCachedThumb(item){
-  const key = _thumbCacheKey(item);
-  const cached = _safeCacheGet(key);
-  if(cached) return cached;
-  const url = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}&t=${item.mtime}`;
-  const dataUrl = await extractVideoFrame(url + "#t=0.1");
-  if(dataUrl) _safeCacheSet(key, dataUrl);
-  return dataUrl;
-}
-
-let _thumbObserver = null;
-function observeThumbs(){
-  if(_thumbObserver) _thumbObserver.disconnect();
-  if(!("IntersectionObserver" in window)){
-    document.querySelectorAll(".thumb-img").forEach(async (img) => {
-      if(img.dataset.loaded) return;
-      const item = JSON.parse(img.dataset.item || "{}");
-      if(!item.filename) return;
-      const dataUrl = await getCachedThumb(item);
-      if(dataUrl){ img.src = dataUrl; img.style.opacity = 1; }
-      img.dataset.loaded = "1";
-    });
-    return;
-  }
-  _thumbObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if(!entry.isIntersecting) return;
-      const img = entry.target;
-      if(img.dataset.loaded) return;
-      img.dataset.loaded = "1";
-      const item = JSON.parse(img.dataset.item || "{}");
-      if(!item.filename) return;
-      getCachedThumb(item).then(dataUrl => {
-        if(dataUrl){ img.src = dataUrl; img.style.opacity = 1; }
-      }).catch(() => {});
-    });
-  }, { rootMargin: "50px" });
-  document.querySelectorAll(".thumb-img").forEach(img => _thumbObserver.observe(img));
-}
 
 async function loadVideoHistory(){
   const status = $("videoHistoryStatus");
@@ -6198,7 +6027,7 @@ async function loadVideoHistory(){
           <span class="variant-badge">${typeBadge}</span>
           <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>
           <div class="variant-info">
-            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
+            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</span>
             <span class="variant-icons">
               <button class="variant-meta-btn" title="Copiar workflow" data-action="workflow">📋</button>
               <button class="variant-del-btn" title="Eliminar" data-action="delete">×</button>
@@ -6325,6 +6154,7 @@ async function loadVideoHistory(){
 
 // --- GENERACIÓN ---
 async function runSingleGeneration(index) {
+    if(!activeJob) return; // guard: stop/error puede dejar la cola vacía entre el setTimeout y la ejecución
     try {
         const mode = activeJob ? (activeJob.firstPassOnly ? "first" : "full") : "full";
         const graph = buildGraph(mode, activeJob);
@@ -6366,7 +6196,6 @@ async function runSingleGeneration(index) {
         pendingSeeds[data.prompt_id] = seedUsed;
         promptVariantMap[data.prompt_id] = varIndex;
         currentPromptId = data.prompt_id;
-        promptSteps[data.prompt_id] = "1";
         startTimer(data.prompt_id, 1);
         pollFallback(data.prompt_id);
     } catch(err) {
@@ -6384,11 +6213,8 @@ async function startJob(job){
     await ensureJobImageUploaded(job);
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;
-    batchSeedMode = job.seedMode === "random" ? "random" : "fixed";
-    window.currentBatchMode = false;
     generationStep = 1;
-    firstPromptId = null;
-    job.currentVariantIndex = null;
+      job.currentVariantIndex = null;
     // Limpiamos tiempos de jobs anteriores para evitar confusión visual.
     $("time1").textContent = "";
     $("time1").classList.remove("live");
