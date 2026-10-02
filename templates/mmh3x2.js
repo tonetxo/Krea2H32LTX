@@ -198,7 +198,6 @@ const ATTENTION_BACKEND_KEY = "mmh3x2_attention_backend";
 const ATTENTION_OPTIMIZER_KEY = "mmh3x2_attention_optimizer";
 const H3OPT_KEY = "mmh3x2_h3opt";
 const AIMDO_KEY = "mmh3x2_aimdo";
-const BLOCK_SPARSE_KEY = "mmh3x2_block_sparse";
 
 const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
 const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "none" };
@@ -208,20 +207,6 @@ const AIMDO_DEFAULTS = { residency: "0 blocks" };
 // make_forward.<locals>.forward() got an unexpected keyword argument 'attention'
 // en el transformer de MiniMax H3. Se conservan las funciones por compatibilidad
 // de workflow antiguos, pero la UI no ofrece el modo.
-const BLOCK_SPARSE_MODES = {
-  "Sol-Attn (adaptive tau)": "sol-attn",
-  "top-k (SLA)": "sla",
-  "VSA (FastVideo)": "vsa"
-};
-const BLOCK_SPARSE_MODES_REVERSE = {
-  "sol-attn": "Sol-Attn (adaptive tau)",
-  "sla": "top-k (SLA)",
-  "vsa": "VSA (FastVideo)"
-};
-function mapBlockSparseSelection(sel){
-  return BLOCK_SPARSE_MODES[sel] || BLOCK_SPARSE_MODES_REVERSE[sel] || sel;
-}
-const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0 };
 
 // --- SPECTRUM (MiniMax H3) ---
 const SPECTRUM_KEY = "mmh3x2_spectrum";
@@ -325,38 +310,17 @@ function saveAimdo(s){ try { localStorage.setItem(AIMDO_KEY, JSON.stringify(s));
 function getAimdoState(){ return { residency: $("aimdoResidency")?.value || AIMDO_DEFAULTS.residency }; }
 function setAimdoUI(s){ if($("aimdoResidency")) $("aimdoResidency").value = s.residency; }
 
-function loadBlockSparse(){
-  try { return Object.assign({}, BLOCK_SPARSE_DEFAULTS, JSON.parse(localStorage.getItem(BLOCK_SPARSE_KEY) || "{}")); }
-  catch(_) { return {...BLOCK_SPARSE_DEFAULTS}; }
-}
-function saveBlockSparse(s){ try { localStorage.setItem(BLOCK_SPARSE_KEY, JSON.stringify(s)); } catch(_){} }
-function getBlockSparseState(){
-  return {
-    selection: $("blockSparseSelection")?.value || BLOCK_SPARSE_DEFAULTS.selection,
-    tau: parseFloat($("blockSparseTau")?.value ?? "1.3"),
-    startPercent: parseFloat($("blockSparseStart")?.value ?? "0.2"),
-    endPercent: parseFloat($("blockSparseEnd")?.value ?? "1.0"),
-  };
-}
-function setBlockSparseUI(s){
-  if($("blockSparseSelection")) $("blockSparseSelection").value = s.selection;
-  if($("blockSparseTau")){ $("blockSparseTau").value = s.tau; $("blockSparseTauVal").textContent = parseFloat(s.tau).toFixed(2); }
-  if($("blockSparseStart")){ $("blockSparseStart").value = s.startPercent; $("blockSparseStartVal").textContent = parseFloat(s.startPercent).toFixed(2); }
-  if($("blockSparseEnd")){ $("blockSparseEnd").value = s.endPercent; $("blockSparseEndVal").textContent = parseFloat(s.endPercent).toFixed(2); }
-}
 
 const _attentionBackendState = loadAttentionBackend();
 const _attentionOptimizerState = loadAttentionOptimizer();
 const _h3OptState = loadH3Opt();
 const _aimdoState = loadAimdo();
-const _blockSparseState = loadBlockSparse();
 setWorkflowModeUI();
 setAttentionBackendUI(_attentionBackendState);
 if(IS_BLOCKATT){
   setAttentionOptimizerUI(_attentionOptimizerState.mode);
   setH3OptUI(_h3OptState);
   setAimdoUI(_aimdoState);
-  setBlockSparseUI(_blockSparseState);
 } else {
   setH3OptUI(_h3OptState);
 }
@@ -690,9 +654,12 @@ CONFIG.findMedia = function(output){
   return null;
 };
 
-CONFIG.showMedia = function(media, meta){
-  const targetPlayer = meta?.targetSlot || 3;
-  displayVideoInPlayer(targetPlayer, media);
+// showMedia: common.js solo lo documenta (contrato del header); nunca lo
+// invoca. Se conserva por compatibilidad con la firma del contrato
+// showMedia(slot, media, options) por si un future caller lo usa.
+CONFIG.showMedia = function(slot, media, options){
+  const targetPlayer = (typeof slot === "number") ? slot : (media?.targetSlot || 3);
+  displayVideoInPlayer(targetPlayer, media, options);
 };
 
 let seedMode = "random";
@@ -714,17 +681,15 @@ function setSeedMode(mode){
 function recalcResolution(){
   if($("mpVal") && $("mpSlider")) $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
   const img1 = $("previewSlotImg1");
-  if(img1?.naturalWidth && img1?.naturalHeight){
-    updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
-  }
-  // Si Slot 1 aún no ha cargado, no forzamos 16:9; esperamos al onload/decode.
+  const hasImg1 = !!(img1 && img1.complete && img1.naturalWidth && img1.style.display !== "none");
+  updateCalculatedResolution(hasImg1 ? img1.naturalWidth : 1280, hasImg1 ? img1.naturalHeight : 720);
 }
 
 CONFIG.variantMeta = function(){
   const p1 = $("prompt")?.value?.trim() || "";
   const p2 = $("prompt2")?.value?.trim() || "";
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
-  const dur1 = parseFloat($("durationSlider1")?.value || $("durationSlider")?.value || "15.0");
+  const dur1 = parseFloat($("durationSlider1")?.value || "15.0");
   const dur2 = parseFloat($("durationSlider2")?.value || "15.0");
   const f1 = calcFramesForDuration(dur1);
   const f2 = calcFramesForDuration(dur2);
@@ -782,6 +747,7 @@ CONFIG.variantMeta = function(){
     ["Memory opt", $("segMemOptOn")?.classList.contains("on") ? "Sí" : "No"],
     (() => { const s = getSpectrumState(); return ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup}${s.bootstrapFirstForecast ? ' · boot' : ''} · ${s.historyStorage}` : "off"]; })(),
     IS_BLOCKATT ? ["Optimizador", getAttentionOptimizerState().mode] : null,
+    ["Empalme vídeo", $("blendToggle")?.checked ? `${$("blendFrames")?.value || 4}f · fuerza ${$("blendStrength")?.value || 0.35} · ${$("blendMode")?.value || "transition_only"}` : "desactivado"],
     ["RIFE", `${rMode}x`]
   ].filter(Boolean);
 
@@ -818,7 +784,8 @@ function formatWorkflowToMeta(workflow){
   const clipName = findClipInWorkflow(workflow);
   if(clipName) rows.push(["CLIP", clipName]);
   if(workflow["50"]?.inputs?.value) rows.push(["Prompt 1", String(workflow["50"].inputs.value).slice(0, 80)]);
-  else if(workflow["6"]?.inputs?.text) rows.push(["Prompt", String(workflow["6"].inputs.text).slice(0, 80)]);
+  // Nota: el nodo "6" de MMH3X2 es H3MemoryOptimization (fallback copiado de
+  // otra UI eliminado).
   if(workflow["58"]?.inputs?.value) rows.push(["Prompt 2", String(workflow["58"].inputs.value).slice(0, 80)]);
   if(workflow["12"]?.inputs?.value) rows.push(["Duración", `${workflow["12"].inputs.value}s`]);
   if(workflow["79"]?.inputs?.value) rows.push(["Pasos", workflow["79"].inputs.value]);
@@ -970,11 +937,13 @@ CONFIG.onProgress = function(value, max, prompt_id, node){
     }
   }
 
-  // 4. Log en tiempo real
+  // 4. Estado en tiempo real SIN borrar el log acumulado: escribir sobre #log
+  // con textContent destruye el historial de log() (que añade hijos div).
+  // Solo refrescamos la primera línea si la UI lo soporta; el resto va al badge.
   const logEl = $("log");
   if(logEl){
-    logEl.textContent = `⏳ ${label}: Paso ${value}/${max} (${pct}%)`;
-    logEl.className = "log l-busy";
+    logEl.dataset.busyState = `⏳ ${label}: Paso ${value}/${max} (${pct}%)`;
+    logEl.classList.add("l-busy");
   }
 };
 
@@ -1126,8 +1095,9 @@ CONFIG.onClearPreview = function(){
 // que llega el preview nuevo. Limpia los elementos de preview en vivo (img/video
 // de preview) y las cajas de "vacío", pero NO los reproductores de resultados
 // (videoSeg1/videoSeg2/videoFinal), que solo se tocan al cargar un resultado.
-function resetPreviewPanes(){
-  ["Final", "Seg1", "Seg2"].forEach(slot => {
+function resetPreviewPanes(runMode){
+  const slots = (runMode === "seg2_only") ? ["Final", "Seg2"] : ["Final", "Seg1", "Seg2"];
+  slots.forEach(slot => {
     const p = $("previewImg" + slot);
     const pv = $("previewVideo" + slot);
     const w = $("previewWrap" + slot);
@@ -1159,7 +1129,7 @@ function createGeneratingCard(varIdx, seedUsed){
         <img class="variant-live-thumb" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;opacity:0.4;transition:opacity 0.2s;">
       </div>
       <div class="variant-info" style="padding:6px;background:var(--panel);">
-        <span class="variant-seed-display" title="Semilla" style="font-size:10px;font-family:var(--mono);color:var(--muted);">Seed: ${seedUsed}</span>
+        <span class="variant-seed-display" title="Semilla" style="font-size:10px;font-family:var(--mono);color:var(--muted);">Seed: ${escapeHtml(String(seedUsed))}</span>
         <span class="variant-time" style="font-size:10px;color:var(--accent);margin-left:auto;">⏳ En curso...</span>
       </div>
     `;
@@ -1189,7 +1159,7 @@ CONFIG.addToVariantGallery = function(mediaOrUrl, seed, varIdx, promptText){
   card.innerHTML = `
     <div class="thumb-wrap">
       <video src="${url}#t=0.001" crossorigin="anonymous" controls muted preload="metadata" playsinline style="width:100%;height:auto;max-height:220px;object-fit:contain;"></video>
-      <span class="variant-badge">Var ${varIdx} · Seed ${seed}</span>
+      <span class="variant-badge">Var ${parseInt(varIdx, 10) || 0} · Seed ${escapeHtml(String(seed))}</span>
     </div>
     <div style="padding:6px;display:flex;justify-content:space-between;align-items:center;background:var(--panel);">
       <button type="button" class="ghost btn-mini btn-load-card" title="Cargar en reproductor principal">▶ Cargar</button>
@@ -1298,6 +1268,13 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
       finishCurrentJob();
     }
   }
+  // Contrato de common.js: si hay outputs pero ningún medio usable, señalamos
+  // foundOutput:false para que pollFallback reintente en vez de avanzar el
+  // batch con una tarjeta "procesando" huérfana. Solo si found==true la UI
+  // ya avanzó el batch ella misma (skipFinalize) y devolvemos true.
+  if(!found){
+    return { foundOutput: false };
+  }
   return true;
 };
 
@@ -1314,11 +1291,19 @@ CONFIG.onSeedUpdate = function(newSeed){
 };
 
 CONFIG.onPromptError = function(pid){
+  // No avanzar la cola aquí: common.js ya hace currentBatchIndex++ +
+  // processNextBatch tras este callback; llamar a finishCurrentJob() desde
+  // aquí arranca el siguiente job mientras processNextBatch dispara una
+  // variante del job ANTIGUO (race de batch/variantCounter).
   delete promptSteps[pid];
-  delete pendingSeeds[pid];
   delete promptVariantMap[pid];
   delete displayedSlots[pid];
-  finishCurrentJob();
+  // Limpiar la tarjeta "generando" huérfana de esta variante.
+  const grid = $("variantGrid");
+  if(grid){
+    const card = grid.querySelector('.variant-card-generating');
+    if(card) card.remove();
+  }
 };
 
 CONFIG.startNextVariant = async function(){
@@ -1337,31 +1322,21 @@ CONFIG.onBatchComplete = function(){
   finishCurrentJob();
 };
 
-CONFIG.onStopCurrent = async function(){
-  try {
-    if(currentPromptId){
-      await fetch(server() + "/interrupt", { method: "POST" });
-      log("⏹ Interrupción solicitada para la tarea actual", "l-warn");
-    }
-  } catch(e){
-    log(`Error al interrumpir: ${e.message}`, "l-err");
-  } finally {
-    finishCurrentJob();
-  }
+CONFIG.onStopCurrent = function(pid){
+  // common.js ya interrumpió el backend antes de llamar aquí (con el pid que
+  // le pasa el contrato); el avance del batch lo hace su processNextBatch.
+  delete promptVariantMap[pid];
+  delete displayedSlots[pid];
 };
 
-CONFIG.onStopAll = async function(){
-  try {
-    await fetch(server() + "/interrupt", { method: "POST" });
-    await fetch(server() + "/queue", { method: "POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({clear:true}) });
-    jobQueue = [];
-    activeJob = null;
-    currentPromptId = null;
-    updateQueueUI();
-    log("⏹ Todas las tareas canceladas y cola vaciada", "l-warn");
-  } catch(e){
-    log(`Error al cancelar todo: ${e.message}`, "l-err");
-  }
+CONFIG.onStopAll = function(){
+  // common.js ya interrumpió el backend y vació pendingSeeds; solo estado propio.
+  promptVariantMap = {};
+  for(const k of Object.keys(displayedSlots)) delete displayedSlots[k];
+  promptSteps = {};
+  jobQueue = [];
+  activeJob = null;
+  updateQueueUI();
 };
 
 let queueIdleCount = 0;
@@ -1452,7 +1427,7 @@ function updateQueueUI(){
     jobQueue.forEach((job, idx) => {
       const row = document.createElement("div");
       row.className = "queue-item-row";
-      const pText = (job.prompt || "sin prompt").trim();
+      const pText = escapeHtml((job.prompt || "sin prompt").trim());
       const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
       const runLabel = job.runMode === "seg1_only" ? "Solo Seg 1"
         : (job.runMode === "seg2_only" ? "Seg 2 + Final" : "completo");
@@ -1609,13 +1584,13 @@ function applyWorkflow(workflow){
     $("lora1Toggle").checked = true;
     if($("lora1Select")) $("lora1Select").value = workflow["145_1"].inputs.lora_name || "";
     if($("lora1Strength")) $("lora1Strength").value = workflow["145_1"].inputs.strength_model || 1.0;
-    if($("lora1Val")) $("lora1Val").textContent = workflow["145_1"].inputs.strength_model || 1.0;
+    if($("lora1StrengthVal")) $("lora1StrengthVal").textContent = parseFloat($("lora1Strength").value).toFixed(2);
   }
   if(workflow["145_2"]?.inputs && $("lora2Toggle")){
     $("lora2Toggle").checked = true;
     if($("lora2Select")) $("lora2Select").value = workflow["145_2"].inputs.lora_name || "";
     if($("lora2Strength")) $("lora2Strength").value = workflow["145_2"].inputs.strength_model || 1.0;
-    if($("lora2Val")) $("lora2Val").textContent = workflow["145_2"].inputs.strength_model || 1.0;
+    if($("lora2StrengthVal")) $("lora2StrengthVal").textContent = parseFloat($("lora2Strength").value).toFixed(2);
   }
 
   // 8. Sampler & Scheduler
@@ -1651,38 +1626,12 @@ function applyWorkflow(workflow){
 
   const sparseNode = findByClass("H3SparseAttention") || findByClass("H3SparseAttentionAdvanced");
   const sparseAdvancedNode = findByClass("H3SparseAttentionAdvanced");
-  const blockSparseNode = findByClass("BlockSparseAttention");
   const aimdoNode = findByClass("H3AIMDOResidencyLimiter");
   const memOptNode = findByClass("H3MemoryOptimization");
 
-  if(blockSparseNode?.inputs){
-    const bs = { ...BLOCK_SPARSE_DEFAULTS };
-    const sel = blockSparseNode.inputs.selection;
-    bs.selection = mapBlockSparseSelection(sel) || bs.selection;
-    if(blockSparseNode.inputs["selection.tau"] != null) bs.tau = blockSparseNode.inputs["selection.tau"];
-    if(blockSparseNode.inputs.start_percent != null) bs.startPercent = blockSparseNode.inputs.start_percent;
-    if(blockSparseNode.inputs.end_percent != null) bs.endPercent = blockSparseNode.inputs.end_percent;
-    setBlockSparseUI(bs);
-    saveBlockSparse(bs);
-    setAttentionOptimizerUI("block-sparse");
-    saveAttentionOptimizer({ mode: "block-sparse" });
-  } else if(sparseAdvancedNode?.inputs || sparseNode?.class_type === "H3SparseAttentionAdvanced"){
-    const h3State = loadH3Opt();
-    if(typeof sparseNode.inputs.video_budget === "number") h3State.videoBudget = sparseNode.inputs.video_budget;
-    if(typeof sparseNode.inputs.denser_early_late_steps === "boolean") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps;
-    else if(typeof sparseNode.inputs.denser_early_late_steps === "string") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps === "true";
-    if(typeof sparseNode.inputs.backend === "string") h3State.sparseBackend = sparseNode.inputs.backend;
-    h3State.memOptEnabled = !!memOptNode;
-    setH3OptUI(h3State);
-    saveH3Opt(h3State);
-    if(aimdoNode?.inputs?.residency_limit){
-      const aimdoState = { residency: aimdoNode.inputs.residency_limit };
-      setAimdoUI(aimdoState);
-      saveAimdo(aimdoState);
-    }
-    setAttentionOptimizerUI("h3-optimizations");
-    saveAttentionOptimizer({ mode: "h3-optimizations" });
-  } else if(sparseNode?.inputs){
+  // BlockSparseAttention: eliminado (falla con MiniMax H3); los workflows
+  // antiguos que lo traigan se normalizan a las ramas de abajo.
+  if(sparseAdvancedNode?.inputs || sparseNode?.class_type === "H3SparseAttentionAdvanced"){
     const h3State = loadH3Opt();
     if(typeof sparseNode.inputs.video_budget === "number") h3State.videoBudget = sparseNode.inputs.video_budget;
     if(typeof sparseNode.inputs.denser_early_late_steps === "boolean") h3State.denserEarlyLate = sparseNode.inputs.denser_early_late_steps;
@@ -1717,7 +1666,20 @@ function applyWorkflow(workflow){
     $("rifeMultiplier").value = String(rifeNode.inputs.multiplier);
   }
   if($("rtxToggle")) $("rtxToggle").checked = !!findByClass("RTXVideoSuperResolution");
-  if($("blendToggle")) $("blendToggle").checked = !!findByClass("VideoTemporalBlend");
+  const vtbNode = findByClass("VideoTemporalBlend");
+  if($("blendToggle")) $("blendToggle").checked = !!vtbNode;
+  if(vtbNode && vtbNode.inputs){
+    if(typeof vtbNode.inputs.blend_strength === "number" && $("blendStrength")){
+      $("blendStrength").value = vtbNode.inputs.blend_strength;
+      if($("blendStrengthVal")) $("blendStrengthVal").textContent = parseFloat(vtbNode.inputs.blend_strength).toFixed(2);
+    }
+    if(typeof vtbNode.inputs.blend_frames === "number" && $("blendFrames")){
+      $("blendFrames").value = vtbNode.inputs.blend_frames;
+      if($("blendFramesVal")) $("blendFramesVal").textContent = `${vtbNode.inputs.blend_frames}f`;
+    }
+    if(vtbNode.inputs.mode && $("blendMode")) $("blendMode").value = vtbNode.inputs.mode;
+  }
+  if(typeof updateBlendControlsVisibility === "function") updateBlendControlsVisibility();
 
   saveSettings();
 }
@@ -1785,7 +1747,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
     video.style.display = "block";
     const alreadyPlaying = prevUrl === videoUrl && !video.paused && options.autoplay !== false;
     if(options.autoplay !== false && !alreadyPlaying){
-      video.play().catch(err => console.log("Autoplay:", err));
+      video.play().catch(err => console.debug("Autoplay:", err));
     }
     const onMeta = () => {
       const vw = video.videoWidth || 0, vh = video.videoHeight || 0;
@@ -1900,7 +1862,7 @@ async function enqueueFaceRefineCurrent(slotIndex = 3){
     sourceMedia: { ...media },
     prompt: $("prompt")?.value?.trim() || "",
     prompt2: $("prompt2")?.value?.trim() || "",
-    duration1: parseFloat($("durationSlider1")?.value || $("durationSlider")?.value || "15.0"),
+    duration1: parseFloat($("durationSlider1")?.value || "15.0"),
     duration2: parseFloat($("durationSlider2")?.value || "15.0"),
     megapixels: parseFloat($("mpSlider")?.value || "0.70"),
     steps: parseInt($("stepsSlider")?.value || "20", 10),
@@ -2076,9 +2038,10 @@ function saveSettings(){
     seg2OllamaModel: $("seg2OllamaModel")?.value || "",
     seedMode: $("segRandom")?.classList.contains("on") ? "random" : "fixed",
     seedVal: $("seedVal")?.value || "12345",
-    duration1: $("durationSlider1")?.value || $("durationSlider")?.value || "15.0",
+    duration1: $("durationSlider1")?.value || "15.0",
     duration2: $("durationSlider2")?.value || "15.0",
     megapixels: $("mpSlider")?.value || "0.70",
+    aspectRatio: $("aspectRatioSelect")?.value || "auto",
     batchSize: $("batchSize")?.value || "1",
     filenamePrefix: $("filenamePrefix")?.value || "video/MiniMax_H3",
     steps: $("stepsSlider")?.value || "20",
@@ -2091,7 +2054,6 @@ function saveSettings(){
     attentionOptimizer: IS_BLOCKATT ? getAttentionOptimizerState() : null,
     h3opt: getH3OptState(),
     aimdo: IS_BLOCKATT ? getAimdoState() : null,
-    blockSparse: IS_BLOCKATT ? getBlockSparseState() : null,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     spectrum: getSpectrumState(),
@@ -2102,6 +2064,9 @@ function saveSettings(){
     lora2Select: $("lora2Select")?.value || "",
     lora2Strength: $("lora2Strength")?.value || "1.0",
     blendToggle: $("blendToggle") ? $("blendToggle").checked : true,
+    blendStrength: $("blendStrength")?.value || "0.35",
+    blendFrames: $("blendFrames")?.value || "4",
+    blendMode: $("blendMode")?.value || "transition_only",
     rtxToggle: $("rtxToggle") ? $("rtxToggle").checked : true,
     rifeToggle: $("rifeToggle") ? $("rifeToggle").checked : true,
     rifeMultiplier: $("rifeMultiplier")?.value || "2",
@@ -2174,6 +2139,9 @@ function restoreSettings(){
       $("mpSlider").value = s.megapixels;
       if($("mpVal")) $("mpVal").textContent = parseFloat(s.megapixels).toFixed(2);
     }
+    if(s.aspectRatio !== undefined && $("aspectRatioSelect")){
+      $("aspectRatioSelect").value = s.aspectRatio;
+    }
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
     if(s.filenamePrefix !== undefined && $("filenamePrefix")) $("filenamePrefix").value = s.filenamePrefix;
 
@@ -2193,7 +2161,6 @@ function restoreSettings(){
       if(s.attentionOptimizer){ setAttentionOptimizerUI(s.attentionOptimizer.mode); saveAttentionOptimizer(s.attentionOptimizer); }
       if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
       if(s.aimdo){ setAimdoUI(s.aimdo); saveAimdo(s.aimdo); }
-      if(s.blockSparse){ setBlockSparseUI(s.blockSparse); saveBlockSparse(s.blockSparse); }
     } else {
       if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
     }
@@ -2225,6 +2192,16 @@ function restoreSettings(){
     }
 
     if(s.blendToggle !== undefined && $("blendToggle")) $("blendToggle").checked = s.blendToggle;
+    if(s.blendStrength !== undefined && $("blendStrength")){
+      $("blendStrength").value = s.blendStrength;
+      if($("blendStrengthVal")) $("blendStrengthVal").textContent = parseFloat(s.blendStrength).toFixed(2);
+    }
+    if(s.blendFrames !== undefined && $("blendFrames")){
+      $("blendFrames").value = s.blendFrames;
+      if($("blendFramesVal")) $("blendFramesVal").textContent = `${s.blendFrames}f`;
+    }
+    if(s.blendMode && $("blendMode")) $("blendMode").value = s.blendMode;
+    if(typeof updateBlendControlsVisibility === "function") updateBlendControlsVisibility();
     if(s.rtxToggle !== undefined && $("rtxToggle")) $("rtxToggle").checked = s.rtxToggle;
     if(s.rifeToggle !== undefined && $("rifeToggle")) $("rifeToggle").checked = s.rifeToggle;
     if(s.rifeMultiplier !== undefined && $("rifeMultiplier")) $("rifeMultiplier").value = s.rifeMultiplier;
@@ -2299,11 +2276,11 @@ async function restoreSavedMedia(){
 
 function attachAutoSaveListeners(){
   const baseIds = [
-    "prompt", "prompt2", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "mpSlider", "stepsSlider",
+    "prompt", "prompt2", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "aspectRatioSelect", "mpSlider", "stepsSlider",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
     "unetModel", "clipModel", "vaeModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
     "lora1Toggle", "lora1Select",
-    "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle",
+    "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle", "blendStrength", "blendFrames", "blendMode",
     "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
     "audioGuideVolume", "audioUserVolume", "audioNormalizeToggle", "shareRefsToggle", "refImageSize",
@@ -2320,6 +2297,25 @@ function attachAutoSaveListeners(){
       el.addEventListener("input", scheduleSaveSettings);
       el.addEventListener("change", scheduleSaveSettings);
     }
+  });
+
+  function updateBlendControlsVisibility(){
+    const on = !!$("blendToggle")?.checked;
+    if($("blendControls")) $("blendControls").style.display = on ? "block" : "none";
+  }
+  // Exponer a top-level: applyWorkflow/restoreSettings la invocan con guard
+  // typeof desde otro scope; sin esto la visibilidad del panel quedaba stale.
+  window.updateBlendControlsVisibility = updateBlendControlsVisibility;
+
+  $("blendToggle")?.addEventListener("change", updateBlendControlsVisibility);
+  updateBlendControlsVisibility();
+
+  $("blendStrength")?.addEventListener("input", (e) => {
+    if($("blendStrengthVal")) $("blendStrengthVal").textContent = parseFloat(e.target.value).toFixed(2);
+  });
+
+  $("blendFrames")?.addEventListener("input", (e) => {
+    if($("blendFramesVal")) $("blendFramesVal").textContent = `${e.target.value}f`;
   });
 
   $("audioCrossfadeSlider")?.addEventListener("input", (e) => {
@@ -2588,6 +2584,7 @@ function clearMediaSlot(slotIdx){
   if(info) info.textContent = "";
   if(fileInput) fileInput.value = "";
   dbDeleteSlot("slot_" + slotIdx);
+  if(slotIdx === 1 && typeof updateCalculatedResolution === "function") updateCalculatedResolution(1280, 720);
   if(typeof updateRefNumberingHint === "function") updateRefNumberingHint();
 }
 
@@ -2727,7 +2724,15 @@ function dataUrlToBlob(dataUrl){
 // ==========================================
 function updateCalculatedResolution(origW, origH){
   const mp = parseFloat($("mpSlider")?.value || "0.70");
-  const ar = (origW && origH) ? (origW / origH) : (16 / 9);
+  const arSelect = $("aspectRatioSelect")?.value || "auto";
+  let ar;
+  if(arSelect === "16:9") ar = 16 / 9;
+  else if(arSelect === "9:16") ar = 9 / 16;
+  else if(arSelect === "1:1") ar = 1.0;
+  else if(arSelect === "4:3") ar = 4 / 3;
+  else if(arSelect === "3:4") ar = 3 / 4;
+  else if(arSelect === "21:9") ar = 21 / 9;
+  else ar = (origW && origH) ? (origW / origH) : (16 / 9);
 
   const targetPixels = mp * 1000000;
   let h = Math.round(Math.sqrt(targetPixels / ar) / 32) * 32;
@@ -2737,7 +2742,10 @@ function updateCalculatedResolution(origW, origH){
 
   if($("width")) $("width").value = w;
   if($("height")) $("height").value = h;
-  if($("arDetectHint")) $("arDetectHint").textContent = `(${ar.toFixed(2)}:1 · ${w}x${h})`;
+  if($("arDetectHint")){
+    const label = arSelect === "auto" ? (origW && origH ? "Auto " : "16:9 ") : `${arSelect} `;
+    $("arDetectHint").textContent = `(${label}${ar.toFixed(2)}:1 · ${w}x${h})`;
+  }
 }
 
 function calcFramesForDuration(dur){
@@ -2749,7 +2757,7 @@ function calcFramesForDuration(dur){
 }
 
 function updateDurationFrames(){
-  const dur1 = parseFloat($("durationSlider1")?.value || $("durationSlider")?.value || "15.0");
+  const dur1 = parseFloat($("durationSlider1")?.value || "15.0");
   const dur2 = parseFloat($("durationSlider2")?.value || "15.0");
   const frames1 = calcFramesForDuration(dur1);
   const frames2 = calcFramesForDuration(dur2);
@@ -2774,13 +2782,13 @@ function updateRefNumberingHint(){
   const has = (i) => !!(mediaSlots[i]?.uploaded || mediaSlots[i]?.file || mediaSlots[i]?.dataUrl);
   let seg1, seg2;
   if(!shared){
-    seg1 = ["Img1", has(2) ? "Img2" : null].filter(Boolean);
+    seg1 = [has(1) ? "Img1" : null, has(2) ? "Img2" : null].filter(Boolean);
     seg2 = ["1er frame Seg 1", has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
   } else {
-    seg1 = ["Img1", has(2) ? "Img2" : null, has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
+    seg1 = [has(1) ? "Img1" : null, has(2) ? "Img2" : null, has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
     seg2 = ["1er frame Seg 1", has(2) ? "Img2" : null, has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
   }
-  const num = (arr) => arr.map((n, i) => `P${i + 1}=${n}`).join(" · ");
+  const num = (arr) => arr.length ? arr.map((n, i) => `P${i + 1}=${n}`).join(" · ") : "T2V puro (sin refs)";
   hint.textContent = `Seg 1 ve: ${num(seg1)}  |  Seg 2 ve: ${num(seg2)}`;
 }
 
@@ -2911,6 +2919,14 @@ function buildGraph(j){
       log("Modo Asistido requiere un modelo en Ollama / llama.cpp. Se usa el del workflow.", "l-warn");
     }
 
+    // Inyectar system prompts con estricta prioridad a la dirección del director para evitar inercia visual
+    if(g[N.OLLAMA_CHAT_1]?.inputs){
+      g[N.OLLAMA_CHAT_1].inputs.system = "You are a video continuation prompt writer for MiniMax H3. You receive the prompt of the first segment followed by a 'Next segment direction' instruction written by the director. CRITICAL DIRECTION PRIORITY: The director's 'Next segment direction' takes ABSOLUTE PRECEDENCE for the action of Segment 2. If the director commands an action transition, rotation, or change of movement (e.g. 'turns around', 'walks toward camera', 'stops', 'changes expression'), you MUST execute this transition immediately from the end of the previous segment. Keep the base scene (subject appearance, style, lighting, camera language, audio continuity) from the original prompt, but make the director's direction the main driver of the new action. Do not re-describe what is already visible. Output ONLY the continuation prompt, with no preamble, quotes or explanation.";
+    }
+    if(g[N.OLLAMA_CHAT_2]?.inputs){
+      g[N.OLLAMA_CHAT_2].inputs.system = "You are a video continuation prompt writer for MiniMax H3. You are shown the last frames of the previous video segment and a draft continuation prompt driven by the director's action command. CRITICAL DIRECTION PRIORITY: The director's direction takes ABSOLUTE PRECEDENCE over visual inertia. If the director requested a turn, change of direction, stop, or new action, do NOT continue the old movement seen in the frames; instead, transition IMMEDIATELY from the subject's final pose into the new commanded action. Fuse the visual continuity (subject, environment, lighting, soundscape) with this NEW action into ONE final prompt for the next segment. Output ONLY the final fused prompt, with no preamble, quotes or explanation.";
+    }
+
     // Inyectar nodo nativo SaveText para capturar y devolver el prompt final generado por Ollama
     g["99_savetext_prompt2"] = {
       inputs: {
@@ -2926,7 +2942,7 @@ function buildGraph(j){
   }
 
   // 2. Duración y Megapíxeles
-  const dur1 = parseFloat((j ? (j.duration1 || j.duration) : ($("durationSlider1")?.value || $("durationSlider")?.value)) || "15.0");
+  const dur1 = parseFloat((j ? (j.duration1 || j.duration) : ($("durationSlider1")?.value)) || "15.0");
   const dur2 = parseFloat((j ? (j.duration2 || j.duration) : ($("durationSlider2")?.value || "15.0")) || "15.0");
 
   if(g[N.DURATION]?.inputs) g[N.DURATION].inputs.value = dur1;
@@ -3040,7 +3056,6 @@ function buildGraph(j){
     // Modo BlockATT: cadena flexible UNet -> ModelAttentionBackend -> (optimizador) -> SigmaShift -> MemOpt?
     const optimizerState = j?.attentionOptimizer || getAttentionOptimizerState();
     const aimdoState = j?.aimdo || getAimdoState();
-    const bs = j?.blockSparse || getBlockSparseState();
 
     // Limpiar nodos alternativos previos
     if(g[N.SPARSE]) delete g[N.SPARSE];
@@ -3078,8 +3093,6 @@ function buildGraph(j){
         currentModelNode = N.AIMDO;
       }
     }
-    // BlockSparseAttention está desactivado en MMH3X2 (fallo con MiniMax H3).
-    // Si un workflow antiguo pide "block-sparse", se ignora y se usa H3SparseAttentionAdvanced.
 
     // Sigma Shift
     if(g[N.SIGMA_SHIFT]?.inputs){
@@ -3507,7 +3520,7 @@ function buildGraph(j){
   if(!sharedRefs){
     // Modo estándar / NO compartido:
     // Seg 1 ve: Img1 (ref_image_0), e Img2 (ref_image_1) si se ha subido
-    let seg1Idx = 1;
+    let seg1Idx = slotHasImg(1) ? 1 : 0;
     if(slotHasImg(2)){
       if(g[N.IMG2]?.inputs) g[N.IMG2].inputs.image = getSlotImgName(2);
       if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${seg1Idx++}`] = [N.IMG2, 0];
@@ -3531,7 +3544,7 @@ function buildGraph(j){
   } else {
     // Modo Compartido:
     // Seg 1 ve: Img1 (0) + todos los slots 2, 3, 4 que tengan imagen subida
-    let seg1Idx = 1;
+    let seg1Idx = slotHasImg(1) ? 1 : 0;
     const nodeMap = { 2: N.IMG2, 3: N.IMG3, 4: N.IMG4 };
     [2, 3, 4].forEach(s => {
       if(slotHasImg(s)){
@@ -3561,6 +3574,25 @@ function buildGraph(j){
   if(!usedSlots.has(2) && g[N.IMG2]) delete g[N.IMG2];
   if(!usedSlots.has(3) && g[N.IMG3]) delete g[N.IMG3];
   if(!usedSlots.has(4) && g[N.IMG4]) delete g[N.IMG4];
+
+  // Si Slot 1 no tiene imagen (T2V) o el usuario fuerza un Aspect Ratio específico,
+  // asignamos width/height numéricos a los nodos MiniMax H3 y eliminamos los nodos 77 y 78
+  // para evitar NodeNotFoundError cuando falta el nodo 10 (LoadImage 1).
+  const arSelect = (j ? j.aspectRatio : $("aspectRatioSelect")?.value) || "auto";
+  if(!usedSlots.has(1) || arSelect !== "auto"){
+    const w = parseInt((j ? j.width : $("width")?.value) || "1152", 10);
+    const h = parseInt((j ? j.height : $("height")?.value) || "640", 10);
+    if(g[N.REF2V_SEG1]?.inputs){
+      g[N.REF2V_SEG1].inputs.width = w;
+      g[N.REF2V_SEG1].inputs.height = h;
+    }
+    if(g[N.REF2V_SEG2]?.inputs){
+      g[N.REF2V_SEG2].inputs.width = w;
+      g[N.REF2V_SEG2].inputs.height = h;
+    }
+    if(g[N.MEGAPIXELS]) delete g[N.MEGAPIXELS];
+    if(g[N.GET_SIZE]) delete g[N.GET_SIZE];
+  }
 
   // 11. Vídeo de Referencia para Seg 2
   const vUp = vSlot?.uploaded || vSlot;
@@ -3873,13 +3905,20 @@ function buildGraph(j){
   }
 
   // 13. Postprocesado: RTX Video Super Resolution y RIFE
-  const rtxOn = $("rtxToggle") ? $("rtxToggle").checked : true;
-  const rifeOn = $("rifeToggle") ? $("rifeToggle").checked : true;
-  const blendOn = $("blendToggle") ? $("blendToggle").checked : true;
+  const rtxOn = (j ? j.rtxToggle : $("rtxToggle")?.checked) ?? true;
+  const rifeOn = (j ? j.rifeToggle : $("rifeToggle")?.checked) ?? true;
+  const blendOn = (j ? j.blendToggle : $("blendToggle")?.checked) ?? true;
 
   if(!blendOn && g[N.BLEND]){
     if(g[N.IMAGE_BATCH]?.inputs) g[N.IMAGE_BATCH].inputs.image_2 = ["64", 0];
     delete g[N.BLEND];
+  } else if(blendOn && g[N.BLEND]?.inputs){
+    const blendStrength = parseFloat((j ? j.blendStrength : $("blendStrength")?.value) ?? "0.35");
+    const blendFrames = parseInt((j ? j.blendFrames : $("blendFrames")?.value) ?? "4", 10);
+    const blendMode = (j ? j.blendMode : $("blendMode")?.value) || "transition_only";
+    g[N.BLEND].inputs.blend_strength = blendStrength;
+    g[N.BLEND].inputs.blend_frames = blendFrames;
+    g[N.BLEND].inputs.mode = blendMode;
   }
 
   let finalImagesSource = [N.IMAGE_BATCH, 0];
@@ -4115,6 +4154,44 @@ function buildGraph(j){
     ["197_trim_guide_audio2", "199_user_trim_seg2", "199_ia_vol_seg2", "199_merge_seg2",
      "199_ia_vol_final", "199_merge_final", "194_trim_audio2", "195_concat_direct_audio"]
       .forEach(id => { delete g[id]; });
+  } else if(runMode === "seg2_only"){
+    const seg1Media = j?.seg1Media || currentMedia[1] || (videoSlot?.uploaded ? { ...videoSlot.uploaded } : null);
+    if(!seg1Media || !seg1Media.filename){
+      throw new Error("No hay un vídeo de Segmento 1 disponible para continuar. Genera antes el Segmento 1 o cárgalo en el reproductor.");
+    }
+    const seg1VideoPath = (seg1Media.subfolder ? seg1Media.subfolder + "/" : "") + seg1Media.filename + " [output]";
+
+    g["100_load_seg1_video"] = {
+      class_type: "LoadVideo",
+      inputs: { file: seg1VideoPath },
+      _meta: { title: "Load Seg 1 Video (Native)" }
+    };
+    g["101_get_seg1_components"] = {
+      class_type: "GetVideoComponents",
+      inputs: { video: ["100_load_seg1_video", 0] },
+      _meta: { title: "Get Seg 1 Components (Native)" }
+    };
+
+    const seg1Images = ["101_get_seg1_components", 0];
+    const seg1Audio = ["101_get_seg1_components", 1];
+
+    if(g["25"]?.inputs) g["25"].inputs.images = seg1Images;
+    if(g["26"]?.inputs) g["26"].inputs.images = seg1Images;
+    if(g["61"]?.inputs) g["61"].inputs.images = seg1Images;
+
+    if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs["ref_video_audios.ref_video_audio_0"] = seg1Audio;
+    if(g[N.AUDIO_CONCAT]?.inputs) g[N.AUDIO_CONCAT].inputs.audio1 = seg1Audio;
+    if(g["65"]?.inputs) g["65"].inputs.audio = seg1Audio;
+    if(g["198_ia_boost_seg1"]?.inputs) g["198_ia_boost_seg1"].inputs.audio = seg1Audio;
+    if(g["199_ia_trim_seg1"]?.inputs) g["199_ia_trim_seg1"].inputs.audio = seg1Audio;
+
+    const seg1NodesToDelete = [
+      N.REF2V_SEG1, N.GUIDER_1, N.SCHEDULER_1, N.SAMPLER_1, N.SAMPLE_1,
+      N.DECODE_VID_1, N.DECODE_AUD_1, N.CREATE_VID_1, N.SAVE_VID_1,
+      "11", "12", "13"
+    ];
+    seg1NodesToDelete.forEach(id => { delete g[id]; });
+    if(!usedSlots.has(1) && g[N.IMG1]) delete g[N.IMG1];
   }
 
   return sanitizeGraph(g);
@@ -4125,7 +4202,25 @@ function buildGraph(j){
 // ==========================================
 async function queueJob(runMode){
   const p1 = $("prompt")?.value?.trim();
-  if(!p1){
+  const p2 = $("prompt2")?.value?.trim();
+
+  let seg1MediaForSeg2 = null;
+  if(runMode === "seg2_only"){
+    seg1MediaForSeg2 = currentMedia[1];
+    if(!seg1MediaForSeg2 || !seg1MediaForSeg2.filename){
+      if(videoSlot && videoSlot.uploaded && videoSlot.uploaded.filename){
+        seg1MediaForSeg2 = { ...videoSlot.uploaded };
+      }
+    }
+    if(!seg1MediaForSeg2 || !seg1MediaForSeg2.filename){
+      log("⚠️ Para usar 'Solo Seg 2 + Final' necesitas tener un Segmento 1 en el reproductor (o un vídeo cargado).", "l-warn");
+      return;
+    }
+    if(!p2 && !p1){
+      log("⚠️ Escribe al menos el Prompt 2 para generar el Segmento 2", "l-warn");
+      return;
+    }
+  } else if(!p1){
     log("⚠️ Por favor escribe al menos el Prompt 1 (Segmento 1)", "l-warn");
     return;
   }
@@ -4148,11 +4243,15 @@ async function queueJob(runMode){
   const job = {
     id: "job_" + Date.now(),
     runMode: runMode || "full",
-    prompt: p1,
-    prompt2: $("prompt2")?.value?.trim() || "",
-    duration1: parseFloat($("durationSlider1")?.value || $("durationSlider")?.value || "15.0"),
+    seg1Media: seg1MediaForSeg2 ? { ...seg1MediaForSeg2 } : null,
+    prompt: p1 || "",
+    prompt2: p2 || "",
+    duration1: parseFloat($("durationSlider1")?.value || "15.0"),
     duration2: parseFloat($("durationSlider2")?.value || "15.0"),
     megapixels: parseFloat($("mpSlider")?.value || "0.70"),
+    width: parseInt($("width")?.value || "1152", 10),
+    height: parseInt($("height")?.value || "640", 10),
+    aspectRatio: $("aspectRatioSelect")?.value || "auto",
     steps: parseInt($("stepsSlider")?.value || "20", 10),
     sampler: $("samplerName")?.value || "res_multistep",
     scheduler: $("schedulerName")?.value || "simple",
@@ -4169,12 +4268,15 @@ async function queueJob(runMode){
     h3opt: getH3OptState(),
     attentionOptimizer: IS_BLOCKATT ? getAttentionOptimizerState() : null,
     aimdo: IS_BLOCKATT ? getAimdoState() : null,
-    blockSparse: IS_BLOCKATT ? getBlockSparseState() : null,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     spectrum: getSpectrumState(),
     solH3: getSolH3State(),
     faceRefine: getFaceRefineState(),
+    blendToggle: $("blendToggle") ? $("blendToggle").checked : true,
+    blendStrength: parseFloat($("blendStrength")?.value || "0.35"),
+    blendFrames: parseInt($("blendFrames")?.value || "4", 10),
+    blendMode: $("blendMode")?.value || "transition_only",
     mediaSlotsSnapshot: {
       1: mediaSlots[1]?.uploaded ? { ...mediaSlots[1].uploaded } : null,
       2: mediaSlots[2]?.uploaded ? { ...mediaSlots[2].uploaded } : null,
@@ -4233,16 +4335,15 @@ async function startJob(job){
 async function enqueueJobVariant(job, seedUsed, varIdx){
   try {
     CONFIG.onSeedUpdate(seedUsed);
-    currentActiveSamplerSlot = 1;
+    currentActiveSamplerSlot = (job.runMode === "seg2_only") ? 2 : 1;
     const graph = buildGraph({ ...job, seed: seedUsed });
 
-    // Nueva variante: los 3 paneles de preview vuelven a "sin generar" para que
-    // se vea la animación completa (Seg1 → Seg2 → Final) y no se arrastre el
-    // preview de la variante anterior.
-    resetPreviewPanes();
+    // Nueva variante: reset de paneles respetando el modo (en seg2_only se conserva Seg 1)
+    resetPreviewPanes(job.runMode);
     updateFinalPromptPanel(graph);
 
-    log(`🚀 Procesando ${job.isFaceRefineOnly ? 'Refinado Facial (FaceRefine)' : (job.runMode === 'seg1_only' ? 'Solo Seg 1' : 'Vídeo MMH3X2')} · Var ${varIdx} (seed ${seedUsed})...`);
+    const modeName = job.isFaceRefineOnly ? 'Refinado Facial (FaceRefine)' : (job.runMode === 'seg1_only' ? 'Solo Seg 1' : (job.runMode === 'seg2_only' ? 'Solo Seg 2 + Final' : 'Vídeo MMH3X2'));
+    log(`🚀 Procesando ${modeName} · Var ${varIdx} (seed ${seedUsed})...`);
     const r = await fetch(server() + "/prompt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -4281,6 +4382,15 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
         const elapsed = Date.now() - stageTimers.startPrompt;
         if(elFinal) elFinal.textContent = `⏱ ${fmtMs(elapsed)}`;
       }, 500);
+    } else if(job.runMode === "seg2_only"){
+      const el1 = $("timeSeg1"), el2 = $("timeSeg2");
+      if(el1){ el1.textContent = "✔ Seg 1 previo"; el1.classList.remove("live"); }
+      if(el2){ el2.textContent = "⏱ 00:00"; el2.classList.add("live"); }
+      stageTimers.startSeg2 = Date.now();
+      stageTimers.ivSeg2 = setInterval(() => {
+        const elapsed = Date.now() - stageTimers.startSeg2;
+        if(el2) el2.textContent = `⏱ ${fmtMs(elapsed)}`;
+      }, 500);
     } else {
       const el1 = $("timeSeg1"), el2 = $("timeSeg2");
       if(el1){ el1.textContent = "⏱ 00:00"; el1.classList.add("live"); }
@@ -4301,7 +4411,14 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
     pollFallback(data.prompt_id);
   } catch(e){
     log(`❌ No se pudo encolar: ${e.message}`, "l-err");
-    finishCurrentJob();
+    // NO drenar la cola ni avanzar el batch aquí: common.js ya hace
+    // currentBatchIndex++ + processNextBatch tras onPromptError; arrancar el
+    // siguiente job desde aquí duplica la continuación (variantes fantasma).
+    const gridErr = $("variantGrid");
+    if(gridErr){
+      const card = gridErr.querySelector('.variant-card-generating');
+      if(card) card.remove();
+    }
   }
 }
 
@@ -4371,7 +4488,7 @@ async function loadVideoHistory(){
           <span class="variant-badge">${typeBadge}</span>
           <video src="${videoUrl}" crossorigin="anonymous" controls muted preload="none" playsinline data-lazy-video="true"></video>
           <div class="variant-info">
-            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${item.filename}">${item.filename}</span>
+            <span style="font-size:10px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</span>
             <span class="variant-icons">
               <button type="button" class="variant-meta-btn" title="Copiar workflow" data-action="workflow">📋</button>
               <button type="button" class="variant-del-btn" title="Eliminar" data-action="delete">×</button>
@@ -4529,7 +4646,7 @@ async function loadKrea2Recent(){
       const sizeKB = Math.round(it.size/1024);
       const div = document.createElement("div");
       div.className = "gallery-item";
-      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${ts} · ${sizeKB}KB</div>`;
+      div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${escapeHtml(String(ts))} · ${sizeKB}KB</div>`;
       div.addEventListener("click", () => {
         // Primer slot libre (1..4)
         let target = -1;
@@ -4701,11 +4818,21 @@ window.addEventListener("DOMContentLoaded", () => {
     updateSeg2OllamaModelVisibility();
   }
 
+  if($("aspectRatioSelect")){
+    $("aspectRatioSelect").addEventListener("change", () => {
+      const img1 = $("previewSlotImg1");
+      const hasImg1 = !!(img1 && img1.complete && img1.naturalWidth && img1.style.display !== "none");
+      updateCalculatedResolution(hasImg1 ? img1.naturalWidth : 1280, hasImg1 ? img1.naturalHeight : 720);
+      scheduleSaveSettings();
+    });
+  }
+
   if($("mpSlider")){
     $("mpSlider").addEventListener("input", (e) => {
       $("mpVal").textContent = parseFloat(e.target.value).toFixed(2);
       const img1 = $("previewSlotImg1");
-      updateCalculatedResolution(img1?.naturalWidth || 1280, img1?.naturalHeight || 720);
+      const hasImg1 = !!(img1 && img1.complete && img1.naturalWidth && img1.style.display !== "none");
+      updateCalculatedResolution(hasImg1 ? img1.naturalWidth : 1280, hasImg1 ? img1.naturalHeight : 720);
     });
   }
 
@@ -4835,24 +4962,24 @@ window.addEventListener("DOMContentLoaded", () => {
   if(typeof AVAILABLE_UNETS !== "undefined" && $("unetModel")){
     const sel = $("unetModel");
     const defaultUnet = BASE_GRAPH[N.UNET]?.inputs?.unet_name || "";
-    sel.innerHTML = AVAILABLE_UNETS.map(m => `<option value="${m}" ${m === defaultUnet ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
+    sel.innerHTML = AVAILABLE_UNETS.map(m => `<option value="${escapeHtml(m)}" ${m === defaultUnet ? 'selected' : ''}>${escapeHtml(m.split("/").pop())}</option>`).join("");
   }
   if(typeof AVAILABLE_CLIPS !== "undefined" && $("clipModel")){
     const sel = $("clipModel");
     const defaultClip = BASE_GRAPH[N.CLIP]?.inputs?.clip_name || "";
-    sel.innerHTML = AVAILABLE_CLIPS.map(m => `<option value="${m}" ${m === defaultClip ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
+    sel.innerHTML = AVAILABLE_CLIPS.map(m => `<option value="${escapeHtml(m)}" ${m === defaultClip ? 'selected' : ''}>${escapeHtml(m.split("/").pop())}</option>`).join("");
   }
   if(typeof AVAILABLE_VAES !== "undefined" && $("vaeModel")){
     const sel = $("vaeModel");
     const defaultVae = BASE_GRAPH[N.VAE_VID]?.inputs?.vae_name || "";
-    sel.innerHTML = AVAILABLE_VAES.map(m => `<option value="${m}" ${m === defaultVae ? 'selected' : ''}>${m.split("/").pop()}</option>`).join("");
+    sel.innerHTML = AVAILABLE_VAES.map(m => `<option value="${escapeHtml(m)}" ${m === defaultVae ? 'selected' : ''}>${escapeHtml(m.split("/").pop())}</option>`).join("");
   }
   if(typeof AVAILABLE_LORAS !== "undefined"){
     ["lora1Select", "lora2Select"].forEach(id => {
       const sel = $(id);
       if(sel){
         sel.innerHTML = '<option value="">(ninguno)</option>' +
-          AVAILABLE_LORAS.map(l => `<option value="${l}">${l.split("/").pop()}</option>`).join("");
+          AVAILABLE_LORAS.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l.split("/").pop())}</option>`).join("");
       }
     });
   }
@@ -4875,8 +5002,10 @@ window.addEventListener("DOMContentLoaded", () => {
       log("💾 Sesión anterior restaurada (ajustes y medios guardados)", "l-ok");
     }
     const img1 = $("previewSlotImg1");
-    if(img1 && img1.complete && img1.naturalWidth){
+    if(img1 && img1.complete && img1.naturalWidth && img1.style.display !== "none"){
       updateCalculatedResolution(img1.naturalWidth, img1.naturalHeight);
+    } else {
+      updateCalculatedResolution(1280, 720);
     }
     updateRefNumberingHint();
   });
@@ -4918,18 +5047,40 @@ window.addEventListener("DOMContentLoaded", () => {
     const styleKey = $("enhancerStyle")?.value || "A";
     const data = loadSysPrompts();
     const system = getCurrentSysPrompt(data, mode, styleKey);
-    const userPrompt = $("prompt")?.value?.trim() || "";
+    let userPrompt = $("prompt")?.value?.trim() || "";
+
+    if(mode === "text" && styleKey === "D"){
+      const p1 = $("prompt")?.value?.trim() || "";
+      const p2 = $("prompt2")?.value?.trim() || "";
+      if(p1 && p2){
+        userPrompt = `PREVIOUS SEGMENT (Seg 1):\n${p1}\n\nNEXT SEGMENT DIRECTION (Seg 2):\n${p2}`;
+      } else if(p2){
+        userPrompt = p2;
+      } else if(p1){
+        userPrompt = `PREVIOUS SEGMENT (Seg 1):\n${p1}\n\nDescribe the next action for Segment 2.`;
+      }
+    }
+
     if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt base primero en Prompt 1", "l-warn"); return; }
 
     const payload = { model, system, prompt: userPrompt || "Describe this image for video generation.", stream: false, options: { num_ctx: 8192 } };
 
     if(mode === "vision"){
+      const sharedRefs = !!$("shareRefsToggle")?.checked;
+      const isSeg2Style = (styleKey === "F");
+      const allowedSlots = isSeg2Style
+        ? (sharedRefs ? [2, 3, 4] : [3, 4])
+        : (sharedRefs ? [1, 2, 3, 4] : [1, 2]);
+
       const availableSlots = [];
-      for(let i = 1; i <= 4; i++){
-        if(mediaSlots[i].file || mediaSlots[i].dataUrl) availableSlots.push(i);
+      for(const i of allowedSlots){
+        if(mediaSlots[i]?.file || mediaSlots[i]?.dataUrl) availableSlots.push(i);
       }
       if(availableSlots.length === 0){
-        log("⚠️ Carga al menos una imagen en los slots de entrada para usar el modo Visión", "l-err");
+        const targetDesc = isSeg2Style
+          ? (sharedRefs ? "Slot 2, 3 o 4" : "Slot 3 o 4 (Segmento 2)")
+          : (sharedRefs ? "los slots de entrada (1 a 4)" : "Slot 1 o 2 (Segmento 1)");
+        log(`⚠️ Carga al menos una imagen en ${targetDesc} para usar este estilo en modo Visión.`, "l-err");
         return;
       }
 
@@ -4951,10 +5102,15 @@ window.addEventListener("DOMContentLoaded", () => {
           return null;
         };
 
-        if(styleKey === "D" && availableSlots.length >= 2){
-          // FL2VA: Primer frame y Último frame
-          const firstB64 = await readSlotBase64(1) || await readSlotBase64(availableSlots[0]);
-          const secondSlot = (mediaSlots[2].file || mediaSlots[2].dataUrl) ? 2 : availableSlots[availableSlots.length - 1];
+        if(styleKey === "D"){
+          // FL2VA: Primer frame y Último frame (requiere 2 imágenes de los slots permitidos)
+          const firstSlot = (mediaSlots[1]?.file || mediaSlots[1]?.dataUrl) ? 1 : availableSlots[0];
+          const secondSlot = (mediaSlots[2]?.file || mediaSlots[2]?.dataUrl) ? 2 : availableSlots.find(s => s !== firstSlot);
+          if(!secondSlot){
+            log("⚠️ FL2VA requiere al menos 2 imágenes (apertura y cierre dentro de los slots permitidos).", "l-warn");
+            return;
+          }
+          const firstB64 = await readSlotBase64(firstSlot);
           const lastB64 = await readSlotBase64(secondSlot);
           if(firstB64 && lastB64){
             payload.images = [firstB64, lastB64];
@@ -4962,17 +5118,23 @@ window.addEventListener("DOMContentLoaded", () => {
               ? `FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above. User hint: ${userPrompt}`
               : "FIRST IMAGE (opening frame, Picture 1): see above. SECOND IMAGE (closing frame, Picture 2): see above.";
           }
-        } else if(styleKey === "F" && (mediaSlots[3].file || mediaSlots[3].dataUrl || mediaSlots[4].file || mediaSlots[4].dataUrl)){
-          // Continuación Seg 2 con imagen
-          const s3B64 = await readSlotBase64(3) || await readSlotBase64(4);
-          if(s3B64){
-            payload.images = [s3B64];
-            payload.prompt = userPrompt
-              ? `REFERENCE IMAGE FOR SEGMENT 2: see above. Existing context / Segment 1 action: ${userPrompt}`
-              : "REFERENCE IMAGE FOR SEGMENT 2: see above. Describe the continued action evolving into this scene.";
+        } else if(styleKey === "F"){
+          // Continuación Seg 2 con imagen (Slot 3 o 4, o 2 si shared)
+          const sSlot = (mediaSlots[3]?.file || mediaSlots[3]?.dataUrl) ? 3
+            : ((mediaSlots[4]?.file || mediaSlots[4]?.dataUrl) ? 4 : availableSlots[0]);
+          const sB64 = await readSlotBase64(sSlot);
+          if(sB64){
+            payload.images = [sB64];
+            const seg1Prompt = $("prompt")?.value?.trim() || "";
+            const seg2Hint = $("prompt2")?.value?.trim() || "";
+            payload.prompt = seg2Hint
+              ? `REFERENCE IMAGE FOR SEGMENT 2: see above. Existing context / Segment 1 action: ${seg1Prompt}. Next segment direction: ${seg2Hint}`
+              : (seg1Prompt
+                ? `REFERENCE IMAGE FOR SEGMENT 2: see above. Existing context / Segment 1 action: ${seg1Prompt}. Describe the continued action evolving into this scene.`
+                : "REFERENCE IMAGE FOR SEGMENT 2: see above. Describe the continued action evolving into this scene.");
           }
         } else if(styleKey === "E" && availableSlots.length > 1){
-          // R2VA: hasta 3 imágenes
+          // R2VA: multi-imagen (hasta 3 imágenes estrictamente de los slots permitidos)
           for(const idx of availableSlots.slice(0, 3)){
             const b64 = await readSlotBase64(idx);
             if(b64) payload.images.push(b64);
@@ -4981,8 +5143,9 @@ window.addEventListener("DOMContentLoaded", () => {
             ? `REFERENCE IMAGES (in order, <Picture N>): see above. User hint: ${userPrompt}`
             : "REFERENCE IMAGES (in order, <Picture N>): see above.";
         } else {
-          // I2VA / Descriptivo / Cinematográfico (Slot 1)
-          const b64 = await readSlotBase64(1) || await readSlotBase64(availableSlots[0]);
+          // I2VA / Descriptivo / Cinematográfico (Slot 1 preferente, o primer slot permitido)
+          const firstSlot = (mediaSlots[1]?.file || mediaSlots[1]?.dataUrl) ? 1 : availableSlots[0];
+          const b64 = await readSlotBase64(firstSlot);
           if(b64) payload.images = [b64];
         }
 

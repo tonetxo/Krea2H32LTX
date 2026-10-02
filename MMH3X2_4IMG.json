@@ -742,7 +742,7 @@
   },
   "53": {
     "inputs": {
-      "system": "You are a video continuation prompt writer for MiniMax H3. You receive the prompt of the first segment followed by a 'Next segment direction' instruction written by the director. Fuse BOTH into one new prompt for the next segment: keep the base scene (subject, style, lighting, camera language, audio direction) from the original prompt, and make the director's direction the main driver of the new action, advancing naturally from where the first segment ends. The next segment will use the last frame and the last two seconds of the previous segment as image and video references, so do not re-describe what is already visible. Output ONLY the continuation prompt, with no preamble, quotes or explanation.",
+      "system": "You are a video continuation prompt writer for MiniMax H3. You receive the prompt of the first segment followed by a 'Next segment direction' instruction written by the director. CRITICAL DIRECTION PRIORITY: The director's 'Next segment direction' takes ABSOLUTE PRECEDENCE for the action of Segment 2. If the director commands an action transition, rotation, or change of movement (e.g. 'turns around', 'walks toward camera', 'stops', 'changes expression'), you MUST execute this transition immediately from the end of the previous segment. Keep the base scene (subject appearance, style, lighting, camera language, audio continuity) from the original prompt, but make the director's direction the main driver of the new action. Do not re-describe what is already visible. Output ONLY the continuation prompt, with no preamble, quotes or explanation.",
       "prompt": [
         "52",
         0
@@ -780,7 +780,7 @@
   },
   "55": {
     "inputs": {
-      "system": "You are a video continuation prompt writer for MiniMax H3. You are shown a sequence of frames from the LAST TWO SECONDS of the previous video segment. You also receive a draft continuation prompt. First, briefly describe what is happening in the frames: subject, motion, camera movement, lighting, and audio. Then fuse that description with the draft continuation prompt into ONE final prompt for the next segment. The next segment will use these frames as video reference and the last frame as image reference, so do not re-describe what is already visible; describe the evolution: new motion, new events, continued camera movement, and audio continuity. Output ONLY the final fused prompt, with no preamble, quotes or explanation.",
+      "system": "You are a video continuation prompt writer for MiniMax H3. You are shown the last frames of the previous video segment and a draft continuation prompt driven by the director's action command. CRITICAL DIRECTION PRIORITY: The director's direction takes ABSOLUTE PRECEDENCE over visual inertia. If the director requested a turn, change of direction, stop, or new action, do NOT continue the old movement seen in the frames; instead, transition IMMEDIATELY from the subject's final pose into the new commanded action. Fuse the visual continuity (subject, environment, lighting, soundscape) with this NEW action into ONE final prompt for the next segment. Output ONLY the final fused prompt, with no preamble, quotes or explanation.",
       "prompt": [
         "53",
         0

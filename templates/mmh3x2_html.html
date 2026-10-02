@@ -281,8 +281,20 @@
       <!-- RESOLUCIÓN & DURACIÓN -->
       <div class="panel">
         <h2>Resolución &amp; Duración</h2>
+        <div class="row" style="margin-bottom:6px;">
+          <label>Relación de aspecto <span class="hint" id="arDetectHint">(16:9)</span></label>
+          <select id="aspectRatioSelect">
+            <option value="auto" selected>Auto (Slot 1 si hay imagen / 16:9 si T2V)</option>
+            <option value="16:9">16:9 (Horizontal estándar · 1152×640)</option>
+            <option value="9:16">9:16 (Vertical móvil / Reels / TikTok · 640×1152)</option>
+            <option value="1:1">1:1 (Cuadrado · 832×832)</option>
+            <option value="4:3">4:3 (Horizontal TV · 960×736)</option>
+            <option value="3:4">3:4 (Vertical TV · 736×960)</option>
+            <option value="21:9">21:9 (Cinemascope · 1344×576)</option>
+          </select>
+        </div>
         <div class="row slider-row">
-          <label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label>
+          <label>Megapíxeles</label>
           <input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.70">
           <div class="slider-val" id="mpVal">0.70</div>
         </div>
@@ -676,9 +688,27 @@
           <!-- Suavizado de empalme temporal (Vídeo) -->
           <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
             <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="blendToggle" checked> <span>Suavizar empalme de vídeo</span>
+              <input type="checkbox" id="blendToggle" checked> <span>Suavizar empalme de vídeo (VideoTemporalBlend)</span>
             </label>
-            <div class="hint" style="font-size:10px;margin-top:2px;">Transición temporal suave (VideoTemporalBlend: 4 frames, fuerza 0.35).</div>
+            <div id="blendControls" style="margin-top:6px;">
+              <div class="row two-col">
+                <div>
+                  <label style="font-size:10px;">Fuerza empalme: <b id="blendStrengthVal">0.35</b></label>
+                  <input type="range" id="blendStrength" min="0.05" max="1.0" step="0.05" value="0.35" style="width:100%;">
+                </div>
+                <div>
+                  <label style="font-size:10px;">Frames transición: <b id="blendFramesVal">4f</b></label>
+                  <input type="range" id="blendFrames" min="1" max="24" step="1" value="4" style="width:100%;">
+                </div>
+              </div>
+              <div class="row" style="margin-top:6px;">
+                <label style="font-size:10px;">Modo de suavizado</label>
+                <select id="blendMode" style="width:100%;">
+                  <option value="transition_only" selected>Solo empalme (Recomendado · transition_only)</option>
+                  <option value="full_video">Todo el vídeo (full_video)</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <!-- Crossfade de Audio regulable -->
