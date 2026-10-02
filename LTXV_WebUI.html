@@ -4820,7 +4820,7 @@ async function loadKrea2ImageAsInput(url, filename){
 })();
 
 
-function applyWorkflow(workflow, opts={}){
+async function applyWorkflow(workflow, opts={}){
   const applied = [];
   const missing = [];
   const setApplied = (label) => applied.push(label);
@@ -5095,6 +5095,39 @@ function applyWorkflow(workflow, opts={}){
       localStorage.setItem("ltxv_text_encoder", teName);
       setApplied("text encoder (" + teName.split("/").pop() + ")");
     }
+  }
+
+  // Imagen de entrada: restaurar el LoadImage del workflow (visor + generación).
+  // inputs.image puede venir como "name.ext" o "subfolder/name.ext" y vive en el
+  // input dir de ComfyUI → sirve /view con type=input. Solo I2V (no vídeo ref).
+  const loadImgNode = findByClass("LoadImage");
+  if(loadImgNode && loadImgNode.inputs && typeof loadImgNode.inputs.image === "string" && loadImgNode.inputs.image.trim()){
+    const imgSpec = loadImgNode.inputs.image.trim().replace(/\\/g, "/");
+    const slashIdx = imgSpec.indexOf("/");
+    const subfolder = slashIdx > 0 ? imgSpec.slice(0, slashIdx) : "";
+    const fname = slashIdx > 0 ? imgSpec.slice(slashIdx + 1) : imgSpec;
+    const media = { filename: fname, subfolder: subfolder, type: "input" };
+    const viewUrl = `${server()}${mediaViewUrl(media, { anchor: "" })}`;
+    // Comprobar que el fichero sigue existiendo antes de enlazarlo a la generación:
+    // si ComfyUI lo borró (input/temp se limpian), el usuario ve el aviso pero los
+    // demás parámetros restaurados permanecen válidos.
+    try {
+      // HEAD: verificar existencia sin descargar (la descarga la hace <img src>).
+      const probe = await fetch(viewUrl, { method: "HEAD" });
+      if(probe.ok){
+        uploadedImage = media;
+        localFile = null;
+        showInputImage(viewUrl);
+        setApplied("imagen de entrada (" + fname + ")");
+      } else {
+        setMissing("imagen de entrada (fichero borrado del backend)");
+      }
+    } catch(e){
+      setMissing("imagen de entrada (no verificable)");
+    }
+  } else {
+    const hasLocal = uploadedImage || localFile;
+    if(!hasLocal) setMissing("imagen de entrada");
   }
 
   if(opts.silent) return { applied, missing };
@@ -5418,10 +5451,10 @@ function handleVideoFile(file, shouldSaveToGallery = true){
       showInputImage(dataUrl);
       log(`🎬 Vídeo cargado: ${file.name} (${frameLabel} frame como imagen de entrada)`, "l-ok");
 
-      metaPromise.then(workflow => {
+      metaPromise.then(async (workflow) => {
         if(workflow){
           log(`📋 Workflow encontrado en ${file.name}`, "l-ok");
-          applyWorkflow(workflow);
+          await applyWorkflow(workflow);
         } else {
           log(`ℹ️ ${file.name} no contiene metadatos de workflow.`, "l-warn");
         }
@@ -5498,7 +5531,10 @@ function buildGraph(mode, job){
   const j = job || activeJob || null;
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
   const imgObj = j ? j.uploadedImage : uploadedImage;
-  if(imgObj) g[N.IMAGE].inputs.image = imgObj.name;
+  // LoadImage acepta "subfolder/name.ext" (necesario para imágenes restauradas
+  // desde metadatos, p.ej. "pasted/image (3).png"); una subida fresca vive en
+  // la raíz de input y solo tiene name.
+  if(imgObj) g[N.IMAGE].inputs.image = (imgObj.subfolder ? imgObj.subfolder + "/" : "") + imgObj.name;
   const promptText = (j ? j.prompt : $("prompt").value) || "";
   if(promptText.trim()) g[N.PROMPT].inputs.text = promptText.trim();
   const sMode = j ? j.seedMode : seedMode;
@@ -5834,7 +5870,7 @@ function setupMetaButton(slot){
     try {
       const workflow = await extractWorkflowFromMP4(url);
       if(workflow) {
-        applyWorkflow(workflow);
+        await applyWorkflow(workflow);
         log(`📋 Workflow del slot ${slot} restaurado desde ${media.filename}`, "l-ok");
       } else {
         log("ℹ️ Este vídeo no contiene metadatos de workflow.", "l-info");
@@ -6147,7 +6183,7 @@ async function loadVideoHistory(){
             const wfUrl = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
             const workflow = await extractWorkflowFromMP4(wfUrl);
             if(workflow){
-              applyWorkflow(workflow);
+              await applyWorkflow(workflow);
               log(`📋 Workflow restaurado desde ${item.filename}`, "l-ok");
             } else {
               log(`ℹ️ ${item.filename} no contiene metadatos de workflow.`, "l-warn");
