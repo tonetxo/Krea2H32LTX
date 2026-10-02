@@ -5189,6 +5189,16 @@ CONFIG.onNodeExecuted = function(data){
         log(`✅ Vídeo listo.`, "l-ok");
       }
       displayVariantMedia(media, 1, pid, elapsedStr, { allowShow: isLive });
+      if(isLive){
+        // Resultado cargado en el reproductor: fuera el preview congelado.
+        const pv1 = $("previewVideo1"), p1 = $("previewImg1");
+        const w1 = $("previewWrap1"), b1 = $("previewStep1"), e1 = $("empty1");
+        if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
+        if(pv1){ pv1.pause(); pv1.style.display = "none"; pv1.removeAttribute("src"); pv1.load(); }
+        if(w1) w1.style.display = "none";
+        if(b1) b1.style.display = "none";
+        if(e1) e1.style.display = "";
+      }
     }
   }
 };
@@ -5220,6 +5230,10 @@ CONFIG.onProgress = function(value, max, prompt_id, node){
 CONFIG.onPreview = function(url, meta){
   const p = $("previewImg1"), pv = $("previewVideo1"), e = $("empty1"), v = $("video1"), w = $("previewWrap1");
   if(!p && !pv) return;
+  // Si el reproductor ya muestra el resultado guardado, los frames tardíos del
+  // preview corresponden a un pase terminado: ignorarlos.
+  if(v && v.src && v.style.display === "block") return;
+  if(displayedSlots[currentPromptId] && displayedSlots[currentPromptId].has(1) && !v?.src) return;
   const isVideoUrl = typeof url === "string" && (url.startsWith("data:video/mp4") || url.startsWith("data:video/webm"));
   const target = isVideoUrl && pv ? pv : p;
   const other  = isVideoUrl ? p : pv;

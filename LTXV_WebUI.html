@@ -4221,6 +4221,18 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
   }
 }
 
+// Limpia el preview EN VIVO de un slot específico (no el reproductor de resultado).
+// Cuando el 1er pase termina, su preview obsoleto (congelado en el último frame)
+// debe desaparecer del visor mientras el 2º pase sigue muestreando.
+function clearPreviewSlot(slot){
+  const p = $("previewImg" + slot);
+  const pv = $("previewVideo" + slot);
+  const e = $("empty" + slot);
+  if(p){ p.style.display = "none"; p.removeAttribute("src"); }
+  if(pv){ pv.pause(); pv.style.display = "none"; pv.removeAttribute("src"); pv.load(); }
+  if(e) e.style.display = "";
+}
+
 CONFIG.onNodeExecuted = function(data){
   if(!data || !data.node || !data.prompt_id) return;
   const pid = data.prompt_id;
@@ -4262,6 +4274,11 @@ CONFIG.onNodeExecuted = function(data){
       // solo aseguramos la tarjeta de galería. Pasamos el tiempo medido por el
       // timer del cliente porque el backend no siempre registra t1 en el history.
       displayVariantMedia(media, 1, pid, firstElapsedStr, { allowShow: isFirstLive });
+      if(isFirstLive){
+        // El 1er pase ya tiene vídeo propio: su preview en vivo (congelado)
+        // sobra mientras el 2º pase sigue muestreando.
+        clearPreviewSlot(1);
+      }
     }
   }
 
@@ -4284,6 +4301,10 @@ CONFIG.onNodeExecuted = function(data){
         log(`✅ 2º pase listo.`, "l-ok");
       }
       displayVariantMedia(media, 2, pid, finalElapsedStr, { allowShow: isFinalLive });
+      if(isFinalLive){
+        // Resultado final cargado: fuera el preview del 2º pase congelado.
+        clearPreviewSlot(2);
+      }
     }
   }
 };
@@ -4292,6 +4313,10 @@ CONFIG.onPreview = function(url, meta){
   const pid = currentPromptId;
   const isFirst = activeJob?.firstPassOnly || (!displayedSlots[pid] || !displayedSlots[pid].has(1));
   const slot = isFirst ? 1 : 2;
+  // El backend puede seguir mandando frames del pase que ya terminó (el preview
+  // va por latente, no por save node): ignorar los del pase ya mostrado, si no
+  // revivirían el preview que acabamos de limpiar en clearPreviewSlot.
+  if(displayedSlots[pid] && displayedSlots[pid].has(slot)) return;
   const p = $("previewImg" + slot);
   const pv = $("previewVideo" + slot);
   const e = $("empty" + slot);

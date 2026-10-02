@@ -5636,6 +5636,9 @@ CONFIG.onNodeExecuted = function(data){
     const m1 = CONFIG.findMedia(data.output);
     if(m1){
       displayVideoInPlayer(1, m1);
+      // El resultado de Seg 1 ya está en el reproductor: fuera su preview en
+      // vivo (congelado) mientras Seg 2 sigue muestreando.
+      clearSegmentPreview("Seg1");
       log("✅ Vídeo Segmento 1 generado y cargado en reproductor 1", "l-ok");
     }
   }
@@ -5649,6 +5652,7 @@ CONFIG.onNodeExecuted = function(data){
     const m2 = CONFIG.findMedia(data.output);
     if(m2){
       displayVideoInPlayer(2, m2);
+      clearSegmentPreview("Seg2");
       log("✅ Vídeo Segmento 2 generado y cargado en reproductor 2", "l-ok");
     }
   }
@@ -5662,6 +5666,7 @@ CONFIG.onNodeExecuted = function(data){
     const mf = CONFIG.findMedia(data.output);
     if(mf){
       displayVideoInPlayer(3, mf);
+      clearSegmentPreview("Final");
       log("✅ Vídeo Final Continuo listo y cargado en reproductor principal", "l-ok");
     }
   }
@@ -5809,6 +5814,11 @@ CONFIG.onNodeExecuting = function(data){
 
 CONFIG.onPreview = function(url, meta){
   const slot = (currentActiveSamplerSlot === 2) ? "Seg2" : "Seg1";
+  // Si el reproductor de esta etapa YA muestra el resultado guardado
+  // (SAVE_VID_* completó), los frames tardíos del preview corresponden al pase
+  // anterior: ignorarlos, si no revivirían el preview ya limpiado.
+  const vDone = $("video" + slot);
+  if(vDone && vDone.src && vDone.style.display === "block") return;
   const p = $("previewImg" + slot);
   const pv = $("previewVideo" + slot);
   const e = $("empty" + slot);
@@ -5878,6 +5888,22 @@ CONFIG.onClearPreview = function(){
     if(b) b.style.display = "none";
   });
 };
+
+// Como clearPreviewSlot de ltxv.js: limpiar el preview EN VIVO de una etapa
+// concreta cuando su vídeo de resultado ya está en el reproductor, sin tocar
+// los reproductores ni los previews de las etapas que siguen muestreando.
+function clearSegmentPreview(slotName){
+  const p = $("previewImg" + slotName);
+  const pv = $("previewVideo" + slotName);
+  const w = $("previewWrap" + slotName);
+  const b = $("previewStep" + slotName);
+  const e = $("empty" + slotName);
+  if(p){ p.style.display = "none"; p.removeAttribute("src"); }
+  if(pv){ pv.pause(); pv.style.display = "none"; pv.removeAttribute("src"); pv.load(); }
+  if(w) w.style.display = "none";
+  if(b) b.style.display = "none";
+  if(e) e.style.display = "";
+}
 
 // Reset de los 3 paneles de preview al empezar una nueva variante: sin esto,
 // Seg1/Final muestran el preview (o resultado) de la generación anterior hasta
