@@ -749,9 +749,9 @@ function loadLoraState() {
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length === 3) {
+      if (Array.isArray(parsed)) {
         parsed.forEach((l, i) => {
-          if (AVAILABLE_LORAS.includes(l.lora) || l.lora === "") loras[i] = l;
+          if (i < loras.length && (AVAILABLE_LORAS.includes(l.lora) || l.lora === "")) loras[i] = l;
         });
       }
     } catch (e) { console.error("Error cargando estado LoRA", e); }

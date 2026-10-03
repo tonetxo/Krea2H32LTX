@@ -293,8 +293,43 @@
             <div class="slider-val" id="latentScaleVal">1.50x</div>
           </div>
           <div class="hint" id="latentResHint" style="margin-top:4px;font-size:10px;">Latent nativo: 1120×640 px (sin escalado)</div>
+
+          <!-- Pase 2: Refinado con segundo Sampler (Hires-Fix) -->
+          <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border, #333);">
+            <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <label style="font-weight:600;">Segundo Sampler (Refinado Hires-Fix)</label>
+              <div class="seed-toggle" style="margin:0;">
+                <div class="seg on" id="segLatentPass2On" data-value="true">Activo</div>
+                <div class="seg" id="segLatentPass2Off" data-value="false">Desactivado</div>
+              </div>
+            </div>
+            <div id="latentPass2Controls" style="display:block;">
+              <div class="row" style="margin-top:4px;">
+                <label>Modelo UNet Pase 2 <span class="hint">(Default: mismo que pase 1)</span></label>
+                <select id="latentPass2Unet"></select>
+              </div>
+              <div id="latentPass2Warn" class="hint" style="display:none; color:var(--warn,#e6a23c); margin-top:3px; font-size:10px;"></div>
+
+              <div class="row" style="margin-top:6px;">
+                <label>Turbo LoRA Pase 2 <span class="hint">(Acelera el refinado)</span></label>
+                <select id="latentPass2Lora"></select>
+              </div>
+              <div class="row slider-row" style="margin-top:4px;">
+                <label>Fuerza Turbo LoRA</label>
+                <input type="range" id="latentPass2LoraStrength" min="0" max="2" step="0.05" value="1.0">
+                <div class="slider-val" id="latentPass2LoraStrengthVal">1.00</div>
+              </div>
+
+              <div class="row slider-row" style="margin-top:8px;">
+                <label>Denoise Refinado <span class="hint">(Fuerza Pase 2)</span></label>
+                <input type="range" id="latentPass2Denoise" min="0.10" max="1.00" step="0.05" value="0.60">
+                <div class="slider-val" id="latentPass2DenoiseVal">0.60</div>
+              </div>
+              <div class="hint" style="margin-top:3px; font-size:10px;">Denoise nativo del scheduler: 0.40–0.50 (alta fidelidad, sin cambios de escena), 0.60 (balance recomendado), 0.90+ (creativo). Ejecuta siempre 3 pasos exactos con la Turbo LoRA.</div>
+            </div>
+          </div>
         </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Escala el espacio latente antes de decodificar VAE con red 3D temporal. Incluye chunking y descarga automática de VRAM (force_unload) para evitar OOM.</div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Escala el espacio latente antes de decodificar VAE con red 3D temporal. Con el segundo sampler activo, elimina la pérdida de textura y el aspecto blando.</div>
       </div>
 
       <div class="panel">
@@ -322,7 +357,27 @@
             <option value="film_net_fp16.safetensors">film_net_fp16.safetensors (FILM)</option>
           </select>
         </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes de RTX Super Resolution para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes del escalado para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
+      </div>
+
+      <div class="panel">
+        <h2>RTX Video Super Resolution (2x)</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRtxOn" data-value="true">Activo</div>
+          <div class="seg" id="segRtxOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="rtxControls" style="display:block; margin-top:8px;">
+          <div class="row">
+            <label>Calidad RTX</label>
+            <select id="rtxQuality">
+              <option value="ULTRA" selected>ULTRA (Máxima definición)</option>
+              <option value="HIGH">HIGH (Equilibrado)</option>
+              <option value="MEDIUM">MEDIUM (Rápido)</option>
+              <option value="LOW">LOW (Bajo consumo)</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Escalado por Tensor Cores NVIDIA RTX (2x). Si ya usas Latent Upscaler 3D, desactivarlo evita resoluciones excesivas y ahorra tiempo.</div>
       </div>
 
       <div class="panel">

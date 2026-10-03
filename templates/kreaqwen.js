@@ -116,7 +116,12 @@ const CONFIG = {
     NEG_REFINER: "110",
     SAMPLER_REFINER: "23",
     DECODE_REFINER: "24",
-    SAVE_IMAGE: "9"
+    SAVE_IMAGE: "9",
+    FACE_CROP: "301",
+    FACE_ENCODE: "302",
+    FACE_SAMPLER: "303",
+    FACE_DECODE: "304",
+    FACE_STITCH: "305"
   },
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -776,6 +781,72 @@ function renderLoraGroup(containerId, list, labelPrefix, onChange){
 }
 
 // Snapshot de Job
+// --- REFINADO FACIAL (ComfyUI-H3-FaceRefine, recorte/recomposición de imagen) ---
+// Reutiliza el detector de rostros y los nodos de recorte/fusión del pack H3
+// FaceRefine (ya instalado), pero sustituye la cadena de latentes de vídeo
+// (MiniMaxH3ReferenceToVideo / H3InjectVideoLatent / H3PerFrameDenoise) por un
+// VAEEncode -> KSampler -> VAEDecode nativo sobre la imagen final.
+const FACEREFINE_KEY = "kreaqwen_facerefine_state";
+const FACEREFINE_DEFAULTS = {
+  enabled: false,
+  denoise: 0.40,
+  steps: 10,
+  canvasSize: 768,
+  feather: 12,
+  select: "largest_face"
+};
+function loadFaceRefine(){
+  try { return Object.assign({}, FACEREFINE_DEFAULTS, JSON.parse(localStorage.getItem(FACEREFINE_KEY) || "{}")); }
+  catch(_) { return {...FACEREFINE_DEFAULTS}; }
+}
+function saveFaceRefine(s){ try { localStorage.setItem(FACEREFINE_KEY, JSON.stringify(s)); } catch(_){} }
+function getFaceRefineState(){
+  return {
+    enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
+    denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.40"),
+    steps: parseInt($("faceRefineStepsSlider")?.value || "10", 10),
+    canvasSize: parseInt($("faceRefineCanvasMode")?.value || "768", 10),
+    feather: parseInt($("faceRefineFeatherSlider")?.value || "12", 10),
+    select: $("faceRefineSelectMode")?.value || "largest_face"
+  };
+}
+function setFaceRefineUI(s){
+  if(!s) return;
+  const on = $("segFaceRefineOn"), off = $("segFaceRefineOff");
+  const panel = $("faceRefineControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("faceRefineStepsSlider")){
+    const st = parseInt(s.steps != null ? s.steps : 10, 10);
+    $("faceRefineStepsSlider").value = st;
+    if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+    if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+  }
+  if($("faceRefineCanvasMode") && s.canvasSize){
+    $("faceRefineCanvasMode").value = String(s.canvasSize);
+  }
+  if($("faceRefineDenoiseSlider")){
+    const d = parseFloat(s.denoise != null ? s.denoise : 0.40);
+    $("faceRefineDenoiseSlider").value = d;
+    if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+    if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+  }
+  if($("faceRefineFeatherSlider")){
+    const f = parseInt(s.feather != null ? s.feather : 12, 10);
+    $("faceRefineFeatherSlider").value = f;
+    if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+    if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  }
+  if($("faceRefineSelectMode") && s.select){
+    $("faceRefineSelectMode").value = s.select;
+  }
+}
+
 function snapshotJob(isBaseOnly = false){
   const mp = parseFloat($("mpSlider")?.value || "1.0");
   const ar = $("aspectRatio")?.value || "16:9 (Widescreen)";
@@ -834,6 +905,8 @@ function snapshotJob(isBaseOnly = false){
     keepModelInRam: $("keepModelInRam")?.checked,
     batchSize: parseInt($("batchSize")?.value || "1", 10),
     filenamePrefix: $("filenamePrefix")?.value || "kreaqwen/imagen",
+    // Refinado facial (recorte + re-muestreo + recomposición sobre la imagen final)
+    faceRefine: getFaceRefineState(),
     // Edición con Qwen 2.1 (img2img / faceswap)
     qwenEdit: {
       enabled: !!$("qwenEditEnabled")?.checked,
@@ -996,6 +1069,105 @@ function appendPostFx(g, imageRef, job){
   }
 
   return cur;
+}
+
+// --- REFINADO FACIAL SOBRE LA IMAGEN FINAL (H3 FaceRefine, imagen) ---
+// Toma la imagen final, recorta el rostro con H3FaceTrackCrop (detector YOLO del
+// pack H3 FaceRefine), lo re-muestrea con el modelo de la última etapa y lo
+// recompone con H3FaceStitch. Sustituye la cadena de latentes de vídeo del pack
+// por VAEEncode -> KSampler -> VAEDecode nativo. Devuelve la referencia de imagen
+// a guardar, o la original si está desactivado.
+function appendFaceRefine(g, imageRef, job, opts){
+  const fr = job.faceRefine;
+  if(!fr || !fr.enabled) return imageRef;
+  if(!opts || !opts.modelRef || !opts.vaeRef || !opts.posRef || !opts.negRef) return imageRef;
+
+  const canvas = fr.canvasSize || 768;
+
+  g[N.FACE_CROP] = {
+    class_type: "H3FaceTrackCrop",
+    inputs: {
+      images: imageRef,
+      detector: "face_yolov8m.pt",
+      confidence: 0.35,
+      crop_factor: 3.0,
+      canvas_width: canvas,
+      canvas_height: canvas,
+      canvas_mode: "manual",
+      smooth_window: 21,
+      size_smooth_window: 51,
+      smooth_method: "gaussian",
+      size_mode: "per_frame",
+      identity_track: false,
+      identity_threshold: 0.28,
+      select: fr.select || "largest_face",
+      fallback_detector: "none",
+      fallback_head_frac: 0.5,
+      select_index: 0,
+      identity_model: "insightface",
+      cut_detection: "none",
+      cut_threshold: 3.0,
+      absent_shots: "off",
+      X: 0,
+      Y: 0,
+      frame_index: 0
+    },
+    _meta: { title: "Face Track Crop" }
+  };
+
+  g[N.FACE_ENCODE] = {
+    class_type: "VAEEncode",
+    inputs: {
+      pixels: [N.FACE_CROP, 0],
+      vae: opts.vaeRef
+    },
+    _meta: { title: "VAE Encode (Rostro)" }
+  };
+
+  g[N.FACE_SAMPLER] = {
+    class_type: "KSampler",
+    inputs: {
+      seed: (job.seedValue != null ? job.seedValue : 0) + 7919,
+      steps: fr.steps || 10,
+      cfg: opts.cfg != null ? opts.cfg : 1.0,
+      sampler_name: opts.sampler || "euler",
+      scheduler: opts.scheduler || "simple",
+      denoise: fr.denoise || 0.40,
+      model: opts.modelRef,
+      positive: opts.posRef,
+      negative: opts.negRef,
+      latent_image: [N.FACE_ENCODE, 0]
+    },
+    _meta: { title: "KSampler (Rostro)" }
+  };
+
+  g[N.FACE_DECODE] = {
+    class_type: "VAEDecode",
+    inputs: {
+      samples: [N.FACE_SAMPLER, 0],
+      vae: opts.vaeRef
+    },
+    _meta: { title: "VAE Decode (Rostro)" }
+  };
+
+  g[N.FACE_STITCH] = {
+    class_type: "H3FaceStitch",
+    inputs: {
+      base_images: imageRef,
+      refined_crops: [N.FACE_DECODE, 0],
+      transform: [N.FACE_CROP, 1],
+      paste_region: "face_only",
+      mask_dilation: 16,
+      feather: fr.feather || 12,
+      colour_match: 1.0,
+      blend: 1.0,
+      undetected_frames: "fade_out",
+      feather_scales_with_crop: false
+    },
+    _meta: { title: "Stitch Face" }
+  };
+
+  return [N.FACE_STITCH, 0];
 }
 
 // Construcción del grafo dinámico nativo ComfyUI
@@ -1175,8 +1347,16 @@ function buildGraph(job){
     delete g[N.NEG_REFINER];
     delete g[N.SAMPLER_REFINER];
     delete g[N.DECODE_REFINER];
-    // Guardar imagen directamente de la base, con post-procesado opcional
-    g[N.SAVE_IMAGE].inputs.images = appendPostFx(g, [N.DECODE_BASE, 0], j);
+    // Refinado facial opcional (reutiliza el modelo de la etapa Base) y
+    // post-procesado cosmético sobre la imagen resultante.
+    const baseFinalRef = appendFaceRefine(g, [N.DECODE_BASE, 0], j, {
+      modelRef: g[N.SAMPLER_BASE].inputs.model,
+      vaeRef: [N.VAE_BASE, 0],
+      posRef: [N.POS_BASE, 0],
+      negRef: [N.NEG_BASE, 0],
+      cfg: j.baseCfg, sampler: j.baseSampler, scheduler: j.baseScheduler
+    });
+    g[N.SAVE_IMAGE].inputs.images = appendPostFx(g, baseFinalRef, j);
     g[N.SAVE_IMAGE].inputs.filename_prefix = j.filenamePrefix;
     return g;
   }
@@ -1314,8 +1494,16 @@ function buildGraph(job){
   g[N.SAMPLER_REFINER].inputs.denoise = j.refinerDenoise;
   g[N.SAMPLER_REFINER].inputs.seed = j.seedValue + 1;
 
-  // Post-procesado opcional sobre la imagen refinada
-  g[N.SAVE_IMAGE].inputs.images = appendPostFx(g, [N.DECODE_REFINER, 0], j);
+  // Refinado facial opcional (reutiliza el modelo de la etapa Refiner) y
+  // post-procesado cosmético sobre la imagen resultante.
+  const refinerFinalRef = appendFaceRefine(g, [N.DECODE_REFINER, 0], j, {
+    modelRef: g[N.SAMPLER_REFINER].inputs.model,
+    vaeRef: [N.VAE_REFINER, 0],
+    posRef: [N.POS_REFINER, 0],
+    negRef: [N.NEG_REFINER, 0],
+    cfg: j.refinerCfg, sampler: j.refinerSampler, scheduler: j.refinerScheduler
+  });
+  g[N.SAVE_IMAGE].inputs.images = appendPostFx(g, refinerFinalRef, j);
   g[N.SAVE_IMAGE].inputs.filename_prefix = j.filenamePrefix;
 
   return g;
@@ -1334,6 +1522,12 @@ CONFIG.variantMeta = function(){
   ];
   if($("variancePreset") && !$("variancePreset").value.includes("Disabled")){
     rows.push(["Variance", `${$("variancePreset").value} (${$("protectMode")?.value || ""})`]);
+  }
+  {
+    const fr = getFaceRefineState();
+    if(fr.enabled){
+      rows.push(["FaceRefine", `on · steps ${fr.steps} · denoise ${fr.denoise.toFixed(2)} · ${fr.canvasSize}px · feather ${fr.feather}px`]);
+    }
   }
   const activeLoras = [];
   baseLoras.forEach((l, i) => {
@@ -1401,6 +1595,12 @@ CONFIG.onNodeExecuting = function(nodeId){
   } else if(nodeId === N.SAMPLER_REFINER){
     currentBatchStage = "refiner";
     setRun("busy", "Refinando imagen (Etapa Refiner)...");
+  } else if(nodeId === N.FACE_CROP){
+    setRun("busy", "Detectando y recortando rostro...");
+  } else if(nodeId === N.FACE_SAMPLER){
+    setRun("busy", "Refinando rostro (FaceRefine)...");
+  } else if(nodeId === N.FACE_STITCH){
+    setRun("busy", "Recomponiendo rostro...");
   } else if(nodeId === N.DECODE_BASE || nodeId === N.DECODE_REFINER){
     setRun("busy", "Decodificando VAE...");
   }
@@ -2252,6 +2452,24 @@ function applyKreaQwenWorkflow(workflow){
     applied.push("edición Qwen");
   }
 
+  // --- Refinado facial (H3 FaceRefine) ---
+  const frCrop = g[N.FACE_CROP];
+  const frSampler = g[N.FACE_SAMPLER];
+  if(frCrop?.class_type === "H3FaceTrackCrop"){
+    const fr = loadFaceRefine();
+    fr.enabled = true;
+    if(frCrop.inputs.canvas_width != null) fr.canvasSize = parseInt(frCrop.inputs.canvas_width, 10);
+    if(frCrop.inputs.select != null) fr.select = frCrop.inputs.select;
+    if(frSampler?.inputs){
+      if(frSampler.inputs.steps != null) fr.steps = parseInt(frSampler.inputs.steps, 10);
+      if(frSampler.inputs.denoise != null) fr.denoise = parseFloat(frSampler.inputs.denoise);
+    }
+    if(g[N.FACE_STITCH]?.inputs?.feather != null) fr.feather = parseInt(g[N.FACE_STITCH].inputs.feather, 10);
+    setFaceRefineUI(fr);
+    saveFaceRefine(fr);
+    applied.push("FaceRefine");
+  }
+
   // --- Post-procesado (ProPost) ---
   const postTypes = {
     ProPostVignette: { id: "vigEnabled", params: { intensity: "vigIntensity", center_x: "vigCX", center_y: "vigCY" } },
@@ -2771,6 +2989,44 @@ function initQwenEditListeners(){
   updateQwenEditRefStatus();
 }
 
+// --- REFINADO FACIAL: listeners de UI ---
+function initFaceRefineListeners(){
+  const persist = () => saveFaceRefine(getFaceRefineState());
+
+  $("segFaceRefineOn")?.addEventListener("click", () => {
+    const s = getFaceRefineState();
+    s.enabled = true;
+    setFaceRefineUI(s);
+    saveFaceRefine(s);
+  });
+  $("segFaceRefineOff")?.addEventListener("click", () => {
+    const s = getFaceRefineState();
+    s.enabled = false;
+    setFaceRefineUI(s);
+    saveFaceRefine(s);
+  });
+  $("faceRefineStepsSlider")?.addEventListener("input", (e) => {
+    const st = parseInt(e.target.value, 10) || 10;
+    if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+    if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+    persist();
+  });
+  $("faceRefineCanvasMode")?.addEventListener("change", persist);
+  $("faceRefineDenoiseSlider")?.addEventListener("input", (e) => {
+    const d = parseFloat(e.target.value) || 0.40;
+    if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+    if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+    persist();
+  });
+  $("faceRefineFeatherSlider")?.addEventListener("input", (e) => {
+    const f = parseInt(e.target.value, 10) || 12;
+    if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+    if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+    persist();
+  });
+  $("faceRefineSelectMode")?.addEventListener("change", persist);
+}
+
 // Inicialización de Listeners y Componentes
 function initKreaQwenUI() {
   populateModelSelects();
@@ -2795,6 +3051,7 @@ function initKreaQwenUI() {
     makeCollapsible("spectrumToggle", "spectrumBody");
     makeCollapsible("galleryToggle", "galleryBody");
     makeCollapsible("qwenEditToggle", "qwenEditBody");
+    makeCollapsible("faceRefineToggle", "faceRefineBody");
   }
 
   window.outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
@@ -2861,6 +3118,12 @@ function initKreaQwenUI() {
 
   // --- Edición con Qwen 2.1 ---
   initQwenEditListeners();
+
+  // --- Refinado facial (H3 FaceRefine) ---
+  initFaceRefineListeners();
+
+  // Cargar el estado persistido del refinado facial
+  setFaceRefineUI(loadFaceRefine());
 
   // --- Cargar metadatos de la imagen de referencia ---
   $("btnLoadMeta")?.addEventListener("click", async () => {

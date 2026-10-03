@@ -21,6 +21,9 @@ const CONFIG = {
     NOISE:"129", DURATION:"132", MATH:"131",
     SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
     SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
+    AV_SPLIT:"400", AV_CONCAT:"401", UNET2:"402", ATTN2:"403", LORA_TURBO2:"404",
+    SIGMA_SHIFT2:"405", PREVIEW2:"406", SIGMAS2:"407", GUIDER2:"408", SAMPLER2:"409",
+    MEM_OPT2:"411", SPARSE_ATTN2:"412", AIMDO2:"413", SOL_H3_2:"414",
     RIFE_LOADER:"180", RIFE_INTERP:"181",
     FACE_CROP:"301", FACE_REF2V:"302", FACE_INJECT:"303", FACE_PERFRAME_DENOISE:"305",
     FACE_SCHEDULER:"306", FACE_GUIDER:"307", FACE_NOISE:"308", FACE_SAMPLER:"309",
@@ -156,7 +159,11 @@ let localFirstFile=null, localLastFile=null;
 let seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
-const currentMediaVariant = {};
+// prompt_id que produjo el resultado mostrado en cada reproductor. Sirve para
+// el guard de onPreview: solo se ignoran frames tardíos si el reproductor ya
+// muestra el resultado del MISMO prompt en curso. Anclar al prompt_id (y no al
+// índice de variante) evita la colisión entre jobs, que reinician variantCounter.
+const currentMediaPrompt = {};
 const BITDEPTH_KEY = "minimaxh3_bit_depth";
 const MODE_KEY = "minimaxh3_mode";
 const SPECTRUM_KEY = "minimaxh3_spectrum";
@@ -475,6 +482,7 @@ function saveH3Settings(){
     spectrum: getSpectrumState(),
     latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
+    rtx: getRtxState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
     aimdo: getAimdoState(),
@@ -514,6 +522,7 @@ function restoreH3Settings(){
     if(s.spectrum){ setSpectrumUI(s.spectrum); saveSpectrum(s.spectrum); }
     if(s.latentUpscale){ setLatentUpscaleUI(s.latentUpscale); saveLatentUpscale(s.latentUpscale); }
     if(s.rife){ setRifeUI(s.rife); saveRife(s.rife); }
+    if(s.rtx){ setRtxUI(s.rtx); saveRtx(s.rtx); }
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
     if(s.attentionOptimizer){ setAttentionOptimizerUI(s.attentionOptimizer.mode); saveAttentionOptimizer(s.attentionOptimizer); }
     if(s.aimdo){ setAimdoUI(s.aimdo); saveAimdo(s.aimdo); }
@@ -523,6 +532,13 @@ function restoreH3Settings(){
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
     if(s.arMode){ arMode = s.arMode; saveArMode(arMode); }
     if(s.aspectRatio) currentAspectRatio = s.aspectRatio;
+    if(Array.isArray(s.loras) && s.loras.length){
+      s.loras.forEach((l, i) => {
+        if(i < loras.length && l) loras[i] = l;
+      });
+      renderLoras();
+      saveLoraState();
+    }
     return true;
   } catch(e){ console.warn("Error restaurando ajustes MiniMaxH3:", e); return false; }
 }
@@ -718,7 +734,16 @@ $("solTauSlider")?.addEventListener("input", (e) => {
 
 // --- LATENT UPSCALER 3D (MiniMax H3) ---
 const LATENT_UPSCALE_KEY = "minimaxh3_latent_upscale_state";
-const LATENT_UPSCALE_DEFAULTS = { enabled: false, scale: 1.5 };
+const LATENT_UPSCALE_DEFAULTS = {
+  enabled: false,
+  scale: 1.5,
+  pass2: true,
+  pass2Unet: "", // "" = "mismo que pase 1"
+  pass2Lora: "h3/taomate_h3_3step_comfy.safetensors",
+  pass2LoraStrength: 1.0,
+  pass2Denoise: 0.60
+};
+
 function loadLatentUpscale(){
   try { return Object.assign({}, LATENT_UPSCALE_DEFAULTS, JSON.parse(localStorage.getItem(LATENT_UPSCALE_KEY) || "{}")); }
   catch(_) { return {...LATENT_UPSCALE_DEFAULTS}; }
@@ -727,8 +752,27 @@ function saveLatentUpscale(s){ try { localStorage.setItem(LATENT_UPSCALE_KEY, JS
 function getLatentUpscaleState(){
   return {
     enabled: $("segLatentUpscaleOn")?.classList.contains("on") ?? false,
-    scale: parseFloat($("latentScaleSlider")?.value || "1.5")
+    scale: parseFloat($("latentScaleSlider")?.value || "1.5"),
+    pass2: $("segLatentPass2On")?.classList.contains("on") ?? true,
+    pass2Unet: $("latentPass2Unet")?.value || "",
+    pass2Lora: $("latentPass2Lora")?.value || "",
+    pass2LoraStrength: parseFloat($("latentPass2LoraStrength")?.value || "1.0"),
+    pass2Denoise: parseFloat($("latentPass2Denoise")?.value || "0.60")
   };
+}
+function checkLatentPass2Warnings(){
+  const warn = $("latentPass2Warn");
+  if(!warn) return;
+  const unetVal = $("latentPass2Unet")?.value || $("unetSelect")?.value || "";
+  const loraVal = $("latentPass2Lora")?.value || "";
+  const isTurboUnet = /turbo|fasth3|8step|4step/i.test(unetVal);
+  const isTurboLora = /turbo|step|acc|lightx2v|fast/i.test(loraVal);
+  if(isTurboUnet && isTurboLora && loraVal !== ""){
+    warn.textContent = "⚠️ El UNet ya es una variante destilada/Turbo y además tienes Turbo LoRA seleccionada. Si la imagen sale quemada o sobrecontrastada, desactiva la LoRA o usa modelo base.";
+    warn.style.display = "";
+  } else {
+    warn.style.display = "none";
+  }
 }
 function setLatentUpscaleUI(s){
   const on = $("segLatentUpscaleOn"), off = $("segLatentUpscaleOff");
@@ -746,6 +790,35 @@ function setLatentUpscaleUI(s){
     if($("latentScaleVal")) $("latentScaleVal").textContent = sc.toFixed(2) + "x";
     if($("latentScaleHint")) $("latentScaleHint").textContent = `(${sc.toFixed(2)}x)`;
   }
+
+  // Pase 2
+  const p2On = $("segLatentPass2On"), p2Off = $("segLatentPass2Off");
+  const p2Controls = $("latentPass2Controls");
+  const pass2Active = s.pass2 !== false;
+  if(pass2Active){
+    p2On?.classList.add("on"); p2Off?.classList.remove("on");
+    if(p2Controls) p2Controls.style.display = "";
+  } else {
+    p2Off?.classList.add("on"); p2On?.classList.remove("on");
+    if(p2Controls) p2Controls.style.display = "none";
+  }
+  if($("latentPass2Unet") && s.pass2Unet !== undefined){
+    $("latentPass2Unet").value = s.pass2Unet;
+  }
+  if($("latentPass2Lora") && s.pass2Lora !== undefined){
+    $("latentPass2Lora").value = s.pass2Lora;
+  }
+  if($("latentPass2LoraStrength")){
+    const st = parseFloat(s.pass2LoraStrength != null ? s.pass2LoraStrength : 1.0);
+    $("latentPass2LoraStrength").value = st;
+    if($("latentPass2LoraStrengthVal")) $("latentPass2LoraStrengthVal").textContent = st.toFixed(2);
+  }
+  if($("latentPass2Denoise")){
+    const d = parseFloat(s.pass2Denoise != null ? s.pass2Denoise : 0.60);
+    $("latentPass2Denoise").value = d;
+    if($("latentPass2DenoiseVal")) $("latentPass2DenoiseVal").textContent = d.toFixed(2);
+  }
+  checkLatentPass2Warnings();
 }
 const _latentUpscaleState = loadLatentUpscale();
 setLatentUpscaleUI(_latentUpscaleState);
@@ -769,9 +842,52 @@ $("latentScaleSlider")?.addEventListener("input", (e) => {
   const sc = parseFloat(e.target.value) || 1.5;
   if($("latentScaleVal")) $("latentScaleVal").textContent = sc.toFixed(2) + "x";
   if($("latentScaleHint")) $("latentScaleHint").textContent = `(${sc.toFixed(2)}x)`;
-  const s = { enabled: $("segLatentUpscaleOn")?.classList.contains("on") ?? false, scale: sc };
+  const s = getLatentUpscaleState();
+  s.scale = sc;
   saveLatentUpscale(s);
   if(typeof recalcResolution === "function") recalcResolution();
+  scheduleSaveH3Settings();
+});
+$("segLatentPass2On")?.addEventListener("click", () => {
+  const s = getLatentUpscaleState();
+  s.pass2 = true;
+  setLatentUpscaleUI(s);
+  saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+});
+$("segLatentPass2Off")?.addEventListener("click", () => {
+  const s = getLatentUpscaleState();
+  s.pass2 = false;
+  setLatentUpscaleUI(s);
+  saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+});
+$("latentPass2Unet")?.addEventListener("change", () => {
+  const s = getLatentUpscaleState();
+  saveLatentUpscale(s);
+  checkLatentPass2Warnings();
+  scheduleSaveH3Settings();
+});
+$("latentPass2Lora")?.addEventListener("change", () => {
+  const s = getLatentUpscaleState();
+  saveLatentUpscale(s);
+  checkLatentPass2Warnings();
+  scheduleSaveH3Settings();
+});
+$("latentPass2LoraStrength")?.addEventListener("input", (e) => {
+  const st = parseFloat(e.target.value) || 1.0;
+  if($("latentPass2LoraStrengthVal")) $("latentPass2LoraStrengthVal").textContent = st.toFixed(2);
+  const s = getLatentUpscaleState();
+  s.pass2LoraStrength = st;
+  saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+});
+$("latentPass2Denoise")?.addEventListener("input", (e) => {
+  const d = parseFloat(e.target.value) || 0.60;
+  if($("latentPass2DenoiseVal")) $("latentPass2DenoiseVal").textContent = d.toFixed(2);
+  const s = getLatentUpscaleState();
+  s.pass2Denoise = d;
+  saveLatentUpscale(s);
   scheduleSaveH3Settings();
 });
 
@@ -812,6 +928,56 @@ $("rifeMultiplier")?.addEventListener("change", (e) => {
   const r = getRifeState(); r.multiplier = mult; saveRife(r); scheduleSaveH3Settings();
 });
 $("rifeModel")?.addEventListener("change", (e) => { const r = getRifeState(); r.model = e.target.value; saveRife(r); scheduleSaveH3Settings(); });
+
+// --- RTX VIDEO SUPER RESOLUTION (2x) ---
+const RTX_KEY = "minimaxh3_rtx_state";
+const RTX_DEFAULTS = { enabled: true, quality: "ULTRA" };
+function loadRtx(){
+  try { return Object.assign({}, RTX_DEFAULTS, JSON.parse(localStorage.getItem(RTX_KEY) || "{}")); }
+  catch(_) { return {...RTX_DEFAULTS}; }
+}
+function saveRtx(r){ try { localStorage.setItem(RTX_KEY, JSON.stringify(r)); } catch(_){} }
+function setRtxUI(r){
+  const on = $("segRtxOn"), off = $("segRtxOff");
+  const panel = $("rtxControls");
+  if(r.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("rtxQuality") && r.quality) $("rtxQuality").value = r.quality;
+}
+function getRtxState(){
+  return {
+    enabled: $("segRtxOn")?.classList.contains("on") ?? true,
+    quality: $("rtxQuality")?.value || "ULTRA"
+  };
+}
+const _rtxState = loadRtx();
+setRtxUI(_rtxState);
+$("segRtxOn")?.addEventListener("click", () => {
+  const r = getRtxState();
+  r.enabled = true;
+  setRtxUI(r);
+  saveRtx(r);
+  scheduleSaveH3Settings();
+  if(typeof recalcResolution === "function") recalcResolution();
+});
+$("segRtxOff")?.addEventListener("click", () => {
+  const r = getRtxState();
+  r.enabled = false;
+  setRtxUI(r);
+  saveRtx(r);
+  scheduleSaveH3Settings();
+  if(typeof recalcResolution === "function") recalcResolution();
+});
+$("rtxQuality")?.addEventListener("change", () => {
+  const r = getRtxState();
+  saveRtx(r);
+  scheduleSaveH3Settings();
+});
 
 // --- FACE REFINE (ComfyUI-H3-FaceRefine) ---
 const FACEREFINE_KEY = "minimaxh3_facerefine_state";
@@ -1510,13 +1676,14 @@ CONFIG.onPreview = function(url, meta){
   const p = $("previewImg1"), pv = $("previewVideo1"), e = $("empty1"), v = $("video1"), w = $("previewWrap1");
   if(!p && !pv) return;
   // Frames tardíos de un pase ya completado solo se ignoran si el reproductor
-  // muestra el resultado de la MISMA variante en curso; con el resultado de
-  // una variante anterior el preview debe salir (antes el guard solo miraba
-  // src!=null y mataba los previews desde la 2ª variante).
-  const activeVar = currentPromptId ? promptVariantMap[currentPromptId] : null;
-  const showsThisVariant = v && v.src && v.style.display === "block"
-    && currentMediaVariant[1] != null && currentMediaVariant[1] === activeVar;
-  if(showsThisVariant) return;
+  // muestra el resultado del MISMO prompt en curso; con el resultado de un
+  // prompt anterior el preview debe salir. Se ancla al prompt_id (único por
+  // prompt) y no al índice de variante: variantCounter se resetea a 0 en cada
+  // job, así que la 1ª variante de cada job comparte índice y un guard por
+  // índice mataba TODOS los previews desde el 2º job en adelante.
+  const showsThisPrompt = v && v.src && v.style.display === "block"
+    && currentMediaPrompt[1] != null && currentMediaPrompt[1] === currentPromptId;
+  if(showsThisPrompt) return;
   if(displayedSlots[currentPromptId] && displayedSlots[currentPromptId].has(1) && !v?.src) return;
   const isVideoUrl = typeof url === "string" && (url.startsWith("data:video/mp4") || url.startsWith("data:video/webm"));
   const target = isVideoUrl && pv ? pv : p;
@@ -1636,7 +1803,7 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
     const badgeText = activeJob?.isFaceRefineOnly
       ? "FaceRefined"
       : (activeJob?.faceRefine?.enabled ? `Var ${varIndex} · FaceRefined` : `Var ${varIndex}`);
-    showVideo(slot, media, { variantIndex: varIndex, badge: badgeText });
+    showVideo(slot, media, { variantIndex: varIndex, badge: badgeText, promptId });
   }
   if(isNewGallery){
     displayedGalleryFiles.add(key);
@@ -1683,14 +1850,20 @@ function recalcResolution(){
     }
   }
 
-  const finalW = latentW * 2;
-  const finalH = latentH * 2;
+  const rtxState = (typeof getRtxState === "function") ? getRtxState() : { enabled: true, quality: "ULTRA" };
+  const rtxMultiplier = rtxState.enabled ? 2 : 1;
+  const finalW = latentW * rtxMultiplier;
+  const finalH = latentH * rtxMultiplier;
   const currentRatioName = getFriendlyRatio(w, h);
   if($("resFinalHint")){
-    if(latentState.enabled){
+    if(latentState.enabled && rtxState.enabled){
       $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras Latent ${latentScale.toFixed(2)}x + RTX 2x`;
-    } else {
+    } else if(latentState.enabled && !rtxState.enabled){
+      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras Latent ${latentScale.toFixed(2)}x (sin RTX)`;
+    } else if(!latentState.enabled && rtxState.enabled){
       $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras RTX 2x`;
+    } else {
+      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) nativo (sin escalados)`;
     }
   }
   updateArLabel(rawInputImageWidth, rawInputImageHeight);
@@ -1838,6 +2011,7 @@ function snapshotJob(){
     solH3: getSolH3State(),
     latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
+    rtx: getRtxState(),
     faceRefine: getFaceRefineState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
@@ -2533,12 +2707,42 @@ async function applyWorkflow(workflow, opts={}){
     if(typeof latentUpNode.inputs.scale === "number") sc = latentUpNode.inputs.scale;
     else if(typeof latentUpNode.inputs["mode.scale"] === "number") sc = latentUpNode.inputs["mode.scale"];
     else if(latentUpNode.inputs.mode && typeof latentUpNode.inputs.mode === "object" && typeof latentUpNode.inputs.mode.scale === "number") sc = latentUpNode.inputs.mode.scale;
-    const lu = { enabled: true, scale: sc };
+
+    // Detectar si el workflow incluye el segundo pase de muestreo (nodo 409 o SamplerCustomAdvanced adicional)
+    const hasSampler2 = !!wfNodes[N.SAMPLER2] || !!findByTitle("Sampler Pase 2 (Refinado Hires-Fix)");
+    const sigmas2Node = wfNodes[N.SIGMAS2] || findByTitle("Scheduler Pase 2 (Denoise)") || findByTitle("Manual Sigmas Pase 2");
+    const unet2Node = wfNodes[N.UNET2] || findByTitle("UNet Loader Pase 2");
+    const turbo2Node = wfNodes[N.LORA_TURBO2] || findByTitle("Turbo LoRA Pase 2");
+
+    let p2Denoise = 0.60;
+    if(sigmas2Node && sigmas2Node.inputs && typeof sigmas2Node.inputs.denoise === "number"){
+      p2Denoise = sigmas2Node.inputs.denoise;
+    }
+    let p2Unet = "";
+    if(unet2Node && unet2Node.inputs && unet2Node.inputs.unet_name){
+      p2Unet = unet2Node.inputs.unet_name;
+    }
+    let p2Lora = "";
+    let p2LoraStrength = 1.0;
+    if(turbo2Node && turbo2Node.inputs){
+      p2Lora = turbo2Node.inputs.lora_name || "";
+      if(typeof turbo2Node.inputs.strength_model === "number") p2LoraStrength = turbo2Node.inputs.strength_model;
+    }
+
+    const lu = {
+      enabled: true,
+      scale: sc,
+      pass2: hasSampler2,
+      pass2Unet: p2Unet,
+      pass2Lora: p2Lora,
+      pass2LoraStrength: p2LoraStrength,
+      pass2Denoise: p2Denoise
+    };
     setLatentUpscaleUI(lu);
     saveLatentUpscale(lu);
-    setApplied(`latent upscaler 3D (${sc.toFixed(2)}x)`);
+    setApplied(`latent upscaler 3D (${sc.toFixed(2)}x${hasSampler2 ? " + pase 2 refinado" : ""})`);
   } else if(latentUpNode === null){
-    const lu = { enabled: false, scale: 1.5 };
+    const lu = { ...LATENT_UPSCALE_DEFAULTS, enabled: false, scale: 1.5 };
     setLatentUpscaleUI(lu);
     saveLatentUpscale(lu);
   }
@@ -2559,6 +2763,20 @@ async function applyWorkflow(workflow, opts={}){
     setFaceRefineUI(fr);
     saveFaceRefine(fr);
     setApplied(`refinado facial (denoise ${d.toFixed(2)}, feather ${f}px)`);
+  }
+
+  // RTX Video Super Resolution
+  const rtxNode = findByClass("RTXVideoSuperResolution");
+  if(rtxNode && rtxNode.inputs){
+    const q = rtxNode.inputs.quality || "ULTRA";
+    const rtx = { enabled: true, quality: q };
+    setRtxUI(rtx);
+    saveRtx(rtx);
+    setApplied(`RTX Super Resolution (calidad ${q})`);
+  } else if(rtxNode === null){
+    const rtx = { enabled: false, quality: "ULTRA" };
+    setRtxUI(rtx);
+    saveRtx(rtx);
   }
 
   updateDurationHints();
@@ -2708,6 +2926,58 @@ function loadInterpModels(){
   if(Array.from(sel.options).some(o => o.value === fb)) sel.value = fb;
 }
 loadInterpModels();
+
+function loadLatentPass2Selectors(){
+  const unetSel = $("latentPass2Unet");
+  if(unetSel){
+    unetSel.innerHTML = "";
+    const sameOpt = document.createElement("option");
+    sameOpt.value = "";
+    sameOpt.textContent = "— Mismo que Pase 1 (Recomendado, 0 VRAM extra) —";
+    unetSel.appendChild(sameOpt);
+    for(const u of (typeof AVAILABLE_UNETS !== "undefined" ? AVAILABLE_UNETS : [])){
+      const opt = document.createElement("option");
+      opt.value = u;
+      opt.textContent = u;
+      unetSel.appendChild(opt);
+    }
+    if(_latentUpscaleState.pass2Unet !== undefined){
+      unetSel.value = _latentUpscaleState.pass2Unet;
+    }
+  }
+
+  const loraSel = $("latentPass2Lora");
+  if(loraSel){
+    loraSel.innerHTML = "";
+    const noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.textContent = "— Ninguna (Muestreo nativo del modelo) —";
+    loraSel.appendChild(noneOpt);
+
+    const lorasList = (typeof AVAILABLE_LORAS !== "undefined" ? AVAILABLE_LORAS : []);
+    for(const l of lorasList){
+      const opt = document.createElement("option");
+      opt.value = l;
+      opt.textContent = l.split("/").pop();
+      opt.title = l;
+      loraSel.appendChild(opt);
+    }
+    // Default: taomate_h3_3step_comfy.safetensors
+    const preferredLora = lorasList.find(l => /taomate_h3_3step_comfy/i.test(l))
+      || lorasList.find(l => /taomate.*3step/i.test(l))
+      || lorasList.find(l => /3step|turbo/i.test(l))
+      || "";
+    const savedLora = _latentUpscaleState.pass2Lora;
+    const matchOption = Array.from(loraSel.options).find(o => o.value === savedLora || (savedLora && (o.value.endsWith(savedLora) || savedLora.endsWith(o.value))));
+    if(matchOption){
+      loraSel.value = matchOption.value;
+    } else if(preferredLora){
+      loraSel.value = preferredLora;
+    }
+  }
+  checkLatentPass2Warnings();
+}
+loadLatentPass2Selectors();
 
 // Zoom/pan/fullscreen para imagen de entrada
 const inputZoom = setupZoomPan("inputWrap", "inputImg", "btnResetZoomInput", "btnFullscreenInput");
@@ -3765,6 +4035,20 @@ function buildGraph(job){
     delete g[N.RES_SELECTOR];
     delete g[N.REF2V];
     delete g[N.LATENT_UPSCALE];
+    delete g[N.AV_SPLIT];
+    delete g[N.AV_CONCAT];
+    delete g[N.UNET2];
+    delete g[N.ATTN2];
+    delete g[N.LORA_TURBO2];
+    delete g[N.SIGMA_SHIFT2];
+    delete g[N.PREVIEW2];
+    delete g[N.SIGMAS2];
+    delete g[N.GUIDER2];
+    delete g[N.SAMPLER2];
+    delete g[N.MEM_OPT2];
+    delete g[N.SPARSE_ATTN2];
+    delete g[N.AIMDO2];
+    delete g[N.SOL_H3_2];
     delete g[N.DECODE_VIDEO];
     delete g[N.DECODE_AUDIO];
     delete g[N.AUDIO_FIRST];
@@ -3803,18 +4087,17 @@ function buildGraph(job){
     g[N.SAVE].inputs.filename_prefix = prefix;
   }
 
-  // 9b. Latent Upscaler 3D (MiniMax H3) — se conecta entre SAMPLER y DECODE_VIDEO
-  // TODO [Hires-Fix 2-Stage Sampler]: Para máxima nitidez en Latent Upscaling y evitar el aspecto blando/plástico
-  // del latent interpolado directo a VAE, se requerirá un segundo pase de muestreo:
-  // Sampler 1 (base baja res) -> MinimaxH3LatentUpscaler3D -> Sampler 2 (denoise 0.35-0.40 con DiT H3) -> VAEDecode.
+  // 9b. Latent Upscaler 3D (MiniMax H3) — con soporte de 2º Sampler de refinado (Hires-Fix)
   const latentState = j ? j.latentUpscale : getLatentUpscaleState();
   const latentUpscaleEnabled = latentState ? latentState.enabled : false;
   const latentScale = latentState ? parseFloat(latentState.scale || "1.5") : 1.5;
+  const pass2Enabled = latentUpscaleEnabled && (latentState.pass2 !== false);
 
   if(latentUpscaleEnabled){
+    // 1. Nodo Latent Upscaler 3D
     g[N.LATENT_UPSCALE] = {
       inputs: {
-        latent: [N.SAMPLER, 0],
+        latent: pass2Enabled ? [N.AV_SPLIT, 0] : [N.SAMPLER, 0],
         model_name: "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors",
         mode: "scale by multiplier",
         "mode.scale": latentScale,
@@ -3830,13 +4113,322 @@ function buildGraph(job){
         title: "MiniMax H3 Latent Upscaler (3D)"
       }
     };
-    if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
-      g[N.DECODE_VIDEO].inputs.samples = [N.LATENT_UPSCALE, 0];
+
+    if(pass2Enabled){
+      // 2. LTXVSeparateAVLatent: separar vídeo y audio del latente nested de Sampler 1 (samples slot 0)
+      g[N.AV_SPLIT] = {
+        class_type: "LTXVSeparateAVLatent",
+        inputs: {
+          av_latent: [N.SAMPLER, 0]
+        },
+        _meta: { title: "Separate AV Latent (Pass 1)" }
+      };
+
+      // 3. LTXVConcatAVLatent: juntar vídeo escalado con audio original del pase 1
+      g[N.AV_CONCAT] = {
+        class_type: "LTXVConcatAVLatent",
+        inputs: {
+          video_latent: [N.LATENT_UPSCALE, 0],
+          audio_latent: [N.AV_SPLIT, 1]
+        },
+        _meta: { title: "Concat Upscaled AV Latent" }
+      };
+
+      // 4. Cadena de Modelo del Pase 2:
+      // Construir modelo base para el pase 2 (mismo UNet o modelo dedicado)
+      const p2Unet = latentState.pass2Unet || "";
+      let model2Node = currentModelNode;
+
+      if(p2Unet && p2Unet.trim() !== ""){
+        // Modelo dedicado para el pase 2
+        g[N.UNET2] = {
+          class_type: "UNETLoader",
+          inputs: {
+            unet_name: p2Unet.trim(),
+            weight_dtype: "default"
+          },
+          _meta: { title: "UNet Loader Pase 2" }
+        };
+        model2Node = N.UNET2;
+
+        // Atención densa para el UNet 2
+        g[N.ATTN2] = {
+          class_type: "ModelAttentionBackend",
+          inputs: {
+            model: [model2Node, 0],
+            attention: backendState.backend || "comfy kitchen attention"
+          },
+          _meta: { title: "Attention Backend Pase 2" }
+        };
+        model2Node = N.ATTN2;
+      } else {
+        delete g[N.UNET2];
+        delete g[N.ATTN2];
+      }
+
+      // Si hay Turbo LoRA para el pase 2 (o el modelo pase 2 es nuevo),
+      // debemos partir del UNet base limpio (o UNET2) para no apilar la Turbo LoRA del pase 1
+      const p2Lora = (latentState.pass2Lora || "").trim();
+      const p2Strength = (typeof latentState.pass2LoraStrength === "number") ? latentState.pass2LoraStrength : 1.0;
+
+      if(p2Lora){
+        // Si no se creó UNET2 específico, creamos una rama desde UNET1 limpio con atención
+        if(!g[N.UNET2]){
+          g[N.ATTN2] = {
+            class_type: "ModelAttentionBackend",
+            inputs: {
+              model: [N.UNET, 0],
+              attention: backendState.backend || "comfy kitchen attention"
+            },
+            _meta: { title: "Attention Backend Pase 2" }
+          };
+          model2Node = N.ATTN2;
+        }
+
+        // Optimizaciones de memoria y atención para Pase 2 (crucial para evitar OOM a resolución escalada)
+        if(optimizerState.mode === "h3-optimizations"){
+          if(h3opt.memOptEnabled){
+            g[N.MEM_OPT2] = {
+              class_type: "H3MemoryOptimization",
+              inputs: {
+                model: [model2Node, 0],
+                fused_qkv: "auto",
+                mlp_memory: "auto",
+                chunk_rows: 4096,
+                preserve_precision: true,
+                precision_mode: "Auto",
+                qkv_streaming_mode: "Auto",
+                embedding_memory_mode: "Auto",
+                kitchen_v_memory_mode: "Standard"
+              },
+              _meta: { title: "H3 Memory Optimization Pase 2" }
+            };
+            model2Node = N.MEM_OPT2;
+          } else {
+            delete g[N.MEM_OPT2];
+          }
+
+          if(h3opt.sparseBackend && h3opt.sparseBackend !== "auto"){
+            g[N.SPARSE_ATTN2] = {
+              class_type: "H3SparseAttentionAdvanced",
+              inputs: {
+                model: [model2Node, 0],
+                video_budget: (typeof h3opt.videoBudget === "number") ? h3opt.videoBudget : 0.3,
+                early_steps: 0,
+                early_kv: 0.6833,
+                late_steps: 0,
+                late_kv: 0.6833,
+                backend: h3opt.sparseBackend,
+                early_schedule: "Ramp",
+                video_token_order: "1x8x8"
+              },
+              _meta: { title: "H3 Sparse Attention Advanced Pase 2" }
+            };
+          } else {
+            g[N.SPARSE_ATTN2] = {
+              class_type: "H3SparseAttention",
+              inputs: {
+                model: [model2Node, 0],
+                video_budget: h3opt.videoBudget,
+                denser_early_late_steps: false
+              },
+              _meta: { title: "H3 Sparse Attention Pase 2" }
+            };
+          }
+          model2Node = N.SPARSE_ATTN2;
+
+          if(aimdo.residency !== "stock"){
+            g[N.AIMDO2] = {
+              class_type: "H3AIMDOResidencyLimiter",
+              inputs: {
+                model: [model2Node, 0],
+                residency: aimdo.residency
+              },
+              _meta: { title: "H3 AIMDO Residency Limiter Pase 2" }
+            };
+            model2Node = N.AIMDO2;
+          } else {
+            delete g[N.AIMDO2];
+          }
+
+        } else {
+          delete g[N.MEM_OPT2];
+          delete g[N.SPARSE_ATTN2];
+          delete g[N.AIMDO2];
+        }
+
+        // Cargar Turbo LoRA (ej. taomate 3step)
+        g[N.LORA_TURBO2] = {
+          class_type: "LoraLoaderModelOnly",
+          inputs: {
+            model: [model2Node, 0],
+            lora_name: p2Lora,
+            strength_model: p2Strength
+          },
+          _meta: { title: "Turbo LoRA Pase 2" }
+        };
+        model2Node = N.LORA_TURBO2;
+
+        // Inheritar LoRAs de estilo del usuario (excluyendo destilaciones turbo)
+        for(let li = 0; li < jobLoras.length; li++){
+          const lObj = jobLoras[li];
+          if(lObj && lObj.on && lObj.lora){
+            const isTurbo = /turbo|step|acc|lightx2v|fast|hyperflow/i.test(lObj.lora);
+            if(!isTurbo){
+              const styleKey = "404_style_" + li;
+              g[styleKey] = {
+                class_type: "LoraLoaderModelOnly",
+                inputs: {
+                  model: [model2Node, 0],
+                  lora_name: lObj.lora,
+                  strength_model: (typeof lObj.strength === "number") ? lObj.strength : 1.0
+                },
+                _meta: { title: `Style LoRA Pase 2 (${li+1})` }
+              };
+              model2Node = styleKey;
+            }
+          }
+        }
+
+        // Sol-H3 en pase 2 si está activo
+        const solH3State = j ? j.solH3 : getSolH3State();
+        if(solH3State && solH3State.enabled){
+          g[N.SOL_H3_2] = {
+            class_type: "SolH3Experimental",
+            inputs: {
+              model: [model2Node, 0],
+              exact_fusion: solH3State.exact_fusion !== false,
+              tau: (typeof solH3State.tau === "number") ? solH3State.tau : 1.0,
+              dense_evaluations: 1,
+              dense_layers: 2
+            },
+            _meta: { title: "Sol-H3 SOL Attention Pase 2" }
+          };
+          model2Node = N.SOL_H3_2;
+        } else {
+          delete g[N.SOL_H3_2];
+        }
+
+        // SigmaShift para la cadena del pase 2
+        if(g[N.SIGMA_SHIFT]){
+          const ss = j ? j.sigmaShift : getSigmaShiftState();
+          g[N.SIGMA_SHIFT2] = {
+            class_type: "MiniMaxH3SigmaShift",
+            inputs: {
+              model: [model2Node, 0],
+              shift_video: ss.shiftVideo,
+              shift_audio: ss.shiftAudio
+            },
+            _meta: { title: "Sigma Shift Pase 2" }
+          };
+          model2Node = N.SIGMA_SHIFT2;
+        } else {
+          delete g[N.SIGMA_SHIFT2];
+        }
+
+      } else {
+        delete g[N.LORA_TURBO2];
+        delete g[N.SIGMA_SHIFT2];
+        delete g[N.MEM_OPT2];
+        delete g[N.SPARSE_ATTN2];
+        delete g[N.AIMDO2];
+        delete g[N.SOL_H3_2];
+      }
+
+      // 5. BasicGuider para el pase 2: reutiliza condicionamiento de ReferenceToVideo
+      g[N.GUIDER2] = {
+        class_type: "BasicGuider",
+        inputs: {
+          model: [model2Node, 0],
+          conditioning: [N.REF2V, 0]
+        },
+        _meta: { title: "Guider Pase 2" }
+      };
+
+      // 6. BasicScheduler para el pase 2 con control Denoise nativo (3 pasos exactos)
+      const p2Denoise = (latentState && typeof latentState.pass2Denoise === "number")
+        ? Math.min(1.0, Math.max(0.05, latentState.pass2Denoise))
+        : 0.60;
+      g[N.SIGMAS2] = {
+        class_type: "BasicScheduler",
+        inputs: {
+          model: [model2Node, 0],
+          scheduler: "simple",
+          steps: 3,
+          denoise: p2Denoise
+        },
+        _meta: { title: "Scheduler Pase 2 (Denoise)" }
+      };
+
+      // 7. SamplerCustomAdvanced (Pase 2)
+      g[N.SAMPLER2] = {
+        class_type: "SamplerCustomAdvanced",
+        inputs: {
+          noise: [N.NOISE, 0],
+          guider: [N.GUIDER2, 0],
+          sampler: [N.SAMPLER_SELECT, 0],
+          sigmas: [N.SIGMAS2, 0],
+          latent_image: [N.AV_CONCAT, 0]
+        },
+        _meta: { title: "Sampler Pase 2 (Refinado Hires-Fix)" }
+      };
+
+      // 8. Salidas directas hacia decoders
+      if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
+        g[N.DECODE_VIDEO].inputs.samples = [N.SAMPLER2, 0];
+      }
+      if(g[N.DECODE_AUDIO] && g[N.DECODE_AUDIO].inputs){
+        g[N.DECODE_AUDIO].inputs.samples = [N.SAMPLER2, 0];
+      }
+
+    } else {
+      // Latent upscale sin 2º pase (decodificación directa de latente interpolado)
+      delete g[N.AV_SPLIT];
+      delete g[N.AV_CONCAT];
+      delete g[N.UNET2];
+      delete g[N.ATTN2];
+      delete g[N.LORA_TURBO2];
+      delete g[N.SIGMA_SHIFT2];
+      delete g[N.PREVIEW2];
+      delete g[N.SIGMAS2];
+      delete g[N.GUIDER2];
+      delete g[N.SAMPLER2];
+      delete g[N.MEM_OPT2];
+      delete g[N.SPARSE_ATTN2];
+      delete g[N.AIMDO2];
+      delete g[N.SOL_H3_2];
+
+      if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
+        g[N.DECODE_VIDEO].inputs.samples = [N.LATENT_UPSCALE, 0];
+      }
+      if(g[N.DECODE_AUDIO] && g[N.DECODE_AUDIO].inputs){
+        g[N.DECODE_AUDIO].inputs.samples = [N.SAMPLER, 0];
+      }
     }
+
   } else {
+    // Latent upscale desactivado por completo
     delete g[N.LATENT_UPSCALE];
+    delete g[N.AV_SPLIT];
+    delete g[N.AV_CONCAT];
+    delete g[N.UNET2];
+    delete g[N.ATTN2];
+    delete g[N.LORA_TURBO2];
+    delete g[N.SIGMA_SHIFT2];
+    delete g[N.PREVIEW2];
+    delete g[N.SIGMAS2];
+    delete g[N.GUIDER2];
+    delete g[N.SAMPLER2];
+    delete g[N.MEM_OPT2];
+    delete g[N.SPARSE_ATTN2];
+    delete g[N.AIMDO2];
+    delete g[N.SOL_H3_2];
+
     if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
       g[N.DECODE_VIDEO].inputs.samples = [N.SAMPLER, 0];
+    }
+    if(g[N.DECODE_AUDIO] && g[N.DECODE_AUDIO].inputs){
+      g[N.DECODE_AUDIO].inputs.samples = [N.SAMPLER, 0];
     }
   }
 
@@ -4039,20 +4631,43 @@ function buildGraph(job){
         title: "Frame Interpolate"
       }
     };
-    if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
-      g[N.RTX_SR].inputs.images = [N.RIFE_INTERP, 0];
-    }
+    currentVideoImages = [N.RIFE_INTERP, 0];
     if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
       g[N.CREATE_VIDEO].inputs.fps = 24 * rifeMultiplier;
     }
   } else {
     delete g[N.RIFE_LOADER];
     delete g[N.RIFE_INTERP];
-    if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
-      g[N.RTX_SR].inputs.images = currentVideoImages;
-    }
     if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
       g[N.CREATE_VIDEO].inputs.fps = 24;
+    }
+  }
+
+  // 12. RTX Video Super Resolution (2x) — opcional tras RIFE/FaceRefine
+  const rtxState = j ? j.rtx : getRtxState();
+  const rtxEnabled = rtxState ? rtxState.enabled : true;
+  const rtxQuality = rtxState ? (rtxState.quality || "ULTRA") : "ULTRA";
+
+  if(rtxEnabled){
+    g[N.RTX_SR] = {
+      class_type: "RTXVideoSuperResolution",
+      inputs: {
+        resize_type: "scale by multiplier",
+        "resize_type.scale": 2,
+        quality: rtxQuality,
+        images: currentVideoImages
+      },
+      _meta: {
+        title: "RTX Video Super Resolution"
+      }
+    };
+    if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
+      g[N.CREATE_VIDEO].inputs.images = [N.RTX_SR, 0];
+    }
+  } else {
+    delete g[N.RTX_SR];
+    if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){
+      g[N.CREATE_VIDEO].inputs.images = currentVideoImages;
     }
   }
 
@@ -4078,12 +4693,15 @@ function showVideo(slot, media, options={}){
   if(sf) sf.style.display="inline-flex";
   if(frBtn) frBtn.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
-  // Variante del resultado mostrado: el guard de onPreview solo debe ignorar
-  // frames tardíos cuando el reproductor muestra el resultado de LA MISMA
-  // variante en curso (si muestra una anterior, el preview sí tiene que salir).
-  const shownVariant = (options.variantIndex != null) ? options.variantIndex
-    : (currentPromptId ? promptVariantMap[currentPromptId] : null);
-  currentMediaVariant[slot] = (shownVariant != null) ? shownVariant : null;
+  // Prompt que produjo el resultado mostrado: el guard de onPreview solo debe
+  // ignorar frames tardíos cuando el reproductor muestra el resultado del MISMO
+  // prompt en curso (si muestra uno anterior, el preview sí tiene que salir).
+  // options.promptId === undefined => carga interna (displayVariantMedia) y
+  // se usa el prompt en curso; promptId: null explícito => carga manual desde
+  // el historial/galería, que no debe silenciar el preview de ningún prompt.
+  const shownPrompt = (options.promptId !== undefined) ? options.promptId
+    : (currentPromptId || null);
+  currentMediaPrompt[slot] = shownPrompt;
   if(badge){
     if(options.badge != null){
       badge.textContent = options.badge;
@@ -4371,7 +4989,7 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
         if(e.target.closest("video")) return;
         if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn")) return;
         const varIndex = parseInt(card.dataset.variantIndex, 10) || (currentBatchIndex + 1);
-        showVideo(1, { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type }, { variantIndex: varIndex });
+        showVideo(1, { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type }, { variantIndex: varIndex, promptId: null });
         log("▶ Vídeo cargado: "+card.dataset.filename, "l-ok");
     });
 
@@ -4495,7 +5113,7 @@ async function loadVideoHistory(){
           if(e.target.closest("button") || e.target.closest(".variant-icons")) return;
           const media = { filename: item.filename, subfolder: item.subfolder || "", type: item.type || "output" };
           const baseName = item.filename.replace(/\.[^.]+$/, "");
-          requestAnimationFrame(() => showVideo(1, media, { badge: baseName, autoplay: false }));
+          requestAnimationFrame(() => showVideo(1, media, { badge: baseName, autoplay: false, promptId: null }));
           log("▶ Reproduciendo en panel principal: "+item.filename, "l-ok");
         });
 

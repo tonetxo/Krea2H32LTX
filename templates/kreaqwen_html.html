@@ -933,6 +933,51 @@
         </div>
       </div>
 
+      <!-- REFINADO FACIAL (H3 FaceRefine) -->
+      <div class="panel">
+        <div class="collapsible-header" id="faceRefineToggle">
+          <span class="arrow">▶</span> Refinado facial (H3 FaceRefine)
+        </div>
+        <div class="collapsible-body" id="faceRefineBody">
+          <div class="seed-toggle">
+            <div class="seg" id="segFaceRefineOn" data-value="true">Activo</div>
+            <div class="seg on" id="segFaceRefineOff" data-value="false">Desactivado</div>
+          </div>
+          <div id="faceRefineControls" style="display:none; margin-top:8px;">
+            <div class="row slider-row">
+              <label>Pasos KSampler <span class="hint" id="faceRefineStepsHint">(10)</span></label>
+              <input type="range" id="faceRefineStepsSlider" min="2" max="30" step="1" value="10">
+              <div class="slider-val" id="faceRefineStepsVal">10</div>
+            </div>
+            <div class="row">
+              <label>Resolución de recorte</label>
+              <select id="faceRefineCanvasMode">
+                <option value="512">512x512 (Ultra rápido · 2x velocidad)</option>
+                <option value="768" selected>768x768 (Alta resolución)</option>
+              </select>
+            </div>
+            <div class="row slider-row">
+              <label>Denoise base <span class="hint" id="faceRefineDenoiseHint">(0.40)</span></label>
+              <input type="range" id="faceRefineDenoiseSlider" min="0.15" max="0.75" step="0.05" value="0.40">
+              <div class="slider-val" id="faceRefineDenoiseVal">0.40</div>
+            </div>
+            <div class="row slider-row">
+              <label>Suavizado de borde (Feather) <span class="hint" id="faceRefineFeatherHint">(12 px)</span></label>
+              <input type="range" id="faceRefineFeatherSlider" min="4" max="32" step="2" value="12">
+              <div class="slider-val" id="faceRefineFeatherVal">12 px</div>
+            </div>
+            <div class="row">
+              <label>Selección de rostro</label>
+              <select id="faceRefineSelectMode">
+                <option value="largest_face" selected>Rostro principal (más grande)</option>
+                <option value="centre_most">Rostro más centrado</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint" style="margin-top:4px;font-size:10px;">Detecta el rostro en la imagen final, lo recorta, lo re-muestrea con el modelo de la última etapa y lo recompone mediante fundido suave. Requiere una cara detectable. Se aplica antes de los efectos Post-Render.</div>
+        </div>
+      </div>
+
       <!-- GESTIÓN DE MEMORIA Y OFFLOAD -->
       <div class="panel">
         <h2>Gestión de Memoria y Offload</h2>
