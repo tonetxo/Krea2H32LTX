@@ -846,7 +846,7 @@ CONFIG.onNodeExecuted = function(data){
 
     const m1 = CONFIG.findMedia(data.output);
     if(m1){
-      displayVideoInPlayer(1, m1);
+      displayVideoInPlayer(1, m1, { variant: promptVariantMap[data.prompt_id] });
       // El resultado de Seg 1 ya está en el reproductor: fuera su preview en
       // vivo (congelado) mientras Seg 2 sigue muestreando.
       clearSegmentPreview("Seg1");
@@ -862,7 +862,7 @@ CONFIG.onNodeExecuted = function(data){
 
     const m2 = CONFIG.findMedia(data.output);
     if(m2){
-      displayVideoInPlayer(2, m2);
+      displayVideoInPlayer(2, m2, { variant: promptVariantMap[data.prompt_id] });
       clearSegmentPreview("Seg2");
       log("✅ Vídeo Segmento 2 generado y cargado en reproductor 2", "l-ok");
     }
@@ -876,7 +876,7 @@ CONFIG.onNodeExecuted = function(data){
 
     const mf = CONFIG.findMedia(data.output);
     if(mf){
-      displayVideoInPlayer(3, mf);
+      displayVideoInPlayer(3, mf, { variant: promptVariantMap[data.prompt_id] });
       clearSegmentPreview("Final");
       log("✅ Vídeo Final Continuo listo y cargado en reproductor principal", "l-ok");
     }
@@ -1025,11 +1025,17 @@ CONFIG.onNodeExecuting = function(data){
 
 CONFIG.onPreview = function(url, meta){
   const slot = (currentActiveSamplerSlot === 2) ? "Seg2" : "Seg1";
-  // Si el reproductor de esta etapa YA muestra el resultado guardado
-  // (SAVE_VID_* completó), los frames tardíos del preview corresponden al pase
-  // anterior: ignorarlos, si no revivirían el preview ya limpiado.
+  const slotIndex = (slot === "Seg2") ? 2 : 1;
+  // Los frames tardíos del preview de un pase YA COMPLETADO se ignoran solo si
+  // el reproductor de esta etapa muestra el resultado de la MISMA variante que
+  // se está generando. Con el resultado de una variante anterior el preview
+  // debe salir (bug: antes el guard comparaba solo src != null y mataba todos
+  // los previews desde la 2ª generación).
   const vDone = $("video" + slot);
-  if(vDone && vDone.src && vDone.style.display === "block") return;
+  if(vDone && vDone.src && vDone.style.display === "block"){
+    const activeVar = currentPromptId ? promptVariantMap[currentPromptId] : null;
+    if(currentMediaVariant[slotIndex] != null && currentMediaVariant[slotIndex] === activeVar) return;
+  }
   const p = $("previewImg" + slot);
   const pv = $("previewVideo" + slot);
   const e = $("empty" + slot);
@@ -1050,9 +1056,13 @@ CONFIG.onPreview = function(url, meta){
   if(isVideoUrl && pv && pv.autoplay !== true){ pv.autoplay = true; pv.muted = true; pv.loop = true; }
   if(isVideoUrl && target.play) target.play().catch(()=>{});
 
-  // Actualizar también en el reproductor final si no hay vídeo terminado cargado
+  // El preview final también entra si videoFinal muestra un resultado de otra
+  // variante (o nada); con el resultado de ESTA variante ya no hace falta.
   const vFin = $("videoFinal");
-  if(!vFin || !vFin.src || vFin.style.display !== "block"){
+  const activeVarFin = currentPromptId ? promptVariantMap[currentPromptId] : null;
+  const finShowsThisVariant = vFin && vFin.src && vFin.style.display === "block"
+    && currentMediaVariant[3] != null && currentMediaVariant[3] === activeVarFin;
+  if(!finShowsThisVariant){
     const pFin = $("previewImgFinal");
     const pvFin = $("previewVideoFinal");
     const wFin = $("previewWrapFinal");
@@ -1250,17 +1260,17 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
     };
     if(entry?.outputs?.[N.SAVE_VID_1]){
       const m1 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_1]);
-      if(m1){ found = true; if(!playerAlreadyShows(1, m1)) displayVideoInPlayer(1, m1); }
+      if(m1){ found = true; if(!playerAlreadyShows(1, m1)) displayVideoInPlayer(1, m1, { variant: promptVariantMap[promptId] }); }
     }
     if(entry?.outputs?.[N.SAVE_VID_2]){
       const m2 = CONFIG.findMedia(entry.outputs[N.SAVE_VID_2]);
-      if(m2){ found = true; if(!playerAlreadyShows(2, m2)) displayVideoInPlayer(2, m2); }
+      if(m2){ found = true; if(!playerAlreadyShows(2, m2)) displayVideoInPlayer(2, m2, { variant: promptVariantMap[promptId] }); }
     }
     if(entry?.outputs?.[N.SAVE_VID_FINAL]){
       const mf = CONFIG.findMedia(entry.outputs[N.SAVE_VID_FINAL]);
       if(mf){
         found = true;
-        if(!playerAlreadyShows(3, mf)) displayVideoInPlayer(3, mf);
+        if(!playerAlreadyShows(3, mf)) displayVideoInPlayer(3, mf, { variant: promptVariantMap[promptId] });
         const varIndex = promptVariantMap[promptId] || (variantCounter + 1);
         CONFIG.addToVariantGallery(mf, realSeed, varIndex);
       }
@@ -1485,6 +1495,11 @@ $("queueItemsToggle")?.addEventListener("click", () => {
 // RENDER Y GESTIÓN DE REPRODUCTORES (H3/LTX PATTERN)
 // ==========================================
 const currentMedia = { 1: null, 2: null, 3: null };
+// Variante a la que pertenece el resultado mostrado en cada reproductor. Sirve
+// para el guard de onPreview: solo hay que ignorar frames tardíos del preview
+// si el reproductor ya muestra el resultado de LA MISMA variante que está
+// generándose; con el resultado de una variante ANTERIOR el preview debe salir.
+const currentMediaVariant = { 1: null, 2: null, 3: null };
 
 // --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS MP4 ---
 async function extractWorkflowFromMP4Buffer(arrayBuffer){
@@ -1745,6 +1760,12 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
     videoUrl = `${server()}/view?filename=${f}&subfolder=${s}&type=${t}`;
   }
   currentMedia[slotIndex] = media;
+  // Anclar la variante del resultado: el guard de onPreview la compara con la
+  // variante del prompt activo (frames tardíos de la MISMA variante se
+  // ignoran; con el resultado de otra variante el preview sí debe salir).
+  if(options.variant !== undefined){
+    currentMediaVariant[slotIndex] = (options.variant != null) ? options.variant : null;
+  }
 
   if(empty) empty.style.display = "none";
   if(pImg){ pImg.style.display = "none"; pImg.removeAttribute("src"); }
