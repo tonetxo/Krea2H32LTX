@@ -1578,36 +1578,54 @@ CONFIG.addToVariantGallery = addToVariantGallery;
 CONFIG.renderVariantMedia = function(card, url, media){
   return `<video src="${escapeHtml(url)}" crossorigin="anonymous" controls muted preload="metadata" playsinline></video>`;
 };
-CONFIG.variantMeta = function(){
+CONFIG.variantMeta = function(seedValue, timeText){
   const s = getSpectrumState();
-  const h = getH3OptState();
-  const ss = getSigmaShiftState();
   const r = getRifeState();
+  const lu = getLatentUpscaleState();
   const w = parseInt($("width")?.value || "1120", 10);
   const he = parseInt($("height")?.value || "640", 10);
   const unet = ($("unetSelect")?.value || BASE_GRAPH?.[N.UNET]?.inputs?.unet_name || "").split('/').pop() || "";
   const clip = ($("clipSelect")?.value || BASE_GRAPH?.[N.CLIP]?.inputs?.clip_name || "").split('/').pop() || "";
   const vae = ($("vaeSelect")?.value || BASE_GRAPH?.[N.VAE_VIDEO]?.inputs?.vae_name || "").split('/').pop() || "";
   const activeLoras = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
+
+  const realSeed = (seedValue !== null && seedValue !== undefined && seedValue !== "") 
+    ? String(seedValue) 
+    : (seedMode === "random" ? "Aleatoria" : ($("seedVal")?.value || "—"));
+  const realTime = (timeText && String(timeText).trim()) ? String(timeText).trim() : ($("time1")?.textContent?.replace("⏱", "")?.trim() || "—");
+
   const rows = [
+    ["Tiempo", realTime],
+    ["Semilla", realSeed],
     ["Modelo", unet],
     ["CLIP", clip],
     ["VAE Vídeo", vae],
     ["LoRAs", activeLoras.length ? activeLoras.join(", ") : "ninguna"],
-    ["H3 Sparse Attn", `on (${h.sparseBackend} · ${Math.round(h.videoBudget * 100)}% budget)`],
-    ["H3 Mem Opt", h.memOptEnabled ? "on (Auto)" : "off"],
-    ["Sigma Shift", `Vídeo ${ss.shiftVideo.toFixed(1)} / Audio ${ss.shiftAudio.toFixed(1)}`],
-    ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup}${s.bootstrapFirstForecast ? ' · boot' : ''} · ${s.historyStorage}` : "off"],
-    ["Interpolación RIFE", r.enabled ? `on · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}` : "off"],
     ["Sampler", $("samplerName")?.value || "res_multistep"],
     ["Scheduler", $("schedulerName")?.value || "simple"],
     ["Steps", $("stepsSlider")?.value || "20"],
     ["Resolución Base", `${w}×${he}`],
-    ["Resolución Vídeo", `${w*2}×${he*2} (RTX 2x)`],
-    ["Aspect Ratio", arMode === "16:9" ? "Forzar 16:9" : "Auto (Imagen)"],
-    ["Duración", `${$("duration")?.value || ""}s`],
-    ["Modo", currentMode],
   ];
+
+  if(lu.enabled){
+    rows.push(["Latent Upscale", `${lu.scale.toFixed(2)}x${lu.pass2 ? ` (Pase 2 denoise ${lu.pass2Denoise || 0.60})` : ''}`]);
+  }
+  const rtx = getRtxState ? getRtxState() : null;
+  if(rtx && rtx.enabled){
+    rows.push(["Resolución Vídeo", `${w*2}×${he*2} (RTX 2x ${rtx.quality})`]);
+  }
+
+  rows.push(["Aspect Ratio", arMode === "16:9" ? "Forzar 16:9" : "Auto (Imagen)"]);
+  rows.push(["Duración", `${$("duration")?.value || ""}s`]);
+  rows.push(["Modo", currentMode]);
+
+  if(s.enabled){
+    rows.push(["Spectrum", `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)}`]);
+  }
+  if(r.enabled){
+    rows.push(["RIFE", `${r.multiplier}x (${24*r.multiplier} fps)`]);
+  }
+
   return { title: "Parámetros MiniMaxH3", rows, loras: activeLoras };
 };
 CONFIG.onSeedUpdate = updateSeedUI;
@@ -4958,7 +4976,7 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     if(existingPlaceholder) existingPlaceholder.remove();
 
     const typeShort = "final";
-    const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
+    const meta = CONFIG.variantMeta ? CONFIG.variantMeta(seedValue, timeText) : null;
     const card = buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort, meta);
 
     const hasSeed = seedValue !== null && seedValue !== undefined;

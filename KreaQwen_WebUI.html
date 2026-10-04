@@ -5897,8 +5897,15 @@ function buildGraph(job){
 }
 
 // Metadata para variantes
-CONFIG.variantMeta = function(){
+CONFIG.variantMeta = function(seedValue, timeText){
+  const realSeed = (seedValue !== null && seedValue !== undefined && seedValue !== "") 
+    ? String(seedValue) 
+    : ($("samplerSeed")?.value || "—");
+  const realTime = (timeText && String(timeText).trim()) ? String(timeText).trim() : ($("time1")?.textContent?.replace("⏱", "")?.trim() || "—");
+
   const rows = [
+    ["Tiempo", realTime],
+    ["Semilla", realSeed],
     ["Modo", $("comboMode")?.value || ""],
     ["Base", $("baseUnetSelect")?.value || ""],
     ["Refiner", $("refinerEnabled")?.checked ? ($("refinerUnetSelect")?.value || "") : "Desactivado"],
@@ -6289,7 +6296,7 @@ function addToVariantGallery(media, seedValue, timeText) {
   if(!box || !grid) return;
   box.style.display = "block";
 
-  const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
+  const meta = CONFIG.variantMeta ? CONFIG.variantMeta(seedValue, timeText) : null;
   const card = buildVariantCard(grid, box, media, seedValue, timeText, null, null, "var", meta);
   const url = mediaUrl(media);
 
