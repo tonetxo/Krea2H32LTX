@@ -981,15 +981,18 @@
       <!-- GESTIÓN DE MEMORIA Y OFFLOAD -->
       <div class="panel">
         <h2>Gestión de Memoria y Offload</h2>
-        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
           <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
             <input type="checkbox" id="keepModelInRam" checked>
             <span>Mantener modelos en RAM (offload rápido)</span>
           </label>
-          <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descargar modelos de VRAM/RAM bajo demanda">Liberar RAM/VRAM</button>
+          <div style="display:flex;gap:6px;">
+            <button id="btnOffloadVram" type="button" class="ghost btn-mini" title="Descarga los modelos de la GPU (VRAM) hacia la RAM del sistema sin borrarlos de memoria. Deja la VRAM libre para Ollama/llama.cpp.">Descargar VRAM a RAM</button>
+            <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descarga y purga los modelos de VRAM y de la RAM de Python por completo.">Liberar Todo</button>
+          </div>
         </div>
         <div class="hint" style="font-size:10px;margin-top:4px;">
-          Con 96 GB de RAM, mantener ambos modelos (Base y Refiner) en memoria elimina por completo la espera de lectura de disco entre variantes.
+          Con 96 GB de RAM, mantener ambos modelos (Base y Refiner) en memoria elimina la espera de lectura de disco. Usa <strong>Descargar VRAM a RAM</strong> antes de usar Ollama para que el LLM vuele sin tener que volver a leer los 21 GB del SSD externo.
         </div>
       </div>
     </div>

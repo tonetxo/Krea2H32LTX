@@ -80,15 +80,18 @@
             Comfy Kitchen cuantiza la atención en INT8 en GPUs Nvidia, acelerando la inferencia y reduciendo VRAM en Flux2/Krea2.
           </div>
         </div>
-        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
           <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
             <input type="checkbox" id="keepModelInRam" checked>
             <span>Mantener modelo en RAM (offload rápido)</span>
           </label>
-          <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descargar modelos de VRAM/RAM bajo demanda">Liberar RAM/VRAM</button>
+          <div style="display:flex;gap:6px;">
+            <button id="btnOffloadVram" type="button" class="ghost btn-mini" title="Descarga los modelos de la GPU (VRAM) hacia la RAM del sistema sin borrarlos de memoria. Deja la VRAM libre para Ollama/llama.cpp.">Descargar VRAM a RAM</button>
+            <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descarga y purga los modelos de VRAM y de la RAM de Python por completo.">Liberar Todo</button>
+          </div>
         </div>
         <div class="hint" style="font-size:10px;margin-top:2px;">
-          Evita recargar el modelo desde disco en cada variante. Con 32GB+ de RAM el intercambio entre variantes es instantáneo.
+          Evita recargar el modelo desde disco en cada variante. Usa <strong>Descargar VRAM a RAM</strong> antes de usar Ollama para que el LLM vuele sin tener que volver a leer los 21 GB del SSD externo.
         </div>
       </div>
 

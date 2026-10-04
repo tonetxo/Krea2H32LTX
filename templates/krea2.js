@@ -1034,17 +1034,41 @@ if($("keepModelInRam")){
     saveKrea2KeepRam(e.target.checked);
   });
 }
-$("btnFreeMemory")?.addEventListener("click", async () => {
+$("btnOffloadVram")?.addEventListener("click", async () => {
+  const btn = $("btnOffloadVram");
+  const prevText = btn?.textContent;
+  if(btn){ btn.disabled = true; btn.textContent = "Descargando..."; }
   try {
-    const srv = server(); // vacío = proxy local; nunca hardcodear 127.0.0.1 (roto en LAN)
+    const srv = server();
+    await fetch(`${srv}/free`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unload_models: true, free_memory: false })
+    });
+    log("⚡ VRAM liberada: modelo descargado a RAM (conservado en memoria para generar sin leer del disco).", "l-ok");
+  } catch(e) {
+    log("⚠️ Error descargando VRAM: " + e.message, "l-err");
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = prevText; }
+  }
+});
+
+$("btnFreeMemory")?.addEventListener("click", async () => {
+  const btn = $("btnFreeMemory");
+  const prevText = btn?.textContent;
+  if(btn){ btn.disabled = true; btn.textContent = "Purgando..."; }
+  try {
+    const srv = server();
     await fetch(`${srv}/free`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ unload_models: true, free_memory: true })
     });
-    log("🧹 Memoria VRAM y modelos descargados de ComfyUI bajo demanda.", "l-ok");
+    log("🧹 Memoria VRAM y modelos purgados por completo en ComfyUI.", "l-ok");
   } catch(e) {
     log("⚠️ Error liberando memoria: " + e.message, "l-err");
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = prevText; }
   }
 });
 

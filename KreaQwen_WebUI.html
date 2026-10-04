@@ -354,6 +354,11 @@ video[draggable="true"]:active{cursor:grabbing;}
 .variant-fs-close:hover{border-color:var(--accent);color:var(--accent);}
 .variant-fs-dl{position:fixed;top:14px;left:16px;background:rgba(12,16,22,0.85);border:1px solid rgba(255,255,255,0.25);color:var(--accent);font-family:var(--mono);font-size:11px;padding:8px 12px;border-radius:8px;text-decoration:none;z-index:2147483647;}
 .variant-fs-dl:hover{border-color:var(--accent);}
+.variant-fs-prev, .variant-fs-next{position:fixed;top:50%;transform:translateY(-50%);background:rgba(12,16,22,0.8);border:1px solid rgba(255,255,255,0.2);color:#fff;font-size:26px;line-height:1;width:44px;height:44px;border-radius:50%;cursor:pointer;z-index:2147483647;display:flex;align-items:center;justify-content:center;transition:all 0.15s ease;user-select:none;}
+.variant-fs-prev:hover, .variant-fs-next:hover{border-color:var(--accent);color:var(--accent);background:rgba(20,25,35,0.95);transform:translateY(-50%) scale(1.08);}
+.variant-fs-prev{left:18px;}
+.variant-fs-next{right:18px;}
+.variant-fs-counter{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:rgba(12,16,22,0.85);border:1px solid rgba(255,255,255,0.2);color:#ddd;font-family:var(--mono);font-size:12px;padding:4px 12px;border-radius:12px;z-index:2147483647;pointer-events:none;letter-spacing:0.04em;}
 
 /* Dropzone de referencia (#refDropzone) y wrap de referencia */
 #refDropzone{min-height:80px;}
@@ -1486,15 +1491,18 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
       <!-- GESTIÓN DE MEMORIA Y OFFLOAD -->
       <div class="panel">
         <h2>Gestión de Memoria y Offload</h2>
-        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
           <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
             <input type="checkbox" id="keepModelInRam" checked>
             <span>Mantener modelos en RAM (offload rápido)</span>
           </label>
-          <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descargar modelos de VRAM/RAM bajo demanda">Liberar RAM/VRAM</button>
+          <div style="display:flex;gap:6px;">
+            <button id="btnOffloadVram" type="button" class="ghost btn-mini" title="Descarga los modelos de la GPU (VRAM) hacia la RAM del sistema sin borrarlos de memoria. Deja la VRAM libre para Ollama/llama.cpp.">Descargar VRAM a RAM</button>
+            <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descarga y purga los modelos de VRAM y de la RAM de Python por completo.">Liberar Todo</button>
+          </div>
         </div>
         <div class="hint" style="font-size:10px;margin-top:4px;">
-          Con 96 GB de RAM, mantener ambos modelos (Base y Refiner) en memoria elimina por completo la espera de lectura de disco entre variantes.
+          Con 96 GB de RAM, mantener ambos modelos (Base y Refiner) en memoria elimina la espera de lectura de disco. Usa <strong>Descargar VRAM a RAM</strong> antes de usar Ollama para que el LLM vuele sin tener que volver a leer los 21 GB del SSD externo.
         </div>
       </div>
     </div>
@@ -4826,6 +4834,7 @@ function saveLoraStates(){
     localStorage.setItem("kreaqwen_base_loras", JSON.stringify(baseLoras));
     localStorage.setItem("kreaqwen_refiner_loras", JSON.stringify(refinerLoras));
   } catch(e){}
+  if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
 }
 
 function renderLoraGroup(containerId, list, labelPrefix, onChange){
@@ -5058,6 +5067,280 @@ function snapshotJob(isBaseOnly = false){
     },
     createdAt: Date.now()
   };
+}
+
+// --- PERSISTENCIA DE SESIÓN (ajustes en localStorage) ---
+const KREAQWEN_SETTINGS_KEY = 'kreaqwen_settings_v1';
+let kreaQwenSaveTimer = null;
+
+function scheduleSaveKreaQwenSettings(){
+  clearTimeout(kreaQwenSaveTimer);
+  kreaQwenSaveTimer = setTimeout(saveKreaQwenSettings, 300);
+}
+
+function saveKreaQwenSettings(){
+  const s = {
+    prompt: $("prompt")?.value ?? "",
+    negPrompt: $("negPrompt")?.value ?? "",
+    comboMode: $("comboMode")?.value || "krea_qwen",
+    baseUnet: $("baseUnetSelect")?.value,
+    baseWeightDtype: $("baseWeightDtype")?.value || "auto",
+    baseClip: $("baseClipSelect")?.value,
+    baseVae: $("baseVaeSelect")?.value,
+    baseAttn: $("baseAttentionBackend")?.value || "none",
+    baseSteps: $("baseSteps")?.value || "8",
+    baseCfg: $("baseCfg")?.value || "1.0",
+    baseSampler: $("baseSamplerName")?.value || "euler",
+    baseScheduler: $("baseSchedulerName")?.value || "simple",
+    baseLoras: JSON.parse(JSON.stringify(baseLoras)),
+
+    refinerEnabled: $("refinerEnabled")?.checked ?? true,
+    refinerUnet: $("refinerUnetSelect")?.value,
+    refinerWeightDtype: $("refinerWeightDtype")?.value || "auto",
+    refinerClip: $("refinerClipSelect")?.value,
+    refinerVae: $("refinerVaeSelect")?.value,
+    refinerAttn: $("refinerAttentionBackend")?.value || "none",
+    refinerDenoise: $("refinerDenoise")?.value || "0.35",
+    refinerSteps: $("refinerSteps")?.value || "6",
+    refinerCfg: $("refinerCfg")?.value || "1.0",
+    refinerSampler: $("refinerSamplerName")?.value || "euler",
+    refinerScheduler: $("refinerSchedulerName")?.value || "simple",
+    refinerLoras: JSON.parse(JSON.stringify(refinerLoras)),
+
+    mp: $("mpSlider")?.value || "1.0",
+    aspectRatio: $("aspectRatio")?.value || "16:9 (Widescreen)",
+    upscaleEnabled: $("upscaleEnabled")?.checked ?? true,
+    upscaleFactor: $("upscaleFactor")?.value || "1.5",
+    upscaleModel: $("upscaleModelSelect")?.value,
+
+    seedMode: $("segSamplerRandom")?.classList.contains("on") ? "random" : "fixed",
+    seedValue: $("samplerSeed")?.value || "1062442950133633",
+
+    variancePreset: $("variancePreset")?.value || "❌ Disabled",
+    varianceFineTune: $("varianceFineTune")?.value || "100",
+    varianceDirection: $("varianceDirection")?.value || "🌎 Diversity",
+    varianceShiftStrength: $("varianceShiftStrength")?.value || "150",
+    varianceNoiseInjection: $("varianceNoiseInjection")?.value || "🚫 None",
+    varianceFadeCurve: $("varianceFadeCurve")?.value || "Instant",
+    protectMode: $("protectMode")?.value || "🚫 None",
+    varianceSeedMode: $("segVarianceRandom")?.classList.contains("on") ? "random" : "fixed",
+    varianceSeedValue: $("varianceSeed")?.value || "315489554057974",
+    eta: $("etaSlider")?.value || "0.5",
+
+    spectrumEnabled: !!$("spectrumEnabled")?.checked,
+    spectrumW: $("spectrumW")?.value || "0.3",
+    spectrumLam: $("spectrumLam")?.value || "0.1",
+
+    qwenEditEnabled: !!$("qwenEditEnabled")?.checked,
+    qwenEditStage: $("qwenEditStage")?.value || "refiner",
+    qwenEditPrompt: $("qwenEditPrompt")?.value || "",
+    qwenEditResolution: $("qwenEditResolution")?.value || "1024",
+
+    faceRefine: getFaceRefineState(),
+
+    evolveMode: $("evolveMode")?.value,
+    evolveStrength: $("evolveStrength")?.value,
+
+    // Post-fx
+    vigEnabled: !!$("vigEnabled")?.checked,
+    vigIntensity: $("vigIntensity")?.value || "1.0",
+    grainEnabled: !!$("grainEnabled")?.checked,
+    grainType: $("grainType")?.value || "Fine Simple",
+    grainPower: $("grainPower")?.value || "0.3",
+    grainSat: $("grainSat")?.value || "0.3",
+    grainGray: !!$("grainGray")?.checked,
+    radialEnabled: !!$("radialEnabled")?.checked,
+    radialStrength: $("radialStrength")?.value || "64",
+    lutEnabled: !!$("lutEnabled")?.checked,
+    lutName: $("lutName")?.value || "",
+    lutStrength: $("lutStrength")?.value || "0.8",
+    lutLog: !!$("lutLog")?.checked,
+
+    keepModelInRam: $("keepModelInRam")?.checked ?? true,
+    batchSize: $("batchSize")?.value || "1",
+    filenamePrefix: $("filenamePrefix")?.value || "kreaqwen/imagen",
+  };
+  try { localStorage.setItem(KREAQWEN_SETTINGS_KEY, JSON.stringify(s)); }
+  catch(e){ console.warn("Error guardando ajustes KreaQwen:", e); }
+}
+
+function restoreKreaQwenSettings(){
+  const raw = localStorage.getItem(KREAQWEN_SETTINGS_KEY);
+  if(!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    if(!s || typeof s !== "object") return false;
+
+    if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
+    if(s.negPrompt !== undefined && $("negPrompt")) $("negPrompt").value = s.negPrompt;
+    if(s.comboMode && $("comboMode")) $("comboMode").value = s.comboMode;
+
+    if(s.baseUnet && $("baseUnetSelect")) $("baseUnetSelect").value = s.baseUnet;
+    if(s.baseWeightDtype && $("baseWeightDtype")) $("baseWeightDtype").value = s.baseWeightDtype;
+    if(s.baseClip && $("baseClipSelect")) $("baseClipSelect").value = s.baseClip;
+    if(s.baseAttn && $("baseAttentionBackend")) $("baseAttentionBackend").value = s.baseAttn;
+    if(s.baseSteps !== undefined && $("baseSteps")) $("baseSteps").value = s.baseSteps;
+    if(s.baseCfg !== undefined && $("baseCfg")) $("baseCfg").value = s.baseCfg;
+    if(s.baseSampler && $("baseSamplerName")) $("baseSamplerName").value = s.baseSampler;
+    if(s.baseScheduler && $("baseSchedulerName")) $("baseSchedulerName").value = s.baseScheduler;
+
+    if(Array.isArray(s.baseLoras) && s.baseLoras.length){
+      s.baseLoras.forEach((l, i) => { if(i < baseLoras.length && l) baseLoras[i] = l; });
+      renderLoraGroup("baseLoraList", baseLoras, "LoRA Base", saveLoraStates);
+    }
+
+    if(s.refinerEnabled !== undefined && $("refinerEnabled")) $("refinerEnabled").checked = !!s.refinerEnabled;
+    if(s.refinerUnet && $("refinerUnetSelect")) $("refinerUnetSelect").value = s.refinerUnet;
+    if(s.refinerWeightDtype && $("refinerWeightDtype")) $("refinerWeightDtype").value = s.refinerWeightDtype;
+    if(s.refinerClip && $("refinerClipSelect")) $("refinerClipSelect").value = s.refinerClip;
+    if(s.refinerAttn && $("refinerAttentionBackend")) $("refinerAttentionBackend").value = s.refinerAttn;
+    if(s.refinerDenoise !== undefined && $("refinerDenoise")){
+      $("refinerDenoise").value = s.refinerDenoise;
+      if($("refinerDenoiseVal")) $("refinerDenoiseVal").textContent = parseFloat(s.refinerDenoise).toFixed(2);
+    }
+    if(s.refinerSteps !== undefined && $("refinerSteps")) $("refinerSteps").value = s.refinerSteps;
+    if(s.refinerCfg !== undefined && $("refinerCfg")) $("refinerCfg").value = s.refinerCfg;
+    if(s.refinerSampler && $("refinerSamplerName")) $("refinerSamplerName").value = s.refinerSampler;
+    if(s.refinerScheduler && $("refinerSchedulerName")) $("refinerSchedulerName").value = s.refinerScheduler;
+
+    // Actualizar selectores VAE según UNet restaurado y asignar VAEs
+    updateVaeSelectors();
+    if(s.baseVae && $("baseVaeSelect")) $("baseVaeSelect").value = s.baseVae;
+    if(s.refinerVae && $("refinerVaeSelect")) $("refinerVaeSelect").value = s.refinerVae;
+
+    if(Array.isArray(s.refinerLoras) && s.refinerLoras.length){
+      s.refinerLoras.forEach((l, i) => { if(i < refinerLoras.length && l) refinerLoras[i] = l; });
+      renderLoraGroup("refinerLoraList", refinerLoras, "LoRA Refiner", saveLoraStates);
+    }
+
+    if(s.mp !== undefined && $("mpSlider")){
+      $("mpSlider").value = s.mp;
+      if($("mpVal")) $("mpVal").textContent = parseFloat(s.mp).toFixed(2);
+    }
+    if(s.aspectRatio && $("aspectRatio")) $("aspectRatio").value = s.aspectRatio;
+    if(s.upscaleEnabled !== undefined && $("upscaleEnabled")) $("upscaleEnabled").checked = !!s.upscaleEnabled;
+    if(s.upscaleFactor !== undefined && $("upscaleFactor")){
+      $("upscaleFactor").value = s.upscaleFactor;
+      if($("upscaleFactorVal")) $("upscaleFactorVal").textContent = `${parseFloat(s.upscaleFactor).toFixed(2)}x`;
+    }
+    if(s.upscaleModel && $("upscaleModelSelect")) $("upscaleModelSelect").value = s.upscaleModel;
+
+    // Semillas
+    if(s.seedMode){
+      if(s.seedMode === "random"){
+        $("segSamplerRandom")?.classList.add("on");
+        $("segSamplerFixed")?.classList.remove("on");
+        if($("samplerSeed")) $("samplerSeed").disabled = true;
+      } else {
+        $("segSamplerFixed")?.classList.add("on");
+        $("segSamplerRandom")?.classList.remove("on");
+        if($("samplerSeed")) $("samplerSeed").disabled = false;
+      }
+    }
+    if(s.seedValue !== undefined && $("samplerSeed")) $("samplerSeed").value = s.seedValue;
+
+    // Varianza
+    if(s.variancePreset && $("variancePreset")) $("variancePreset").value = s.variancePreset;
+    if(s.varianceFineTune !== undefined && $("varianceFineTune")){
+      $("varianceFineTune").value = s.varianceFineTune;
+      if($("varianceFineTuneVal")) $("varianceFineTuneVal").textContent = s.varianceFineTune;
+    }
+    if(s.varianceDirection && $("varianceDirection")) $("varianceDirection").value = s.varianceDirection;
+    if(s.varianceShiftStrength !== undefined && $("varianceShiftStrength")){
+      $("varianceShiftStrength").value = s.varianceShiftStrength;
+      if($("varianceShiftStrengthVal")) $("varianceShiftStrengthVal").textContent = s.varianceShiftStrength;
+    }
+    if(s.varianceNoiseInjection && $("varianceNoiseInjection")) $("varianceNoiseInjection").value = s.varianceNoiseInjection;
+    if(s.varianceFadeCurve && $("varianceFadeCurve")) $("varianceFadeCurve").value = s.varianceFadeCurve;
+    if(s.protectMode && $("protectMode")) $("protectMode").value = s.protectMode;
+    if(s.varianceSeedMode){
+      if(s.varianceSeedMode === "random"){
+        $("segVarianceRandom")?.classList.add("on");
+        $("segVarianceFixed")?.classList.remove("on");
+        if($("varianceSeed")) $("varianceSeed").disabled = true;
+      } else {
+        $("segVarianceFixed")?.classList.add("on");
+        $("segVarianceRandom")?.classList.remove("on");
+        if($("varianceSeed")) $("varianceSeed").disabled = false;
+      }
+    }
+    if(s.varianceSeedValue !== undefined && $("varianceSeed")) $("varianceSeed").value = s.varianceSeedValue;
+    if(s.eta !== undefined && $("etaSlider")){
+      $("etaSlider").value = s.eta;
+      if($("etaVal")) $("etaVal").textContent = parseFloat(s.eta).toFixed(2);
+    }
+
+    // Spectrum
+    if(s.spectrumEnabled !== undefined && $("spectrumEnabled")) $("spectrumEnabled").checked = !!s.spectrumEnabled;
+    if(s.spectrumW !== undefined && $("spectrumW")){
+      $("spectrumW").value = s.spectrumW;
+      if($("spectrumWVal")) $("spectrumWVal").textContent = parseFloat(s.spectrumW).toFixed(2);
+    }
+    if(s.spectrumLam !== undefined && $("spectrumLam")){
+      $("spectrumLam").value = s.spectrumLam;
+      if($("spectrumLamVal")) $("spectrumLamVal").textContent = parseFloat(s.spectrumLam).toFixed(2);
+    }
+
+    // Qwen Edit
+    if(s.qwenEditEnabled !== undefined && $("qwenEditEnabled")) $("qwenEditEnabled").checked = !!s.qwenEditEnabled;
+    if(s.qwenEditStage && $("qwenEditStage")) $("qwenEditStage").value = s.qwenEditStage;
+    if(s.qwenEditPrompt !== undefined && $("qwenEditPrompt")) $("qwenEditPrompt").value = s.qwenEditPrompt;
+    if(s.qwenEditResolution !== undefined && $("qwenEditResolution")){
+      $("qwenEditResolution").value = s.qwenEditResolution;
+      if($("qwenEditResolutionVal")) $("qwenEditResolutionVal").textContent = s.qwenEditResolution;
+    }
+
+    // FaceRefine
+    if(s.faceRefine){
+      setFaceRefineUI(s.faceRefine);
+      saveFaceRefine(s.faceRefine);
+    }
+
+    if(s.evolveMode && $("evolveMode")) $("evolveMode").value = s.evolveMode;
+    if(s.evolveStrength !== undefined && $("evolveStrength")){
+      $("evolveStrength").value = s.evolveStrength;
+      if($("evolveStrengthVal")) $("evolveStrengthVal").textContent = `${s.evolveStrength}%`;
+    }
+
+    // Post-fx
+    if(s.vigEnabled !== undefined && $("vigEnabled")) $("vigEnabled").checked = !!s.vigEnabled;
+    if(s.vigIntensity !== undefined && $("vigIntensity")){
+      $("vigIntensity").value = s.vigIntensity;
+      if($("vigVal")) $("vigVal").textContent = parseFloat(s.vigIntensity).toFixed(2);
+    }
+    if(s.grainEnabled !== undefined && $("grainEnabled")) $("grainEnabled").checked = !!s.grainEnabled;
+    if(s.grainType && $("grainType")) $("grainType").value = s.grainType;
+    if(s.grainPower !== undefined && $("grainPower")){
+      $("grainPower").value = s.grainPower;
+      if($("grainVal")) $("grainVal").textContent = parseFloat(s.grainPower).toFixed(2);
+    }
+    if(s.grainSat !== undefined && $("grainSat")) $("grainSat").value = s.grainSat;
+    if(s.grainGray !== undefined && $("grainGray")) $("grainGray").checked = !!s.grainGray;
+    if(s.radialEnabled !== undefined && $("radialEnabled")) $("radialEnabled").checked = !!s.radialEnabled;
+    if(s.radialStrength !== undefined && $("radialStrength")){
+      $("radialStrength").value = s.radialStrength;
+      if($("radialVal")) $("radialVal").textContent = s.radialStrength;
+    }
+    if(s.lutEnabled !== undefined && $("lutEnabled")) $("lutEnabled").checked = !!s.lutEnabled;
+    if(s.lutName && $("lutName")) $("lutName").value = s.lutName;
+    if(s.lutStrength !== undefined && $("lutStrength")){
+      $("lutStrength").value = s.lutStrength;
+      if($("lutVal")) $("lutVal").textContent = parseFloat(s.lutStrength).toFixed(2);
+    }
+    if(s.lutLog !== undefined && $("lutLog")) $("lutLog").checked = !!s.lutLog;
+
+    // Varios
+    if(s.keepModelInRam !== undefined && $("keepModelInRam")) $("keepModelInRam").checked = !!s.keepModelInRam;
+    if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
+    if(s.filenamePrefix !== undefined && $("filenamePrefix")) $("filenamePrefix").value = s.filenamePrefix;
+
+    updateDimensionHints();
+    ["baseSteps","baseCfg","baseSamplerName","baseSchedulerName","refinerSteps","refinerCfg","refinerSamplerName","refinerSchedulerName","refinerDenoise"].forEach(id => markTouched(id));
+    return true;
+  } catch(e){
+    console.warn("Error restaurando ajustes KreaQwen:", e);
+    return false;
+  }
 }
 
 // --- EDICIÓN CON QWEN 2.1 (nodos en el grafo) ---
@@ -5770,20 +6053,65 @@ CONFIG.renderVariantMedia = function(card, url, media){
   return `<img src="${escapeHtml(url)}">`;
 };
 
-// Visor a pantalla completa para una variante, SIN cargarla en el visor principal.
-// Crea un overlay propio con zoom/pan (rueda + arrastre) y cierra con Esc/click.
+// Estado y navegación de variantes (teclado / pantalla completa)
+let currentVariantIndex = -1;
 let _variantFsOverlay = null;
 let _variantFsCleanup = null;
+let _variantFsIndex = -1;
 
-function openVariantFullscreen(url){
-  if(!url) return;
+function getVariantCards(){
+  const grid = $("variantGrid");
+  if(!grid) return [];
+  return Array.from(grid.querySelectorAll(".variant-card"));
+}
+
+function selectVariantByIndex(idx){
+  const cards = getVariantCards();
+  if(!cards.length) return null;
+  if(idx < 0) idx = cards.length - 1;
+  if(idx >= cards.length) idx = 0;
+  currentVariantIndex = idx;
+  const card = cards[idx];
+  const url = `${server()}/view?filename=${encodeURIComponent(card.dataset.filename)}&subfolder=${encodeURIComponent(card.dataset.subfolder || "")}&type=${encodeURIComponent(card.dataset.type || "output")}`;
+  const mediaData = { filename: card.dataset.filename, subfolder: card.dataset.subfolder || "", type: card.dataset.type || "output" };
+  currentFinalMedia = { media: mediaData, ...mediaData, url };
+  showImageView("final");
+  return { card, url, index: idx, total: cards.length };
+}
+
+function navigateVariant(dir){
+  const cards = getVariantCards();
+  if(!cards.length) return null;
+  if(currentVariantIndex < 0) currentVariantIndex = 0;
+  return selectVariantByIndex(currentVariantIndex + dir);
+}
+
+// Visor a pantalla completa para una variante con navegación por flechas de teclado / swipe
+function openVariantFullscreen(target){
   closeVariantFullscreen();
+
+  const cards = getVariantCards();
+  let initialUrl = "";
+  if(typeof target === "number"){
+    _variantFsIndex = target;
+  } else if(target && target.nodeType === 1 && target.classList.contains("variant-card")){
+    _variantFsIndex = cards.indexOf(target);
+  } else if(typeof target === "string"){
+    initialUrl = target;
+    _variantFsIndex = cards.findIndex(c => {
+      const cUrl = `${server()}/view?filename=${encodeURIComponent(c.dataset.filename)}&subfolder=${encodeURIComponent(c.dataset.subfolder || "")}&type=${encodeURIComponent(c.dataset.type || "output")}`;
+      return cUrl === target || (c.dataset.filename && target.includes(encodeURIComponent(c.dataset.filename)));
+    });
+  }
+  if(_variantFsIndex < 0){
+    if(cards.length > 0) _variantFsIndex = 0;
+    else if(!initialUrl) return;
+  }
 
   const overlay = document.createElement("div");
   overlay.className = "variant-fs-overlay";
 
   const img = document.createElement("img");
-  img.src = url;
   img.draggable = false;
 
   const closeBtn = document.createElement("button");
@@ -5793,18 +6121,67 @@ function openVariantFullscreen(url){
 
   const dl = document.createElement("a");
   dl.className = "variant-fs-dl";
-  dl.href = url; dl.download = ""; dl.textContent = "⬇ Descargar";
+  dl.download = "";
+  dl.textContent = "⬇ Descargar";
   dl.title = "Descargar";
+
+  const prevBtn = document.createElement("button");
+  prevBtn.className = "variant-fs-prev";
+  prevBtn.textContent = "‹";
+  prevBtn.title = "Anterior (Flecha izquierda)";
+
+  const nextBtn = document.createElement("button");
+  nextBtn.className = "variant-fs-next";
+  nextBtn.textContent = "›";
+  nextBtn.title = "Siguiente (Flecha derecha)";
+
+  const counter = document.createElement("div");
+  counter.className = "variant-fs-counter";
 
   overlay.appendChild(img);
   overlay.appendChild(closeBtn);
   overlay.appendChild(dl);
+  overlay.appendChild(prevBtn);
+  overlay.appendChild(nextBtn);
+  overlay.appendChild(counter);
   document.body.appendChild(overlay);
   _variantFsOverlay = overlay;
 
-  // Zoom/pan local (sin tocar el visor principal).
+  // Zoom/pan local (sin tocar el visor principal)
   let zoom = 1, panX = 0, panY = 0, dragging = false, sx = 0, sy = 0, spx = 0, spy = 0;
   const apply = () => { img.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`; };
+
+  function renderFsImage(idx){
+    const currentCards = getVariantCards();
+    if(currentCards.length > 0){
+      if(idx < 0) idx = currentCards.length - 1;
+      if(idx >= currentCards.length) idx = 0;
+      _variantFsIndex = idx;
+      currentVariantIndex = idx;
+      const c = currentCards[idx];
+      const fn = c.dataset.filename || "";
+      const sf = c.dataset.subfolder || "";
+      const tp = c.dataset.type || "output";
+      const u = `${server()}/view?filename=${encodeURIComponent(fn)}&subfolder=${encodeURIComponent(sf)}&type=${encodeURIComponent(tp)}`;
+      img.src = u;
+      dl.href = u;
+      dl.download = `kreaqwen_${fn || 'variante.png'}`;
+      counter.textContent = `${idx + 1} / ${currentCards.length}`;
+      prevBtn.style.display = currentCards.length > 1 ? "flex" : "none";
+      nextBtn.style.display = currentCards.length > 1 ? "flex" : "none";
+      counter.style.display = currentCards.length > 1 ? "block" : "none";
+    } else if(initialUrl){
+      img.src = initialUrl;
+      dl.href = initialUrl;
+      prevBtn.style.display = "none";
+      nextBtn.style.display = "none";
+      counter.style.display = "none";
+    }
+    zoom = 1; panX = 0; panY = 0;
+    apply();
+  }
+
+  renderFsImage(_variantFsIndex >= 0 ? _variantFsIndex : 0);
 
   const onWheel = (e) => {
     e.preventDefault();
@@ -5836,16 +6213,52 @@ function openVariantFullscreen(url){
     dragging = false;
     overlay.classList.remove("dragging");
   };
-  const onKey = (e) => { if(e.key === "Escape") closeVariantFullscreen(); };
+  const onKey = (e) => {
+    if(e.key === "Escape"){
+      closeVariantFullscreen();
+    } else if(e.key === "ArrowLeft"){
+      e.preventDefault();
+      renderFsImage(_variantFsIndex - 1);
+    } else if(e.key === "ArrowRight"){
+      e.preventDefault();
+      renderFsImage(_variantFsIndex + 1);
+    }
+  };
   const onClick = (e) => { if(e.target === overlay) closeVariantFullscreen(); };
   const onClose = (e) => { e.stopPropagation(); closeVariantFullscreen(); };
+  const onPrev = (e) => { e.stopPropagation(); renderFsImage(_variantFsIndex - 1); };
+  const onNext = (e) => { e.stopPropagation(); renderFsImage(_variantFsIndex + 1); };
+
+  // Touch swipe en móvil dentro del overlay
+  let tStartX = 0, tStartY = 0, tStartT = 0;
+  const onTouchStart = (e) => {
+    if(e.touches.length === 1){
+      tStartX = e.touches[0].clientX;
+      tStartY = e.touches[0].clientY;
+      tStartT = Date.now();
+    }
+  };
+  const onTouchEnd = (e) => {
+    if(e.changedTouches.length === 1 && zoom <= 1){
+      const dx = e.changedTouches[0].clientX - tStartX;
+      const dy = e.changedTouches[0].clientY - tStartY;
+      const dt = Date.now() - tStartT;
+      if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 800){
+        renderFsImage(_variantFsIndex + (dx < 0 ? 1 : -1));
+      }
+    }
+  };
 
   overlay.addEventListener("wheel", onWheel, { passive: false });
   overlay.addEventListener("mousedown", onDown);
   overlay.addEventListener("click", onClick);
   closeBtn.addEventListener("click", onClose);
+  prevBtn.addEventListener("click", onPrev);
+  nextBtn.addEventListener("click", onNext);
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);
+  overlay.addEventListener("touchstart", onTouchStart, { passive: true });
+  overlay.addEventListener("touchend", onTouchEnd, { passive: true });
   document.addEventListener("keydown", onKey);
 
   _variantFsCleanup = () => {
@@ -5853,8 +6266,12 @@ function openVariantFullscreen(url){
     overlay.removeEventListener("mousedown", onDown);
     overlay.removeEventListener("click", onClick);
     closeBtn.removeEventListener("click", onClose);
+    prevBtn.removeEventListener("click", onPrev);
+    nextBtn.removeEventListener("click", onNext);
     window.removeEventListener("mousemove", onMove);
     window.removeEventListener("mouseup", onUp);
+    overlay.removeEventListener("touchstart", onTouchStart);
+    overlay.removeEventListener("touchend", onTouchEnd);
     document.removeEventListener("keydown", onKey);
   };
 }
@@ -5886,7 +6303,7 @@ function addToVariantGallery(media, seedValue, timeText) {
     fs.style.cssText = "background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;";
     fs.addEventListener("click", (e) => {
       e.stopPropagation();
-      openVariantFullscreen(url);
+      openVariantFullscreen(card);
     });
     icons.insertBefore(fs, icons.firstChild);
 
@@ -5948,10 +6365,12 @@ function addToVariantGallery(media, seedValue, timeText) {
   }
 
   card.addEventListener("click", (e) => {
-    if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
+    if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn") || e.target.closest(".variant-fs-btn")) return;
     // Incluir la clave "media": sendOutputToExternalUI exige mediaObj.media.filename.
     const mediaData = { filename: card.dataset.filename, subfolder: card.dataset.subfolder || "", type: card.dataset.type || "output" };
     currentFinalMedia = { media: mediaData, ...mediaData, url };
+    const cards = getVariantCards();
+    currentVariantIndex = cards.indexOf(card);
     showImageView("final");
   });
 
@@ -6594,6 +7013,7 @@ function applyKreaQwenWorkflow(workflow){
   });
   if(typeof updateQwenEditRefStatus === "function") updateQwenEditRefStatus();
   if(typeof updateDimensionHints === "function") updateDimensionHints();
+  if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
 
   log(`📋 Parámetros restaurados de metadatos (${applied.join(", ")}).`, "l-ok");
 }
@@ -6669,6 +7089,7 @@ async function startJob(job){
 }
 
 function enqueueGeneration(isBaseOnly = false){
+  if(typeof saveKreaQwenSettings === "function") saveKreaQwenSettings();
   const job = snapshotJob(isBaseOnly);
   if(activeJob){
     jobQueue.push(job);
@@ -7095,19 +7516,24 @@ function initQwenEditListeners(){
 
 // --- REFINADO FACIAL: listeners de UI ---
 function initFaceRefineListeners(){
-  const persist = () => saveFaceRefine(getFaceRefineState());
+  const persist = () => {
+    saveFaceRefine(getFaceRefineState());
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  };
 
   $("segFaceRefineOn")?.addEventListener("click", () => {
     const s = getFaceRefineState();
     s.enabled = true;
     setFaceRefineUI(s);
     saveFaceRefine(s);
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
   });
   $("segFaceRefineOff")?.addEventListener("click", () => {
     const s = getFaceRefineState();
     s.enabled = false;
     setFaceRefineUI(s);
     saveFaceRefine(s);
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
   });
   $("faceRefineStepsSlider")?.addEventListener("input", (e) => {
     const st = parseInt(e.target.value, 10) || 10;
@@ -7136,14 +7562,18 @@ function initKreaQwenUI() {
   populateModelSelects();
   updateDimensionHints();
 
-  // Aplica el perfil del modo inicial (p.ej. krea_qwen -> refiner Qwen con 20 steps).
-  resetTouched();
-  applyComboMode($("comboMode")?.value || "krea_qwen");
-
   // Carga y renderizado de LoRAs (Base y Refiner)
   loadLoraStates();
   renderLoraGroup("baseLoraList", baseLoras, "LoRA Base", saveLoraStates);
   renderLoraGroup("refinerLoraList", refinerLoras, "LoRA Refiner", saveLoraStates);
+
+  // Restaurar ajustes completos de sesión si existen en localStorage; si no, aplicar modo inicial por defecto
+  const restored = restoreKreaQwenSettings();
+  if(!restored){
+    resetTouched();
+    applyComboMode($("comboMode")?.value || "krea_qwen");
+    setFaceRefineUI(loadFaceRefine());
+  }
 
   // Activación de paneles desplegables (collapsible)
   if(typeof makeCollapsible === "function"){
@@ -7160,6 +7590,23 @@ function initKreaQwenUI() {
 
   window.outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
   window.refZoom = setupZoomPan("refWrap", "refImg", "btnResetZoomRef", "btnFullscreenRef");
+
+  // Navegación de variantes en pantalla completa del visor principal con flechas del teclado
+  document.addEventListener("keydown", (e) => {
+    if(_variantFsOverlay) return; // Si el modal de variantes está abierto, él gestiona sus teclas
+    if(!window.outputZoom?.isFullscreen() && !window.refZoom?.isFullscreen()) return;
+    if(e.key === "ArrowLeft"){
+      e.preventDefault();
+      navigateVariant(-1);
+    } else if(e.key === "ArrowRight"){
+      e.preventDefault();
+      navigateVariant(1);
+    }
+  });
+
+  // Swipe táctil en móvil para cambiar de variante en el visor principal
+  window.outputZoom?.onSwipe?.((dir) => navigateVariant(dir));
+  window.refZoom?.onSwipe?.((dir) => navigateVariant(dir));
 
   // Dropzone de referencia
   const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef"), wrap = $("refWrap");
@@ -7251,11 +7698,13 @@ function initKreaQwenUI() {
     $("segSamplerRandom")?.classList.add("on");
     $("segSamplerFixed")?.classList.remove("on");
     if($("samplerSeed")) $("samplerSeed").disabled = true;
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
   });
   $("segSamplerFixed")?.addEventListener("click", () => {
     $("segSamplerFixed")?.classList.add("on");
     $("segSamplerRandom")?.classList.remove("on");
     if($("samplerSeed")) $("samplerSeed").disabled = false;
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
   });
 
   // Semilla de Varianza (Krea2)
@@ -7263,11 +7712,13 @@ function initKreaQwenUI() {
     $("segVarianceRandom")?.classList.add("on");
     $("segVarianceFixed")?.classList.remove("on");
     if($("varianceSeed")) $("varianceSeed").disabled = true;
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
   });
   $("segVarianceFixed")?.addEventListener("click", () => {
     $("segVarianceFixed")?.classList.add("on");
     $("segVarianceRandom")?.classList.remove("on");
     if($("varianceSeed")) $("varianceSeed").disabled = false;
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
   });
 
   // Controles de varianza RBG
@@ -7286,6 +7737,15 @@ function initKreaQwenUI() {
 
   $("btnClearNegPrompt")?.addEventListener("click", () => {
     if($("negPrompt")) $("negPrompt").value = "";
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+
+  // Persistencia reactiva continua en localStorage para cualquier cambio en controles
+  document.addEventListener("input", () => {
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+  document.addEventListener("change", () => {
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
   });
 
   // Historial de imágenes
@@ -7298,16 +7758,33 @@ function initKreaQwenUI() {
     log("Cola de trabajos vaciada.", "l-info");
   });
 
+  $("btnOffloadVram")?.addEventListener("click", async () => {
+    const btn = $("btnOffloadVram");
+    const prevText = btn?.textContent;
+    if(btn){ btn.disabled = true; btn.textContent = "Descargando..."; }
+    try {
+      const r = await postBackend("/free", { unload_models: true, free_memory: false });
+      if(!r.ok){
+        throw new Error(`HTTP ${r.status}`);
+      }
+      log("⚡ VRAM liberada: modelos descargados a RAM (conservados en memoria para generar sin leer del disco).", "l-ok");
+    } catch(e){
+      log("Error descargando VRAM: " + e.message, "l-err");
+    } finally {
+      if(btn){ btn.disabled = false; btn.textContent = prevText; }
+    }
+  });
+
   $("btnFreeMemory")?.addEventListener("click", async () => {
     const btn = $("btnFreeMemory");
     const prevText = btn?.textContent;
-    if(btn){ btn.disabled = true; btn.textContent = "Liberando..."; }
+    if(btn){ btn.disabled = true; btn.textContent = "Purgando..."; }
     try {
       const r = await postBackend("/free", { unload_models: true, free_memory: true });
       if(!r.ok){
         throw new Error(`HTTP ${r.status}`);
       }
-      log("Memoria VRAM y modelos liberados en ComfyUI.", "l-ok");
+      log("Memoria VRAM y caché de RAM purgados por completo en ComfyUI.", "l-ok");
     } catch(e){
       log("Error liberando memoria: " + e.message, "l-err");
     } finally {
