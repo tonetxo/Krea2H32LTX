@@ -1234,6 +1234,19 @@ function restoreKreaQwenSettings(){
   }
 }
 
+// La caché de prefijo de Qwen-Image 2.1 en ComfyUI peta con CFG>1 (positivo y negativo crean
+// slots de tamaño distinto y PoseBranchCache.select usa list.remove → compara tensores).
+// "off" recalcula el prefijo en cada paso: algo más lento, pero estable.
+function appendQwenCacheOff(g, stage, modelRef){
+  const id = `qwen21_cache_${stage}`;
+  g[id] = {
+    class_type: "QwenImage21Cache",
+    inputs: { model: modelRef, device: "off", dtype: "default" },
+    _meta: { title: `Qwen 2.1 Cache OFF (${stage})` }
+  };
+  return [id, 0];
+}
+
 // --- EDICIÓN CON QWEN 2.1 (nodos en el grafo) ---
 // Añade el encoder de edición y carga las referencias base64. Devuelve las
 // referencias de conditioning/latent a usar en la etapa, o null si no aplica.
@@ -1259,7 +1272,7 @@ function appendQwenEditStage(g, stage, opts){
   const inputs = {
     clip: opts.clipRef,
     prompt: qe.prompt || opts.prompt || "",
-    negative_prompt: "",
+    negative_prompt: opts.negative || "",
     resolution: qe.resolution,
     vae: opts.vaeRef,
   };
@@ -1546,6 +1559,10 @@ function buildGraph(job){
     curBaseModel = ["swarm_spectrum_base", 0];
   }
 
+  if(isQwenBase && Number(j.baseCfg) > 1){
+    curBaseModel = appendQwenCacheOff(g, "base", curBaseModel);
+  }
+
   g[N.SAMPLER_BASE].inputs.model = curBaseModel;
 
   // CLIP Base
@@ -1706,6 +1723,10 @@ function buildGraph(job){
       _meta: { title: "SwarmSpectrum (Refiner)" }
     };
     curRefinerModel = ["swarm_spectrum_refiner", 0];
+  }
+
+  if(isQwenRefiner && Number(j.refinerCfg) > 1){
+    curRefinerModel = appendQwenCacheOff(g, "refiner", curRefinerModel);
   }
 
   g[N.SAMPLER_REFINER].inputs.model = curRefinerModel;
