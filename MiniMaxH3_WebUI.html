@@ -101,6 +101,8 @@ button:hover{filter:brightness(1.08);}button:disabled{opacity:.4;cursor:not-allo
 .variant-icons{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;}
 .variant-del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
 .variant-del-btn:hover{color:var(--danger);background:rgba(255,106,106,.12);}
+.variant-upscale-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;line-height:1;padding:0 2px;border-radius:3px;transition:color .15s,background .15s;display:inline-flex;align-items:center;justify-content:center;min-width:14px;}
+.variant-upscale-btn:hover{color:var(--accent);background:rgba(59,130,246,.15);}
 .variant-seed-display{color:var(--accent);cursor:pointer;user-select:text;display:flex;align-items:center;gap:6px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .variant-seed-display:hover{color:#fff;}
 .copy-icon{font-size:12px;opacity:.7;transition:opacity .2s;}
@@ -995,6 +997,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           <div class="vid-actions">
             <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
             <button class="vid-action-btn" id="btnSaveFrame1" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
+            <button class="vid-action-btn" id="btnUpscale1" title="Realizar Latent Upscale (2º pase) de este clip" style="display:none;" type="button">🔍 Upscale Latente</button>
             <button class="vid-action-btn" id="btnFaceRefine1" title="Refinar los rostros del clip actual con H3 FaceRefine" style="display:none;" type="button">😊 Refinar rostro</button>
             <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
@@ -3823,6 +3826,7 @@ const CONFIG = {
     NOISE:"129", DURATION:"132", MATH:"131",
     SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
     SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
+    DECODE_VIDEO_1:"420", DECODE_AUDIO_1:"421", CREATE_VIDEO_1:"422", FIRST_SAVE:"423",
     AV_SPLIT:"400", AV_CONCAT:"401", UNET2:"402", ATTN2:"403", LORA_TURBO2:"404",
     SIGMA_SHIFT2:"405", PREVIEW2:"406", SIGMAS2:"407", GUIDER2:"408", SAMPLER2:"409",
     MEM_OPT2:"411", SPARSE_ATTN2:"412", AIMDO2:"413", SOL_H3_2:"414",
@@ -3961,6 +3965,7 @@ let localFirstFile=null, localLastFile=null;
 let seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
+let currentMediaSeed = {};
 // prompt_id que produjo el resultado mostrado en cada reproductor. Sirve para
 // el guard de onPreview: solo se ignoran frames tardíos si el reproductor ya
 // muestra el resultado del MISMO prompt en curso. Anclar al prompt_id (y no al
@@ -5432,18 +5437,41 @@ CONFIG.variantMeta = function(seedValue, timeText){
 };
 CONFIG.onSeedUpdate = updateSeedUI;
 CONFIG.onNodeExecuted = function(data){
-  // Un solo save node; no hay lógica de pasos. Mostramos en cuanto llega.
   if(!data || !data.node || !data.prompt_id) return;
   const pid = data.prompt_id;
   if(!(pid in pendingSeeds)) return;
+
+  // FIRST_SAVE (nodo 423): El 1er pase está listo. Lo mostramos y guardamos en la galería.
+  if(data.node === N.FIRST_SAVE && data.output){
+    const media = CONFIG.findMedia(data.output);
+    if(media){
+      if(!displayedSlots[pid]) displayedSlots[pid] = new Set();
+      const isFirstLive = !displayedSlots[pid].has(1);
+      let firstElapsedStr = "";
+      if(isFirstLive){
+        displayedSlots[pid].add(1);
+        const t = timers[pid];
+        if(t){
+          const elapsed = Date.now() - t.start;
+          firstElapsedStr = fmtMs(elapsed);
+          const el1 = $("time1");
+          if(el1){ el1.textContent = `⏱ 1er ${firstElapsedStr}`; el1.classList.remove("live"); }
+        }
+        log(`✅ 1er pase listo (guardado en variantes; procesando 2º pase de refinado)...`, "l-ok");
+      }
+      displayVariantMedia(media, 1, pid, firstElapsedStr, { allowShow: isFirstLive, badgePrefix: "1er pase" });
+    }
+  }
+
+  // SAVE (nodo 92): Vídeo final (pase 2 tras upscale o pase único sin upscale).
   if(data.node === N.SAVE && data.output){
     const media = CONFIG.findMedia(data.output);
     if(media){
       if(!displayedSlots[pid]) displayedSlots[pid] = new Set();
-      const isLive = !displayedSlots[pid].has(1);
+      const isFinalLive = !displayedSlots[pid].has(2);
       let elapsedStr = "";
-      if(isLive){
-        displayedSlots[pid].add(1);
+      if(isFinalLive){
+        displayedSlots[pid].add(2);
         const t = timers[pid];
         if(t){
           const elapsed = Date.now() - t.start;
@@ -5451,10 +5479,12 @@ CONFIG.onNodeExecuted = function(data){
           const el1 = $("time1");
           if(el1){ el1.textContent = `⏱ ${elapsedStr}`; el1.classList.remove("live"); }
         }
-        log(`✅ Vídeo listo.`, "l-ok");
+        log(`✅ Vídeo final listo.`, "l-ok");
       }
-      displayVariantMedia(media, 1, pid, elapsedStr, { allowShow: isLive });
-      if(isLive){
+      const hadFirstPass = displayedSlots[pid] && displayedSlots[pid].has(1);
+      const slotNum = hadFirstPass ? 2 : 1;
+      displayVariantMedia(media, slotNum, pid, elapsedStr, { allowShow: true, badgePrefix: hadFirstPass ? "final" : null });
+      if(isFinalLive){
         // Resultado cargado en el reproductor: fuera el preview congelado.
         const pv1 = $("previewVideo1"), p1 = $("previewImg1");
         const w1 = $("previewWrap1"), b1 = $("previewStep1"), e1 = $("empty1");
@@ -5580,25 +5610,37 @@ CONFIG.onStopAll = function(){
   batchSeedMode = "random";
 };
 
-// --- displayResult: un solo save node ---
-// Delegamos el control de batches a common.js (processNextBatch/onBatchComplete).
-// Solo mostramos el resultado y devolvemos false para que common.js avance el batch.
+// --- displayResult: soporte para 1er pase y vídeo final ---
 CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings){
-  const media = entry.outputs[N.SAVE] ? CONFIG.findMedia(entry.outputs[N.SAVE]) : null;
+  const media1 = entry.outputs[N.FIRST_SAVE] ? CONFIG.findMedia(entry.outputs[N.FIRST_SAVE]) : null;
+  const media2 = entry.outputs[N.SAVE] ? CONFIG.findMedia(entry.outputs[N.SAVE]) : null;
   const t1 = timings && timings.t1;
+  const t2 = timings && timings.t2;
 
   if(!displayedSlots[promptId]) displayedSlots[promptId] = new Set();
-  const already = displayedSlots[promptId].has(1);
 
-  if(media){
-    if(!already){
+  if(media1){
+    const already1 = displayedSlots[promptId].has(1);
+    if(!already1){
       displayedSlots[promptId].add(1);
-      displayVariantMedia(media, 1, promptId, t1 || tTotal || "", { allowShow: true });
-    } else if(t1 || tTotal){
-      displayVariantMedia(media, 1, promptId, t1 || tTotal || "", { allowShow: false });
+      displayVariantMedia(media1, 1, promptId, t1 || "", { allowShow: !media2, badgePrefix: "1er pase" });
+    } else if(t1){
+      displayVariantMedia(media1, 1, promptId, t1, { allowShow: false, badgePrefix: "1er pase" });
+    }
+  }
+
+  if(media2){
+    const hadFirst = !!media1 || displayedSlots[promptId].has(1);
+    const slot2 = hadFirst ? 2 : 1;
+    const already2 = displayedSlots[promptId].has(slot2);
+    if(!already2){
+      displayedSlots[promptId].add(slot2);
+      displayVariantMedia(media2, slot2, promptId, t2 || tTotal || "", { allowShow: true, badgePrefix: hadFirst ? "final" : null });
+    } else if(t2 || tTotal){
+      displayVariantMedia(media2, slot2, promptId, t2 || tTotal, { allowShow: false, badgePrefix: hadFirst ? "final" : null });
     }
     const el = $("time1");
-    if(el){ el.textContent = `⏱ ${t1 || tTotal || "—"}`; el.classList.remove("live"); }
+    if(el){ el.textContent = `⏱ ${t2 || tTotal || "—"}`; el.classList.remove("live"); }
   }
 
   delete pendingSeeds[promptId];
@@ -5611,23 +5653,25 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
   return false;
 };
 
-function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true } = {}){
+function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true, badgePrefix = null } = {}){
   if(!media || !media.filename) return;
   const varIndex = promptVariantMap[promptId] != null
     ? promptVariantMap[promptId]
     : (activeJob?.currentVariantIndex != null ? activeJob.currentVariantIndex : (variantCounter + 1));
   const key = `${media.filename}|${media.subfolder || ""}|${slot}`;
   const isNewGallery = !displayedGalleryFiles.has(key);
+  const typeShort = badgePrefix || (slot === 1 ? (activeJob?.latentUpscale?.enabled ? "1er pase" : "final") : "final");
 
   if(allowShow){
     const badgeText = activeJob?.isFaceRefineOnly
       ? "FaceRefined"
-      : (activeJob?.faceRefine?.enabled ? `Var ${varIndex} · FaceRefined` : `Var ${varIndex}`);
-    showVideo(slot, media, { variantIndex: varIndex, badge: badgeText, promptId });
+      : (activeJob?.faceRefine?.enabled ? `Var ${varIndex} · FaceRefined` : `Var ${varIndex} · ${typeShort}`);
+    const seedVal = pendingSeeds[promptId] ?? null;
+    showVideo(1, media, { variantIndex: varIndex, badge: badgeText, promptId, seed: seedVal });
   }
   if(isNewGallery){
     displayedGalleryFiles.add(key);
-    addToVariantGallery(media, pendingSeeds[promptId] ?? null, timeText || "", slot, varIndex);
+    addToVariantGallery(media, pendingSeeds[promptId] ?? null, timeText || "", slot, varIndex, typeShort);
   } else if(timeText){
     const cards = document.querySelectorAll(`.variant-card[data-slot="${slot}"]`);
     for(const card of cards){
@@ -7869,6 +7913,10 @@ function buildGraph(job){
     delete g[N.SPARSE_ATTN2];
     delete g[N.AIMDO2];
     delete g[N.SOL_H3_2];
+    delete g[N.DECODE_VIDEO_1];
+    delete g[N.DECODE_AUDIO_1];
+    delete g[N.CREATE_VIDEO_1];
+    delete g[N.FIRST_SAVE];
     delete g[N.DECODE_VIDEO];
     delete g[N.DECODE_AUDIO];
     delete g[N.AUDIO_FIRST];
@@ -8193,7 +8241,7 @@ function buildGraph(job){
         _meta: { title: "Sampler Pase 2 (Refinado Hires-Fix)" }
       };
 
-      // 8. Salidas directas hacia decoders
+      // 8. Salidas directas hacia decoders (Pase 2)
       if(g[N.DECODE_VIDEO] && g[N.DECODE_VIDEO].inputs){
         g[N.DECODE_VIDEO].inputs.samples = [N.SAMPLER2, 0];
       }
@@ -8201,8 +8249,52 @@ function buildGraph(job){
         g[N.DECODE_AUDIO].inputs.samples = [N.SAMPLER2, 0];
       }
 
+      // 8b. Decodificación y guardado del 1er pase (resolución base) en la galería
+      g[N.DECODE_VIDEO_1] = {
+        class_type: "VAEDecode",
+        inputs: {
+          samples: [N.SAMPLER, 0],
+          vae: [N.VAE_VIDEO, 0]
+        },
+        _meta: { title: "VAE Decode Video (Pass 1)" }
+      };
+      g[N.DECODE_AUDIO_1] = {
+        class_type: "VAEDecodeAudio",
+        inputs: {
+          samples: [N.SAMPLER, 0],
+          vae: [N.VAE_AUDIO, 0]
+        },
+        _meta: { title: "VAE Decode Audio (Pass 1)" }
+      };
+      g[N.CREATE_VIDEO_1] = {
+        class_type: "CreateVideo",
+        inputs: {
+          fps: 24,
+          bit_depth: bitDepth,
+          color_space: "sRGB",
+          images: [N.DECODE_VIDEO_1, 0],
+          audio: [N.DECODE_AUDIO_1, 0]
+        },
+        _meta: { title: "Create Video Pass 1" }
+      };
+      g[N.FIRST_SAVE] = {
+        class_type: "SaveVideo",
+        inputs: {
+          filename_prefix: prefix + "_pass1",
+          format: "auto",
+          "format.codec": "auto",
+          codec: "auto",
+          video: [N.CREATE_VIDEO_1, 0]
+        },
+        _meta: { title: "Save Video Pass 1" }
+      };
+
     } else {
       // Latent upscale sin 2º pase (decodificación directa de latente interpolado)
+      delete g[N.DECODE_VIDEO_1];
+      delete g[N.DECODE_AUDIO_1];
+      delete g[N.CREATE_VIDEO_1];
+      delete g[N.FIRST_SAVE];
       delete g[N.AV_SPLIT];
       delete g[N.AV_CONCAT];
       delete g[N.UNET2];
@@ -8228,6 +8320,10 @@ function buildGraph(job){
 
   } else {
     // Latent upscale desactivado por completo
+    delete g[N.DECODE_VIDEO_1];
+    delete g[N.DECODE_AUDIO_1];
+    delete g[N.CREATE_VIDEO_1];
+    delete g[N.FIRST_SAVE];
     delete g[N.LATENT_UPSCALE];
     delete g[N.AV_SPLIT];
     delete g[N.AV_CONCAT];
@@ -8499,6 +8595,7 @@ function showVideo(slot, media, options={}){
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
   const frBtn = $("btnFaceRefine"+slot);
+  const upBtn = $("btnUpscale"+slot);
   const prev=$("previewImg"+slot), wrap=$("previewWrap"+slot), step=$("previewStep"+slot);
   if(prev) prev.style.display="none";
   if(wrap) wrap.style.display="none";
@@ -8512,7 +8609,11 @@ function showVideo(slot, media, options={}){
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
   if(frBtn) frBtn.style.display="inline-flex";
+  if(upBtn) upBtn.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
+  if(options.seed != null){
+    currentMediaSeed[slot] = options.seed;
+  }
   // Prompt que produjo el resultado mostrado: el guard de onPreview solo debe
   // ignorar frames tardíos cuando el reproductor muestra el resultado del MISMO
   // prompt en curso (si muestra uno anterior, el preview sí tiene que salir).
@@ -8720,6 +8821,54 @@ if(btnFaceRefine1){
   btnFaceRefine1.addEventListener("click", enqueueFaceRefineCurrent);
 }
 
+// --- Upscale Latente (2º Pase) On-Demand ---
+async function enqueueLatentUpscaleForVariant(card, seedValue){
+  let seed = seedValue;
+  if((seed == null || isNaN(seed)) && card && card.dataset && card.dataset.seed){
+    seed = parseInt(card.dataset.seed, 10);
+  }
+  if((seed == null || isNaN(seed)) && currentMediaSeed[1] != null){
+    seed = currentMediaSeed[1];
+  }
+  if(seed == null || isNaN(seed)){
+    seed = parseInt($("seedVal")?.value || "12345", 10);
+  }
+
+  // Si Latent Upscale estaba desactivado en la interfaz, lo encendemos visualmente
+  const luToggle = $("latentUpscaleToggle");
+  if(luToggle && !luToggle.checked){
+    luToggle.checked = true;
+    if(typeof updateLatentUpscaleUI === "function") updateLatentUpscaleUI();
+  }
+
+  const job = snapshotJob();
+  job.id = ++jobCounter;
+  job.seedMode = "fixed";
+  job.seedValue = seed;
+  job.batchSize = 1;
+  job.latentUpscale = {
+    ...getLatentUpscaleState(),
+    enabled: true,
+    pass2: true
+  };
+  job.isLatentUpscaleRun = true;
+
+  log(`🚀 Encolando Latent Upscale (2º pase) para la variante (semilla ${seed})...`, "l-ok");
+  if(activeJob){
+    jobQueue.push(job);
+    updateQueueUI();
+  } else {
+    await startJob(job);
+  }
+}
+
+const btnUpscale1 = $("btnUpscale1");
+if(btnUpscale1){
+  btnUpscale1.addEventListener("click", () => {
+    enqueueLatentUpscaleForVariant(null, currentMediaSeed[1]);
+  });
+}
+
 const vidbox1 = document.querySelector("#video1")?.closest(".vidbox");
 if(vidbox1){
   vidbox1.addEventListener("keydown", (e) => {
@@ -8764,7 +8913,7 @@ function createOrUpdatePlaceholderVariantCard(varIdx, seedUsed){
     }
 }
 
-function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
+function addToVariantGallery(media, seedValue, timeText, slot, variantIndex, typeShort = "final") {
     if(!media || !media.filename) {
         log("⚠️ No se encontró vídeo de salida para añadir a la galería de variantes.", "l-err");
         return;
@@ -8777,17 +8926,31 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
     const existingPlaceholder = grid.querySelector(`.variant-card[data-variant-index="${variantIndex}"]`);
     if(existingPlaceholder) existingPlaceholder.remove();
 
-    const typeShort = "final";
     const meta = CONFIG.variantMeta ? CONFIG.variantMeta(seedValue, timeText) : null;
     const card = buildVariantCard(grid, box, media, seedValue, timeText, variantIndex, slot, typeShort, meta);
 
     const hasSeed = seedValue !== null && seedValue !== undefined;
     if(hasSeed) {
+        card.dataset.seed = String(seedValue);
         const seedSpan = card.querySelector('.variant-seed-display');
         seedSpan.addEventListener('click', (e) => {
             e.stopPropagation();
             copySeedToClipboard(seedSpan, seedValue);
         });
+    }
+
+    // Botón de Upscale rápido en la tarjeta de variante
+    const iconsSpan = card.querySelector(".variant-icons");
+    if(iconsSpan){
+        const upBtn = document.createElement("button");
+        upBtn.className = "variant-upscale-btn";
+        upBtn.title = "Upscale Latente (2º pase) para esta variante";
+        upBtn.innerHTML = "🔍";
+        upBtn.onclick = (e) => {
+            e.stopPropagation();
+            enqueueLatentUpscaleForVariant(card, seedValue);
+        };
+        iconsSpan.insertBefore(upBtn, iconsSpan.firstChild);
     }
 
     const delBtn = card.querySelector(".variant-del-btn");
@@ -8807,9 +8970,10 @@ function addToVariantGallery(media, seedValue, timeText, slot, variantIndex) {
 
     card.addEventListener("click", (e) => {
         if(e.target.closest("video")) return;
-        if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn")) return;
+        if(e.target.closest(".variant-seed-display") || e.target.closest(".variant-del-btn") || e.target.closest(".variant-upscale-btn")) return;
         const varIndex = parseInt(card.dataset.variantIndex, 10) || (currentBatchIndex + 1);
-        showVideo(1, { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type }, { variantIndex: varIndex, promptId: null });
+        const cardSeed = (seedValue !== null && seedValue !== undefined) ? seedValue : (card.dataset.seed ? parseInt(card.dataset.seed, 10) : null);
+        showVideo(1, { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type }, { variantIndex: varIndex, promptId: null, seed: cardSeed });
         log("▶ Vídeo cargado: "+card.dataset.filename, "l-ok");
     });
 
