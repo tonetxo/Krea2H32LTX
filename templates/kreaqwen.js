@@ -1259,7 +1259,7 @@ function appendQwenEditStage(g, stage, opts){
   const inputs = {
     clip: opts.clipRef,
     prompt: qe.prompt || opts.prompt || "",
-    negative_prompt: opts.negative || "",
+    negative_prompt: "",
     resolution: qe.resolution,
     vae: opts.vaeRef,
   };
@@ -1565,8 +1565,7 @@ function buildGraph(job){
   const varianceActive = j.variancePreset && !j.variancePreset.includes("Disabled");
   if(qwenEditBase){
     g[N.SAMPLER_BASE].inputs.positive = [qwenEditBase.encoder, 0];
-    // Evitamos usar la salida negativa del nodo de edición (que tiene un bug hardcoded a 2560), usamos el texto base
-    g[N.SAMPLER_BASE].inputs.negative = [N.NEG_BASE, 0];
+    g[N.SAMPLER_BASE].inputs.negative = [qwenEditBase.encoder, 1];
   } else if(isKreaBase && varianceActive){
     g["rbg_variance_base"] = {
       class_type: "RBG_Smart_Seed_Variance",
@@ -1737,7 +1736,7 @@ function buildGraph(job){
   // RBG Smart Seed Variance Refiner (solo si Krea2 está en Refiner y no en Base)
   if(qwenEditRefiner){
     g[N.SAMPLER_REFINER].inputs.positive = [qwenEditRefiner.encoder, 0];
-    g[N.SAMPLER_REFINER].inputs.negative = [N.NEG_REFINER, 0];
+    g[N.SAMPLER_REFINER].inputs.negative = [qwenEditRefiner.encoder, 1];
   } else if(!isKreaBase && isKreaRefiner && varianceActive){
     g["rbg_variance_refiner"] = {
       class_type: "RBG_Smart_Seed_Variance",
