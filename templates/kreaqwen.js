@@ -522,26 +522,34 @@ function applyComboMode(mode){
 
 // Invertir orden Base y Refiner
 function invertOrder(){
-  const modeSel = $("comboMode");
-  const curMode = modeSel?.value || "krea_qwen";
-  if(curMode === "krea_qwen"){
-    modeSel.value = "qwen_krea";
-    applyComboMode("qwen_krea");
-  } else if(curMode === "qwen_krea"){
-    modeSel.value = "krea_qwen";
-    applyComboMode("krea_qwen");
-  } else {
-    // Intercambiar selectores manualmente. Tras el swap recalculamos CLIP, VAE y perfil
-    // de CADA etapa a partir de su UNET, para no mezclar arquitecturas.
-    const swap = (id1, id2) => {
-      const el1 = $(id1), el2 = $(id2);
-      if(el1 && el2){ const tmp = el1.value; el1.value = el2.value; el2.value = tmp; }
-    };
-    swap("baseUnetSelect", "refinerUnetSelect");
-    syncStageToUnet("baseUnetSelect", "baseClipSelect", "base");
-    syncStageToUnet("refinerUnetSelect", "refinerClipSelect", "refiner");
-  }
+  const swap = (id1, id2) => {
+    const el1 = $(id1), el2 = $(id2);
+    if(el1 && el2){ const tmp = el1.value; el1.value = el2.value; el2.value = tmp; }
+  };
+  
+  const v1 = $("baseVaeSelect")?.value;
+  const v2 = $("refinerVaeSelect")?.value;
+
+  swap("baseUnetSelect", "refinerUnetSelect");
+  swap("baseClipSelect", "refinerClipSelect");
+  
   updateVaeSelectors();
+  
+  if($("baseVaeSelect")) $("baseVaeSelect").value = v2;
+  if($("refinerVaeSelect")) $("refinerVaeSelect").value = v1;
+  
+  syncStageToUnet("baseUnetSelect", "baseClipSelect", "base");
+  syncStageToUnet("refinerUnetSelect", "refinerClipSelect", "refiner");
+
+  const modeSel = $("comboMode");
+  const bFam = unetArchFamily($("baseUnetSelect")?.value);
+  const rFam = unetArchFamily($("refinerUnetSelect")?.value);
+  const newMode = (bFam === "krea2" && rFam === "qwen21") ? "krea_qwen" :
+                  (bFam === "qwen21" && rFam === "krea2") ? "qwen_krea" :
+                  (bFam === "krea2" && rFam === "krea2") ? "krea_krea" :
+                  (bFam === "qwen21" && rFam === "qwen21") ? "qwen_qwen" : "";
+  if(newMode && modeSel) modeSel.value = newMode;
+  
   log("⇄ Orden de modelos invertido.", "l-ok");
 }
 
