@@ -479,7 +479,7 @@ function applyComboMode(mode){
   // Aplica perfil y ademas fija el CLIP (fichero+type) coherente con el UNET.
   function setStage(unetSel, clipSel, family, stage, preferKw){
     selectByFamily(unetSel, family, preferKw);
-    selectByKw(clipSel, archClipKeyword(family));
+    // selectByKw(clipSel, archClipKeyword(family)); // No cambiar text encoder al cambiar modelo
     applyProfile(profileForFamily(family), stage);
   }
 
@@ -508,9 +508,9 @@ function applyComboMode(mode){
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "base_only"){
-    // En base_only heredamos el perfil y el CLIP del modelo base actual
+    // En base_only heredamos el perfil (pero no tocamos el text encoder) del modelo base actual
     const baseFam = unetArchFamily(selBaseU?.value);
-    selectByKw(selBaseC, archClipKeyword(baseFam));
+    // selectByKw(selBaseC, archClipKeyword(baseFam));
     applyProfile(profileForFamily(baseFam), "base_only");
     if($("refinerEnabled")) $("refinerEnabled").checked = false;
     if($("upscaleEnabled")) $("upscaleEnabled").checked = false;
@@ -548,13 +548,6 @@ function invertOrder(){
 // Recalcula CLIP (fichero+type) y perfil de una etapa a partir de su UNET actual.
 function syncStageToUnet(unetSelId, clipSelId, prefix){
   const family = unetArchFamily($(unetSelId)?.value);
-  const clipSel = $(clipSelId);
-  if(clipSel){
-    const kw = archClipKeyword(family);
-    for(const opt of clipSel.options){
-      if(opt.value.toLowerCase().includes(kw)){ opt.selected = true; break; }
-    }
-  }
   applyProfile(profileForFamily(family), prefix);
   return family;
 }
