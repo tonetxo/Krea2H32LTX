@@ -1973,6 +1973,7 @@ function selectVariantByIndex(idx){
   const mediaData = { filename: card.dataset.filename, subfolder: card.dataset.subfolder || "", type: card.dataset.type || "output" };
   currentFinalMedia = { media: mediaData, ...mediaData, url };
   showImageView("final");
+  extractWorkflowFromImage(url);
   return { card, url, index: idx, total: cards.length };
 }
 
@@ -2269,6 +2270,7 @@ function addToVariantGallery(media, seedValue, timeText) {
     const cards = getVariantCards();
     currentVariantIndex = cards.indexOf(card);
     showImageView("final");
+    extractWorkflowFromImage(url);
   });
 
   variantCounter++;
