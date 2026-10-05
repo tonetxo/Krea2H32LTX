@@ -1553,7 +1553,8 @@ function buildGraph(job){
   g[N.CLIP_BASE].inputs.type = archClipType(famBase);
 
   g[N.POS_BASE].inputs.text = (j.prompt || "").trim();
-  g[N.NEG_BASE].inputs.text = (j.negPrompt || "").trim();
+  // Qwen 2.1 no soporta prompt negativo correctamente, forzamos vacío para evitar fallos de dimensiones
+  g[N.NEG_BASE].inputs.text = isQwenBase ? "" : (j.negPrompt || "").trim();
 
   // Edición con Qwen 2.1 en la etapa Base (solo si el Base es Qwen).
   const qwenEditBase = (isQwenBase && j.qwenEdit?.enabled && (j.qwenEdit.stage === "base" || j.qwenEdit.stage === "both"))
@@ -1713,7 +1714,8 @@ function buildGraph(job){
   g[N.CLIP_REFINER].inputs.type = archClipType(famRefiner);
 
   g[N.POS_REFINER].inputs.text = (j.prompt || "").trim();
-  g[N.NEG_REFINER].inputs.text = (j.negPrompt || "").trim();
+  // Qwen 2.1 no soporta prompt negativo correctamente, forzamos vacío
+  g[N.NEG_REFINER].inputs.text = isQwenRefiner ? "" : (j.negPrompt || "").trim();
 
   // Edición con Qwen 2.1 en la etapa Refiner: mantiene el latent del borrador
   // (VAEEncode de la etapa intermedia) y sustituye el conditioning por el encoder
