@@ -237,7 +237,7 @@ function resolveWeightDtype(selectedOption, unetName){
 // CLIP requerido por cada arquitectura (fichero + type de CLIPLoader).
 const ARCH_CLIP = {
   krea2:  { keyword: "qwen3vl_4b", type: "krea2" },
-  qwen21: { keyword: "qwen3vl_8b", type: "qwen_image" },
+  qwen21: { keyword: "qwen3vl_8b_nvfp4_heretic", type: "qwen_image" },
   flux2:  { keyword: "qwen3vl_8b", type: "flux2" },
 };
 
@@ -277,8 +277,9 @@ function compatibleVaes(family){
 function fallbackVae(family){
   const list = compatibleVaes(family);
   if(family === "qwen21"){
-    return list.find(v => v.toLowerCase().includes("qwen_image_2.1_vae")) ||
-           list[0] || "QwenImage/qwen_image_2.1_vae_bf16.safetensors";
+    return list.find(v => v.toLowerCase().includes("texture_fix_vae_for_qwen_image_2.1")) ||
+           list.find(v => v.toLowerCase().includes("qwen_image_2.1_vae")) ||
+           list[0] || "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors";
   }
   if(family === "flux2"){
     return list.find(v => v.toLowerCase().includes("flux2-vae")) ||
@@ -336,7 +337,7 @@ function updateVaeSelectors(){
 }
 
 function vaeShortKw(family){
-  if(family === "qwen21") return "qwen_image_2.1_vae";
+  if(family === "qwen21") return "texture_fix_vae_for_qwen_image_2.1";
   if(family === "flux2") return "flux2-vae";
   return "qwen_image_vae";
 }
@@ -348,10 +349,10 @@ function populateModelSelects(){
   const upscales = typeof AVAILABLE_UPSCALE_MODELS !== "undefined" ? AVAILABLE_UPSCALE_MODELS : [];
 
   fill("baseUnetSelect", unets, "habanero");
-  fill("refinerUnetSelect", unets, "qwen");
+  fill("refinerUnetSelect", unets, "qwen-image-2.1-UC-NVFP4");
   fill("baseClipSelect", clips, "qwen3vl_4b");
-  fill("refinerClipSelect", clips, "qwen3vl_8b");
-  fill("upscaleModelSelect", upscales, "4xpurephoto");
+  fill("refinerClipSelect", clips, "qwen3vl_8b_nvfp4_heretic");
+  fill("upscaleModelSelect", upscales, "4xPurePhoto-Span.pth");
   updateVaeSelectors();
 }
 
@@ -484,12 +485,12 @@ function applyComboMode(mode){
 
   if(mode === "krea_qwen"){
     setStage(selBaseU, selBaseC, "krea2", "base", "habanero");
-    setStage(selRefU, selRefC, "qwen21", "refiner");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC-NVFP4");
     if(hint) hint.textContent = "Krea2 compone la escena con estética fotográfica cinematográfica; Qwen 2.1 refina microtexturas y nitidez tras el reescalado.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "qwen_krea"){
-    setStage(selBaseU, selBaseC, "qwen21", "base");
+    setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC-NVFP4");
     setStage(selRefU, selRefC, "krea2", "refiner", "habanero");
     if(hint) hint.textContent = "Qwen 2.1 genera la composición con adherencia profunda al prompt; Krea2 aporta riqueza tonal y grano en la pasada de refinamiento.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
@@ -501,8 +502,8 @@ function applyComboMode(mode){
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "qwen_qwen"){
-    setStage(selBaseU, selBaseC, "qwen21", "base");
-    setStage(selRefU, selRefC, "qwen21", "refiner");
+    setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC-NVFP4");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC-NVFP4");
     if(hint) hint.textContent = "Pipeline homogéneo Qwen 2.1: renderizado y refinado con máxima nitidez textual y detalle anatómico.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
@@ -862,10 +863,10 @@ function snapshotJob(isBaseOnly = false){
     negPrompt: $("negPrompt")?.value || "",
     comboMode: isBaseOnly ? "base_only" : ($("comboMode")?.value || "krea_qwen"),
     baseUnet: $("baseUnetSelect")?.value,
-    baseWeightDtype: $("baseWeightDtype")?.value || "auto",
+    baseWeightDtype: $("baseWeightDtype")?.value || "default",
     baseClip: $("baseClipSelect")?.value,
     baseVae: $("baseVaeSelect")?.value,
-    baseAttn: $("baseAttentionBackend")?.value || "none",
+    baseAttn: $("baseAttentionBackend")?.value || "comfy kitchen attention",
     baseSteps: parseInt($("baseSteps")?.value || "8", 10),
     baseCfg: parseFloat($("baseCfg")?.value || "1.0"),
     baseSampler: $("baseSamplerName")?.value || "euler",
@@ -890,17 +891,17 @@ function snapshotJob(isBaseOnly = false){
     targetH: upH,
     refinerEnabled: isBaseOnly ? false : $("refinerEnabled")?.checked,
     refinerUnet: $("refinerUnetSelect")?.value,
-    refinerWeightDtype: $("refinerWeightDtype")?.value || "auto",
+    refinerWeightDtype: $("refinerWeightDtype")?.value || "default",
     refinerClip: $("refinerClipSelect")?.value,
     refinerVae: $("refinerVaeSelect")?.value,
-    refinerAttn: $("refinerAttentionBackend")?.value || "none",
+    refinerAttn: $("refinerAttentionBackend")?.value || "comfy kitchen attention",
     refinerDenoise: parseFloat($("refinerDenoise")?.value || "0.35"),
     refinerSteps: parseInt($("refinerSteps")?.value || "6", 10),
     refinerCfg: parseFloat($("refinerCfg")?.value || "1.0"),
     refinerSampler: $("refinerSamplerName")?.value || "euler",
     refinerScheduler: $("refinerSchedulerName")?.value || "simple",
     refinerLoras: JSON.parse(JSON.stringify(refinerLoras)),
-    spectrumEnabled: $("spectrumEnabled")?.checked,
+    spectrumEnabled: $("spectrumEnabled") ? $("spectrumEnabled").checked : true,
     spectrumW: parseFloat($("spectrumW")?.value || "0.3"),
     spectrumLam: parseFloat($("spectrumLam")?.value || "0.1"),
     keepModelInRam: $("keepModelInRam")?.checked,
@@ -972,10 +973,10 @@ function saveKreaQwenSettings(){
     negPrompt: $("negPrompt")?.value ?? "",
     comboMode: $("comboMode")?.value || "krea_qwen",
     baseUnet: $("baseUnetSelect")?.value,
-    baseWeightDtype: $("baseWeightDtype")?.value || "auto",
+    baseWeightDtype: $("baseWeightDtype")?.value || "default",
     baseClip: $("baseClipSelect")?.value,
     baseVae: $("baseVaeSelect")?.value,
-    baseAttn: $("baseAttentionBackend")?.value || "none",
+    baseAttn: $("baseAttentionBackend")?.value || "comfy kitchen attention",
     baseSteps: $("baseSteps")?.value || "8",
     baseCfg: $("baseCfg")?.value || "1.0",
     baseSampler: $("baseSamplerName")?.value || "euler",
@@ -984,10 +985,10 @@ function saveKreaQwenSettings(){
 
     refinerEnabled: $("refinerEnabled")?.checked ?? true,
     refinerUnet: $("refinerUnetSelect")?.value,
-    refinerWeightDtype: $("refinerWeightDtype")?.value || "auto",
+    refinerWeightDtype: $("refinerWeightDtype")?.value || "default",
     refinerClip: $("refinerClipSelect")?.value,
     refinerVae: $("refinerVaeSelect")?.value,
-    refinerAttn: $("refinerAttentionBackend")?.value || "none",
+    refinerAttn: $("refinerAttentionBackend")?.value || "comfy kitchen attention",
     refinerDenoise: $("refinerDenoise")?.value || "0.35",
     refinerSteps: $("refinerSteps")?.value || "6",
     refinerCfg: $("refinerCfg")?.value || "1.0",
@@ -999,7 +1000,7 @@ function saveKreaQwenSettings(){
     aspectRatio: $("aspectRatio")?.value || "16:9 (Widescreen)",
     upscaleEnabled: $("upscaleEnabled")?.checked ?? true,
     upscaleFactor: $("upscaleFactor")?.value || "1.5",
-    upscaleModel: $("upscaleModelSelect")?.value,
+    upscaleModel: $("upscaleModelSelect")?.value || "4xPurePhoto-Span.pth",
 
     seedMode: $("segSamplerRandom")?.classList.contains("on") ? "random" : "fixed",
     seedValue: $("samplerSeed")?.value || "1062442950133633",
@@ -1015,7 +1016,7 @@ function saveKreaQwenSettings(){
     varianceSeedValue: $("varianceSeed")?.value || "315489554057974",
     eta: $("etaSlider")?.value || "0.5",
 
-    spectrumEnabled: !!$("spectrumEnabled")?.checked,
+    spectrumEnabled: $("spectrumEnabled") ? $("spectrumEnabled").checked : true,
     spectrumW: $("spectrumW")?.value || "0.3",
     spectrumLam: $("spectrumLam")?.value || "0.1",
 
@@ -1160,6 +1161,7 @@ function restoreKreaQwenSettings(){
 
     // Spectrum
     if(s.spectrumEnabled !== undefined && $("spectrumEnabled")) $("spectrumEnabled").checked = !!s.spectrumEnabled;
+    else if($("spectrumEnabled")) $("spectrumEnabled").checked = true;
     if(s.spectrumW !== undefined && $("spectrumW")){
       $("spectrumW").value = s.spectrumW;
       if($("spectrumWVal")) $("spectrumWVal").textContent = parseFloat(s.spectrumW).toFixed(2);

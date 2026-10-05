@@ -159,10 +159,10 @@
         <div class="row" style="margin-top:6px;">
           <label>Precisión de carga Base (Weight Dtype)</label>
           <select id="baseWeightDtype">
-            <option value="auto" selected>Auto (FP8 Rápido en RTX 5070 Ti / Default si INT8)</option>
+            <option value="auto">Auto (FP8 Rápido en RTX 5070 Ti / Default si INT8)</option>
             <option value="fp8_e4m3fn_fast">fp8_e4m3fn_fast (Aceleración FP8)</option>
             <option value="fp8_e4m3fn">fp8_e4m3fn</option>
-            <option value="default">default (FP16 / Nativo del archivo)</option>
+            <option value="default" selected>default (FP16 / Nativo del archivo)</option>
           </select>
         </div>
         <div class="row" style="margin-top:6px;">
@@ -176,8 +176,8 @@
         <div class="row" style="margin-top:6px;">
           <label>Backend de atención Base</label>
           <select id="baseAttentionBackend">
-            <option value="none" selected>SageAttention / Nativo ComfyUI (--use-sage-attention)</option>
-            <option value="comfy kitchen attention">Comfy Kitchen Attention (INT8)</option>
+            <option value="none">SageAttention / Nativo ComfyUI (--use-sage-attention)</option>
+            <option value="comfy kitchen attention" selected>Comfy Kitchen Attention (INT8)</option>
             <option value="pytorch attention">PyTorch Attention</option>
           </select>
         </div>
@@ -563,10 +563,10 @@
           <div class="row" style="margin-top:6px;">
             <label>Precisión de carga Refiner (Weight Dtype)</label>
             <select id="refinerWeightDtype">
-              <option value="auto" selected>Auto (FP8 Rápido en RTX 5070 Ti / Default si INT8)</option>
+              <option value="auto">Auto (FP8 Rápido en RTX 5070 Ti / Default si INT8)</option>
               <option value="fp8_e4m3fn_fast">fp8_e4m3fn_fast (Aceleración FP8)</option>
               <option value="fp8_e4m3fn">fp8_e4m3fn</option>
-              <option value="default">default (FP16 / Nativo del archivo)</option>
+              <option value="default" selected>default (FP16 / Nativo del archivo)</option>
             </select>
           </div>
           <div class="row" style="margin-top:6px;">
@@ -580,8 +580,8 @@
           <div class="row" style="margin-top:6px;">
             <label>Backend de atención Refiner</label>
             <select id="refinerAttentionBackend">
-              <option value="none" selected>SageAttention / Nativo ComfyUI (--use-sage-attention)</option>
-              <option value="comfy kitchen attention">Comfy Kitchen Attention (INT8)</option>
+              <option value="none">SageAttention / Nativo ComfyUI (--use-sage-attention)</option>
+              <option value="comfy kitchen attention" selected>Comfy Kitchen Attention (INT8)</option>
               <option value="pytorch attention">PyTorch Attention</option>
             </select>
           </div>
@@ -810,7 +810,7 @@
         </div>
         <div class="collapsible-body" id="spectrumBody">
           <div class="row" style="display:flex;align-items:center;gap:8px;">
-            <input type="checkbox" id="spectrumEnabled" style="margin:0;">
+            <input type="checkbox" id="spectrumEnabled" checked style="margin:0;">
             <label for="spectrumEnabled" style="margin:0;font-size:11px;cursor:pointer;">Activar SwarmSpectrum (aceleración por polinomios de Chebyshev)</label>
           </div>
           <div class="row slider-row" style="margin-top:6px;">
