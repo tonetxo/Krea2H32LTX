@@ -7066,9 +7066,11 @@ async function runSingleGeneration(index){
     // por generación. Enviar -1 no basta: el nodo hace torch.manual_seed(-1), que
     // es determinista y produce SIEMPRE el mismo patrón de varianza.
     if(job.varianceSeedMode === "random") job.varianceSeedValue = randomSeed();
+    log(`⏳ Preparando grafo para variante ${index + 1}/${totalBatchSize}...`, "l-info");
     await resolveQwenEditRefs(job);
     const graph = buildGraph(job);
 
+    log(`🚀 Enviando variante ${index + 1}/${totalBatchSize} a ComfyUI...`, "l-info");
     const srv = getServerUrl();
     const r = await fetch(`${srv}/prompt`, {
       signal: AbortSignal.timeout(60000), // colgado → activeJob fantasma
@@ -7090,6 +7092,7 @@ async function runSingleGeneration(index){
     const data = await r.json();
     if(data.error) throw new Error(JSON.stringify(data.error));
 
+    log(`📡 Recibido por ComfyUI (Prompt: ${data.prompt_id.slice(0, 8)}...). Procesando...`, "l-ok");
     pendingSeeds[data.prompt_id] = seedUsed;
     currentPromptId = data.prompt_id;
     startTimer(data.prompt_id, 1);
@@ -7791,8 +7794,9 @@ function initKreaQwenUI() {
 
   $("btnClearQueue")?.addEventListener("click", () => {
     jobQueue = [];
+    finishCurrentJob();
     updateQueueUI();
-    log("Cola de trabajos vaciada.", "l-info");
+    log("🗑️ Cola de trabajos vaciada y estado restablecido a reposo.", "l-info");
   });
 
   $("btnOffloadVram")?.addEventListener("click", async () => {
