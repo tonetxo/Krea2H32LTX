@@ -18,6 +18,7 @@ The project provides four standalone, zero-dependency web applications designed 
 | **MMH3X2** | `MMH3X2_WebUI.html` | `:8003` | **MiniMax H3 (2 Segments)** | **Continuous narrative video (up to 30s+)**: 2 chained segments, up to 4 reference images + 1 video, visual continuity powered by Ollama (with real-time fused prompt inspection), audio crossfade, and flexible attention/optimization pipelines (Standard & BlockATT with AIMDO / Spectrum). |
 | **MiniMaxH3** | `MiniMaxH3_WebUI.html` | `:8002` | **MiniMax H3** | **Single-segment video generation**: **i2v** (image-to-video), **flf2v** (first-and-last frame), and **r2v** (multi-reference: up to 6 images, 3 videos, 3 audio tracks). Includes **Dual-Mode H3 FaceRefine** (inline toggle & on-demand player button), **Sol-H3 SM120 Blackwell Attention**, **3D Latent Upscaler**, and RIFE frame interpolation. |
 | **LTXV** | `LTXV_WebUI.html` | `:8000` | **LTX-Video / LTX-2.5** | **Ultra-fast video generation**: First Pass & Full Pass pipelines with SageAttention, DMD LoRA, custom VAE selectors, and high-speed distilled transformers. |
+| **KreaQwen** | `KreaQwen_WebUI.html` | `:8004` | **Qwen 2.1 Image + Krea2 / Flux2** | **Dual-model fusion & guided editing**: Base + Refiner stages with dynamic model inversion, native Qwen Edit mode (img2img / faceswap with multi-reference images), integrated Post-FX suite (LUTs, 35mm grain, vignette, radial blur), RGB smart seed variance, and FaceRefine. |
 | **Krea2** | `Krea2_WebUI.html` | `:8001` | **Krea2 / Flux2** | **First-frame generation**: High-fidelity text-to-image pipeline for Flux2 / Krea2 with RGB variance control and a direct "Send to Video" handoff button. |
 
 ---
@@ -67,19 +68,19 @@ The project provides four standalone, zero-dependency web applications designed 
 The build system utilizes lightweight Python generators that compile self-contained HTML files from modular template components:
 
 ```text
-generar_mmh3x2.py / generar_minimaxh3.py / generar_krea2.py / generar_ltxv.py
+generar_mmh3x2.py / generar_minimaxh3.py / generar_krea2.py / generar_kreaqwen.py / generar_ltxv.py
         ↓ (reads config via config_loader.py & scans model directories)
 generar_common.py (Shared template assembly logic)
         ↓
 templates/
   ├── base.css            (Dark theme, control panels, two-column layout, queue monitor)
-  ├── mmh3x2.css / minimaxh3.css / krea2.css / ltxv.css
+  ├── mmh3x2.css / minimaxh3.css / krea2.css / kreaqwen.css / ltxv.css
   ├── common.js           (WebSockets, /queue monitor, synced prompt library, timers)
-  ├── mmh3x2.js / minimaxh3.js / krea2.js / ltxv.js
+  ├── mmh3x2.js / minimaxh3.js / krea2.js / kreaqwen.js / ltxv.js
   ├── common_head.html / common_html.html
-  └── mmh3x2_html.html / minimaxh3_html.html / krea2_html.html / ltxv_html.html
+  └── mmh3x2_html.html / minimaxh3_html.html / krea2_html.html / kreaqwen_html.html / ltxv_html.html
         ↓ Generates standalone single-page apps:
-MMH3X2_WebUI.html / MiniMaxH3_WebUI.html / Krea2_WebUI.html / LTXV_WebUI.html
+MMH3X2_WebUI.html / MiniMaxH3_WebUI.html / Krea2_WebUI.html / KreaQwen_WebUI.html / LTXV_WebUI.html
 ```
 
 ### Static File Server and Proxy (`serve.py`)
@@ -110,6 +111,9 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | **Spectrum** *(optional)* | [ComfyUI-Spectrum](https://github.com/MinusZoneAI/ComfyUI-Spectrum) | `SpectrumApplyMiniMaxH3` | MMH3X2 (Spectrum), MiniMaxH3 |
 | **rgthree-comfy** *(optional)* | [rgthree-comfy](https://github.com/rgthree/rgthree-comfy) | `Power Lora Loader`, `Seed` | Krea2, LTXV |
 | **ComfyUI-H3PromptStudio** | [ComfyUI-H3PromptStudio](https://github.com/tonetxo/ComfyUI-H3PromptStudio) | `MiniMaxH3ReferenceToVideo`, `MiniMaxH3SigmaShift`, `ModelAttentionBackend` | MMH3X2, MiniMaxH3 |
+| **ComfyUI-ProPost** *(optional)* | [ComfyUI-ProPost](https://github.com/digitaljohn/comfyui-propost) | `ProPostApplyLUT`, `ProPostFilmGrain`, `ProPostRadialBlur`, `ProPostVignette` | KreaQwen (Post-FX Suite) |
+| **ComfyUI-RBG-SmartSeedVariance** *(optional)* | [ComfyUI-RBG-SmartSeedVariance](https://github.com/RamonGuthrie/ComfyUI-RBG-SmartSeedVariance.git) | `RBG_Smart_Seed_Variance` | Krea2, KreaQwen (Smart Seed Variance) |
+| **H3-Optimizations** *(optional)* | [H3-Optimizations](https://github.com/Zironic/H3-Optimizations) | `H3VSAAttention`, `H3MemoryOptimization`, `H3SparseAttention`, `H3AIMDOResidencyLimiter` | MiniMaxH3 (VSA Attention, AIMDO) |
 
 > [!TIP]
 > You can run `python3 diagnostico_comfyui.py` at any time to automatically check which nodes are installed on your backend.
@@ -154,7 +158,8 @@ Example `config.json`:
     "ltxv": 8000,
     "krea2": 8001,
     "minimaxh3": 8002,
-    "mmh3x2": 8003
+    "mmh3x2": 8003,
+    "kreaqwen": 8004
   }
 }
 ```
@@ -163,13 +168,16 @@ Example `config.json`:
 Compile the standalone HTML files and index your local models, LoRAs, and VAEs:
 ```bash
 # Build all interfaces at once:
-python3 generar_mmh3x2.py && python3 generar_minimaxh3.py && python3 generar_krea2.py && python3 generar_ltxv.py
+python3 generar_mmh3x2.py && python3 generar_minimaxh3.py && python3 generar_krea2.py && python3 generar_kreaqwen.py && python3 generar_ltxv.py
 ```
 
 ### 5. Launch the Web Servers
 Launch whichever interface you want to use:
 
 ```bash
+# KreaQwen (Qwen 2.1 + Krea2/Flux2 image generation & guided editing) - Port 8004
+./lanzar_kreaqwen.sh
+
 # MMH3X2 (2-segment continuous video generation) - Port 8003
 ./lanzar_mmh3x2.sh
 

@@ -94,6 +94,27 @@ REQUIRED_PACKAGES = [
         "critical": True,
         "workflows": ["MMH3X2", "MiniMaxH3"],
     },
+    {
+        "name": "ComfyUI-ProPost",
+        "repo": "https://github.com/digitaljohn/comfyui-propost",
+        "nodes": ["ProPostApplyLUT", "ProPostFilmGrain", "ProPostRadialBlur", "ProPostVignette"],
+        "critical": False,
+        "workflows": ["KreaQwen (Post-FX)"],
+    },
+    {
+        "name": "ComfyUI-RBG-SmartSeedVariance",
+        "repo": "https://github.com/RamonGuthrie/ComfyUI-RBG-SmartSeedVariance.git",
+        "nodes": ["RBG_Smart_Seed_Variance"],
+        "critical": False,
+        "workflows": ["Krea2", "KreaQwen (Varianza RBG)"],
+    },
+    {
+        "name": "H3-Optimizations",
+        "repo": "https://github.com/Zironic/H3-Optimizations",
+        "nodes": ["H3VSAAttention", "H3MemoryOptimization", "H3SparseAttention", "H3AIMDOResidencyLimiter"],
+        "critical": False,
+        "workflows": ["MiniMaxH3 (VSA Attention, AIMDO)"],
+    },
 ]
 
 
@@ -216,8 +237,9 @@ def main():
 
     print("\n" + "=" * 65)
     print("🚀 Para compilar las UIs web:")
-    print("   python3 generar_mmh3x2.py && python3 generar_minimaxh3.py && python3 generar_krea2.py && python3 generar_ltxv.py")
+    print("   python3 generar_mmh3x2.py && python3 generar_minimaxh3.py && python3 generar_krea2.py && python3 generar_kreaqwen.py && python3 generar_ltxv.py")
     print("\n🌐 Para iniciar los servidores:")
+    print("   python3 serve.py 8004  # KreaQwen Panel Pro (Qwen 2.1 + Krea2 / Flux2)")
     print("   python3 serve.py 8003  # MMH3X2 Panel Pro")
     print("   python3 serve.py 8002  # MiniMaxH3 Panel Pro")
     print("   python3 serve.py 8001  # Krea2 Panel Pro")
