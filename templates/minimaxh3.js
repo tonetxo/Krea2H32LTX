@@ -5430,7 +5430,7 @@ async function startJob(job){
   activeJob = job;
   updateQueueUI();
   try {
-    connectSocket();
+    await ensureSocketConnected();
     jobH3UploadInProgress = true;
     try {
       await ensureJobImagesUploaded(job);

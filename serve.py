@@ -131,7 +131,7 @@ def _parse_time_arg(value):
 
 
 # Routes that should be proxied to the backend instead of served as files.
-PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt")
+PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt", "/free")
 OLLAMA_PREFIXES = ("/api",)
 LLAMACPP_PREFIXES = ("/llamacpp",)
 WS_PREFIX = "/ws"

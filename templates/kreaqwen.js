@@ -3001,7 +3001,7 @@ async function startJob(job){
   activeJob = job;
   updateQueueUI();
   try {
-    connectSocket();
+    await ensureSocketConnected();
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;
     setRun("busy", `KreaQwen #${job.id} en proceso (${job.comboMode})...`);
@@ -3683,40 +3683,6 @@ function initKreaQwenUI() {
     finishCurrentJob();
     updateQueueUI();
     log("🗑️ Cola de trabajos vaciada y estado restablecido a reposo.", "l-info");
-  });
-
-  $("btnOffloadVram")?.addEventListener("click", async () => {
-    const btn = $("btnOffloadVram");
-    const prevText = btn?.textContent;
-    if(btn){ btn.disabled = true; btn.textContent = "Descargando..."; }
-    try {
-      const r = await postBackend("/free", { unload_models: true, free_memory: false });
-      if(!r.ok){
-        throw new Error(`HTTP ${r.status}`);
-      }
-      log("⚡ VRAM liberada: modelos descargados a RAM (conservados en memoria para generar sin leer del disco).", "l-ok");
-    } catch(e){
-      log("Error descargando VRAM: " + e.message, "l-err");
-    } finally {
-      if(btn){ btn.disabled = false; btn.textContent = prevText; }
-    }
-  });
-
-  $("btnFreeMemory")?.addEventListener("click", async () => {
-    const btn = $("btnFreeMemory");
-    const prevText = btn?.textContent;
-    if(btn){ btn.disabled = true; btn.textContent = "Purgando..."; }
-    try {
-      const r = await postBackend("/free", { unload_models: true, free_memory: true });
-      if(!r.ok){
-        throw new Error(`HTTP ${r.status}`);
-      }
-      log("Memoria VRAM y caché de RAM purgados por completo en ComfyUI.", "l-ok");
-    } catch(e){
-      log("Error liberando memoria: " + e.message, "l-err");
-    } finally {
-      if(btn){ btn.disabled = false; btn.textContent = prevText; }
-    }
   });
 
   // --- Envío entre WebUIs ---

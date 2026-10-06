@@ -2082,6 +2082,26 @@ async function fetchWithRetry(url, options = {}, attempts = 3, delay = 350){
   }
 }
 
+async function postComfyBackend(endpoint, body){
+  const payload = JSON.stringify(body);
+  const opts = { method: "POST", headers: { "Content-Type": "application/json" }, body: payload };
+  const srv = (typeof server === "function" && server()) ? server() : "";
+  let r;
+  try {
+    r = await fetch(`${srv}${endpoint}`, opts);
+    if(r.ok) return r;
+  } catch(err){
+    if(srv) throw err;
+  }
+  // Si estamos en modo proxy (srv vacío) y falló o devolvió 404/405/502, reintentamos directo al backend
+  if(!srv && (r ? (r.status === 404 || r.status === 405 || r.status === 502) : true)){
+    const host = window.location.hostname || "127.0.0.1";
+    const port = (typeof DEFAULT_BACKEND_PORT !== "undefined" && DEFAULT_BACKEND_PORT) ? DEFAULT_BACKEND_PORT : "8188";
+    r = await fetch(`http://${host}:${port}${endpoint}`, opts);
+  }
+  return r;
+}
+
 function getFriendlyRatio(w, h){
   if(!w || !h) return "16:9";
   const r = w / h;
@@ -2314,12 +2334,40 @@ function connectSocket() {
       };
       socket.onerror = (err) => console.error("WS Error", err);
       socket.onclose = () => {
-        // Fallback activo sin error bloqueante
+        socket = null;
+        setConn("bad", "sin conexión (WS)");
+        setTimeout(() => {
+          if(!document.hidden) connectSocket();
+        }, 1500);
       };
     } catch(err){
       console.warn("No se pudo abrir WebSocket:", err);
     }
 }
+
+function ensureSocketConnected(timeoutMs = 1500) {
+  connectSocket();
+  if(!socket || socket.readyState === WebSocket.OPEN) return Promise.resolve();
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = setInterval(() => {
+      if(!socket || socket.readyState === WebSocket.OPEN || Date.now() - start > timeoutMs){
+        clearInterval(check);
+        resolve();
+      }
+    }, 50);
+  });
+}
+
+// Auto-reconexión proactiva al volver a la pestaña en navegadores como Chrome
+document.addEventListener("visibilitychange", () => {
+  if(!document.hidden){
+    if(!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING){
+      console.debug("[WS] Pestaña visible: reconectando socket...");
+      connectSocket();
+    }
+  }
+});
 
 // --- COMFYUI SERVER QUEUE MONITOR ---
 let serverQueueState = { running: 0, pending: 0 };
@@ -4000,6 +4048,47 @@ function initCommon(){
           }
       }
   });
+
+  // --- GESTIÓN DE MEMORIA Y OFFLOAD ---
+  const btnOffload = $("btnOffloadVram");
+  if(btnOffload && !btnOffload.dataset.bound){
+    btnOffload.dataset.bound = "1";
+    btnOffload.addEventListener("click", async () => {
+      const prevText = btnOffload.textContent;
+      btnOffload.disabled = true;
+      btnOffload.textContent = "Descargando...";
+      try {
+        const r = await postComfyBackend("/free", { unload_models: true, free_memory: false });
+        if(!r || !r.ok) throw new Error(r ? "HTTP " + r.status : "Sin respuesta");
+        log("⚡ VRAM liberada: modelos descargados a RAM (conservados en memoria para generar sin leer del disco).", "l-ok");
+      } catch(e){
+        log("⚠️ Error descargando VRAM: " + e.message, "l-err");
+      } finally {
+        btnOffload.disabled = false;
+        btnOffload.textContent = prevText;
+      }
+    });
+  }
+
+  const btnFree = $("btnFreeMemory");
+  if(btnFree && !btnFree.dataset.bound){
+    btnFree.dataset.bound = "1";
+    btnFree.addEventListener("click", async () => {
+      const prevText = btnFree.textContent;
+      btnFree.disabled = true;
+      btnFree.textContent = "Purgando...";
+      try {
+        const r = await postComfyBackend("/free", { unload_models: true, free_memory: true });
+        if(!r || !r.ok) throw new Error(r ? "HTTP " + r.status : "Sin respuesta");
+        log("🧹 Memoria VRAM y modelos purgados por completo en ComfyUI.", "l-ok");
+      } catch(e){
+        log("⚠️ Error liberando memoria: " + e.message, "l-err");
+      } finally {
+        btnFree.disabled = false;
+        btnFree.textContent = prevText;
+      }
+    });
+  }
 }
 
 // --- DRAG HACIA FUERA (drag-out) ---
@@ -7115,7 +7204,7 @@ async function startJob(job){
   activeJob = job;
   updateQueueUI();
   try {
-    connectSocket();
+    await ensureSocketConnected();
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;
     setRun("busy", `KreaQwen #${job.id} en proceso (${job.comboMode})...`);
@@ -7797,40 +7886,6 @@ function initKreaQwenUI() {
     finishCurrentJob();
     updateQueueUI();
     log("🗑️ Cola de trabajos vaciada y estado restablecido a reposo.", "l-info");
-  });
-
-  $("btnOffloadVram")?.addEventListener("click", async () => {
-    const btn = $("btnOffloadVram");
-    const prevText = btn?.textContent;
-    if(btn){ btn.disabled = true; btn.textContent = "Descargando..."; }
-    try {
-      const r = await postBackend("/free", { unload_models: true, free_memory: false });
-      if(!r.ok){
-        throw new Error(`HTTP ${r.status}`);
-      }
-      log("⚡ VRAM liberada: modelos descargados a RAM (conservados en memoria para generar sin leer del disco).", "l-ok");
-    } catch(e){
-      log("Error descargando VRAM: " + e.message, "l-err");
-    } finally {
-      if(btn){ btn.disabled = false; btn.textContent = prevText; }
-    }
-  });
-
-  $("btnFreeMemory")?.addEventListener("click", async () => {
-    const btn = $("btnFreeMemory");
-    const prevText = btn?.textContent;
-    if(btn){ btn.disabled = true; btn.textContent = "Purgando..."; }
-    try {
-      const r = await postBackend("/free", { unload_models: true, free_memory: true });
-      if(!r.ok){
-        throw new Error(`HTTP ${r.status}`);
-      }
-      log("Memoria VRAM y caché de RAM purgados por completo en ComfyUI.", "l-ok");
-    } catch(e){
-      log("Error liberando memoria: " + e.message, "l-err");
-    } finally {
-      if(btn){ btn.disabled = false; btn.textContent = prevText; }
-    }
   });
 
   // --- Envío entre WebUIs ---

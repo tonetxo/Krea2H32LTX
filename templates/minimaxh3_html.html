@@ -409,6 +409,21 @@
       </div>
 
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
+
+      <!-- GESTIÓN DE MEMORIA Y OFFLOAD -->
+      <div class="panel">
+        <h2>Gestión de Memoria y Offload</h2>
+        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--muted);">Liberación de VRAM / RAM</span>
+          <div style="display:flex;gap:6px;">
+            <button id="btnOffloadVram" type="button" class="ghost btn-mini" title="Descarga los modelos de la GPU (VRAM) hacia la RAM del sistema sin borrarlos de memoria. Deja la VRAM libre para Ollama/llama.cpp.">Descargar VRAM a RAM</button>
+            <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descarga y purga los modelos de VRAM y de la RAM de Python por completo.">Liberar Todo</button>
+          </div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:4px;">
+          Usa <strong>Descargar VRAM a RAM</strong> para liberar la GPU (útil para que Ollama se ejecute en VRAM) manteniendo los modelos precargados en memoria. Usa <strong>Liberar Todo</strong> para vaciar completamente la memoria.
+        </div>
+      </div>
     </div>
 
     <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, RESULTADOS Y COLA -->

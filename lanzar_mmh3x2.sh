@@ -2,7 +2,7 @@
 # Configuración
 HTML_FILE="MMH3X2_WebUI.html"
 PORT=8003
-BROWSER="firefox"
+BROWSER="xdg-open"
 
 echo "Iniciando servidor local para MMH3X2 Panel..."
 

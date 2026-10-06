@@ -614,6 +614,21 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       </div>
       <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="sageattn3">sageattn3</option><option value="sageattn2">sageattn2</option><option value="sageattn" selected>sageattn</option><option value="sageattn_qk">sageattn_qk</option><option value="auto">auto</option><option value="comfy kitchen attention">comfy kitchen attention</option></select></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
+
+      <!-- GESTIÓN DE MEMORIA Y OFFLOAD -->
+      <div class="panel">
+        <h2>Gestión de Memoria y Offload</h2>
+        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--muted);">Liberación de VRAM / RAM</span>
+          <div style="display:flex;gap:6px;">
+            <button id="btnOffloadVram" type="button" class="ghost btn-mini" title="Descarga los modelos de la GPU (VRAM) hacia la RAM del sistema sin borrarlos de memoria. Deja la VRAM libre para Ollama/llama.cpp.">Descargar VRAM a RAM</button>
+            <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descarga y purga los modelos de VRAM y de la RAM de Python por completo.">Liberar Todo</button>
+          </div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:4px;">
+          Usa <strong>Descargar VRAM a RAM</strong> para liberar la GPU (útil para que Ollama se ejecute en VRAM) manteniendo los modelos precargados en memoria. Usa <strong>Liberar Todo</strong> para vaciar completamente la memoria.
+        </div>
+      </div>
     </div>
 
     <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, RESULTADOS Y COLA -->
@@ -1998,6 +2013,26 @@ async function fetchWithRetry(url, options = {}, attempts = 3, delay = 350){
   }
 }
 
+async function postComfyBackend(endpoint, body){
+  const payload = JSON.stringify(body);
+  const opts = { method: "POST", headers: { "Content-Type": "application/json" }, body: payload };
+  const srv = (typeof server === "function" && server()) ? server() : "";
+  let r;
+  try {
+    r = await fetch(`${srv}${endpoint}`, opts);
+    if(r.ok) return r;
+  } catch(err){
+    if(srv) throw err;
+  }
+  // Si estamos en modo proxy (srv vacío) y falló o devolvió 404/405/502, reintentamos directo al backend
+  if(!srv && (r ? (r.status === 404 || r.status === 405 || r.status === 502) : true)){
+    const host = window.location.hostname || "127.0.0.1";
+    const port = (typeof DEFAULT_BACKEND_PORT !== "undefined" && DEFAULT_BACKEND_PORT) ? DEFAULT_BACKEND_PORT : "8188";
+    r = await fetch(`http://${host}:${port}${endpoint}`, opts);
+  }
+  return r;
+}
+
 function getFriendlyRatio(w, h){
   if(!w || !h) return "16:9";
   const r = w / h;
@@ -2230,12 +2265,40 @@ function connectSocket() {
       };
       socket.onerror = (err) => console.error("WS Error", err);
       socket.onclose = () => {
-        // Fallback activo sin error bloqueante
+        socket = null;
+        setConn("bad", "sin conexión (WS)");
+        setTimeout(() => {
+          if(!document.hidden) connectSocket();
+        }, 1500);
       };
     } catch(err){
       console.warn("No se pudo abrir WebSocket:", err);
     }
 }
+
+function ensureSocketConnected(timeoutMs = 1500) {
+  connectSocket();
+  if(!socket || socket.readyState === WebSocket.OPEN) return Promise.resolve();
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = setInterval(() => {
+      if(!socket || socket.readyState === WebSocket.OPEN || Date.now() - start > timeoutMs){
+        clearInterval(check);
+        resolve();
+      }
+    }, 50);
+  });
+}
+
+// Auto-reconexión proactiva al volver a la pestaña en navegadores como Chrome
+document.addEventListener("visibilitychange", () => {
+  if(!document.hidden){
+    if(!socket || socket.readyState === WebSocket.CLOSED || socket.readyState === WebSocket.CLOSING){
+      console.debug("[WS] Pestaña visible: reconectando socket...");
+      connectSocket();
+    }
+  }
+});
 
 // --- COMFYUI SERVER QUEUE MONITOR ---
 let serverQueueState = { running: 0, pending: 0 };
@@ -3916,6 +3979,47 @@ function initCommon(){
           }
       }
   });
+
+  // --- GESTIÓN DE MEMORIA Y OFFLOAD ---
+  const btnOffload = $("btnOffloadVram");
+  if(btnOffload && !btnOffload.dataset.bound){
+    btnOffload.dataset.bound = "1";
+    btnOffload.addEventListener("click", async () => {
+      const prevText = btnOffload.textContent;
+      btnOffload.disabled = true;
+      btnOffload.textContent = "Descargando...";
+      try {
+        const r = await postComfyBackend("/free", { unload_models: true, free_memory: false });
+        if(!r || !r.ok) throw new Error(r ? "HTTP " + r.status : "Sin respuesta");
+        log("⚡ VRAM liberada: modelos descargados a RAM (conservados en memoria para generar sin leer del disco).", "l-ok");
+      } catch(e){
+        log("⚠️ Error descargando VRAM: " + e.message, "l-err");
+      } finally {
+        btnOffload.disabled = false;
+        btnOffload.textContent = prevText;
+      }
+    });
+  }
+
+  const btnFree = $("btnFreeMemory");
+  if(btnFree && !btnFree.dataset.bound){
+    btnFree.dataset.bound = "1";
+    btnFree.addEventListener("click", async () => {
+      const prevText = btnFree.textContent;
+      btnFree.disabled = true;
+      btnFree.textContent = "Purgando...";
+      try {
+        const r = await postComfyBackend("/free", { unload_models: true, free_memory: true });
+        if(!r || !r.ok) throw new Error(r ? "HTTP " + r.status : "Sin respuesta");
+        log("🧹 Memoria VRAM y modelos purgados por completo en ComfyUI.", "l-ok");
+      } catch(e){
+        log("⚠️ Error liberando memoria: " + e.message, "l-err");
+      } finally {
+        btnFree.disabled = false;
+        btnFree.textContent = prevText;
+      }
+    });
+  }
 }
 
 // --- DRAG HACIA FUERA (drag-out) ---
@@ -6332,7 +6436,7 @@ async function startJob(job){
   activeJob = job;
   updateQueueUI();
   try {
-    connectSocket();
+    await ensureSocketConnected();
     await ensureJobImageUploaded(job);
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;

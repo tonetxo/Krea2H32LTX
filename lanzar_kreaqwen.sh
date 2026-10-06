@@ -2,7 +2,7 @@
 # Configuración
 HTML_FILE="KreaQwen_WebUI.html"
 PORT=8004
-BROWSER="firefox"
+BROWSER="xdg-open"
 
 echo "Iniciando servidor local para KreaQwen Panel..."
 

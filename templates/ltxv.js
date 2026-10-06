@@ -2302,7 +2302,7 @@ async function startJob(job){
   activeJob = job;
   updateQueueUI();
   try {
-    connectSocket();
+    await ensureSocketConnected();
     await ensureJobImageUploaded(job);
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;

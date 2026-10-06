@@ -2,7 +2,7 @@
 # Configuración
 HTML_FILE="LTXV_WebUI.html"
 PORT=8000
-BROWSER="firefox" # Cambia a 'google-chrome' o 'chromium' si prefieres
+BROWSER="xdg-open" # Cambia a 'google-chrome' o 'chromium' si prefieres
 
 echo "🚀 Iniciando servidor local para LTXV Panel..."
 
