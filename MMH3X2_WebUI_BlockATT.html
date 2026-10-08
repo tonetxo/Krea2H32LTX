@@ -1396,6 +1396,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <div class="vid-actions">
             <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">Descargar</button>
             <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">Extraer Frame</button>
+            <button class="vid-action-btn" id="btnInterpolateFinal" title="Interpolar fotogramas del vídeo final (RIFE / RTX Frame Gen)" style="display:none;" type="button">⚡ Interpolar</button>
             <button class="vid-action-btn" id="btnFaceRefineFinal" title="Refinar los rostros del vídeo final con H3 FaceRefine" style="display:none;" type="button">Refinar Rostro</button>
             <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>Workflow</button>
           </div>
@@ -6973,6 +6974,7 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
   const pVid = $("previewVideo" + suffix);
   const btnDl = $("btnDownload" + suffix);
   const btnExt = $("btnExtractFrame" + suffix);
+  const btnInterp = $("btnInterpolate" + suffix);
   const btnFr = $("btnFaceRefine" + suffix);
   const btnMeta = $("btnLoadMeta" + suffix);
   const timeTag = $("time" + suffix);
@@ -7099,6 +7101,13 @@ function displayVideoInPlayer(slotIndex, mediaOrUrl, options = {}){
     };
   }
 
+  if(btnInterp){
+    btnInterp.style.display = "inline-flex";
+    btnInterp.onclick = () => {
+      enqueueInterpolateCurrent(slotIndex);
+    };
+  }
+
   if(btnFr){
     btnFr.style.display = "inline-flex";
     btnFr.onclick = () => {
@@ -7190,6 +7199,44 @@ async function enqueueFaceRefineCurrent(slotIndex = 3){
 const btnFaceRefineFinalEl = $("btnFaceRefineFinal");
 if(btnFaceRefineFinalEl){
   btnFaceRefineFinalEl.addEventListener("click", () => enqueueFaceRefineCurrent(3));
+}
+
+// --- FRAME INTERPOLATION ON-DEMAND ---
+async function enqueueInterpolateCurrent(slotIndex = 3){
+  const media = currentMedia[slotIndex] || currentMedia[3];
+  if(!media || !media.filename){
+    log("No hay ningún vídeo en el reproductor para interpolar.", "l-warn");
+    return;
+  }
+  const rifeEngine = $("rifeEngine")?.value || "rife";
+  const rifeMult = parseInt($("rifeMultiplier")?.value || "2", 10);
+  const rifeModel = $("rifeModel")?.value || "rife_v4.26.safetensors";
+  const job = {
+    id: "interp_" + Date.now(),
+    runMode: "interpolate_only",
+    isInterpolateOnly: true,
+    sourceMedia: { ...media },
+    rife: {
+      enabled: true,
+      engine: rifeEngine,
+      multiplier: rifeMult,
+      model: rifeModel
+    },
+    batchSize: 1
+  };
+  log(`⚡ Añadida interpolación (${rifeEngine.toUpperCase()} ${rifeMult}x) para ${media.filename} a la cola...`, "l-info");
+  if(!activeJob){
+    startJob(job);
+  } else {
+    jobQueue.push(job);
+    updateQueueUI();
+    log(`📥 Tarea añadida a la cola (${jobQueue.length} en espera)`, "l-ok");
+  }
+}
+
+const btnInterpolateFinalEl = $("btnInterpolateFinal");
+if(btnInterpolateFinalEl){
+  btnInterpolateFinalEl.addEventListener("click", () => enqueueInterpolateCurrent(3));
 }
 
 // --- Extracción de fotograma exacto (patrón H3/LTX) ---
@@ -8535,6 +8582,92 @@ function buildGraph(j){
       _meta: { title: "Model Preview Override (animado L2RGB)" }
     };
     currentModelNode = previewOverrideKey;
+  }
+
+  // MODO ON-DEMAND: Interpolar frames del clip actual sin re-muestrear los dos segmentos principales
+  if(j && j.isInterpolateOnly){
+    const sourceMedia = j.sourceMedia || currentMedia[3];
+    const videoFilePath = (sourceMedia && sourceMedia.subfolder ? sourceMedia.subfolder + "/" : "") + (sourceMedia ? sourceMedia.filename : "") + " [output]";
+
+    // Eliminar todos los nodos de la generación estándar
+    Object.keys(g).forEach(id => delete g[id]);
+
+    const rifeState = j.rife || {
+      engine: $("rifeEngine")?.value || "rife",
+      multiplier: parseInt($("rifeMultiplier")?.value || "2", 10),
+      model: $("rifeModel")?.value || "rife_v4.26.safetensors"
+    };
+    const mult = parseInt(rifeState.multiplier || "2", 10);
+
+    g["100_load_video"] = {
+      class_type: "LoadVideo",
+      inputs: { file: videoFilePath },
+      _meta: { title: "Load Video (Native)" }
+    };
+    g["101_get_components"] = {
+      class_type: "GetVideoComponents",
+      inputs: { video: ["100_load_video", 0] },
+      _meta: { title: "Get Video Components (Native)" }
+    };
+
+    let interpImages = ["101_get_components", 0];
+    if(rifeState.engine === "rtx"){
+      g["102_rtx_fg"] = {
+        class_type: "RTXVideoFrameGeneration",
+        inputs: {
+          images: interpImages,
+          generation_type: "frame rate multiplier",
+          "generation_type.multiplier": mult,
+          mode: "HIGH",
+          automatic_shot_change_detection: true,
+          shot_change: false,
+          image_encoding: "8-bit RGB"
+        },
+        _meta: { title: "RTX Video Frame Generation" }
+      };
+      interpImages = ["102_rtx_fg", 0];
+    } else {
+      g["102_rife_loader"] = {
+        class_type: "FrameInterpolationModelLoader",
+        inputs: { model_name: rifeState.model || "rife_v4.26.safetensors" },
+        _meta: { title: "Frame Interpolation Model Loader" }
+      };
+      g["103_rife_interp"] = {
+        class_type: "FrameInterpolate",
+        inputs: {
+          multiplier: mult,
+          images: interpImages,
+          interp_model: ["102_rife_loader", 0]
+        },
+        _meta: { title: "Frame Interpolate" }
+      };
+      interpImages = ["103_rife_interp", 0];
+    }
+
+    const prefix = ($("filenamePrefix")?.value || "video/MMH3X2").trim();
+    g[N.CREATE_VID_FINAL] = {
+      class_type: "CreateVideo",
+      inputs: {
+        fps: 24 * mult,
+        bit_depth: ["101_get_components", 3],
+        color_space: ["101_get_components", 4],
+        images: interpImages,
+        audio: ["101_get_components", 1]
+      },
+      _meta: { title: "Create Video Final (Interpolated)" }
+    };
+    g[N.SAVE_VID_FINAL] = {
+      class_type: "SaveVideo",
+      inputs: {
+        filename_prefix: prefix + `_interpolated_${mult}x`,
+        format: "auto",
+        "format.codec": "auto",
+        codec: "auto",
+        video: [N.CREATE_VID_FINAL, 0]
+      },
+      _meta: { title: "Save Video Final (Interpolated)" }
+    };
+    return g;
   }
 
   // MODO ON-DEMAND: Refinar rostro del clip final sin re-muestrear los dos segmentos principales
@@ -10032,7 +10165,8 @@ async function enqueueJobVariant(job, seedUsed, varIdx){
 
     const frTgt = job.faceRefine?.target;
     const frDesc = frTgt === "hands" ? "Refinado de Manos (HandRefine)" : (frTgt === "face_hands" ? "Refinado Combo (Rostro + Manos)" : (frTgt === "hair" ? "Refinado de Cabello" : (frTgt === "skin" ? "Refinado de Piel" : (frTgt === "body" ? "Refinado de Cuerpo/Persona" : "Refinado Facial (FaceRefine)"))));
-    const modeName = job.isFaceRefineOnly ? frDesc : (job.runMode === 'seg1_only' ? 'Solo Seg 1' : (job.runMode === 'seg2_only' ? 'Solo Seg 2 + Final' : 'Vídeo MMH3X2'));
+    const interpDesc = `Interpolación de Frames (${job.rife?.engine === 'rtx' ? 'RTX Frame Gen' : 'RIFE'} ${job.rife?.multiplier || 2}x)`;
+    const modeName = job.isInterpolateOnly ? interpDesc : (job.isFaceRefineOnly ? frDesc : (job.runMode === 'seg1_only' ? 'Solo Seg 1' : (job.runMode === 'seg2_only' ? 'Solo Seg 2 + Final' : 'Vídeo MMH3X2')));
     log(`🚀 Procesando ${modeName} · Var ${varIdx} (seed ${seedUsed})...`);
     const r = await fetch(server() + "/prompt", {
       method: "POST",

@@ -1948,10 +1948,11 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
 
   if(allowShow){
     const frTgt = activeJob?.faceRefine?.target;
-    const frLabel = frTgt === "hands" ? "HandRefined" : (frTgt === "face_hands" ? "ComboRefined" : (frTgt === "hair" ? "HairRefined" : (frTgt === "skin" ? "SkinRefined" : (frTgt === "body" ? "BodyRefined" : "FaceRefined"))));
-    const badgeText = activeJob?.isFaceRefineOnly
-      ? frLabel
-      : (activeJob?.faceRefine?.enabled ? `Var ${varIndex} · ${frLabel}` : `Var ${varIndex} · ${typeShort}`);
+    const badgeText = activeJob?.isInterpolateOnly
+      ? `Var ${varIndex} · Interp ${activeJob.rife?.multiplier || 2}x`
+      : (activeJob?.isFaceRefineOnly
+        ? frLabel
+        : (activeJob?.faceRefine?.enabled ? `Var ${varIndex} · ${frLabel}` : `Var ${varIndex} · ${typeShort}`));
     const seedVal = pendingSeeds[promptId] ?? null;
     showVideo(1, media, { variantIndex: varIndex, badge: badgeText, promptId, seed: seedVal });
   }
@@ -4012,6 +4013,89 @@ function buildGraph(job){
     delete g[N.SOL_H3];
   }
 
+  // MODO ON-DEMAND: Interpolar frames del clip actual
+  if(j && j.isInterpolateOnly){
+    const sourceMedia = j.sourceMedia || currentMedia[1];
+    const videoFilePath = (sourceMedia && sourceMedia.subfolder ? sourceMedia.subfolder + "/" : "") + (sourceMedia ? sourceMedia.filename : "") + " [output]";
+
+    Object.keys(g).forEach(id => delete g[id]);
+
+    const rifeState = j.rife || getRifeState();
+    const mult = parseInt(rifeState.multiplier || "2", 10);
+    const rifeModel = rifeState.model || "rife_v4.26.safetensors";
+    const rifeEngine = rifeState.engine || "rife";
+
+    g["100_load_video"] = {
+      class_type: "LoadVideo",
+      inputs: { file: videoFilePath },
+      _meta: { title: "Load Video (Native)" }
+    };
+    g["101_get_components"] = {
+      class_type: "GetVideoComponents",
+      inputs: { video: ["100_load_video", 0] },
+      _meta: { title: "Get Video Components (Native)" }
+    };
+
+    let interpImages = ["101_get_components", 0];
+    if(rifeEngine === "rtx"){
+      g["102_rtx_fg"] = {
+        class_type: "RTXVideoFrameGeneration",
+        inputs: {
+          images: interpImages,
+          generation_type: "frame rate multiplier",
+          "generation_type.multiplier": mult,
+          mode: "HIGH",
+          automatic_shot_change_detection: true,
+          shot_change: false,
+          image_encoding: "8-bit RGB"
+        },
+        _meta: { title: "RTX Video Frame Generation" }
+      };
+      interpImages = ["102_rtx_fg", 0];
+    } else {
+      g["102_rife_loader"] = {
+        class_type: "FrameInterpolationModelLoader",
+        inputs: { model_name: rifeModel },
+        _meta: { title: "Frame Interpolation Model Loader" }
+      };
+      g["103_rife_interp"] = {
+        class_type: "FrameInterpolate",
+        inputs: {
+          multiplier: mult,
+          images: interpImages,
+          interp_model: ["102_rife_loader", 0]
+        },
+        _meta: { title: "Frame Interpolate" }
+      };
+      interpImages = ["103_rife_interp", 0];
+    }
+
+    const prefix = ($("filenamePrefix")?.value || "video/MiniMax_H3").trim();
+    g[N.CREATE_VIDEO] = {
+      class_type: "CreateVideo",
+      inputs: {
+        fps: 24 * mult,
+        bit_depth: 8,
+        color_space: "sRGB",
+        images: interpImages,
+        audio: ["101_get_components", 1]
+      },
+      _meta: { title: "Create Interpolated Video" }
+    };
+    g[N.SAVE] = {
+      class_type: "SaveVideo",
+      inputs: {
+        filename_prefix: prefix + `_interpolated_${mult}x`,
+        format: "auto",
+        "format.codec": "auto",
+        codec: "auto",
+        video: [N.CREATE_VIDEO, 0]
+      },
+      _meta: { title: "Save Interpolated Video" }
+    };
+    return g;
+  }
+
   // MODO ON-DEMAND: Refinar rostro del clip actual sin re-muestrear el vídeo principal
   if(j && j.isFaceRefineOnly){
     const frState = j.faceRefine || getFaceRefineState();
@@ -5379,6 +5463,7 @@ function showVideo(slot, media, options={}){
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
   const frBtn = $("btnFaceRefine"+slot);
   const upBtn = $("btnUpscale"+slot);
+  const interpBtn = $("btnInterpolate"+slot);
   const prev=$("previewImg"+slot), wrap=$("previewWrap"+slot), step=$("previewStep"+slot);
   if(prev) prev.style.display="none";
   if(wrap) wrap.style.display="none";
@@ -5393,6 +5478,7 @@ function showVideo(slot, media, options={}){
   if(sf) sf.style.display="inline-flex";
   if(frBtn) frBtn.style.display="inline-flex";
   if(upBtn) upBtn.style.display="inline-flex";
+  if(interpBtn) interpBtn.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   if(options.seed != null){
     currentMediaSeed[slot] = options.seed;
@@ -5602,6 +5688,34 @@ async function enqueueFaceRefineCurrent(){
 const btnFaceRefine1 = $("btnFaceRefine1");
 if(btnFaceRefine1){
   btnFaceRefine1.addEventListener("click", enqueueFaceRefineCurrent);
+}
+
+// --- Interpolar frames del clip actual (On-Demand) ---
+async function enqueueInterpolateCurrent(){
+  const media = currentMedia[1];
+  if(!media || !media.filename){
+    log("No hay ningún vídeo en el reproductor para interpolar.", "l-warn");
+    return;
+  }
+  const rifeState = getRifeState();
+  const job = snapshotJob();
+  job.id = ++jobCounter;
+  job.isInterpolateOnly = true;
+  job.sourceMedia = { ...media };
+  job.rife = rifeState;
+  job.batchSize = 1;
+  log(`⚡ Añadida interpolación (${rifeState.engine.toUpperCase()} ${rifeState.multiplier}x) para ${media.filename} a la cola.`, "l-info");
+  if(activeJob){
+    jobQueue.push(job);
+    updateQueueUI();
+  } else {
+    await startJob(job);
+  }
+}
+
+const btnInterpolate1 = $("btnInterpolate1");
+if(btnInterpolate1){
+  btnInterpolate1.addEventListener("click", enqueueInterpolateCurrent);
 }
 
 // --- Upscale Latente (2º Pase) On-Demand ---
@@ -6047,7 +6161,7 @@ async function startJob(job){
     job.currentVariantIndex = null;
     $("time1").textContent = "";
     $("time1").classList.remove("live");
-    setRun("busy", job.isFaceRefineOnly ? `Refinando rostro de ${job.sourceMedia?.filename || "clip"}...` : `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
+    setRun("busy", job.isInterpolateOnly ? `Interpolando frames de ${job.sourceMedia?.filename || "clip"}...` : (job.isFaceRefineOnly ? `Refinando de ${job.sourceMedia?.filename || "clip"}...` : `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`));
     enableStopButtons(true);
     await runSingleGeneration(0);
   } catch(err) {
