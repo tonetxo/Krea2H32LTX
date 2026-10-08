@@ -333,12 +333,23 @@
       </div>
 
       <div class="panel">
-        <h2>Refinado facial (H3 FaceRefine)</h2>
+        <h2>Refinado de elementos (Face / Hand / Body Refine)</h2>
         <div class="seed-toggle">
           <div class="seg" id="segFaceRefineOn" data-value="true">Activo</div>
           <div class="seg on" id="segFaceRefineOff" data-value="false">Desactivado</div>
         </div>
         <div id="faceRefineControls" style="display:none; margin-top:8px;">
+          <div class="row">
+            <label>Elemento a refinar</label>
+            <select id="faceRefineTarget">
+              <option value="face" selected>Rostro (Face · face_yolov8m)</option>
+              <option value="hands">Manos (Hands · hand_yolov8s)</option>
+              <option value="face_hands">Combo: Rostro + Manos (2 pasadas)</option>
+              <option value="hair">Cabello (Hair · yolov8-seg)</option>
+              <option value="skin">Piel (Skin · yolov8-seg)</option>
+              <option value="body">Cuerpo / Persona (Person · yolov8m-seg)</option>
+            </select>
+          </div>
           <div class="row">
             <label>Resolución de recorte</label>
             <select id="faceRefineCanvasMode">
@@ -362,18 +373,18 @@
             <div class="slider-val" id="faceRefineFeatherVal">16 px</div>
           </div>
           <div class="row">
-            <label>Selección de rostro</label>
+            <label>Modo de selección</label>
             <select id="faceRefineSelectMode">
-              <option value="largest_face" selected>1 rostro (Principal · más grande)</option>
-              <option value="dual_faces">2 rostros (Dual · refina ambas caras)</option>
-              <option value="centre_most">1 rostro (Más centrado)</option>
-              <option value="left_most">1 rostro (A la izquierda)</option>
-              <option value="right_most">1 rostro (A la derecha)</option>
-              <option value="second_face">1 rostro (Solo segundo rostro · index 1)</option>
+              <option value="largest_face" selected>1 objetivo (Principal · más grande)</option>
+              <option value="dual_faces">2 objetivos (Dual · refina ambos)</option>
+              <option value="centre_most">1 objetivo (Más centrado)</option>
+              <option value="left_most">1 objetivo (A la izquierda)</option>
+              <option value="right_most">1 objetivo (A la derecha)</option>
+              <option value="second_face">1 objetivo (Solo segundo · index 1)</option>
             </select>
           </div>
         </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera los rostros con Denoise adaptativo por fotograma. El modo Dual refina dos personajes en cadena. 512x512 evita OOM en vídeos largos y acelera el render.</div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera rostros, manos, pelo o cuerpo con Denoise adaptativo por fotograma. El modo Combo o Dual refina dos elementos en cadena. 512x512 evita OOM en vídeos largos y acelera el render.</div>
       </div>
 
       <div class="panel">

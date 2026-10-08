@@ -1002,8 +1002,37 @@ $("rtxQuality")?.addEventListener("change", () => {
 
 // --- FACE REFINE (ComfyUI-H3-FaceRefine) ---
 const FACEREFINE_KEY = "minimaxh3_facerefine_state";
+const ELEMENT_REFINE_CONFIG = {
+  face: {
+    detector: "face_yolov8m.pt",
+    cropFactor: 3.0,
+    prompt: "cinematic face, natural expression, ultra high detail, sharp focus, 8k"
+  },
+  hands: {
+    detector: "hand_yolov8s.pt",
+    cropFactor: 2.8,
+    prompt: "detailed realistic hands, 5 distinct fingers, natural fingernails, high quality skin texture, sharp focus"
+  },
+  hair: {
+    detector: "hair_yolov8n-seg_60.pt",
+    cropFactor: 2.2,
+    prompt: "detailed strands of hair, natural hair flow, clean scalp, high definition, sharp focus"
+  },
+  skin: {
+    detector: "skin_yolov8m-seg_400.pt",
+    cropFactor: 2.5,
+    prompt: "smooth natural skin texture, realistic pores, fine details, sharp focus, 8k"
+  },
+  body: {
+    detector: "person_yolov8m-seg.pt",
+    cropFactor: 1.3,
+    prompt: "detailed clothing fabric, realistic anatomy, natural posture, ultra high definition"
+  }
+};
+
 const FACEREFINE_DEFAULTS = {
   enabled: false,
+  target: "face",
   canvas: 512,
   steps: 4,
   denoise: 0.35,
@@ -1018,6 +1047,7 @@ function saveFaceRefine(s){ try { localStorage.setItem(FACEREFINE_KEY, JSON.stri
 function getFaceRefineState(){
   return {
     enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
+    target: $("faceRefineTarget")?.value || "face",
     canvas: parseInt($("faceRefineCanvasMode")?.value || "512", 10),
     steps: parseInt($("faceRefineStepsSlider")?.value || "4", 10),
     denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.35"),
@@ -1035,6 +1065,9 @@ function setFaceRefineUI(s){
   } else {
     off?.classList.add("on"); on?.classList.remove("on");
     if(panel) panel.style.display = "none";
+  }
+  if($("faceRefineTarget") && s.target){
+    $("faceRefineTarget").value = s.target;
   }
   if($("faceRefineCanvasMode")){
     $("faceRefineCanvasMode").value = String(s.canvas || 512);
@@ -1074,6 +1107,12 @@ $("segFaceRefineOff")?.addEventListener("click", () => {
   const s = getFaceRefineState();
   s.enabled = false;
   setFaceRefineUI(s);
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+$("faceRefineTarget")?.addEventListener("change", (e) => {
+  const s = getFaceRefineState();
+  s.target = e.target.value;
   saveFaceRefine(s);
   scheduleSaveH3Settings();
 });
@@ -1908,9 +1947,11 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
   const typeShort = badgePrefix || (slot === 1 ? (activeJob?.latentUpscale?.enabled ? "1er pase" : "final") : "final");
 
   if(allowShow){
+    const frTgt = activeJob?.faceRefine?.target;
+    const frLabel = frTgt === "hands" ? "HandRefined" : (frTgt === "face_hands" ? "ComboRefined" : (frTgt === "hair" ? "HairRefined" : (frTgt === "skin" ? "SkinRefined" : (frTgt === "body" ? "BodyRefined" : "FaceRefined"))));
     const badgeText = activeJob?.isFaceRefineOnly
-      ? "FaceRefined"
-      : (activeJob?.faceRefine?.enabled ? `Var ${varIndex} · FaceRefined` : `Var ${varIndex} · ${typeShort}`);
+      ? frLabel
+      : (activeJob?.faceRefine?.enabled ? `Var ${varIndex} · ${frLabel}` : `Var ${varIndex} · ${typeShort}`);
     const seedVal = pendingSeeds[promptId] ?? null;
     showVideo(1, media, { variantIndex: varIndex, badge: badgeText, promptId, seed: seedVal });
   }
@@ -3991,20 +4032,26 @@ function buildGraph(job){
       _meta: { title: "Get Video Components (Native)" }
     };
 
+    const frTarget = frState.target || "face";
+    const isCombo = (frTarget === "face_hands");
     const rawSelect = frState.select || "largest_face";
-    const isDual = (rawSelect === "dual_faces");
+    const isDual = (rawSelect === "dual_faces") || isCombo;
+
+    const elemCfg1 = ELEMENT_REFINE_CONFIG[isCombo ? "face" : frTarget] || ELEMENT_REFINE_CONFIG.face;
+    const elemCfg2 = isCombo ? ELEMENT_REFINE_CONFIG.hands : elemCfg1;
+
     let pass1Select = "largest_face";
     let pass1Index = 0;
-    if(rawSelect === "dual_faces"){
-      pass1Select = "largest_face";
-      pass1Index = 0;
-    } else if(rawSelect === "second_face"){
+    if(rawSelect === "second_face"){
       pass1Select = "largest_face";
       pass1Index = 1;
     } else if(rawSelect === "centre_most" || rawSelect === "left_most" || rawSelect === "right_most"){
       pass1Select = rawSelect;
       pass1Index = 0;
     }
+
+    const pass2Select = "largest_face";
+    const pass2Index = isCombo ? 0 : 1;
 
     const pass2NodeIds = [
       N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
@@ -4017,9 +4064,9 @@ function buildGraph(job){
       class_type: "H3FaceTrackCrop",
       inputs: {
         images: [N.FACE_COMPONENTS, 0],
-        detector: "face_yolov8m.pt",
+        detector: elemCfg1.detector,
         confidence: 0.35,
-        crop_factor: 3.0,
+        crop_factor: elemCfg1.cropFactor,
         canvas_width: frCanvas,
         canvas_height: frCanvas,
         canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
@@ -4041,15 +4088,17 @@ function buildGraph(job){
         Y: 0,
         frame_index: 0
       },
-      _meta: { title: "Face Track Crop" }
+      _meta: { title: isCombo ? "Face Track Crop" : "Element Track Crop" }
     };
 
-    const frPrompt = pVal || "cinematic face, natural expression, ultra high detail, sharp focus, 8k";
+    const baseP = pVal || "";
+    const frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
+    const frPrompt2 = baseP ? `${baseP}, ${elemCfg2.prompt}` : elemCfg2.prompt;
     const frRef2vInputs = {
       clip: [N.CLIP, 0],
       vae: [N.VAE_VIDEO, 0],
       audio_vae: [N.VAE_AUDIO, 0],
-      prompt: frPrompt,
+      prompt: frPrompt1,
       width: [N.FACE_CROP, 4],
       height: [N.FACE_CROP, 5],
       length: [N.FACE_CROP, 6],
@@ -4160,15 +4209,15 @@ function buildGraph(job){
 
     let currentVideoImages = [N.FACE_STITCH, 0];
 
-    // Sub-grafo FaceRefine — Pasada 2 (Dual Faces)
+    // Sub-grafo FaceRefine — Pasada 2 (Dual / Combo)
     if(isDual){
       g[N.FACE_CROP_2] = {
         class_type: "H3FaceTrackCrop",
         inputs: {
           images: [N.FACE_STITCH, 0],
-          detector: "face_yolov8m.pt",
+          detector: elemCfg2.detector,
           confidence: 0.35,
-          crop_factor: 3.0,
+          crop_factor: elemCfg2.cropFactor,
           canvas_width: frCanvas,
           canvas_height: frCanvas,
           canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
@@ -4178,10 +4227,10 @@ function buildGraph(job){
           size_mode: "per_frame",
           identity_track: false,
           identity_threshold: 0.28,
-          select: "largest_face",
+          select: pass2Select,
           fallback_detector: "none",
           fallback_head_frac: 0.5,
-          select_index: 1,
+          select_index: pass2Index,
           identity_model: "insightface",
           cut_detection: "none",
           cut_threshold: 3.0,
@@ -4190,14 +4239,14 @@ function buildGraph(job){
           Y: 0,
           frame_index: 0
         },
-        _meta: { title: "Face Track Crop 2" }
+        _meta: { title: isCombo ? "Hand Track Crop 2" : "Element Track Crop 2" }
       };
 
       const frRef2vInputs2 = {
         clip: [N.CLIP, 0],
         vae: [N.VAE_VIDEO, 0],
         audio_vae: [N.VAE_AUDIO, 0],
-        prompt: frPrompt,
+        prompt: frPrompt2,
         width: [N.FACE_CROP_2, 4],
         height: [N.FACE_CROP_2, 5],
         length: [N.FACE_CROP_2, 6],
@@ -4404,7 +4453,7 @@ function buildGraph(job){
     g[N.SAVE] = {
       class_type: "SaveVideo",
       inputs: {
-        filename_prefix: "video/MiniMax_H3_FaceRefined",
+        filename_prefix: "video/MiniMax_H3_" + (isCombo ? "ComboRefined" : (frTarget === "hands" ? "HandRefined" : (frTarget === "face" ? "FaceRefined" : `${frTarget}_Refined`))),
         format: "auto",
         "format.codec": "auto",
         codec: "auto",
@@ -4878,20 +4927,26 @@ function buildGraph(job){
   let currentVideoImages = [N.DECODE_VIDEO, 0];
 
   if(faceRefineEnabled){
+    const frTarget = frState.target || "face";
+    const isCombo = (frTarget === "face_hands");
     const rawSelect = frState.select || "largest_face";
-    const isDual = (rawSelect === "dual_faces");
+    const isDual = (rawSelect === "dual_faces") || isCombo;
+
+    const elemCfg1 = ELEMENT_REFINE_CONFIG[isCombo ? "face" : frTarget] || ELEMENT_REFINE_CONFIG.face;
+    const elemCfg2 = isCombo ? ELEMENT_REFINE_CONFIG.hands : elemCfg1;
+
     let pass1Select = "largest_face";
     let pass1Index = 0;
-    if(rawSelect === "dual_faces"){
-      pass1Select = "largest_face";
-      pass1Index = 0;
-    } else if(rawSelect === "second_face"){
+    if(rawSelect === "second_face"){
       pass1Select = "largest_face";
       pass1Index = 1;
     } else if(rawSelect === "centre_most" || rawSelect === "left_most" || rawSelect === "right_most"){
       pass1Select = rawSelect;
       pass1Index = 0;
     }
+
+    const pass2Select = "largest_face";
+    const pass2Index = isCombo ? 0 : 1;
 
     const pass2NodeIds = [
       N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
@@ -4909,9 +4964,9 @@ function buildGraph(job){
       class_type: "H3FaceTrackCrop",
       inputs: {
         images: [N.DECODE_VIDEO, 0],
-        detector: "face_yolov8m.pt",
+        detector: elemCfg1.detector,
         confidence: 0.35,
-        crop_factor: 3.0,
+        crop_factor: elemCfg1.cropFactor,
         canvas_width: frCanvas,
         canvas_height: frCanvas,
         canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
@@ -4933,15 +4988,17 @@ function buildGraph(job){
         Y: 0,
         frame_index: 0
       },
-      _meta: { title: "Face Track Crop" }
+      _meta: { title: isCombo ? "Face Track Crop" : "Element Track Crop" }
     };
 
-    const frPrompt = pVal || "cinematic face, natural expression, ultra high detail, sharp focus, 8k";
+    const baseP = pVal || "";
+    const frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
+    const frPrompt2 = baseP ? `${baseP}, ${elemCfg2.prompt}` : elemCfg2.prompt;
     const frRef2vInputs = {
       clip: [N.CLIP, 0],
       vae: [N.VAE_VIDEO, 0],
       audio_vae: [N.VAE_AUDIO, 0],
-      prompt: frPrompt,
+      prompt: frPrompt1,
       width: [N.FACE_CROP, 4],
       height: [N.FACE_CROP, 5],
       length: [N.FACE_CROP, 6],
@@ -5057,15 +5114,15 @@ function buildGraph(job){
 
     currentVideoImages = [N.FACE_STITCH, 0];
 
-    // Sub-grafo FaceRefine — Pasada 2 (Dual Faces)
+    // Sub-grafo FaceRefine — Pasada 2 (Dual / Combo)
     if(isDual){
       g[N.FACE_CROP_2] = {
         class_type: "H3FaceTrackCrop",
         inputs: {
           images: [N.FACE_STITCH, 0],
-          detector: "face_yolov8m.pt",
+          detector: elemCfg2.detector,
           confidence: 0.35,
-          crop_factor: 3.0,
+          crop_factor: elemCfg2.cropFactor,
           canvas_width: frCanvas,
           canvas_height: frCanvas,
           canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
@@ -5075,10 +5132,10 @@ function buildGraph(job){
           size_mode: "per_frame",
           identity_track: false,
           identity_threshold: 0.28,
-          select: "largest_face",
+          select: pass2Select,
           fallback_detector: "none",
           fallback_head_frac: 0.5,
-          select_index: 1,
+          select_index: pass2Index,
           identity_model: "insightface",
           cut_detection: "none",
           cut_threshold: 3.0,
@@ -5087,14 +5144,14 @@ function buildGraph(job){
           Y: 0,
           frame_index: 0
         },
-        _meta: { title: "Face Track Crop 2" }
+        _meta: { title: isCombo ? "Hand Track Crop 2" : "Element Track Crop 2" }
       };
 
       const frRef2vInputs2 = {
         clip: [N.CLIP, 0],
         vae: [N.VAE_VIDEO, 0],
         audio_vae: [N.VAE_AUDIO, 0],
-        prompt: frPrompt,
+        prompt: frPrompt2,
         width: [N.FACE_CROP_2, 4],
         height: [N.FACE_CROP_2, 5],
         length: [N.FACE_CROP_2, 6],
