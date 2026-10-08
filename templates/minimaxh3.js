@@ -483,6 +483,7 @@ function saveH3Settings(){
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
     latentUpscale: getLatentUpscaleState(),
+    faceRefine: getFaceRefineState(),
     rife: getRifeState(),
     rtx: getRtxState(),
     attentionBackend: getAttentionBackendState(),
@@ -523,6 +524,7 @@ function restoreH3Settings(){
     if(s.sigmaShift){ setSigmaShiftUI(s.sigmaShift); saveSigmaShift(s.sigmaShift); }
     if(s.spectrum){ setSpectrumUI(s.spectrum); saveSpectrum(s.spectrum); }
     if(s.latentUpscale){ setLatentUpscaleUI(s.latentUpscale); saveLatentUpscale(s.latentUpscale); }
+    if(s.faceRefine){ setFaceRefineUI(s.faceRefine); saveFaceRefine(s.faceRefine); }
     if(s.rife){ setRifeUI(s.rife); saveRife(s.rife); }
     if(s.rtx){ setRtxUI(s.rtx); saveRtx(s.rtx); }
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
@@ -999,6 +1001,8 @@ $("rtxQuality")?.addEventListener("change", () => {
 const FACEREFINE_KEY = "minimaxh3_facerefine_state";
 const FACEREFINE_DEFAULTS = {
   enabled: false,
+  canvas: 512,
+  steps: 4,
   denoise: 0.35,
   feather: 16,
   select: "largest_face"
@@ -1011,6 +1015,8 @@ function saveFaceRefine(s){ try { localStorage.setItem(FACEREFINE_KEY, JSON.stri
 function getFaceRefineState(){
   return {
     enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
+    canvas: parseInt($("faceRefineCanvasMode")?.value || "512", 10),
+    steps: parseInt($("faceRefineStepsSlider")?.value || "4", 10),
     denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.35"),
     feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
     select: $("faceRefineSelectMode")?.value || "largest_face"
@@ -1026,6 +1032,15 @@ function setFaceRefineUI(s){
   } else {
     off?.classList.add("on"); on?.classList.remove("on");
     if(panel) panel.style.display = "none";
+  }
+  if($("faceRefineCanvasMode")){
+    $("faceRefineCanvasMode").value = String(s.canvas || 512);
+  }
+  if($("faceRefineStepsSlider")){
+    const st = parseInt(s.steps != null ? s.steps : 4, 10);
+    $("faceRefineStepsSlider").value = st;
+    if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+    if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
   }
   if($("faceRefineDenoiseSlider")){
     const d = parseFloat(s.denoise != null ? s.denoise : 0.35);
@@ -1056,6 +1071,21 @@ $("segFaceRefineOff")?.addEventListener("click", () => {
   const s = getFaceRefineState();
   s.enabled = false;
   setFaceRefineUI(s);
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+$("faceRefineCanvasMode")?.addEventListener("change", (e) => {
+  const s = getFaceRefineState();
+  s.canvas = parseInt(e.target.value, 10) || 512;
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+$("faceRefineStepsSlider")?.addEventListener("input", (e) => {
+  const st = parseInt(e.target.value, 10) || 4;
+  if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+  if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+  const s = getFaceRefineState();
+  s.steps = st;
   saveFaceRefine(s);
   scheduleSaveH3Settings();
 });
@@ -3941,6 +3971,8 @@ function buildGraph(job){
   // MODO ON-DEMAND: Refinar rostro del clip actual sin re-muestrear el vídeo principal
   if(j && j.isFaceRefineOnly){
     const frState = j.faceRefine || getFaceRefineState();
+    const frCanvas = frState.canvas || frState.canvasSize || 512;
+    const frSteps = (typeof frState.steps === "number") ? frState.steps : 4;
     const sourceMedia = j.sourceMedia || currentMedia[1];
     const videoFilePath = (sourceMedia && sourceMedia.subfolder ? sourceMedia.subfolder + "/" : "") + (sourceMedia ? sourceMedia.filename : "") + " [output]";
 
@@ -3964,9 +3996,9 @@ function buildGraph(job){
         detector: "face_yolov8m.pt",
         confidence: 0.35,
         crop_factor: 3.0,
-        canvas_width: 768,
-        canvas_height: 768,
-        canvas_mode: "auto_capped_768",
+        canvas_width: frCanvas,
+        canvas_height: frCanvas,
+        canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
         smooth_window: 21,
         size_smooth_window: 51,
         smooth_method: "gaussian",
@@ -4041,7 +4073,7 @@ function buildGraph(job){
       inputs: {
         model: [N.FACE_PERFRAME_DENOISE, 2],
         scheduler: "simple",
-        steps: 8,
+        steps: frSteps,
         denoise: frState.denoise || 0.35
       },
       _meta: { title: "Face Basic Scheduler" }
@@ -4666,6 +4698,8 @@ function buildGraph(job){
   // 10. Refinado facial (H3 FaceRefine) — intercalado tras DECODE_VIDEO y antes de RIFE / RTX_SR
   const frState = j ? j.faceRefine : getFaceRefineState();
   const faceRefineEnabled = frState ? frState.enabled : false;
+  const frCanvas = frState ? (frState.canvas || frState.canvasSize || 512) : 512;
+  const frSteps = frState ? ((typeof frState.steps === "number") ? frState.steps : 4) : 4;
   let currentVideoImages = [N.DECODE_VIDEO, 0];
 
   if(faceRefineEnabled){
@@ -4676,9 +4710,9 @@ function buildGraph(job){
         detector: "face_yolov8m.pt",
         confidence: 0.35,
         crop_factor: 3.0,
-        canvas_width: 768,
-        canvas_height: 768,
-        canvas_mode: "auto_capped_768",
+        canvas_width: frCanvas,
+        canvas_height: frCanvas,
+        canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
         smooth_window: 21,
         size_smooth_window: 51,
         smooth_method: "gaussian",
@@ -4758,7 +4792,7 @@ function buildGraph(job){
       inputs: {
         model: [N.FACE_PERFRAME_DENOISE, 2],
         scheduler: "simple",
-        steps: 8,
+        steps: frSteps,
         denoise: frState.denoise || 0.35
       },
       _meta: { title: "Face Basic Scheduler" }
