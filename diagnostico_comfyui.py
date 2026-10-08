@@ -54,10 +54,17 @@ REQUIRED_PACKAGES = [
     },
     {
         "name": "Spectrum",
-        "repo": "https://github.com/MinusZoneAI/ComfyUI-Spectrum",
+        "repo": "https://github.com/xmarre/ComfyUI-Spectrum-MiniMax-H3",
         "nodes": ["SpectrumApplyMiniMaxH3"],
         "critical": False,
         "workflows": ["MMH3X2 (Spectrum)", "MiniMaxH3"],
+    },
+    {
+        "name": "comfyui_nvidia_rtx_nodes",
+        "repo": "https://github.com/Comfy-Org/Nvidia_RTX_Nodes_ComfyUI",
+        "nodes": ["RTXVideoSuperResolution", "RTXVideoFrameGeneration", "RTXTrueHDR"],
+        "critical": False,
+        "workflows": ["MiniMaxH3 (RTX SR)", "LTXV (RTX SR)"],
     },
     {
         "name": "rgthree-comfy",

@@ -75,10 +75,17 @@
         </div>
       </div>
       <div class="panel">
-        <h2>Interpolación de Frames (RIFE)</h2>
+        <h2>Interpolación de Frames</h2>
         <div class="seed-toggle">
           <div class="seg on" id="segRifeOn" data-value="true">Activo</div>
           <div class="seg" id="segRifeOff" data-value="false">Desactivado</div>
+        </div>
+        <div class="row">
+          <label>Motor de interpolación</label>
+          <select id="rifeEngine">
+            <option value="rife" selected>RIFE / FILM (Red neuronal IA)</option>
+            <option value="rtx">NVIDIA RTX Frame Gen (Tensor Cores)</option>
+          </select>
         </div>
         <div class="row">
           <label>Multiplicador FPS <span class="hint" id="rifeFpsHint">(24fps → 48fps)</span></label>
@@ -88,7 +95,7 @@
             <option value="4">4x (96 fps — Hyper Smooth)</option>
           </select>
         </div>
-        <div class="row">
+        <div class="row" id="rifeModelRow">
           <label>Modelo RIFE</label>
           <select id="rifeModel">
             <option value="rife_v4.26.safetensors" selected>rife_v4.26.safetensors (Recomendado)</option>
@@ -100,6 +107,28 @@
           </select>
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes de RTX Super Resolution para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
+      </div>
+
+      <div class="panel">
+        <h2>RTX Video Super Resolution (2x)</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRtxOn" data-value="true">Activo</div>
+          <div class="seg" id="segRtxOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="rtxControls" style="display:block; margin-top:8px;">
+          <div class="row">
+            <label>Calidad RTX</label>
+            <select id="rtxQuality">
+              <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
+              <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
+              <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate Equilibrado)</option>
+              <option value="HIGH">HIGH (Equilibrado)</option>
+              <option value="MEDIUM">MEDIUM (Rápido)</option>
+              <option value="LOW">LOW (Bajo consumo)</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Escalado por Tensor Cores NVIDIA RTX (2x). Proporciona definición cinematográfica final.</div>
       </div>
       <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="sageattn3">sageattn3</option><option value="sageattn2">sageattn2</option><option value="sageattn" selected>sageattn</option><option value="sageattn_qk">sageattn_qk</option><option value="auto">auto</option><option value="comfy kitchen attention">comfy kitchen attention</option></select></div></div>
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>

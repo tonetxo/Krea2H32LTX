@@ -660,16 +660,33 @@
           <!-- RTX Video Super Resolution -->
           <div class="row">
             <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution (2x ULTRA)</span>
+              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution (2x)</span>
             </label>
+            <div id="rtxControls" style="margin-top:4px;">
+              <select id="rtxQuality">
+                <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
+                <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
+                <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate Equilibrado)</option>
+                <option value="HIGH">HIGH (Equilibrado)</option>
+                <option value="MEDIUM">MEDIUM (Rápido)</option>
+                <option value="LOW">LOW (Bajo consumo)</option>
+              </select>
+            </div>
             <div class="hint" style="font-size:10px;margin-top:2px;">Escala por hardware con Tensor Cores manteniendo detalles nítidos.</div>
           </div>
 
-          <!-- RIFE Frame Interpolation -->
+          <!-- Interpolación de Frames (RIFE / RTX Frame Gen) -->
           <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
             <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="rifeToggle" checked> <span>Interpolación de Frames (RIFE)</span>
+              <input type="checkbox" id="rifeToggle" checked> <span>Interpolación de Frames</span>
             </label>
+            <div class="row" style="margin-top:4px;">
+              <label style="font-size:10px;">Motor de interpolación</label>
+              <select id="rifeEngine">
+                <option value="rife" selected>RIFE / FILM (Red neuronal IA)</option>
+                <option value="rtx">NVIDIA RTX Frame Gen (Tensor Cores)</option>
+              </select>
+            </div>
             <div class="row two-col" style="margin-top:6px;">
               <div>
                 <label style="font-size:10px;">Multiplicador</label>
@@ -678,7 +695,7 @@
                   <option value="4">4x (24 fps → 96 fps)</option>
                 </select>
               </div>
-              <div>
+              <div id="rifeModelCol">
                 <label style="font-size:10px;">Modelo RIFE</label>
                 <select id="rifeModel"><option value="rife_v4.26.safetensors">rife_v4.26</option></select>
               </div>

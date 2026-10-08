@@ -685,7 +685,7 @@ function recalcResolution(){
   updateCalculatedResolution(hasImg1 ? img1.naturalWidth : 1280, hasImg1 ? img1.naturalHeight : 720);
 }
 
-CONFIG.variantMeta = function(){
+CONFIG.variantMeta = function(seedValue, timeText){
   const p1 = $("prompt")?.value?.trim() || "";
   const p2 = $("prompt2")?.value?.trim() || "";
   const seg2Mode = $("seg2PromptMode")?.value || "direct";
@@ -722,6 +722,8 @@ CONFIG.variantMeta = function(){
   const audioCfOn = $("audioCrossfadeToggle") ? $("audioCrossfadeToggle").checked : false;
   const audioCfSec = $("audioCrossfadeSlider") ? parseFloat($("audioCrossfadeSlider").value).toFixed(2) : "1.00";
 
+  const timingVal = (timeText && String(timeText).trim()) ? String(timeText).trim() : ($("timeFinal")?.textContent?.replace("⏱", "")?.trim() || "");
+
   const rows = [
     ["Modelo", unet],
     ["CLIP", clip],
@@ -737,6 +739,7 @@ CONFIG.variantMeta = function(){
     ["Duración Seg 2", `${dur2.toFixed(1)}s (${f2}f)`],
     ["Duración Total", `${(fTotal / 24).toFixed(1)}s (${fTotal}f)`],
     ["Resolución", `${w}×${h} (${mp} MP)`],
+    ["A/R", getFriendlyRatio(parseInt(w, 10), parseInt(h, 10))],
     ["Pasos (Steps)", steps],
     ["Sampler", sampler],
     ["Scheduler", scheduler],
@@ -748,8 +751,17 @@ CONFIG.variantMeta = function(){
     (() => { const s = getSpectrumState(); return ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup}${s.bootstrapFirstForecast ? ' · boot' : ''} · ${s.historyStorage}` : "off"]; })(),
     IS_BLOCKATT ? ["Optimizador", getAttentionOptimizerState().mode] : null,
     ["Empalme vídeo", $("blendToggle")?.checked ? `${$("blendFrames")?.value || 4}f · fuerza ${$("blendStrength")?.value || 0.35} · ${$("blendMode")?.value || "transition_only"}` : "desactivado"],
-    ["RIFE", `${rMode}x`]
+    (() => {
+      const rifeOn = $("rifeToggle")?.checked;
+      if(!rifeOn) return ["Interpolación", "desactivada"];
+      const engine = $("rifeEngine")?.value || "rife";
+      const mult = $("rifeMultiplier")?.value || "2";
+      return ["Interpolación", (engine === "rtx") ? `RTX Frame Gen ${mult}x` : `RIFE ${mult}x`];
+    })(),
+    ["RTX Super Resolution", $("rtxToggle")?.checked ? `on (2x ${$("rtxQuality")?.value || "HIGHBITRATE_ULTRA"})` : "off"]
   ].filter(Boolean);
+
+  if(timingVal) rows.unshift(["Tiempo gen.", timingVal]);
 
   return { title: "Parámetros MMH3X2", rows, loras: lorasActive };
 };
@@ -776,9 +788,18 @@ function findClipInWorkflow(workflow){
   return "";
 }
 
-function formatWorkflowToMeta(workflow){
+function formatWorkflowToMeta(workflow, extra = {}){
   if(!workflow || typeof workflow !== "object") return null;
   const rows = [];
+
+  const res = extra.resolution || "—";
+  const ar = extra.aspectRatio || "—";
+  const timing = extra.timing || "—";
+
+  if(res !== "—") rows.push(["Resolución", res]);
+  if(ar !== "—") rows.push(["A/R", ar]);
+  if(timing !== "—") rows.push(["Tiempo gen.", timing]);
+
   const modelName = findModelInWorkflow(workflow);
   if(modelName) rows.push(["Modelo", modelName]);
   const clipName = findClipInWorkflow(workflow);
@@ -846,6 +867,7 @@ CONFIG.onNodeExecuted = function(data){
 
     const m1 = CONFIG.findMedia(data.output);
     if(m1){
+      if(m1.filename) saveVideoTiming(m1.filename, fmtMs(seg1Ms));
       displayVideoInPlayer(1, m1, { variant: promptVariantMap[data.prompt_id], promptId: data.prompt_id });
       // El resultado de Seg 1 ya está en el reproductor: fuera su preview en
       // vivo (congelado) mientras Seg 2 sigue muestreando.
@@ -862,6 +884,7 @@ CONFIG.onNodeExecuted = function(data){
 
     const m2 = CONFIG.findMedia(data.output);
     if(m2){
+      if(m2.filename) saveVideoTiming(m2.filename, fmtMs(seg2Ms));
       displayVideoInPlayer(2, m2, { variant: promptVariantMap[data.prompt_id], promptId: data.prompt_id });
       clearSegmentPreview("Seg2");
       log("✅ Vídeo Segmento 2 generado y cargado en reproductor 2", "l-ok");
@@ -876,6 +899,7 @@ CONFIG.onNodeExecuted = function(data){
 
     const mf = CONFIG.findMedia(data.output);
     if(mf){
+      if(mf.filename) saveVideoTiming(mf.filename, fmtMs(totalMs));
       displayVideoInPlayer(3, mf, { variant: promptVariantMap[data.prompt_id], promptId: data.prompt_id });
       clearSegmentPreview("Final");
       log("✅ Vídeo Final Continuo listo y cargado en reproductor principal", "l-ok");
@@ -1706,12 +1730,34 @@ function applyWorkflow(workflow){
   // Sin nodo Spectrum en el workflow: no tocar el estado guardado.
 
   // 12. Toggles postprocesado y RIFE
+  const rtxFgNode = findByClass("RTXVideoFrameGeneration");
   const rifeNode = workflow["72"] || findByClass("FrameInterpolate");
-  if($("rifeToggle")) $("rifeToggle").checked = !!rifeNode;
-  if(rifeNode?.inputs?.multiplier && $("rifeMultiplier")){
-    $("rifeMultiplier").value = String(rifeNode.inputs.multiplier);
+  if(rtxFgNode){
+    if($("rifeToggle")) $("rifeToggle").checked = true;
+    if($("rifeEngine")) $("rifeEngine").value = "rtx";
+    const mult = (typeof rtxFgNode.inputs?.["generation_type.multiplier"] === "number")
+      ? rtxFgNode.inputs["generation_type.multiplier"]
+      : (typeof rtxFgNode.inputs?.multiplier === "number" ? rtxFgNode.inputs.multiplier : 2);
+    if($("rifeMultiplier")) $("rifeMultiplier").value = String(mult);
+    const col = $("rifeModelCol");
+    if(col) col.style.display = "none";
+  } else if(rifeNode){
+    if($("rifeToggle")) $("rifeToggle").checked = true;
+    if($("rifeEngine")) $("rifeEngine").value = "rife";
+    if(rifeNode.inputs?.multiplier && $("rifeMultiplier")){
+      $("rifeMultiplier").value = String(rifeNode.inputs.multiplier);
+    }
+    const col = $("rifeModelCol");
+    if(col) col.style.display = "";
+  } else {
+    if($("rifeToggle")) $("rifeToggle").checked = false;
   }
-  if($("rtxToggle")) $("rtxToggle").checked = !!findByClass("RTXVideoSuperResolution");
+
+  const rtxNode = findByClass("RTXVideoSuperResolution");
+  if($("rtxToggle")) $("rtxToggle").checked = !!rtxNode;
+  if(rtxNode?.inputs?.quality && $("rtxQuality")){
+    $("rtxQuality").value = rtxNode.inputs.quality;
+  }
   const vtbNode = findByClass("VideoTemporalBlend");
   if($("blendToggle")) $("blendToggle").checked = !!vtbNode;
   if(vtbNode && vtbNode.inputs){
@@ -2121,9 +2167,10 @@ function saveSettings(){
     blendToggle: $("blendToggle") ? $("blendToggle").checked : true,
     blendStrength: $("blendStrength")?.value || "0.35",
     blendFrames: $("blendFrames")?.value || "4",
-    blendMode: $("blendMode")?.value || "transition_only",
     rtxToggle: $("rtxToggle") ? $("rtxToggle").checked : true,
+    rtxQuality: $("rtxQuality")?.value || "HIGHBITRATE_ULTRA",
     rifeToggle: $("rifeToggle") ? $("rifeToggle").checked : true,
+    rifeEngine: $("rifeEngine")?.value || "rife",
     rifeMultiplier: $("rifeMultiplier")?.value || "2",
     rifeModel: $("rifeModel")?.value || "rife_v4.26.safetensors",
     audioMode: $("audioMode")?.value || "none",
@@ -2258,7 +2305,13 @@ function restoreSettings(){
     if(s.blendMode && $("blendMode")) $("blendMode").value = s.blendMode;
     if(typeof updateBlendControlsVisibility === "function") updateBlendControlsVisibility();
     if(s.rtxToggle !== undefined && $("rtxToggle")) $("rtxToggle").checked = s.rtxToggle;
+    if(s.rtxQuality && $("rtxQuality")) $("rtxQuality").value = s.rtxQuality;
     if(s.rifeToggle !== undefined && $("rifeToggle")) $("rifeToggle").checked = s.rifeToggle;
+    if(s.rifeEngine && $("rifeEngine")){
+      $("rifeEngine").value = s.rifeEngine;
+      const col = $("rifeModelCol");
+      if(col) col.style.display = (s.rifeEngine === "rtx") ? "none" : "";
+    }
     if(s.rifeMultiplier !== undefined && $("rifeMultiplier")) $("rifeMultiplier").value = s.rifeMultiplier;
     if(s.rifeModel && $("rifeModel")) $("rifeModel").value = s.rifeModel;
     if(s.audioMode !== undefined && $("audioMode")) $("audioMode").value = s.audioMode;
@@ -2336,7 +2389,7 @@ function attachAutoSaveListeners(){
     "unetModel", "clipModel", "vaeModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
     "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle", "blendStrength", "blendFrames", "blendMode",
-    "rtxToggle", "rifeToggle", "rifeMultiplier", "rifeModel", "audioMode",
+    "rtxToggle", "rtxQuality", "rifeToggle", "rifeEngine", "rifeMultiplier", "rifeModel", "audioMode",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
     "audioGuideVolume", "audioUserVolume", "audioNormalizeToggle", "shareRefsToggle", "refImageSize",
     "enhancerModel", "enhancerMode", "enhancerStyle", "enhancerChainMode"
@@ -2364,6 +2417,11 @@ function attachAutoSaveListeners(){
 
   $("blendToggle")?.addEventListener("change", updateBlendControlsVisibility);
   updateBlendControlsVisibility();
+
+  $("rifeEngine")?.addEventListener("change", (e) => {
+    const col = $("rifeModelCol");
+    if(col) col.style.display = (e.target.value === "rtx") ? "none" : "";
+  });
 
   $("blendStrength")?.addEventListener("input", (e) => {
     if($("blendStrengthVal")) $("blendStrengthVal").textContent = parseFloat(e.target.value).toFixed(2);
@@ -4155,20 +4213,43 @@ function buildGraph(j){
     delete g[N.FACE_COMPONENTS];
   }
 
+  const rtxQuality = (j ? j.rtxQuality : $("rtxQuality")?.value) || "HIGHBITRATE_ULTRA";
   if(rtxOn && g[N.RTX]?.inputs){
     g[N.RTX].inputs.images = finalImagesSource;
+    g[N.RTX].inputs.quality = rtxQuality;
     finalImagesSource = [N.RTX, 0];
   } else {
     delete g[N.RTX];
   }
 
-  if(rifeOn && g[N.RIFE]?.inputs){
-    const mult = parseInt($("rifeMultiplier")?.value || "2", 10);
-    if(g[N.RIFE_MULT]?.inputs) g[N.RIFE_MULT].inputs.value = mult;
-    const rifeModel = $("rifeModel")?.value || "rife_v4.26.safetensors";
-    if(g[N.RIFE_LOADER]?.inputs) g[N.RIFE_LOADER].inputs.model_name = rifeModel;
-    g[N.RIFE].inputs.images = finalImagesSource;
-    finalImagesSource = [N.RIFE, 0];
+  const rifeEngine = (j ? j.rifeEngine : $("rifeEngine")?.value) || "rife";
+  if(rifeOn){
+    const mult = parseInt((j ? j.rifeMultiplier : $("rifeMultiplier")?.value) || "2", 10);
+    if(rifeEngine === "rtx"){
+      delete g[N.RIFE_LOADER];
+      delete g[N.RIFE_MULT];
+      g[N.RIFE] = {
+        class_type: "RTXVideoFrameGeneration",
+        inputs: {
+          images: finalImagesSource,
+          generation_type: "frame rate multiplier",
+          "generation_type.multiplier": mult,
+          mode: "HIGH",
+          automatic_shot_change_detection: true,
+          shot_change: false,
+          image_encoding: "8-bit RGB"
+        },
+        _meta: { title: "RTX Video Frame Generation" }
+      };
+      finalImagesSource = [N.RIFE, 0];
+      if(g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.fps = 24 * mult;
+    } else if(g[N.RIFE]?.inputs){
+      if(g[N.RIFE_MULT]?.inputs) g[N.RIFE_MULT].inputs.value = mult;
+      const rifeModel = (j ? j.rifeModel : $("rifeModel")?.value) || "rife_v4.26.safetensors";
+      if(g[N.RIFE_LOADER]?.inputs) g[N.RIFE_LOADER].inputs.model_name = rifeModel;
+      g[N.RIFE].inputs.images = finalImagesSource;
+      finalImagesSource = [N.RIFE, 0];
+    }
   } else {
     delete g[N.RIFE];
     delete g[N.RIFE_LOADER];
@@ -4515,6 +4596,7 @@ async function loadVideoHistory(){
   if(!grid) return;
   if(status) status.textContent = "Cargando...";
   grid.innerHTML = "";
+  syncHistoryTimings();
 
   try {
     const r = await fetch("/api/mmh3x2_list");
@@ -4583,13 +4665,23 @@ async function loadVideoHistory(){
           if(!card.dataset.meta && item.filename){
             try {
               const rawUrl = mediaViewUrl(item);
-              const wf = await extractWorkflowFromMP4(rawUrl);
-              if(wf){
-                const metaObj = formatWorkflowToMeta(wf);
-                if(metaObj){
-                  card.dataset.meta = JSON.stringify(metaObj);
-                  showVariantTooltip(card);
-                }
+              const [wf, specs] = await Promise.all([
+                extractWorkflowFromMP4(rawUrl),
+                resolveVideoSpecs(videoEl)
+              ]);
+              let timing = getVideoTiming(item.filename);
+              if(!timing){
+                await syncHistoryTimings();
+                timing = getVideoTiming(item.filename);
+              }
+              const metaObj = formatWorkflowToMeta(wf || {}, {
+                resolution: specs.resolution,
+                aspectRatio: specs.aspectRatio,
+                timing: timing || "—"
+              });
+              if(metaObj){
+                card.dataset.meta = JSON.stringify(metaObj);
+                showVariantTooltip(card);
               }
             } catch(_){}
           } else if(card.dataset.meta){

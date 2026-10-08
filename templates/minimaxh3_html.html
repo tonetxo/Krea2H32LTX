@@ -333,10 +333,17 @@
       </div>
 
       <div class="panel">
-        <h2>Interpolación de Frames (RIFE)</h2>
+        <h2>Interpolación de Frames</h2>
         <div class="seed-toggle">
           <div class="seg on" id="segRifeOn" data-value="true">Activo</div>
           <div class="seg" id="segRifeOff" data-value="false">Desactivado</div>
+        </div>
+        <div class="row">
+          <label>Motor de interpolación</label>
+          <select id="rifeEngine">
+            <option value="rife" selected>RIFE / FILM (Red neuronal IA)</option>
+            <option value="rtx">NVIDIA RTX Frame Gen (Tensor Cores)</option>
+          </select>
         </div>
         <div class="row">
           <label>Multiplicador FPS <span class="hint" id="rifeFpsHint">(24fps → 48fps)</span></label>
@@ -346,7 +353,7 @@
             <option value="4">4x (96 fps — Hyper Smooth)</option>
           </select>
         </div>
-        <div class="row">
+        <div class="row" id="rifeModelRow">
           <label>Modelo RIFE</label>
           <select id="rifeModel">
             <option value="rife_v4.26.safetensors" selected>rife_v4.26.safetensors (Recomendado)</option>
@@ -370,7 +377,9 @@
           <div class="row">
             <label>Calidad RTX</label>
             <select id="rtxQuality">
-              <option value="ULTRA" selected>ULTRA (Máxima definición)</option>
+              <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
+              <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
+              <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate Equilibrado)</option>
               <option value="HIGH">HIGH (Equilibrado)</option>
               <option value="MEDIUM">MEDIUM (Rápido)</option>
               <option value="LOW">LOW (Bajo consumo)</option>

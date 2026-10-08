@@ -198,6 +198,193 @@ function getFriendlyRatio(w, h){
   return r >= 1 ? `${r.toFixed(2)}:1` : `1:${(1/r).toFixed(2)}`;
 }
 
+// --- VIDEO SPECS & TIMING HELPERS ---
+const TIMINGS_STORAGE_KEY = "comfy_video_timings";
+
+async function fetchComfyBackend(endpoint, opts = {}){
+  const srv = (typeof server === "function" && server()) ? server() : "";
+  let r;
+  try {
+    r = await fetch(`${srv}${endpoint}`, opts);
+    if(r.ok) return r;
+  } catch(_){}
+  if(!srv && (r ? (r.status === 404 || r.status === 405 || r.status === 502) : true)){
+    const host = window.location.hostname || "127.0.0.1";
+    const port = (typeof DEFAULT_BACKEND_PORT !== "undefined" && DEFAULT_BACKEND_PORT) ? DEFAULT_BACKEND_PORT : "7821";
+    try {
+      r = await fetch(`http://${host}:${port}${endpoint}`, opts);
+    } catch(_){}
+  }
+  return r;
+}
+
+function formatTimingValue(val){
+  if(val == null || val === "" || val === "—") return "—";
+  if(typeof val === "number"){
+    if(val <= 0) return "—";
+    const s = val < 1000 ? val : val / 1000;
+    if(s < 60) return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`;
+    const m = Math.floor(s / 60);
+    const remS = Math.round(s % 60);
+    return `${m}m ${remS}s`;
+  }
+  let str = String(val).replace(/^⏱\s*/, '').trim();
+  const m = str.match(/^(\d{1,2}):(\d{2})$/);
+  if(m){
+    const min = parseInt(m[1], 10);
+    const sec = parseInt(m[2], 10);
+    if(min === 0) return `${sec}s`;
+    return `${min}m ${sec}s`;
+  }
+  return str;
+}
+
+function saveVideoTiming(filename, timeStr){
+  if(!filename || !timeStr) return;
+  try {
+    const raw = localStorage.getItem(TIMINGS_STORAGE_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[filename] = formatTimingValue(timeStr);
+    const keys = Object.keys(map);
+    if(keys.length > 500){
+      for(let i = 0; i < keys.length - 500; i++){
+        delete map[keys[i]];
+      }
+    }
+    localStorage.setItem(TIMINGS_STORAGE_KEY, JSON.stringify(map));
+  } catch(_){}
+}
+
+function getVideoTiming(filename){
+  if(!filename) return "";
+  try {
+    const raw = localStorage.getItem(TIMINGS_STORAGE_KEY);
+    if(!raw) return "";
+    const map = JSON.parse(raw);
+    return map[filename] || "";
+  } catch(_){
+    return "";
+  }
+}
+
+let _lastSyncTimingsTime = 0;
+let _syncTimingsPromise = null;
+
+async function syncHistoryTimings(){
+  const now = Date.now();
+  if(_syncTimingsPromise && (now - _lastSyncTimingsTime < 8000)){
+    return _syncTimingsPromise;
+  }
+  _lastSyncTimingsTime = now;
+  _syncTimingsPromise = (async () => {
+    try {
+      const r = await fetchComfyBackend("/history");
+      if(!r || !r.ok) return;
+      const historyData = await r.json();
+      if(!historyData || typeof historyData !== "object") return;
+
+      const raw = localStorage.getItem(TIMINGS_STORAGE_KEY);
+      const timingsMap = raw ? JSON.parse(raw) : {};
+      let updated = false;
+
+      for(const pid of Object.keys(historyData)){
+        const entry = historyData[pid];
+        if(!entry || !entry.status || !entry.outputs) continue;
+        const msgs = entry.status.messages || [];
+        let tStart = null, tEnd = null;
+        for(const m of msgs){
+          if(!Array.isArray(m) || m.length < 2) continue;
+          if(m[0] === "execution_start" && m[1]?.timestamp != null) tStart = m[1].timestamp;
+          if(m[0] === "execution_success" && m[1]?.timestamp != null) tEnd = m[1].timestamp;
+        }
+        if(tStart != null && tEnd != null){
+          const durMs = (tEnd > 1e11) ? (tEnd - tStart) : (tEnd - tStart) * 1000;
+          if(durMs > 0){
+            const formatted = formatTimingValue(durMs);
+            for(const nid of Object.keys(entry.outputs)){
+              const out = entry.outputs[nid];
+              if(!out) continue;
+              const files = [
+                ...(Array.isArray(out.gifs) ? out.gifs : []),
+                ...(Array.isArray(out.videos) ? out.videos : []),
+                ...(Array.isArray(out.images) ? out.images : [])
+              ];
+              for(const f of files){
+                if(f && f.filename && !timingsMap[f.filename]){
+                  timingsMap[f.filename] = formatted;
+                  updated = true;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      if(updated){
+        localStorage.setItem(TIMINGS_STORAGE_KEY, JSON.stringify(timingsMap));
+      }
+    } catch(_){}
+  })();
+  return _syncTimingsPromise;
+}
+
+async function resolveVideoSpecs(videoEl, wf){
+  let w = (videoEl && videoEl.videoWidth) ? videoEl.videoWidth : 0;
+  let h = (videoEl && videoEl.videoHeight) ? videoEl.videoHeight : 0;
+
+  if((!w || !h) && videoEl){
+    if(videoEl.readyState >= 1 && videoEl.videoWidth > 0){
+      w = videoEl.videoWidth;
+      h = videoEl.videoHeight;
+    } else {
+      try {
+        if(videoEl.preload === "none"){
+          videoEl.preload = "metadata";
+          videoEl.load();
+        }
+        await new Promise((resolve) => {
+          if(videoEl.videoWidth > 0) return resolve();
+          const timer = setTimeout(resolve, 300);
+          videoEl.addEventListener("loadedmetadata", () => {
+            clearTimeout(timer);
+            resolve();
+          }, { once: true });
+        });
+        w = videoEl.videoWidth || 0;
+        h = videoEl.videoHeight || 0;
+      } catch(_){}
+    }
+  }
+
+  // Fallback a nodos del workflow si el vídeo no aportó dimensiones todavía
+  if((!w || !h) && wf && typeof wf === "object"){
+    for(const k of Object.keys(wf)){
+      const inp = wf[k]?.inputs;
+      if(!inp) continue;
+      if(typeof inp.width === "number" && typeof inp.height === "number" && inp.width > 0 && inp.height > 0){
+        w = inp.width;
+        h = inp.height;
+        break;
+      }
+    }
+  }
+
+  let resolution = (w && h) ? `${w}×${h}` : "—";
+  let aspectRatio = (w && h) ? getFriendlyRatio(w, h) : "—";
+
+  if(aspectRatio === "—" && wf && typeof wf === "object"){
+    for(const k of Object.keys(wf)){
+      const inp = wf[k]?.inputs;
+      if(inp?.aspect_ratio){
+        aspectRatio = String(inp.aspect_ratio);
+        break;
+      }
+    }
+  }
+
+  return { width: w, height: h, resolution, aspectRatio };
+}
+
 function log(msg, cls){
   const el = $("log");
   if(!el){ console.log(`[log] ${msg}`); return; }
@@ -508,6 +695,26 @@ async function handlePromptDone(promptId) {
                    (clientResult ? fmtMs(clientResult.total) : null);
     const t1 = (timings && timings.t1 != null) ? fmtMs(timings.t1) : null;
     const t2 = (timings && timings.t2 != null) ? fmtMs(timings.t2) : null;
+
+    if(entry.outputs && (tTotal || t1 || t2)){
+      for(const nid of Object.keys(entry.outputs)){
+        const out = entry.outputs[nid];
+        if(!out) continue;
+        const files = [
+          ...(Array.isArray(out.gifs) ? out.gifs : []),
+          ...(Array.isArray(out.videos) ? out.videos : []),
+          ...(Array.isArray(out.images) ? out.images : [])
+        ];
+        for(const f of files){
+          if(f && f.filename){
+            let tSpec = tTotal;
+            if(CONFIG.N && String(nid) === String(CONFIG.N.FIRST_SAVE) && t1) tSpec = t1;
+            else if(CONFIG.N && String(nid) === String(CONFIG.N.FINAL_SAVE || CONFIG.N.SAVE) && t2) tSpec = t2;
+            if(tSpec) saveVideoTiming(f.filename, tSpec);
+          }
+        }
+      }
+    }
 
     const displayResult = await CONFIG.displayResult(entry, realSeed, tTotal, promptId, { t1, t2 });
     const skipFinalize = displayResult === true || (displayResult && displayResult.skipFinalize === true);

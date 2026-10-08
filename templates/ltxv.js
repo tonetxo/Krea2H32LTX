@@ -68,18 +68,26 @@ setBitDepthUI(loadBitDepth());
 $("segBitDepth8")?.addEventListener("click", () => { setBitDepthUI(8); saveBitDepth(8); });
 $("segBitDepth10")?.addEventListener("click", () => { setBitDepthUI(10); saveBitDepth(10); });
 
-// --- FRAME INTERPOLATION (RIFE) ---
+// --- FRAME INTERPOLATION (RIFE / RTX FRAME GEN) ---
 const RIFE_KEY = "ltxv_rife_state";
-const RIFE_DEFAULTS = { enabled: true, multiplier: 2, model: "rife_v4.26.safetensors" };
+const RIFE_DEFAULTS = { enabled: true, engine: "rife", multiplier: 2, model: "rife_v4.26.safetensors" };
 function loadRife(){
   try { return Object.assign({}, RIFE_DEFAULTS, JSON.parse(localStorage.getItem(RIFE_KEY) || "{}")); }
   catch(_) { return {...RIFE_DEFAULTS}; }
 }
 function saveRife(r){ try { localStorage.setItem(RIFE_KEY, JSON.stringify(r)); } catch(_){} }
+function toggleRifeEngineUI(engine){
+  const modelRow = $("rifeModelRow");
+  if(modelRow) modelRow.style.display = (engine === "rtx") ? "none" : "";
+}
 function setRifeUI(r){
   const on = $("segRifeOn"), off = $("segRifeOff");
   if(r.enabled){ on?.classList.add("on"); off?.classList.remove("on"); }
   else { off?.classList.add("on"); on?.classList.remove("on"); }
+  if($("rifeEngine") && r.engine){
+    $("rifeEngine").value = r.engine;
+    toggleRifeEngineUI(r.engine);
+  }
   if($("rifeMultiplier")){
     $("rifeMultiplier").value = r.multiplier;
     const fps = 24 * parseInt(r.multiplier, 10);
@@ -91,6 +99,7 @@ function getRifeState(){
   const mult = parseInt($("rifeMultiplier")?.value || "2", 10);
   return {
     enabled: $("segRifeOn")?.classList.contains("on") ?? true,
+    engine: $("rifeEngine")?.value || "rife",
     multiplier: mult,
     model: $("rifeModel")?.value || "rife_v4.26.safetensors"
   };
@@ -117,12 +126,49 @@ loadInterpModels();
 setRifeUI(_rifeState);
 $("segRifeOn")?.addEventListener("click", () => { const r = getRifeState(); r.enabled = true; setRifeUI(r); saveRife(r); });
 $("segRifeOff")?.addEventListener("click", () => { const r = getRifeState(); r.enabled = false; setRifeUI(r); saveRife(r); });
+$("rifeEngine")?.addEventListener("change", (e) => {
+  const engine = e.target.value;
+  toggleRifeEngineUI(engine);
+  const r = getRifeState(); r.engine = engine; saveRife(r);
+});
 $("rifeMultiplier")?.addEventListener("change", (e) => {
   const mult = parseInt(e.target.value, 10);
   if($("rifeFpsHint")) $("rifeFpsHint").textContent = `(24fps → ${24 * mult}fps)`;
   const r = getRifeState(); r.multiplier = mult; saveRife(r);
 });
 $("rifeModel")?.addEventListener("change", (e) => { const r = getRifeState(); r.model = e.target.value; saveRife(r); });
+
+// --- RTX VIDEO SUPER RESOLUTION (2x) ---
+const RTX_KEY = "ltxv_rtx_state";
+const RTX_DEFAULTS = { enabled: true, quality: "HIGHBITRATE_ULTRA" };
+function loadRtx(){
+  try { return Object.assign({}, RTX_DEFAULTS, JSON.parse(localStorage.getItem(RTX_KEY) || "{}")); }
+  catch(_) { return {...RTX_DEFAULTS}; }
+}
+function saveRtx(r){ try { localStorage.setItem(RTX_KEY, JSON.stringify(r)); } catch(_){} }
+function setRtxUI(r){
+  const on = $("segRtxOn"), off = $("segRtxOff");
+  const panel = $("rtxControls");
+  if(r.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("rtxQuality") && r.quality) $("rtxQuality").value = r.quality;
+}
+function getRtxState(){
+  return {
+    enabled: $("segRtxOn")?.classList.contains("on") ?? true,
+    quality: $("rtxQuality")?.value || "HIGHBITRATE_ULTRA"
+  };
+}
+const _rtxState = loadRtx();
+setRtxUI(_rtxState);
+$("segRtxOn")?.addEventListener("click", () => { const r = getRtxState(); r.enabled = true; setRtxUI(r); saveRtx(r); });
+$("segRtxOff")?.addEventListener("click", () => { const r = getRtxState(); r.enabled = false; setRtxUI(r); saveRtx(r); });
+$("rtxQuality")?.addEventListener("change", () => { const r = getRtxState(); saveRtx(r); });
 
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
@@ -136,21 +182,26 @@ CONFIG.renderVariantMedia = function(card, url, media){
 };
 // Metadata para el tooltip de la variant-card: captura los sliders/LoRAs en el
 // momento de crear la tarjeta (no al hacer hover, que podría haber cambiado).
-  CONFIG.variantMeta = function(){
+  CONFIG.variantMeta = function(seedValue, timeText){
   const r = getRifeState();
+  const w = parseInt($("width")?.value || 0, 10);
+  const h = parseInt($("height")?.value || 0, 10);
   const rows = [
     ["Modelo", $("modelSelect")?.value || ""],
     ["Text Encoder", $("textEncoderSelect")?.value ? $("textEncoderSelect").value.split('/').pop() : ""],
     ["VAE Vídeo", $("vaeSelect")?.value || "Checkpoint"],
     ["VAE Audio", $("audioVaeSelect")?.value || "Checkpoint"],
     ["Atención", $("sageAttentionType")?.value || "sageattn3"],
-    ["Interpolación RIFE", r.enabled ? `on · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}` : "off"],
+    ["Interpolación", r.enabled ? ((r.engine === "rtx") ? `RTX Frame Gen · ${r.multiplier}x (${24*r.multiplier} fps)` : `RIFE · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}`) : "off"],
+    ["RTX Super Resolution", (typeof getRtxState === "function" && getRtxState().enabled) ? `on (2x ${getRtxState().quality})` : "off"],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
-    ["Resolución", `${$("width")?.value || ""}×${$("height")?.value || ""}`],
+    ["Resolución", (w && h) ? `${w}×${h}` : `${$("width")?.value || ""}×${$("height")?.value || ""}`],
+    ["A/R", getFriendlyRatio(w, h)],
     ["Frames", $("frames")?.value || ""],
     ["Fidelidad", parseFloat($("fidelitySlider")?.value || 0).toFixed(2)],
     ["Movimiento", parseFloat($("motionSlider")?.value || 0).toFixed(1)],
   ];
+  if(timeText) rows.unshift(["Tiempo gen.", timeText]);
   const loraList = (typeof loras !== "undefined" && Array.isArray(loras)) ? loras : [];
   const lorasMeta = loraList.map(l => ({
     name: l.lora ? l.lora.replace(/^.*\//, "") : "",
@@ -166,6 +217,7 @@ CONFIG.onSeedUpdate = updateSeedUI;
 // mover el timer al slot 2 para que cuente solo el tiempo del 2º pase.
 function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true } = {}){
   if(!media || !media.filename) return;
+  if(timeText) saveVideoTiming(media.filename, timeText);
   const varIndex = promptVariantMap[promptId] != null
     ? promptVariantMap[promptId]
     : (activeJob?.currentVariantIndex != null ? activeJob.currentVariantIndex : (variantCounter + 1));
@@ -1064,13 +1116,22 @@ async function applyWorkflow(workflow, opts={}){
   }
   if(!bitDepthSet) setMissing("profundidad de color");
 
-  // Restaurar Frame Interpolation (RIFE)
+  // Restaurar Frame Interpolation (RIFE / RTX Frame Gen)
+  const rtxFgNode = findByClass("RTXVideoFrameGeneration");
   const interpNode = findByClass("FrameInterpolate");
   const interpLoader = findByClass("FrameInterpolationModelLoader");
-  if(interpNode && interpNode.inputs){
+  if(rtxFgNode && rtxFgNode.inputs){
+    const mult = (typeof rtxFgNode.inputs["generation_type.multiplier"] === "number")
+      ? rtxFgNode.inputs["generation_type.multiplier"]
+      : (typeof rtxFgNode.inputs.multiplier === "number" ? rtxFgNode.inputs.multiplier : 2);
+    const r = { enabled: true, engine: "rtx", multiplier: mult, model: "rife_v4.26.safetensors" };
+    setRifeUI(r);
+    saveRife(r);
+    setApplied("interpolación RTX Frame Gen (" + mult + "x)");
+  } else if(interpNode && interpNode.inputs){
     const mult = interpNode.inputs.multiplier || 2;
     const model = (interpLoader && interpLoader.inputs) ? interpLoader.inputs.model_name : "rife_v4.26.safetensors";
-    const r = { enabled: true, multiplier: mult, model: model };
+    const r = { enabled: true, engine: "rife", multiplier: mult, model: model };
     setRifeUI(r);
     saveRife(r);
     setApplied("interpolación RIFE (" + mult + "x)");
@@ -1079,7 +1140,20 @@ async function applyWorkflow(workflow, opts={}){
     r.enabled = false;
     setRifeUI(r);
     saveRife(r);
-    setMissing("interpolación RIFE");
+  }
+
+  // Restaurar RTX Video Super Resolution
+  const rtxNode = findByClass("RTXVideoSuperResolution");
+  if(rtxNode && rtxNode.inputs){
+    const q = rtxNode.inputs.quality || "HIGHBITRATE_ULTRA";
+    const r = { enabled: true, quality: q };
+    setRtxUI(r);
+    saveRtx(r);
+    setApplied("RTX Super Resolution (" + q + ")");
+  } else {
+    const r = { enabled: false, quality: "HIGHBITRATE_ULTRA" };
+    setRtxUI(r);
+    saveRtx(r);
   }
 
   // Text Encoder (Gemma / LTX-2.5)
@@ -1755,47 +1829,95 @@ function buildGraph(mode, job){
     g[N.FIRST_SAVE].inputs.filename_prefix = prefix + "_prev";
   }
 
-  // Frame Interpolation (RIFE) — se conecta entre VAEDecode (740) y RTX_SR (921) o CreateVideo (919)
+  // Frame Interpolation (RIFE / RTX Frame Gen) — se conecta entre VAEDecode (740) y RTX_SR (921) o CreateVideo (919)
   const rifeState = j ? j.rife : getRifeState();
   const rifeEnabled = rifeState ? rifeState.enabled : true;
   const rifeMultiplier = rifeState ? parseInt(rifeState.multiplier || "2", 10) : 2;
   const rifeModel = rifeState ? (rifeState.model || "rife_v4.26.safetensors") : "rife_v4.26.safetensors";
+  const rifeEngine = rifeState ? (rifeState.engine || "rife") : "rife";
+
+  let currentVideoSource = [N.DECODE_VIDEO_2, 0];
 
   if(rifeEnabled){
-    g[N.RIFE_LOADER] = {
-      inputs: {
-        model_name: rifeModel
-      },
-      class_type: "FrameInterpolationModelLoader",
-      _meta: {
-        title: "Frame Interpolation Model Loader"
-      }
-    };
-    g[N.RIFE_INTERP] = {
-      inputs: {
-        multiplier: rifeMultiplier,
-        images: [N.DECODE_VIDEO_2, 0],
-        interp_model: [N.RIFE_LOADER, 0]
-      },
-      class_type: "FrameInterpolate",
-      _meta: {
-        title: "Frame Interpolate"
-      }
-    };
-    if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
-      g[N.RTX_SR].inputs.images = [N.RIFE_INTERP, 0];
+    if(rifeEngine === "rtx"){
+      delete g[N.RIFE_LOADER];
+      g[N.RIFE_INTERP] = {
+        inputs: {
+          images: currentVideoSource,
+          generation_type: "frame rate multiplier",
+          "generation_type.multiplier": rifeMultiplier,
+          mode: "HIGH",
+          automatic_shot_change_detection: true,
+          shot_change: false,
+          image_encoding: "8-bit RGB"
+        },
+        class_type: "RTXVideoFrameGeneration",
+        _meta: {
+          title: "RTX Video Frame Generation"
+        }
+      };
+    } else {
+      g[N.RIFE_LOADER] = {
+        inputs: {
+          model_name: rifeModel
+        },
+        class_type: "FrameInterpolationModelLoader",
+        _meta: {
+          title: "Frame Interpolation Model Loader"
+        }
+      };
+      g[N.RIFE_INTERP] = {
+        inputs: {
+          multiplier: rifeMultiplier,
+          images: currentVideoSource,
+          interp_model: [N.RIFE_LOADER, 0]
+        },
+        class_type: "FrameInterpolate",
+        _meta: {
+          title: "Frame Interpolate"
+        }
+      };
     }
+    currentVideoSource = [N.RIFE_INTERP, 0];
     if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
       g[N.CREATE_VIDEO_2].inputs.fps = 24 * rifeMultiplier;
     }
   } else {
     delete g[N.RIFE_LOADER];
     delete g[N.RIFE_INTERP];
-    if(g[N.RTX_SR] && g[N.RTX_SR].inputs){
-      g[N.RTX_SR].inputs.images = [N.DECODE_VIDEO_2, 0];
-    }
     if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
       g[N.CREATE_VIDEO_2].inputs.fps = 24;
+    }
+  }
+
+  // RTX Video Super Resolution (2x) — opcional tras RIFE/DECODE_VIDEO_2
+  const rtxState = j ? j.rtx : getRtxState();
+  const rtxEnabled = rtxState ? rtxState.enabled : true;
+  const rtxQuality = rtxState ? (rtxState.quality || "HIGHBITRATE_ULTRA") : "HIGHBITRATE_ULTRA";
+
+  if(rtxEnabled){
+    if(!g[N.RTX_SR] || !g[N.RTX_SR].inputs){
+      g[N.RTX_SR] = {
+        class_type: "RTXVideoSuperResolution",
+        inputs: {
+          resize_type: "scale by multiplier",
+          "resize_type.scale": 2,
+          quality: rtxQuality,
+          images: currentVideoSource
+        },
+        _meta: { title: "RTX Video Super Resolution" }
+      };
+    } else {
+      g[N.RTX_SR].inputs.images = currentVideoSource;
+      g[N.RTX_SR].inputs.quality = rtxQuality;
+    }
+    if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
+      g[N.CREATE_VIDEO_2].inputs.images = [N.RTX_SR, 0];
+    }
+  } else {
+    if(g[N.RTX_SR]) delete g[N.RTX_SR];
+    if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
+      g[N.CREATE_VIDEO_2].inputs.images = currentVideoSource;
     }
   }
 
@@ -2093,6 +2215,7 @@ async function loadVideoHistory(){
   const grid = $("videoHistoryGrid");
   status.textContent = "Cargando...";
   grid.innerHTML = "";
+  syncHistoryTimings();
   try {
     const r = await fetch("/api/ltxv_list");
     if(!r.ok) throw new Error("HTTP "+r.status);
@@ -2136,32 +2259,44 @@ async function loadVideoHistory(){
           if(!card.dataset.meta && item.filename){
             try {
               const wfUrl = `${server()}/view?filename=${encodeURIComponent(item.filename)}&subfolder=${encodeURIComponent(item.subfolder)}&type=${encodeURIComponent(item.type)}`;
-              const wf = await extractWorkflowFromMP4(wfUrl);
-              if(wf){
-                function findModel(w){
-                  for(const k of Object.keys(w)){
-                    const n = w[k];
-                    if(!n || !n.inputs) continue;
-                    if(n.inputs.unet_name) return String(n.inputs.unet_name).split("/").pop();
-                    if(n.inputs.ckpt_name) return String(n.inputs.ckpt_name).split("/").pop();
-                    if(n.inputs.model_name) return String(n.inputs.model_name).split("/").pop();
-                  }
-                  return "";
+              const videoEl = card.querySelector("video");
+              const [wf, specs] = await Promise.all([
+                extractWorkflowFromMP4(wfUrl),
+                resolveVideoSpecs(videoEl)
+              ]);
+              let timing = getVideoTiming(item.filename);
+              if(!timing){
+                await syncHistoryTimings();
+                timing = getVideoTiming(item.filename);
+              }
+              function findModel(w){
+                for(const k of Object.keys(w)){
+                  const n = w[k];
+                  if(!n || !n.inputs) continue;
+                  if(n.inputs.unet_name) return String(n.inputs.unet_name).split("/").pop();
+                  if(n.inputs.ckpt_name) return String(n.inputs.ckpt_name).split("/").pop();
+                  if(n.inputs.model_name) return String(n.inputs.model_name).split("/").pop();
                 }
-                const modelName = findModel(wf);
-                const rows = [];
-                if(modelName) rows.push(["Modelo", modelName]);
-                const p = wf["6"]?.inputs?.text || wf["50"]?.inputs?.value || "";
-                if(p) rows.push(["Prompt", p.length > 80 ? p.slice(0, 77) + "..." : p]);
-                const loras = [];
+                return "";
+              }
+              const modelName = wf ? findModel(wf) : "";
+              const rows = [];
+              if(specs.resolution && specs.resolution !== "—") rows.push(["Resolución", specs.resolution]);
+              if(specs.aspectRatio && specs.aspectRatio !== "—") rows.push(["A/R", specs.aspectRatio]);
+              if(timing) rows.push(["Tiempo gen.", timing]);
+              if(modelName) rows.push(["Modelo", modelName]);
+              const p = wf ? (wf["6"]?.inputs?.text || wf["50"]?.inputs?.value || "") : "";
+              if(p) rows.push(["Prompt", p.length > 80 ? p.slice(0, 77) + "..." : p]);
+              const loras = [];
+              if(wf){
                 for(const k of Object.keys(wf)){
                   if(wf[k]?.inputs?.lora_name){
                     loras.push(`${String(wf[k].inputs.lora_name).split("/").pop()} (${wf[k].inputs.strength_model || 1})`);
                   }
                 }
-                card.dataset.meta = JSON.stringify({ title: "Metadata Vídeo", rows, loras });
-                showVariantTooltip(card);
               }
+              card.dataset.meta = JSON.stringify({ title: "Metadata Vídeo", rows, loras });
+              showVariantTooltip(card);
             } catch(_){}
           } else if(card.dataset.meta){
             showVariantTooltip(card);
