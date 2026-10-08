@@ -743,6 +743,58 @@
             </div>
           </div>
 
+          <!-- Color Grading & Look Cinemático -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="postFxMasterToggle"> <span>Color Grading &amp; Look Cinemático</span>
+              </label>
+            </div>
+            <div id="postFxControls" style="display:none;margin-top:6px;">
+              <!-- 3D LUT (Color Grading) -->
+              <div class="row" style="margin-bottom:6px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                  <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                    <input type="checkbox" id="postFxLutToggle" checked> <span style="font-size:11px;font-weight:600;">LUT (3D Color Grade)</span>
+                  </label>
+                  <span class="hint" id="postFxLutVal" style="font-size:10px;">80%</span>
+                </div>
+                <select id="postFxLutSelect" style="width:100%;margin-top:4px;">
+                  <option value="">-- Seleccionar LUT (.cube) --</option>
+                </select>
+                <div class="row slider-row" style="margin-top:4px;">
+                  <label style="font-size:10px;min-width:65px;">Intensidad</label>
+                  <input type="range" id="postFxLutStrength" min="0" max="1" step="0.01" value="0.8" style="flex:1;">
+                </div>
+              </div>
+
+              <!-- Viñeta y Grano dinámico en 2 columnas -->
+              <div class="row two-col" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+                <!-- Viñeta -->
+                <div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                      <input type="checkbox" id="postFxVigToggle"> <span style="font-size:10.5px;font-weight:600;">Viñeta</span>
+                    </label>
+                    <span class="hint" id="postFxVigVal" style="font-size:10px;">0.25</span>
+                  </div>
+                  <input type="range" id="postFxVigIntensity" min="0" max="0.6" step="0.02" value="0.25" style="width:100%;margin-top:4px;">
+                </div>
+                <!-- Grano dinámico -->
+                <div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                      <input type="checkbox" id="postFxGrainToggle"> <span style="font-size:10.5px;font-weight:600;">Grano Dinámico</span>
+                    </label>
+                    <span class="hint" id="postFxGrainVal" style="font-size:10px;">0.15</span>
+                  </div>
+                  <input type="range" id="postFxGrainPower" min="0" max="0.4" step="0.01" value="0.15" style="width:100%;margin-top:4px;">
+                </div>
+              </div>
+              <div class="hint" style="font-size:10px;margin-top:4px;">Aplica corrección cromática por LUT (.cube) y textura óptica dinámica frame a frame.</div>
+            </div>
+          </div>
+
           <!-- Crossfade de Audio regulable -->
           <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
             <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">

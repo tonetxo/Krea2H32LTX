@@ -534,6 +534,144 @@ let stageTimers = {
 // UI Tabs
 let currentViewMode = "all";
 
+// --- COLOR GRADING & LOOK CINEMÁTICO (POST-FX) ---
+const POSTFX_KEY = "mmh3x2_postfx_state";
+
+function loadPostFx(){
+  try {
+    const raw = localStorage.getItem(POSTFX_KEY);
+    if(raw) return JSON.parse(raw);
+  } catch(_){}
+  return {
+    enabled: false,
+    lut: { enabled: true, name: "", strength: 0.8 },
+    vignette: { enabled: false, intensity: 0.25 },
+    grain: { enabled: false, power: 0.15 }
+  };
+}
+
+function savePostFx(s){
+  try { localStorage.setItem(POSTFX_KEY, JSON.stringify(s)); } catch(_){}
+}
+
+function setPostFxUI(s){
+  if(!s) return;
+  const master = $("postFxMasterToggle");
+  const panel = $("postFxControls");
+  if(master) master.checked = !!s.enabled;
+  if(panel) panel.style.display = s.enabled ? "block" : "none";
+
+  if($("postFxLutToggle")) $("postFxLutToggle").checked = s.lut?.enabled ?? true;
+  if($("postFxLutSelect") && s.lut?.name) $("postFxLutSelect").value = s.lut.name;
+  if($("postFxLutStrength")){
+    $("postFxLutStrength").value = s.lut?.strength ?? 0.8;
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+  }
+
+  if($("postFxVigToggle")) $("postFxVigToggle").checked = !!s.vignette?.enabled;
+  if($("postFxVigIntensity")){
+    $("postFxVigIntensity").value = s.vignette?.intensity ?? 0.25;
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat($("postFxVigIntensity").value).toFixed(2);
+  }
+
+  if($("postFxGrainToggle")) $("postFxGrainToggle").checked = !!s.grain?.enabled;
+  if($("postFxGrainPower")){
+    $("postFxGrainPower").value = s.grain?.power ?? 0.15;
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat($("postFxGrainPower").value).toFixed(2);
+  }
+}
+
+function getPostFxState(){
+  return {
+    enabled: $("postFxMasterToggle")?.checked ?? false,
+    lut: {
+      enabled: $("postFxLutToggle")?.checked ?? true,
+      name: $("postFxLutSelect")?.value || "",
+      strength: parseFloat($("postFxLutStrength")?.value || "0.8")
+    },
+    vignette: {
+      enabled: $("postFxVigToggle")?.checked ?? false,
+      intensity: parseFloat($("postFxVigIntensity")?.value || "0.25")
+    },
+    grain: {
+      enabled: $("postFxGrainToggle")?.checked ?? false,
+      power: parseFloat($("postFxGrainPower")?.value || "0.15")
+    }
+  };
+}
+
+function populatePostFxLuts(){
+  const sel = $("postFxLutSelect");
+  if(!sel) return;
+  const luts = (typeof AVAILABLE_LUTS !== "undefined" && Array.isArray(AVAILABLE_LUTS)) ? AVAILABLE_LUTS : [];
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Seleccionar LUT (.cube) --</option>';
+  for(const name of luts){
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name.endsWith(".cube") ? name.slice(0, -5) : name;
+    sel.appendChild(opt);
+  }
+  if(prev && luts.includes(prev)){
+    sel.value = prev;
+  }
+}
+
+function appendVideoPostFx(g, imageRef, postFxState){
+  const fx = postFxState || getPostFxState();
+  if(!fx || !fx.enabled) return imageRef;
+  let cur = imageRef;
+
+  // 1. 3D LUT Color Grading
+  if(fx.lut?.enabled && fx.lut?.name){
+    g["post_lut"] = {
+      class_type: "LayerColor: LUT Apply",
+      inputs: {
+        image: cur,
+        LUT: fx.lut.name,
+        color_space: "linear",
+        strength: Math.round((fx.lut.strength ?? 0.8) * 100)
+      },
+      _meta: { title: "LayerColor: LUT Apply" }
+    };
+    cur = ["post_lut", 0];
+  } else {
+    delete g["post_lut"];
+  }
+
+  // 2. Viñeta y/o Grano dinámico
+  const hasVig = !!(fx.vignette?.enabled && (fx.vignette.intensity > 0));
+  const hasGrain = !!(fx.grain?.enabled && (fx.grain.power > 0));
+
+  if(hasVig || hasGrain){
+    g["post_film"] = {
+      class_type: "LayerFilter: FilmV2",
+      inputs: {
+        image: cur,
+        center_x: 0.5,
+        center_y: 0.5,
+        saturation: 1.0,
+        vignette_intensity: hasVig ? parseFloat(fx.vignette.intensity || 0.25) : 0.0,
+        grain_method: "fastgrain",
+        grain_power: hasGrain ? parseFloat(fx.grain.power || 0.15) : 0.0,
+        grain_scale: 1.0,
+        grain_sat: 0.5,
+        filmgrainer_shadows: 0.6,
+        filmgrainer_highs: 0.2,
+        blur_strength: 0,
+        blur_focus_spread: 2.2,
+        focal_depth: 0.9
+      },
+      _meta: { title: "LayerFilter: Film V2 (Vignette & Grain)" }
+    };
+    cur = ["post_film", 0];
+  } else {
+    delete g["post_film"];
+  }
+
+  return cur;
+}
+
 // Listeners de optimizaciones (se adjuntan tras DOMContentLoaded)
 function attachAttentionOptimizerListeners(){
   $("workflowMode")?.addEventListener("change", (e) => {
@@ -688,6 +826,28 @@ function attachAttentionOptimizerListeners(){
     s.postproc = e.target.checked;
     saveFaceRefine(s);
     scheduleSaveSettings();
+  });
+
+  $("postFxMasterToggle")?.addEventListener("change", (e) => {
+    if($("postFxControls")) $("postFxControls").style.display = e.target.checked ? "block" : "none";
+    savePostFx(getPostFxState());
+    scheduleSaveSettings();
+  });
+  $("postFxLutToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveSettings(); });
+  $("postFxLutSelect")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveSettings(); });
+  $("postFxLutStrength")?.addEventListener("input", (e) => {
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
+    savePostFx(getPostFxState()); scheduleSaveSettings();
+  });
+  $("postFxVigToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveSettings(); });
+  $("postFxVigIntensity")?.addEventListener("input", (e) => {
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat(e.target.value).toFixed(2);
+    savePostFx(getPostFxState()); scheduleSaveSettings();
+  });
+  $("postFxGrainToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveSettings(); });
+  $("postFxGrainPower")?.addEventListener("input", (e) => {
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat(e.target.value).toFixed(2);
+    savePostFx(getPostFxState()); scheduleSaveSettings();
   });
 }
 
@@ -2033,6 +2193,7 @@ async function enqueueFaceRefineCurrent(slotIndex = 3){
     h3opt: getH3OptState(),
     solH3: getSolH3State(),
     faceRefine: getFaceRefineState(),
+    postFx: getPostFxState(),
     mediaSlotsSnapshot: {
       1: mediaSlots[1]?.uploaded ? { ...mediaSlots[1].uploaded } : null,
       2: mediaSlots[2]?.uploaded ? { ...mediaSlots[2].uploaded } : null,
@@ -2081,6 +2242,7 @@ async function enqueueInterpolateCurrent(slotIndex = 3){
       multiplier: rifeMult,
       model: rifeModel
     },
+    postFx: getPostFxState(),
     batchSize: 1
   };
   log(`⚡ Añadida interpolación (${rifeEngine.toUpperCase()} ${rifeMult}x) para ${media.filename} a la cola...`, "l-info");
@@ -2282,7 +2444,8 @@ function saveSettings(){
     shareRefsToggle: !!$("shareRefsToggle")?.checked,
     refImageSize: $("refImageSize")?.value || "match",
     solH3: getSolH3State(),
-    faceRefine: getFaceRefineState()
+    faceRefine: getFaceRefineState(),
+    postFx: getPostFxState()
   };
   try {
     localStorage.setItem(MMH3X2_SETTINGS_KEY, JSON.stringify(s));
@@ -2432,6 +2595,10 @@ function restoreSettings(){
     // enhancerModel se restaura tras cargar la lista de modelos (loadEnhancerModels).
     if(s.shareRefsToggle !== undefined && $("shareRefsToggle")) $("shareRefsToggle").checked = s.shareRefsToggle;
     if(s.refImageSize && $("refImageSize")) $("refImageSize").value = s.refImageSize;
+    if(s.postFx){
+      setPostFxUI(s.postFx);
+      savePostFx(s.postFx);
+    }
     updateRefNumberingHint();
 
     return true;
@@ -2485,6 +2652,7 @@ function attachAutoSaveListeners(){
     "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle", "blendStrength", "blendFrames", "blendMode",
     "rtxToggle", "rtxQuality", "rifeToggle", "rifeEngine", "rifeMultiplier", "rifeModel", "audioMode",
+    "postFxMasterToggle", "postFxLutToggle", "postFxLutSelect", "postFxLutStrength", "postFxVigToggle", "postFxVigIntensity", "postFxGrainToggle", "postFxGrainPower",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
     "audioGuideVolume", "audioUserVolume", "audioNormalizeToggle", "shareRefsToggle", "refImageSize",
     "enhancerModel", "enhancerMode", "enhancerStyle", "enhancerChainMode"
@@ -3470,6 +3638,9 @@ function buildGraph(j){
     };
 
     let interpImages = ["101_get_components", 0];
+    // CRÍTICO: Post-FX (LUT/Color) ANTES de interpolar frames, reduciendo carga de CPU/RAM a la mitad
+    interpImages = appendVideoPostFx(g, interpImages, j?.postFx);
+
     if(rifeState.engine === "rtx"){
       g["102_rtx_fg"] = {
         class_type: "RTXVideoFrameGeneration",
@@ -3907,6 +4078,9 @@ function buildGraph(j){
     const frPostproc = frState.postproc !== undefined ? frState.postproc : false;
     const rtxOn = frPostproc && ($("rtxToggle") ? $("rtxToggle").checked : false);
     const rifeOn = frPostproc && ($("rifeToggle") ? $("rifeToggle").checked : false);
+
+    // CRÍTICO: Post-FX (LUT/Color) ANTES de RTX y RIFE para procesar frames nativos
+    faceFinalImages = appendVideoPostFx(g, faceFinalImages, j?.postFx);
 
     if(rtxOn && g[N.RTX]?.inputs){
       g[N.RTX].inputs.images = faceFinalImages;
@@ -4755,6 +4929,10 @@ function buildGraph(j){
     pass2NodeIds.forEach(id => { delete g[id]; });
   }
 
+  // 12b. Color Grading & Look Cinemático (Post-FX)
+  // CRÍTICO: Debe aplicarse sobre los frames base ANTES de RTX Super Resolution y ANTES de RIFE.
+  finalImagesSource = appendVideoPostFx(g, finalImagesSource, j?.postFx);
+
   const rtxQuality = (j ? j.rtxQuality : $("rtxQuality")?.value) || "HIGHBITRATE_ULTRA";
   if(rtxOn && g[N.RTX]?.inputs){
     g[N.RTX].inputs.images = finalImagesSource;
@@ -4953,6 +5131,7 @@ async function queueJob(runMode){
     spectrum: getSpectrumState(),
     solH3: getSolH3State(),
     faceRefine: getFaceRefineState(),
+    postFx: getPostFxState(),
     blendToggle: $("blendToggle") ? $("blendToggle").checked : true,
     blendStrength: parseFloat($("blendStrength")?.value || "0.35"),
     blendFrames: parseInt($("blendFrames")?.value || "4", 10),
@@ -5470,6 +5649,8 @@ function enableKrea2RecentSlotDrop(){
 window.addEventListener("DOMContentLoaded", () => {
   setupMediaSlots();
   enableKrea2RecentSlotDrop();
+  populatePostFxLuts();
+  setPostFxUI(loadPostFx());
 
   if($("btnFull")) $("btnFull").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("full"); });
   if($("btnSeg1")) $("btnSeg1").addEventListener("click", (e) => { e.currentTarget?.blur(); queueJob("seg1_only"); });

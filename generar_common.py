@@ -197,16 +197,21 @@ def generate_html(config):
     mmh3x2_ui_port = config.get('mmh3x2_ui_port', '8003')
     kreaqwen_ui_port = config.get('kreaqwen_ui_port', '8004')
 
-    # --- LUTs (.cube) para el post-procesado ProPost (opcional) ---
+    # --- LUTs (.cube) para el post-procesado (opcional) ---
+    lut_dirs = config.get('lut_dirs')
+    if lut_dirs is None:
+        try:
+            import config_loader
+            lut_dirs = config_loader.get_lut_dirs()
+        except Exception:
+            lut_dirs = []
     lut_files = []
-    for d in config.get('lut_dirs', []) or []:
+    for d in lut_dirs or []:
         for root, _, file_list in os.walk(d, followlinks=True):
             for f in file_list:
                 if f.lower().endswith('.cube'):
-                    rel = os.path.relpath(os.path.join(root, f), d)
-                    rel = rel.replace('\\', '/')
-                    if rel not in lut_files:
-                        lut_files.append(rel)
+                    if f not in lut_files:
+                        lut_files.append(f)
     lut_files.sort()
     lut_js_array = json.dumps(lut_files)
 

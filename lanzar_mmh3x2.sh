@@ -14,9 +14,9 @@ if [ ! -f "$HTML_FILE" ]; then
 fi
 
 if command -v ss >/dev/null 2>&1; then
-  BACKEND_BIND=$(ss -tlnp 2>/dev/null | awk '/:7821 /{print $4; exit}')
+  BACKEND_BIND=$(ss -tlnp 2>/dev/null | awk '/:(7821|8188) /{print $4; exit}')
   if [ -n "$BACKEND_BIND" ] && echo "$BACKEND_BIND" | grep -q '^127\.'; then
-    echo "Aviso: El backend (ComfyUI :7821) solo escucha en $BACKEND_BIND."
+    echo "Aviso: El backend (ComfyUI) solo escucha en $BACKEND_BIND."
     echo "Si abres esta UI desde otro dispositivo en la LAN, relánzalo con --listen 0.0.0.0."
   fi
 fi

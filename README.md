@@ -15,8 +15,8 @@ The project provides four standalone, zero-dependency web applications designed 
 
 | WebUI | Generated File | Default Port | Model / Architecture | Core Purpose & Modes |
 |---|---|---|---|---|
-| **MMH3X2** | `MMH3X2_WebUI.html` | `:8003` | **MiniMax H3 (2 Segments)** | **Continuous narrative video (up to 30s+)**: 2 chained segments, up to 4 reference images + 1 video, visual continuity powered by Ollama (with real-time fused prompt inspection), audio crossfade, and flexible attention/optimization pipelines (Standard & BlockATT with AIMDO / Spectrum). |
-| **MiniMaxH3** | `MiniMaxH3_WebUI.html` | `:8002` | **MiniMax H3** | **Single-segment video generation**: **i2v** (image-to-video), **flf2v** (first-and-last frame), and **r2v** (multi-reference: up to 6 images, 3 videos, 3 audio tracks). Includes **Dual-Mode H3 FaceRefine** (inline toggle & on-demand player button), **Sol-H3 SM120 Blackwell Attention**, **3D Latent Upscaler**, and RIFE frame interpolation. |
+| **MMH3X2** | `MMH3X2_WebUI.html` | `:8003` | **MiniMax H3 (2 Segments)** | **Continuous narrative video (up to 30s+)**: 2 chained segments, up to 4 reference images + 1 video, visual continuity powered by Ollama (with real-time fused prompt inspection), audio crossfade, flexible attention/optimization pipelines (Standard & BlockATT with AIMDO / Spectrum), **Multi-Target Element Refine** (Face/Hands/Hair/Skin/Body via YOLOv8 & Dual-pass), **Cinematic Color Grading & Post-FX** (3D LUTs, dynamic film grain, vignette), and on-demand player tools. |
+| **MiniMaxH3** | `MiniMaxH3_WebUI.html` | `:8002` | **MiniMax H3** | **Single-segment video generation**: **i2v** (image-to-video), **flf2v** (first-and-last frame), and **r2v** (multi-reference: up to 6 images, 3 videos, 3 audio tracks). Includes **Multi-Target Element Refine** (Face/Hands/Hair/Skin/Body via YOLOv8 with single or dual targets), **Cinematic Color Grading & Post-FX** (3D LUTs, dynamic film grain, vignette), **Sol-H3 SM120 Blackwell Attention**, **3D Latent Upscaler**, and on-demand player frame interpolation (RIFE / RTX). |
 | **LTXV** | `LTXV_WebUI.html` | `:8000` | **LTX-Video / LTX-2.5** | **Ultra-fast video generation**: First Pass & Full Pass pipelines with SageAttention, DMD LoRA, custom VAE selectors, and high-speed distilled transformers. |
 | **KreaQwen** | `KreaQwen_WebUI.html` | `:8004` | **Qwen 2.1 Image + Krea2 / Flux2** | **Dual-model fusion & guided editing**: Base + Refiner stages with dynamic model inversion, native Qwen Edit mode (img2img / faceswap with multi-reference images), integrated Post-FX suite (LUTs, 35mm grain, vignette, radial blur), RGB smart seed variance, and FaceRefine. |
 | **Krea2** | `Krea2_WebUI.html` | `:8001` | **Krea2 / Flux2** | **First-frame generation**: High-fidelity text-to-image pipeline for Flux2 / Krea2 with RGB variance control and a direct "Send to Video" handoff button. |
@@ -60,6 +60,27 @@ The project provides four standalone, zero-dependency web applications designed 
 - Integrated server bound to `HOST=0.0.0.0` for access from smartphones, tablets, and secondary PCs (`http://<LAN_IP>:8003/MMH3X2_WebUI.html`).
 - Media is served via direct HTTP streaming, avoiding local storage consumption on mobile clients.
 - Metadata is fully preserved in all generated PNGs and MP4s.
+
+### 8. Multi-Target Element Refine (YOLOv8 AI Tracking & Seamless Stitching)
+- **Specialized Trackers**: Integrates YOLOv8 detection and segmentation models for fine-grained video inpainting:
+  - **Faces**: `face_yolov8m.pt` (detailed facial expressions and skin).
+  - **Hands**: `hand_yolov8s.pt` (anatomically precise 5 fingers and nails).
+  - **Hair**: `yolov8n-seg_60.pt` (hair flow and individual strands).
+  - **Skin & Body**: `yolov8m-seg.pt` (full-body / garment / posture refinement).
+- **Targeting Strategies**: Single primary target, centered target, left/right positional priority, or **Dual-Target Mode** (refines two distinct subjects in consecutive passes on the same video).
+- **Memory-Safe Canvas Modes**: Choose between **512x512** (ultra-fast, low VRAM footprint to prevent OOM on long renders) or **768x768** (native high-resolution DiT canvas).
+- **Adaptive Frame Denoising & Feathering**: Customizable per-frame denoise levels and edge feathering to ensure seamless blending without seam lines or flickering.
+
+### 9. Cinematic Color Grading & Post-FX Suite
+- **100% Video-Safe 3D LUTs**: Color grading powered by GPU lookup tables (`.cube`). 70+ presets auto-detected (e.g. *Teal and Orange, Blade Runner, Casablanca-Noir, Kodak Portra, Matrix, Amelie*), with 0%–100% opacity mixing.
+- **Dynamic Organic Film Grain**: Real film noise that increments its random seed frame-by-frame (`seed += 1`). Unlike static noise overlays, this completely eliminates the "frozen camera lens dirt" artifact.
+- **Radial Vignette**: Cinematic lens vignette with gentle edge attenuation.
+- **Zero-Overhead Bypass**: When deactivated, post-processing nodes are omitted from the ComfyUI graph entirely.
+
+### 10. On-Demand Video Player Tools
+- **Standalone Frame Interpolation**: Click the **⚡ Interpolar** button on any completed video in the player to immediately interpolate motion (2x, 3x, 4x via RIFE or NVIDIA RTX Frame Gen) without re-generating the scene.
+- **Standalone Element Refine**: Click the **✨ Refinar Rostro / Elementos** button to run face/hand refinement directly on an existing video clip.
+- **Frame Extraction**: Click the **📸 Capturar Frame** button to grab any frame at the current playhead position as full-resolution input for image-to-video or editing.
 
 ---
 
@@ -112,6 +133,7 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | **rgthree-comfy** *(optional)* | [rgthree-comfy](https://github.com/rgthree/rgthree-comfy) | `Power Lora Loader`, `Seed` | Krea2, LTXV |
 | **ComfyUI-H3PromptStudio** | [ComfyUI-H3PromptStudio](https://github.com/tonetxo/ComfyUI-H3PromptStudio) | `MiniMaxH3ReferenceToVideo`, `MiniMaxH3SigmaShift`, `ModelAttentionBackend` | MMH3X2, MiniMaxH3 |
 | **ComfyUI-ProPost** *(optional)* | [ComfyUI-ProPost](https://github.com/digitaljohn/comfyui-propost) | `ProPostApplyLUT`, `ProPostFilmGrain`, `ProPostRadialBlur`, `ProPostVignette` | KreaQwen (Post-FX Suite) |
+| **ComfyUI_LayerStyle** *(optional)* | [ComfyUI_LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle) | `LayerColor: LUT Apply`, `LayerFilter: FilmV2` | MiniMaxH3, MMH3X2 (Color Grading & Post-FX) |
 | **ComfyUI-RBG-SmartSeedVariance** *(optional)* | [ComfyUI-RBG-SmartSeedVariance](https://github.com/RamonGuthrie/ComfyUI-RBG-SmartSeedVariance.git) | `RBG_Smart_Seed_Variance` | Krea2, KreaQwen (Smart Seed Variance) |
 | **H3-Optimizations** *(optional)* | [H3-Optimizations](https://github.com/Zironic/H3-Optimizations) | `H3VSAAttention`, `H3MemoryOptimization`, `H3SparseAttention`, `H3AIMDOResidencyLimiter` | MiniMaxH3 (VSA Attention, AIMDO) |
 

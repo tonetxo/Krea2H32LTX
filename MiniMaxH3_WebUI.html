@@ -986,6 +986,60 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         <div class="hint" style="margin-top:4px;font-size:10px;">Escalado por Tensor Cores NVIDIA RTX (2x). Si ya usas Latent Upscaler 3D, desactivarlo evita resoluciones excesivas y ahorra tiempo.</div>
       </div>
 
+      <!-- COLOR GRADING & LOOK CINEMÁTICO -->
+      <div class="panel">
+        <h2>Color Grading & Look Cinemático</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segPostFxOn" data-value="true">Activo</div>
+          <div class="seg on" id="segPostFxOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="postFxControls" style="display:none; margin-top:8px;">
+          <!-- 3D LUT (Color Grading) -->
+          <div class="row" style="margin-bottom:6px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+              <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="postFxLutToggle" checked> <span style="font-size:11px;font-weight:600;">LUT (3D Color Grade)</span>
+              </label>
+              <span class="hint" id="postFxLutVal" style="font-size:10px;">80%</span>
+            </div>
+            <select id="postFxLutSelect" style="width:100%;margin-top:4px;">
+              <option value="">-- Seleccionar LUT (.cube) --</option>
+            </select>
+            <div class="row slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;min-width:65px;">Intensidad</label>
+              <input type="range" id="postFxLutStrength" min="0" max="1" step="0.01" value="0.8" style="flex:1;">
+            </div>
+          </div>
+
+          <!-- Viñeta y Grano dinámico en 2 columnas -->
+          <div class="row two-col" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <!-- Viñeta -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                  <input type="checkbox" id="postFxVigToggle"> <span style="font-size:10.5px;font-weight:600;">Viñeta</span>
+                </label>
+                <span class="hint" id="postFxVigVal" style="font-size:10px;">0.25</span>
+              </div>
+              <input type="range" id="postFxVigIntensity" min="0" max="0.6" step="0.02" value="0.25" style="width:100%;margin-top:4px;">
+            </div>
+            <!-- Grano dinámico -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                  <input type="checkbox" id="postFxGrainToggle"> <span style="font-size:10.5px;font-weight:600;">Grano Dinámico</span>
+                </label>
+                <span class="hint" id="postFxGrainVal" style="font-size:10px;">0.15</span>
+              </div>
+              <input type="range" id="postFxGrainPower" min="0" max="0.4" step="0.01" value="0.15" style="width:100%;margin-top:4px;">
+            </div>
+          </div>
+          <div class="hint" style="font-size:10px;margin-top:6px;">
+            Gradación de color precisa por 3D LUT y textura cinematográfica sin grano congelado.
+          </div>
+        </div>
+      </div>
+
       <div class="panel"><h2>Profundidad de color vídeo</h2><div class="seed-toggle"><div class="seg on" id="segBitDepth8" data-value="8">8 bits</div><div class="seg" id="segBitDepth10" data-value="10">10 bits</div></div></div>
 
       <!-- GESTIÓN DE MEMORIA Y OFFLOAD -->
@@ -1674,11 +1728,11 @@ const BASE_GRAPH = {
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-3step-ComfyUI.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors", "h3/taomate_h3_3step_comfy.safetensors"];
 const AVAILABLE_VAES = ["MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors"];
-const AVAILABLE_UNETS = ["boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ernie/ernie-image-turbo.safetensors", "flux/8StepsCreartHyperFlux_creartUltimate.safetensors", "flux2/DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "flux2/Krea2_Turbo_convrot_int8mixed.safetensors", "flux2/flux-2-klein-9b.safetensors", "flux2/flux-2-klein-9b_int8_convrot.safetensors", "flux2/jibMixKrea2_v40Habanero.safetensors", "ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "minimax_music3_dit_int8_convrot.safetensors", "minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_w6a8.safetensors", "nunchaku/fluxedUpFluxNSFWCheckpoint_51NVFP4.safetensors", "nunchaku/svdq-fp4_r32-CyberRealistic-Flux-V2.5.safetensors", "nunchaku/svdq-fp4_r32-Jib-Mix-Flux-V12.safetensors", "nunchaku/svdq-fp4_r32-flux.1-dev-colossusv12.safetensors", "nunchaku/svdq-fp4_r32-flux.1-dev.safetensors", "nunchaku/svdq-fp4_r32-flux.1-fill-dev.safetensors", "nunchaku/svdq-fp4_r32-flux.1-kontext-dev.safetensors", "nunchaku/svdq-fp4_r32-fluxmania-legacy.safetensors", "nunchaku/svdq-fp4_r32-pixelwave-dev-0.3.safetensors", "nunchaku/svdq-fp4_r32-shuttle-jaguar.safetensors", "qwen/qwen-image-2.1-UC-NVFP4.safetensors", "qwen/qwen_image_2.1_int8_convrot.safetensors", "qwen/qwen_image_edit_2511_int8_convrot.safetensors", "seedvr2_3b_int8_convrot.safetensors", "zimage/z_image_turbo_bf16.safetensors"];
+const AVAILABLE_UNETS = ["boogu/boogu_image_turbo_hotfix_nvfp4.safetensors", "ernie/ernie-image-turbo.safetensors", "flux/8StepsCreartHyperFlux_creartUltimate.safetensors", "flux2/DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "flux2/Krea2_Turbo_convrot_int8mixed.safetensors", "flux2/flux-2-klein-9b.safetensors", "flux2/flux-2-klein-9b_int8_convrot.safetensors", "flux2/jibMixKrea2_v40Habanero.safetensors", "ideogram/Ideogram4-instant_int8-convrot-simple.safetensors", "ideogram/ig4_uncond-int8_convrot_simple.safetensors", "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "ltx2.5-Stubelius_remix_v1_nvfp4.safetensors", "minimax_music3_dit_int8_convrot.safetensors", "minimaxh3/10Eros_Max_h3_TURBO-hybrid_beta5_w4a8_14gb_optimized.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_w6a8.safetensors", "nunchaku/fluxedUpFluxNSFWCheckpoint_51NVFP4.safetensors", "nunchaku/svdq-fp4_r32-CyberRealistic-Flux-V2.5.safetensors", "nunchaku/svdq-fp4_r32-Jib-Mix-Flux-V12.safetensors", "nunchaku/svdq-fp4_r32-flux.1-dev-colossusv12.safetensors", "nunchaku/svdq-fp4_r32-flux.1-dev.safetensors", "nunchaku/svdq-fp4_r32-flux.1-fill-dev.safetensors", "nunchaku/svdq-fp4_r32-flux.1-kontext-dev.safetensors", "nunchaku/svdq-fp4_r32-fluxmania-legacy.safetensors", "nunchaku/svdq-fp4_r32-pixelwave-dev-0.3.safetensors", "nunchaku/svdq-fp4_r32-shuttle-jaguar.safetensors", "qwen/qwen-image-2.1-UC-NVFP4.safetensors", "qwen/qwen-image-2.1-UC-int8_convrot.safetensors", "qwen/qwen_image_2.1_int8_convrot.safetensors", "qwen/qwen_image_edit_2511_int8_convrot.safetensors", "seedvr2_3b_int8_convrot.safetensors", "zimage/z_image_turbo_bf16.safetensors"];
 const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "t5_base.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
 const AVAILABLE_UPSCALE_MODELS = [];
-const AVAILABLE_LUTS = [];
+const AVAILABLE_LUTS = ["3Strip.cube", "70s.cube", "Agfa Portrait XPS 160.cube", "Amelie.cube", "Aviator.cube", "Blade Runner.cube", "Bleach.cube", "BlueArchitecture.cube", "Brooklyn.cube", "CELLULOID_01_FU_LOW.cube", "Casablanca-Noir.cube", "Celadon.cube", "Chamoisee.cube", "CineStill-800-T-V1.0--N125.cube", "Citizen-Depth.cube", "Colorist_Factory_Severn_LUT.cube", "Cubanismo.cube", "Drive.cube", "Duotone.cube", "Emulsion.cube", "Enemy.cube", "Enhance.cube", "Fashion.cube", "Fuji Astia 100F.cube", "Fuji Eterna 3513.cube", "Fuji Eterna 8563.cube", "Fuji Provia 100F.cube", "Fuji Sensia 100.cube", "Fuji Superia Xtra 400.cube", "Fuji Vivid 8543.cube", "Glacier.cube", "Godfather.cube", "Grand Budapest.cube", "Grime.cube", "Grit.cube", "Hannibal.cube", "Her.cube", "Kodak Ektachrome 64.cube", "Kodak Professional Portra 400.cube", "Kodak Vision 2383.cube", "LPP Tetrachrome 400.cube", "MONOCHROME_2_.cube", "Mad Max.cube", "Matrix V1.cube", "Matrix V2.cube", "Metropolis-Mist.cube", "Mint.cube", "Moonrise Kingdom.cube", "Ochre.cube", "Polaroid 600.cube", "Punch.cube", "Raging-Shadow.cube", "Revenant.cube", "Rhythm.cube", "Seven.cube", "Spy.cube", "Stranger Things.cube", "Summer.cube", "Sunset-Boulevard-Glow.cube", "Teal and Orange.cube", "Thriller.cube", "Vinteo.cube", "Wonder Woman.cube", "justyndigitalphotography.cube", "ta\u015fdemirrr_1.A006_04280540_S.cube"];
 const LTXV_UI_PORT = "8002";
 const MINIMAXH3_UI_PORT = "8002";
 const MMH3X2_UI_PORT = "8003";
@@ -4642,6 +4696,7 @@ function saveH3Settings(){
     faceRefine: getFaceRefineState(),
     rife: getRifeState(),
     rtx: getRtxState(),
+    postFx: getPostFxState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
     aimdo: getAimdoState(),
@@ -4683,6 +4738,7 @@ function restoreH3Settings(){
     if(s.faceRefine){ setFaceRefineUI(s.faceRefine); saveFaceRefine(s.faceRefine); }
     if(s.rife){ setRifeUI(s.rife); saveRife(s.rife); }
     if(s.rtx){ setRtxUI(s.rtx); saveRtx(s.rtx); }
+    if(s.postFx){ setPostFxUI(s.postFx); savePostFx(s.postFx); }
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
     if(s.attentionOptimizer){ setAttentionOptimizerUI(s.attentionOptimizer.mode); saveAttentionOptimizer(s.attentionOptimizer); }
     if(s.aimdo){ setAimdoUI(s.aimdo); saveAimdo(s.aimdo); }
@@ -5151,6 +5207,174 @@ $("rtxQuality")?.addEventListener("change", () => {
   const r = getRtxState();
   saveRtx(r);
   scheduleSaveH3Settings();
+});
+
+// --- COLOR GRADING & LOOK CINEMÁTICO (POST-FX) ---
+const POSTFX_KEY = "minimaxh3_postfx_state";
+
+function loadPostFx(){
+  try {
+    const raw = localStorage.getItem(POSTFX_KEY);
+    if(raw) return JSON.parse(raw);
+  } catch(_){}
+  return {
+    enabled: false,
+    lut: { enabled: true, name: "", strength: 0.8 },
+    vignette: { enabled: false, intensity: 0.25 },
+    grain: { enabled: false, power: 0.15 }
+  };
+}
+
+function savePostFx(s){
+  try { localStorage.setItem(POSTFX_KEY, JSON.stringify(s)); } catch(_){}
+}
+
+function setPostFxUI(s){
+  if(!s) return;
+  const on = $("segPostFxOn"), off = $("segPostFxOff");
+  const panel = $("postFxControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "block";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+
+  if($("postFxLutToggle")) $("postFxLutToggle").checked = s.lut?.enabled ?? true;
+  if($("postFxLutSelect") && s.lut?.name) $("postFxLutSelect").value = s.lut.name;
+  if($("postFxLutStrength")){
+    $("postFxLutStrength").value = s.lut?.strength ?? 0.8;
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+  }
+
+  if($("postFxVigToggle")) $("postFxVigToggle").checked = !!s.vignette?.enabled;
+  if($("postFxVigIntensity")){
+    $("postFxVigIntensity").value = s.vignette?.intensity ?? 0.25;
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat($("postFxVigIntensity").value).toFixed(2);
+  }
+
+  if($("postFxGrainToggle")) $("postFxGrainToggle").checked = !!s.grain?.enabled;
+  if($("postFxGrainPower")){
+    $("postFxGrainPower").value = s.grain?.power ?? 0.15;
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat($("postFxGrainPower").value).toFixed(2);
+  }
+}
+
+function getPostFxState(){
+  return {
+    enabled: $("segPostFxOn")?.classList.contains("on") ?? false,
+    lut: {
+      enabled: $("postFxLutToggle")?.checked ?? true,
+      name: $("postFxLutSelect")?.value || "",
+      strength: parseFloat($("postFxLutStrength")?.value || "0.8")
+    },
+    vignette: {
+      enabled: $("postFxVigToggle")?.checked ?? false,
+      intensity: parseFloat($("postFxVigIntensity")?.value || "0.25")
+    },
+    grain: {
+      enabled: $("postFxGrainToggle")?.checked ?? false,
+      power: parseFloat($("postFxGrainPower")?.value || "0.15")
+    }
+  };
+}
+
+function populatePostFxLuts(){
+  const sel = $("postFxLutSelect");
+  if(!sel) return;
+  const luts = (typeof AVAILABLE_LUTS !== "undefined" && Array.isArray(AVAILABLE_LUTS)) ? AVAILABLE_LUTS : [];
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Seleccionar LUT (.cube) --</option>';
+  for(const name of luts){
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name.endsWith(".cube") ? name.slice(0, -5) : name;
+    sel.appendChild(opt);
+  }
+  if(prev && luts.includes(prev)){
+    sel.value = prev;
+  }
+}
+
+function appendVideoPostFx(g, imageRef, postFxState){
+  const fx = postFxState || getPostFxState();
+  if(!fx || !fx.enabled) return imageRef;
+  let cur = imageRef;
+
+  // 1. 3D LUT Color Grading
+  if(fx.lut?.enabled && fx.lut?.name){
+    g["post_lut"] = {
+      class_type: "LayerColor: LUT Apply",
+      inputs: {
+        image: cur,
+        LUT: fx.lut.name,
+        color_space: "linear",
+        strength: Math.round((fx.lut.strength ?? 0.8) * 100)
+      },
+      _meta: { title: "LayerColor: LUT Apply" }
+    };
+    cur = ["post_lut", 0];
+  } else {
+    delete g["post_lut"];
+  }
+
+  // 2. Viñeta y/o Grano dinámico
+  const hasVig = !!(fx.vignette?.enabled && (fx.vignette.intensity > 0));
+  const hasGrain = !!(fx.grain?.enabled && (fx.grain.power > 0));
+
+  if(hasVig || hasGrain){
+    g["post_film"] = {
+      class_type: "LayerFilter: FilmV2",
+      inputs: {
+        image: cur,
+        center_x: 0.5,
+        center_y: 0.5,
+        saturation: 1.0,
+        vignette_intensity: hasVig ? parseFloat(fx.vignette.intensity || 0.25) : 0.0,
+        grain_method: "fastgrain",
+        grain_power: hasGrain ? parseFloat(fx.grain.power || 0.15) : 0.0,
+        grain_scale: 1.0,
+        grain_sat: 0.5,
+        filmgrainer_shadows: 0.6,
+        filmgrainer_highs: 0.2,
+        blur_strength: 0,
+        blur_focus_spread: 2.2,
+        focal_depth: 0.9
+      },
+      _meta: { title: "LayerFilter: Film V2 (Vignette & Grain)" }
+    };
+    cur = ["post_film", 0];
+  } else {
+    delete g["post_film"];
+  }
+
+  return cur;
+}
+
+$("segPostFxOn")?.addEventListener("click", () => {
+  const s = getPostFxState(); s.enabled = true;
+  setPostFxUI(s); savePostFx(s); scheduleSaveH3Settings();
+});
+$("segPostFxOff")?.addEventListener("click", () => {
+  const s = getPostFxState(); s.enabled = false;
+  setPostFxUI(s); savePostFx(s); scheduleSaveH3Settings();
+});
+$("postFxLutToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveH3Settings(); });
+$("postFxLutSelect")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveH3Settings(); });
+$("postFxLutStrength")?.addEventListener("input", (e) => {
+  if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
+  savePostFx(getPostFxState()); scheduleSaveH3Settings();
+});
+$("postFxVigToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveH3Settings(); });
+$("postFxVigIntensity")?.addEventListener("input", (e) => {
+  if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat(e.target.value).toFixed(2);
+  savePostFx(getPostFxState()); scheduleSaveH3Settings();
+});
+$("postFxGrainToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveH3Settings(); });
+$("postFxGrainPower")?.addEventListener("input", (e) => {
+  if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat(e.target.value).toFixed(2);
+  savePostFx(getPostFxState()); scheduleSaveH3Settings();
 });
 
 // --- FACE REFINE (ComfyUI-H3-FaceRefine) ---
@@ -6101,6 +6325,11 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
 
   if(allowShow){
     const frTgt = activeJob?.faceRefine?.target;
+    const frLabel = frTgt === "face_hands" ? "Rostro+Manos"
+      : (frTgt === "hands" ? "Manos"
+      : (frTgt === "hair" ? "Pelo"
+      : (frTgt === "skin" ? "Piel"
+      : (frTgt === "body" ? "Cuerpo" : "Rostro"))));
     const badgeText = activeJob?.isInterpolateOnly
       ? `Var ${varIndex} · Interp ${activeJob.rife?.multiplier || 2}x`
       : (activeJob?.isFaceRefineOnly
@@ -6316,6 +6545,7 @@ function snapshotJob(){
     latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
     rtx: getRtxState(),
+    postFx: getPostFxState(),
     faceRefine: getFaceRefineState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
@@ -8190,6 +8420,9 @@ function buildGraph(job){
     };
 
     let interpImages = ["101_get_components", 0];
+    // CRÍTICO: Post-FX (LUT/Color) ANTES de interpolar frames, reduciendo carga de CPU/RAM a la mitad
+    interpImages = appendVideoPostFx(g, interpImages, j?.postFx);
+
     if(rifeEngine === "rtx"){
       g["102_rtx_fg"] = {
         class_type: "RTXVideoFrameGeneration",
@@ -8656,6 +8889,9 @@ function buildGraph(job){
     const rtxState = j ? j.rtx : getRtxState();
     const rtxEnabled = rtxState ? rtxState.enabled : true;
     const rtxQuality = rtxState ? (rtxState.quality || "ULTRA") : "ULTRA";
+
+    // CRÍTICO: Post-FX (LUT/Color) ANTES de RTX Video Super Resolution para evitar procesar a 2.5K/4K en CPU
+    currentVideoImages = appendVideoPostFx(g, currentVideoImages, j?.postFx);
 
     if(rtxEnabled){
       g[N.RTX_SR] = {
@@ -9519,6 +9755,11 @@ function buildGraph(job){
     delete g[N.FACE_STITCH];
     pass2NodeIds.forEach(id => { delete g[id]; });
   }
+
+  // 10b. Color Grading & Look Cinemático (Post-FX)
+  // CRÍTICO: Debe aplicarse sobre los frames base a resolución original ANTES de interpolar y escalar.
+  // Evita multiplicar frames x2/x4 y píxeles x4, reduciendo el consumo de RAM/Swap a una fracción segura.
+  currentVideoImages = appendVideoPostFx(g, currentVideoImages, j?.postFx);
 
   // 11. Frame Interpolation (RIFE / RTX Frame Gen) — se conecta después de FaceRefine y ANTES de RTXVideoSuperResolution
   const rifeState = j ? j.rife : getRifeState();
@@ -10729,9 +10970,11 @@ function dataUrlToBlob(dataUrl){
 
 (async function initMinimaxH3(){
   try {
+    populatePostFxLuts();
     const hadSettings = restoreH3Settings();
     if(!hadSettings){
       setModeUI(loadMode());
+      setPostFxUI(loadPostFx());
     } else {
       // Después de restaurar ajustes, aseguramos selectores por defecto si no hay sesión previa.
       setDefaultSelectors();

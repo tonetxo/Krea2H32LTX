@@ -180,7 +180,7 @@ def get_comfyui_url():
         return configured
 
     import socket
-    for p in (8188, 7821, 7820):
+    for p in (8188, 7821, 7820, 7822, 7823, 7824, 7825):
         try:
             with socket.create_connection(("127.0.0.1", p), timeout=0.08):
                 return f"http://127.0.0.1:{p}"
@@ -216,9 +216,13 @@ def get_lut_dirs():
     if cfg_luts and os.path.isdir(os.path.expanduser(cfg_luts)):
         candidates.append(os.path.realpath(os.path.expanduser(cfg_luts)))
 
-    # Carpeta de modelos luts (p.ej. ~/SwarmUI/Models/luts)
+    # Carpeta de modelos luts (p.ej. ~/SwarmUI/Models/luts o ~/ComfyUI/models/luts)
     models_dir = get_models_dir()
     candidates.append(os.path.join(models_dir, "luts"))
+
+    comfy_root = get_comfyui_root()
+    candidates.append(os.path.join(comfy_root, "models", "luts"))
+    candidates.append(os.path.join(comfy_root, "custom_nodes", "comfyui_layerstyle", "lut"))
 
     # Directorio de la extensión PostRenderTorched (relativo a la raíz de SwarmUI)
     swarm_root = os.path.dirname(models_dir)

@@ -3,10 +3,14 @@
     "url": "http://127.0.0.1:8188",
     "root_dir": "",
     "models_dir": "",
-    "output_dir": ""
+    "output_dir": "",
+    "luts_dir": ""
   },
   "ollama": {
     "url": "http://127.0.0.1:11434"
+  },
+  "llamacpp": {
+    "url": "http://127.0.0.1:8080"
   },
   "ports": {
     "ltxv": 8000,

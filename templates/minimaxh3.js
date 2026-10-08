@@ -489,6 +489,7 @@ function saveH3Settings(){
     faceRefine: getFaceRefineState(),
     rife: getRifeState(),
     rtx: getRtxState(),
+    postFx: getPostFxState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
     aimdo: getAimdoState(),
@@ -530,6 +531,7 @@ function restoreH3Settings(){
     if(s.faceRefine){ setFaceRefineUI(s.faceRefine); saveFaceRefine(s.faceRefine); }
     if(s.rife){ setRifeUI(s.rife); saveRife(s.rife); }
     if(s.rtx){ setRtxUI(s.rtx); saveRtx(s.rtx); }
+    if(s.postFx){ setPostFxUI(s.postFx); savePostFx(s.postFx); }
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
     if(s.attentionOptimizer){ setAttentionOptimizerUI(s.attentionOptimizer.mode); saveAttentionOptimizer(s.attentionOptimizer); }
     if(s.aimdo){ setAimdoUI(s.aimdo); saveAimdo(s.aimdo); }
@@ -998,6 +1000,174 @@ $("rtxQuality")?.addEventListener("change", () => {
   const r = getRtxState();
   saveRtx(r);
   scheduleSaveH3Settings();
+});
+
+// --- COLOR GRADING & LOOK CINEMÁTICO (POST-FX) ---
+const POSTFX_KEY = "minimaxh3_postfx_state";
+
+function loadPostFx(){
+  try {
+    const raw = localStorage.getItem(POSTFX_KEY);
+    if(raw) return JSON.parse(raw);
+  } catch(_){}
+  return {
+    enabled: false,
+    lut: { enabled: true, name: "", strength: 0.8 },
+    vignette: { enabled: false, intensity: 0.25 },
+    grain: { enabled: false, power: 0.15 }
+  };
+}
+
+function savePostFx(s){
+  try { localStorage.setItem(POSTFX_KEY, JSON.stringify(s)); } catch(_){}
+}
+
+function setPostFxUI(s){
+  if(!s) return;
+  const on = $("segPostFxOn"), off = $("segPostFxOff");
+  const panel = $("postFxControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "block";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+
+  if($("postFxLutToggle")) $("postFxLutToggle").checked = s.lut?.enabled ?? true;
+  if($("postFxLutSelect") && s.lut?.name) $("postFxLutSelect").value = s.lut.name;
+  if($("postFxLutStrength")){
+    $("postFxLutStrength").value = s.lut?.strength ?? 0.8;
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+  }
+
+  if($("postFxVigToggle")) $("postFxVigToggle").checked = !!s.vignette?.enabled;
+  if($("postFxVigIntensity")){
+    $("postFxVigIntensity").value = s.vignette?.intensity ?? 0.25;
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat($("postFxVigIntensity").value).toFixed(2);
+  }
+
+  if($("postFxGrainToggle")) $("postFxGrainToggle").checked = !!s.grain?.enabled;
+  if($("postFxGrainPower")){
+    $("postFxGrainPower").value = s.grain?.power ?? 0.15;
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat($("postFxGrainPower").value).toFixed(2);
+  }
+}
+
+function getPostFxState(){
+  return {
+    enabled: $("segPostFxOn")?.classList.contains("on") ?? false,
+    lut: {
+      enabled: $("postFxLutToggle")?.checked ?? true,
+      name: $("postFxLutSelect")?.value || "",
+      strength: parseFloat($("postFxLutStrength")?.value || "0.8")
+    },
+    vignette: {
+      enabled: $("postFxVigToggle")?.checked ?? false,
+      intensity: parseFloat($("postFxVigIntensity")?.value || "0.25")
+    },
+    grain: {
+      enabled: $("postFxGrainToggle")?.checked ?? false,
+      power: parseFloat($("postFxGrainPower")?.value || "0.15")
+    }
+  };
+}
+
+function populatePostFxLuts(){
+  const sel = $("postFxLutSelect");
+  if(!sel) return;
+  const luts = (typeof AVAILABLE_LUTS !== "undefined" && Array.isArray(AVAILABLE_LUTS)) ? AVAILABLE_LUTS : [];
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Seleccionar LUT (.cube) --</option>';
+  for(const name of luts){
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name.endsWith(".cube") ? name.slice(0, -5) : name;
+    sel.appendChild(opt);
+  }
+  if(prev && luts.includes(prev)){
+    sel.value = prev;
+  }
+}
+
+function appendVideoPostFx(g, imageRef, postFxState){
+  const fx = postFxState || getPostFxState();
+  if(!fx || !fx.enabled) return imageRef;
+  let cur = imageRef;
+
+  // 1. 3D LUT Color Grading
+  if(fx.lut?.enabled && fx.lut?.name){
+    g["post_lut"] = {
+      class_type: "LayerColor: LUT Apply",
+      inputs: {
+        image: cur,
+        LUT: fx.lut.name,
+        color_space: "linear",
+        strength: Math.round((fx.lut.strength ?? 0.8) * 100)
+      },
+      _meta: { title: "LayerColor: LUT Apply" }
+    };
+    cur = ["post_lut", 0];
+  } else {
+    delete g["post_lut"];
+  }
+
+  // 2. Viñeta y/o Grano dinámico
+  const hasVig = !!(fx.vignette?.enabled && (fx.vignette.intensity > 0));
+  const hasGrain = !!(fx.grain?.enabled && (fx.grain.power > 0));
+
+  if(hasVig || hasGrain){
+    g["post_film"] = {
+      class_type: "LayerFilter: FilmV2",
+      inputs: {
+        image: cur,
+        center_x: 0.5,
+        center_y: 0.5,
+        saturation: 1.0,
+        vignette_intensity: hasVig ? parseFloat(fx.vignette.intensity || 0.25) : 0.0,
+        grain_method: "fastgrain",
+        grain_power: hasGrain ? parseFloat(fx.grain.power || 0.15) : 0.0,
+        grain_scale: 1.0,
+        grain_sat: 0.5,
+        filmgrainer_shadows: 0.6,
+        filmgrainer_highs: 0.2,
+        blur_strength: 0,
+        blur_focus_spread: 2.2,
+        focal_depth: 0.9
+      },
+      _meta: { title: "LayerFilter: Film V2 (Vignette & Grain)" }
+    };
+    cur = ["post_film", 0];
+  } else {
+    delete g["post_film"];
+  }
+
+  return cur;
+}
+
+$("segPostFxOn")?.addEventListener("click", () => {
+  const s = getPostFxState(); s.enabled = true;
+  setPostFxUI(s); savePostFx(s); scheduleSaveH3Settings();
+});
+$("segPostFxOff")?.addEventListener("click", () => {
+  const s = getPostFxState(); s.enabled = false;
+  setPostFxUI(s); savePostFx(s); scheduleSaveH3Settings();
+});
+$("postFxLutToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveH3Settings(); });
+$("postFxLutSelect")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveH3Settings(); });
+$("postFxLutStrength")?.addEventListener("input", (e) => {
+  if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
+  savePostFx(getPostFxState()); scheduleSaveH3Settings();
+});
+$("postFxVigToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveH3Settings(); });
+$("postFxVigIntensity")?.addEventListener("input", (e) => {
+  if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat(e.target.value).toFixed(2);
+  savePostFx(getPostFxState()); scheduleSaveH3Settings();
+});
+$("postFxGrainToggle")?.addEventListener("change", () => { savePostFx(getPostFxState()); scheduleSaveH3Settings(); });
+$("postFxGrainPower")?.addEventListener("input", (e) => {
+  if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat(e.target.value).toFixed(2);
+  savePostFx(getPostFxState()); scheduleSaveH3Settings();
 });
 
 // --- FACE REFINE (ComfyUI-H3-FaceRefine) ---
@@ -1948,6 +2118,11 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
 
   if(allowShow){
     const frTgt = activeJob?.faceRefine?.target;
+    const frLabel = frTgt === "face_hands" ? "Rostro+Manos"
+      : (frTgt === "hands" ? "Manos"
+      : (frTgt === "hair" ? "Pelo"
+      : (frTgt === "skin" ? "Piel"
+      : (frTgt === "body" ? "Cuerpo" : "Rostro"))));
     const badgeText = activeJob?.isInterpolateOnly
       ? `Var ${varIndex} · Interp ${activeJob.rife?.multiplier || 2}x`
       : (activeJob?.isFaceRefineOnly
@@ -2163,6 +2338,7 @@ function snapshotJob(){
     latentUpscale: getLatentUpscaleState(),
     rife: getRifeState(),
     rtx: getRtxState(),
+    postFx: getPostFxState(),
     faceRefine: getFaceRefineState(),
     attentionBackend: getAttentionBackendState(),
     attentionOptimizer: getAttentionOptimizerState(),
@@ -4037,6 +4213,9 @@ function buildGraph(job){
     };
 
     let interpImages = ["101_get_components", 0];
+    // CRÍTICO: Post-FX (LUT/Color) ANTES de interpolar frames, reduciendo carga de CPU/RAM a la mitad
+    interpImages = appendVideoPostFx(g, interpImages, j?.postFx);
+
     if(rifeEngine === "rtx"){
       g["102_rtx_fg"] = {
         class_type: "RTXVideoFrameGeneration",
@@ -4503,6 +4682,9 @@ function buildGraph(job){
     const rtxState = j ? j.rtx : getRtxState();
     const rtxEnabled = rtxState ? rtxState.enabled : true;
     const rtxQuality = rtxState ? (rtxState.quality || "ULTRA") : "ULTRA";
+
+    // CRÍTICO: Post-FX (LUT/Color) ANTES de RTX Video Super Resolution para evitar procesar a 2.5K/4K en CPU
+    currentVideoImages = appendVideoPostFx(g, currentVideoImages, j?.postFx);
 
     if(rtxEnabled){
       g[N.RTX_SR] = {
@@ -5366,6 +5548,11 @@ function buildGraph(job){
     delete g[N.FACE_STITCH];
     pass2NodeIds.forEach(id => { delete g[id]; });
   }
+
+  // 10b. Color Grading & Look Cinemático (Post-FX)
+  // CRÍTICO: Debe aplicarse sobre los frames base a resolución original ANTES de interpolar y escalar.
+  // Evita multiplicar frames x2/x4 y píxeles x4, reduciendo el consumo de RAM/Swap a una fracción segura.
+  currentVideoImages = appendVideoPostFx(g, currentVideoImages, j?.postFx);
 
   // 11. Frame Interpolation (RIFE / RTX Frame Gen) — se conecta después de FaceRefine y ANTES de RTXVideoSuperResolution
   const rifeState = j ? j.rife : getRifeState();
@@ -6576,9 +6763,11 @@ function dataUrlToBlob(dataUrl){
 
 (async function initMinimaxH3(){
   try {
+    populatePostFxLuts();
     const hadSettings = restoreH3Settings();
     if(!hadSettings){
       setModeUI(loadMode());
+      setPostFxUI(loadPostFx());
     } else {
       // Después de restaurar ajustes, aseguramos selectores por defecto si no hay sesión previa.
       setDefaultSelectors();

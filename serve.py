@@ -35,21 +35,15 @@ import urllib.parse
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 HOST = sys.argv[4] if len(sys.argv) > 4 else os.environ.get("HOST", "127.0.0.1")
 
+import config_loader
+
 def get_backend():
     if len(sys.argv) > 2:
         return sys.argv[2]
     env = os.environ.get("BACKEND_URL")
     if env:
         return env
-    for p in (7821, 7822, 7823, 7824, 7825, 7826, 7827, 7828, 7829, 7830, 7820, 8188):
-        try:
-            with socket.create_connection(("127.0.0.1", p), timeout=0.08):
-                return f"http://127.0.0.1:{p}"
-        except OSError:
-            pass
-    return "http://127.0.0.1:7821"
-
-import config_loader
+    return config_loader.get_comfyui_url()
 
 BACKEND = get_backend()
 OLLAMA = config_loader.get_ollama_url()

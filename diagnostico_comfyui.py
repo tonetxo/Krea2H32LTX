@@ -109,6 +109,13 @@ REQUIRED_PACKAGES = [
         "workflows": ["KreaQwen (Post-FX)"],
     },
     {
+        "name": "comfyui_layerstyle",
+        "repo": "https://github.com/chflame163/ComfyUI_LayerStyle",
+        "nodes": ["LayerColor: LUT Apply", "LayerFilter: FilmV2"],
+        "critical": False,
+        "workflows": ["MiniMaxH3 (Post-FX / Color Grading)", "MMH3X2 (Post-FX / Color Grading)"],
+    },
+    {
         "name": "ComfyUI-RBG-SmartSeedVariance",
         "repo": "https://github.com/RamonGuthrie/ComfyUI-RBG-SmartSeedVariance.git",
         "nodes": ["RBG_Smart_Seed_Variance"],
