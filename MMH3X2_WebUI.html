@@ -1167,8 +1167,12 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <div class="row">
             <label>Selección de rostro</label>
             <select id="faceRefineSelectMode">
-              <option value="largest_face" selected>Rostro principal (más grande)</option>
-              <option value="centre_most">Rostro más centrado</option>
+              <option value="largest_face" selected>1 rostro (Principal · más grande)</option>
+              <option value="dual_faces">2 rostros (Dual · refina ambas caras)</option>
+              <option value="centre_most">1 rostro (Más centrado)</option>
+              <option value="left_most">1 rostro (A la izquierda)</option>
+              <option value="right_most">1 rostro (A la derecha)</option>
+              <option value="second_face">1 rostro (Solo segundo rostro · index 1)</option>
             </select>
           </div>
           <div class="row" style="margin-top:6px;">
@@ -5206,7 +5210,17 @@ const CONFIG = {
     FACE_STITCH: "311",
     FACE_LOAD_VIDEO: "312",
     FACE_COMPONENTS: "313",
-    FACE_SAMPLER_SELECT: "314"
+    FACE_SAMPLER_SELECT: "314",
+    FACE_CROP_2: "321",
+    FACE_REF2V_2: "322",
+    FACE_INJECT_2: "323",
+    FACE_PERFRAME_DENOISE_2: "325",
+    FACE_SCHEDULER_2: "326",
+    FACE_GUIDER_2: "327",
+    FACE_NOISE_2: "328",
+    FACE_SAMPLER_2: "329",
+    FACE_DECODE_2: "330",
+    FACE_STITCH_2: "331"
   },
   loras: [
     { on: false, lora: "", strength: 1.0 },
@@ -8503,7 +8517,28 @@ function buildGraph(j){
       _meta: { title: "Get Video Components (Native)" }
     };
 
-    // Sub-grafo FaceRefine
+    const rawSelect = frState.select || "largest_face";
+    const isDual = (rawSelect === "dual_faces");
+    let pass1Select = "largest_face";
+    let pass1Index = 0;
+    if(rawSelect === "dual_faces"){
+      pass1Select = "largest_face";
+      pass1Index = 0;
+    } else if(rawSelect === "second_face"){
+      pass1Select = "largest_face";
+      pass1Index = 1;
+    } else if(rawSelect === "centre_most" || rawSelect === "left_most" || rawSelect === "right_most"){
+      pass1Select = rawSelect;
+      pass1Index = 0;
+    }
+
+    const pass2NodeIds = [
+      N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
+      N.FACE_SCHEDULER_2, N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2,
+      N.FACE_DECODE_2, N.FACE_STITCH_2
+    ];
+
+    // Sub-grafo FaceRefine — Pasada 1
     g[N.FACE_CROP] = {
       class_type: "H3FaceTrackCrop",
       inputs: {
@@ -8520,10 +8555,10 @@ function buildGraph(j){
         size_mode: "per_frame",
         identity_track: false,
         identity_threshold: 0.28,
-        select: frState.select || "largest_face",
+        select: pass1Select,
         fallback_detector: "none",
         fallback_head_frac: 0.5,
-        select_index: 0,
+        select_index: pass1Index,
         identity_model: "insightface",
         cut_detection: "none",
         cut_threshold: 3.0,
@@ -8662,6 +8697,157 @@ function buildGraph(j){
     };
 
     let faceFinalImages = [N.FACE_STITCH, 0];
+
+    // Sub-grafo FaceRefine — Pasada 2 (Dual Faces)
+    if(isDual){
+      g[N.FACE_CROP_2] = {
+        class_type: "H3FaceTrackCrop",
+        inputs: {
+          images: [N.FACE_STITCH, 0],
+          detector: "face_yolov8m.pt",
+          confidence: 0.35,
+          crop_factor: 3.0,
+          canvas_width: frCanvasSize,
+          canvas_height: frCanvasSize,
+          canvas_mode: frCanvasSize >= 768 ? "auto_capped_768" : "auto",
+          smooth_window: 21,
+          size_smooth_window: 51,
+          smooth_method: "gaussian",
+          size_mode: "per_frame",
+          identity_track: false,
+          identity_threshold: 0.28,
+          select: "largest_face",
+          fallback_detector: "none",
+          fallback_head_frac: 0.5,
+          select_index: 1,
+          identity_model: "insightface",
+          cut_detection: "none",
+          cut_threshold: 3.0,
+          absent_shots: "off",
+          X: 0,
+          Y: 0,
+          frame_index: 0
+        },
+        _meta: { title: "Face Track Crop 2" }
+      };
+
+      const frRef2vInputs2 = {
+        clip: [N.CLIP, 0],
+        vae: [N.VAE_VID, 0],
+        audio_vae: [N.VAE_AUD, 0],
+        prompt: frPrompt,
+        width: [N.FACE_CROP_2, 4],
+        height: [N.FACE_CROP_2, 5],
+        length: [N.FACE_CROP_2, 6],
+        ref_image_size: "match",
+        "ref_audios.ref_audio_0": [N.FACE_COMPONENTS, 1]
+      };
+      if(slotHasImg(1) && g[N.IMG1]?.inputs){
+        frRef2vInputs2["ref_images.ref_image_0"] = [N.IMG1, 0];
+      }
+      g[N.FACE_REF2V_2] = {
+        class_type: "MiniMaxH3ReferenceToVideo",
+        inputs: frRef2vInputs2,
+        _meta: { title: "Face Conditioning 2 & AV Latent" }
+      };
+
+      g[N.FACE_INJECT_2] = {
+        class_type: "H3InjectVideoLatent",
+        inputs: {
+          av_latent: [N.FACE_REF2V_2, 1],
+          images: [N.FACE_CROP_2, 0],
+          vae: [N.VAE_VID, 0]
+        },
+        _meta: { title: "Inject Face Video Latent 2" }
+      };
+
+      g[N.FACE_PERFRAME_DENOISE_2] = {
+        class_type: "H3PerFrameDenoise",
+        inputs: {
+          model: [currentModelNode, 0],
+          av_latent: [N.FACE_INJECT_2, 0],
+          transform: [N.FACE_CROP_2, 1],
+          denoise_multiplier_small_face: 1.0,
+          denoise_multiplier_large_face: frState.denoise || 0.35,
+          scale_mode: "absolute_px",
+          face_px_small: 30.0,
+          face_px_large: 120.0,
+          gamma: 1.0,
+          smooth_frames: 9
+        },
+        _meta: { title: "Per-Frame Face Denoise 2" }
+      };
+
+      g[N.FACE_SCHEDULER_2] = {
+        class_type: "BasicScheduler",
+        inputs: {
+          model: [N.FACE_PERFRAME_DENOISE_2, 2],
+          scheduler: "simple",
+          steps: frSteps,
+          denoise: frState.denoise || 0.35
+        },
+        _meta: { title: "Face Basic Scheduler 2" }
+      };
+
+      g[N.FACE_GUIDER_2] = {
+        class_type: "BasicGuider",
+        inputs: {
+          model: [N.FACE_PERFRAME_DENOISE_2, 2],
+          conditioning: [N.FACE_REF2V_2, 0]
+        },
+        _meta: { title: "Face Guider 2" }
+      };
+
+      g[N.FACE_NOISE_2] = {
+        class_type: "RandomNoise",
+        inputs: {
+          noise_seed: ((j && j.seed) ? j.seed + 1 : Math.floor(Math.random() * 100000000))
+        },
+        _meta: { title: "Face Noise 2" }
+      };
+
+      g[N.FACE_SAMPLER_2] = {
+        class_type: "SamplerCustomAdvanced",
+        inputs: {
+          noise: [N.FACE_NOISE_2, 0],
+          guider: [N.FACE_GUIDER_2, 0],
+          sampler: [N.FACE_SAMPLER_SELECT, 0],
+          sigmas: [N.FACE_SCHEDULER_2, 0],
+          latent_image: [N.FACE_PERFRAME_DENOISE_2, 0]
+        },
+        _meta: { title: "Sample Face Latent 2" }
+      };
+
+      g[N.FACE_DECODE_2] = {
+        class_type: "VAEDecode",
+        inputs: {
+          samples: [N.FACE_SAMPLER_2, 0],
+          vae: [N.VAE_VID, 0]
+        },
+        _meta: { title: "Decode Face Crops 2" }
+      };
+
+      g[N.FACE_STITCH_2] = {
+        class_type: "H3FaceStitch",
+        inputs: {
+          base_images: [N.FACE_STITCH, 0],
+          refined_crops: [N.FACE_DECODE_2, 0],
+          transform: [N.FACE_CROP_2, 1],
+          paste_region: "face_only",
+          mask_dilation: 16,
+          feather: frState.feather || 16,
+          colour_match: 1.0,
+          blend: 1.0,
+          undetected_frames: "fade_out",
+          feather_scales_with_crop: false
+        },
+        _meta: { title: "Stitch Face 2" }
+      };
+
+      faceFinalImages = [N.FACE_STITCH_2, 0];
+    } else {
+      pass2NodeIds.forEach(id => { delete g[id]; });
+    }
     const frPostproc = frState.postproc !== undefined ? frState.postproc : false;
     const rtxOn = frPostproc && ($("rtxToggle") ? $("rtxToggle").checked : false);
     const rifeOn = frPostproc && ($("rifeToggle") ? $("rifeToggle").checked : false);
@@ -9162,6 +9348,28 @@ function buildGraph(j){
   const frSteps = frState?.steps || 4;
 
   if(faceRefineEnabled){
+    const rawSelect = frState.select || "largest_face";
+    const isDual = (rawSelect === "dual_faces");
+    let pass1Select = "largest_face";
+    let pass1Index = 0;
+    if(rawSelect === "dual_faces"){
+      pass1Select = "largest_face";
+      pass1Index = 0;
+    } else if(rawSelect === "second_face"){
+      pass1Select = "largest_face";
+      pass1Index = 1;
+    } else if(rawSelect === "centre_most" || rawSelect === "left_most" || rawSelect === "right_most"){
+      pass1Select = rawSelect;
+      pass1Index = 0;
+    }
+
+    const pass2NodeIds = [
+      N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
+      N.FACE_SCHEDULER_2, N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2,
+      N.FACE_DECODE_2, N.FACE_STITCH_2
+    ];
+
+    // Sub-grafo FaceRefine — Pasada 1
     g[N.FACE_CROP] = {
       class_type: "H3FaceTrackCrop",
       inputs: {
@@ -9178,10 +9386,10 @@ function buildGraph(j){
         size_mode: "per_frame",
         identity_track: false,
         identity_threshold: 0.28,
-        select: frState.select || "largest_face",
+        select: pass1Select,
         fallback_detector: "none",
         fallback_head_frac: 0.5,
-        select_index: 0,
+        select_index: pass1Index,
         identity_model: "insightface",
         cut_detection: "none",
         cut_threshold: 3.0,
@@ -9316,6 +9524,156 @@ function buildGraph(j){
     };
 
     finalImagesSource = [N.FACE_STITCH, 0];
+
+    // Sub-grafo FaceRefine — Pasada 2 (Dual Faces)
+    if(isDual){
+      g[N.FACE_CROP_2] = {
+        class_type: "H3FaceTrackCrop",
+        inputs: {
+          images: [N.FACE_STITCH, 0],
+          detector: "face_yolov8m.pt",
+          confidence: 0.35,
+          crop_factor: 3.0,
+          canvas_width: frCanvasSize,
+          canvas_height: frCanvasSize,
+          canvas_mode: frCanvasSize >= 768 ? "auto_capped_768" : "auto",
+          smooth_window: 21,
+          size_smooth_window: 51,
+          smooth_method: "gaussian",
+          size_mode: "per_frame",
+          identity_track: false,
+          identity_threshold: 0.28,
+          select: "largest_face",
+          fallback_detector: "none",
+          fallback_head_frac: 0.5,
+          select_index: 1,
+          identity_model: "insightface",
+          cut_detection: "none",
+          cut_threshold: 3.0,
+          absent_shots: "off",
+          X: 0,
+          Y: 0,
+          frame_index: 0
+        },
+        _meta: { title: "Face Track Crop 2" }
+      };
+
+      const frRef2vInputs2 = {
+        clip: [N.CLIP, 0],
+        vae: [N.VAE_VID, 0],
+        audio_vae: [N.VAE_AUD, 0],
+        prompt: frPrompt,
+        width: [N.FACE_CROP_2, 4],
+        height: [N.FACE_CROP_2, 5],
+        length: [N.FACE_CROP_2, 6],
+        ref_image_size: "match"
+      };
+      if(slotHasImg(1) && g[N.IMG1]?.inputs?.image){
+        frRef2vInputs2["ref_images.ref_image_0"] = [N.IMG1, 0];
+      }
+      g[N.FACE_REF2V_2] = {
+        class_type: "MiniMaxH3ReferenceToVideo",
+        inputs: frRef2vInputs2,
+        _meta: { title: "Face Conditioning 2 & AV Latent" }
+      };
+
+      g[N.FACE_INJECT_2] = {
+        class_type: "H3InjectVideoLatent",
+        inputs: {
+          av_latent: [N.FACE_REF2V_2, 1],
+          images: [N.FACE_CROP_2, 0],
+          vae: [N.VAE_VID, 0]
+        },
+        _meta: { title: "Inject Face Video Latent 2" }
+      };
+
+      g[N.FACE_PERFRAME_DENOISE_2] = {
+        class_type: "H3PerFrameDenoise",
+        inputs: {
+          model: [currentModelNode, 0],
+          av_latent: [N.FACE_INJECT_2, 0],
+          transform: [N.FACE_CROP_2, 1],
+          denoise_multiplier_small_face: 1.0,
+          denoise_multiplier_large_face: frState.denoise || 0.35,
+          scale_mode: "absolute_px",
+          face_px_small: 30.0,
+          face_px_large: 120.0,
+          gamma: 1.0,
+          smooth_frames: 9
+        },
+        _meta: { title: "Per-Frame Face Denoise 2" }
+      };
+
+      g[N.FACE_SCHEDULER_2] = {
+        class_type: "BasicScheduler",
+        inputs: {
+          model: [N.FACE_PERFRAME_DENOISE_2, 2],
+          scheduler: "simple",
+          steps: frSteps,
+          denoise: frState.denoise || 0.35
+        },
+        _meta: { title: "Face Basic Scheduler 2" }
+      };
+
+      g[N.FACE_GUIDER_2] = {
+        class_type: "BasicGuider",
+        inputs: {
+          model: [N.FACE_PERFRAME_DENOISE_2, 2],
+          conditioning: [N.FACE_REF2V_2, 0]
+        },
+        _meta: { title: "Face Guider 2" }
+      };
+
+      g[N.FACE_NOISE_2] = {
+        class_type: "RandomNoise",
+        inputs: {
+          noise_seed: Math.floor(Math.random() * 100000000)
+        },
+        _meta: { title: "Face Noise 2" }
+      };
+
+      g[N.FACE_SAMPLER_2] = {
+        class_type: "SamplerCustomAdvanced",
+        inputs: {
+          noise: [N.FACE_NOISE_2, 0],
+          guider: [N.FACE_GUIDER_2, 0],
+          sampler: [N.FACE_SAMPLER_SELECT, 0],
+          sigmas: [N.FACE_SCHEDULER_2, 0],
+          latent_image: [N.FACE_PERFRAME_DENOISE_2, 0]
+        },
+        _meta: { title: "Sample Face Latent 2" }
+      };
+
+      g[N.FACE_DECODE_2] = {
+        class_type: "VAEDecode",
+        inputs: {
+          samples: [N.FACE_SAMPLER_2, 0],
+          vae: [N.VAE_VID, 0]
+        },
+        _meta: { title: "Decode Face Crops 2" }
+      };
+
+      g[N.FACE_STITCH_2] = {
+        class_type: "H3FaceStitch",
+        inputs: {
+          base_images: [N.FACE_STITCH, 0],
+          refined_crops: [N.FACE_DECODE_2, 0],
+          transform: [N.FACE_CROP_2, 1],
+          paste_region: "face_only",
+          mask_dilation: 16,
+          feather: frState.feather || 16,
+          colour_match: 1.0,
+          blend: 1.0,
+          undetected_frames: "fade_out",
+          feather_scales_with_crop: false
+        },
+        _meta: { title: "Stitch Face 2" }
+      };
+
+      finalImagesSource = [N.FACE_STITCH_2, 0];
+    } else {
+      pass2NodeIds.forEach(id => { delete g[id]; });
+    }
   } else {
     delete g[N.FACE_CROP];
     delete g[N.FACE_REF2V];
@@ -9330,6 +9688,7 @@ function buildGraph(j){
     delete g[N.FACE_STITCH];
     delete g[N.FACE_LOAD_VIDEO];
     delete g[N.FACE_COMPONENTS];
+    pass2NodeIds.forEach(id => { delete g[id]; });
   }
 
   const rtxQuality = (j ? j.rtxQuality : $("rtxQuality")?.value) || "HIGHBITRATE_ULTRA";
@@ -9402,7 +9761,9 @@ function buildGraph(j){
       N.BLEND, N.INJECT_LATENT, N.ADD_GUIDE, N.RTX, N.RIFE, N.RIFE_LOADER, N.RIFE_MULT,
       N.FACE_CROP, N.FACE_REF2V, N.FACE_INJECT, N.FACE_PERFRAME_DENOISE, N.FACE_SCHEDULER,
       N.FACE_GUIDER, N.FACE_NOISE, N.FACE_SAMPLER, N.FACE_SAMPLER_SELECT, N.FACE_DECODE, N.FACE_STITCH,
-      N.FACE_LOAD_VIDEO, N.FACE_COMPONENTS
+      N.FACE_LOAD_VIDEO, N.FACE_COMPONENTS,
+      N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2, N.FACE_SCHEDULER_2,
+      N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2, N.FACE_DECODE_2, N.FACE_STITCH_2
     ];
     nodesToDelete.forEach(id => { delete g[id]; });
     // Nodos auxiliares de audio que sobran en modo solo-Seg1.
