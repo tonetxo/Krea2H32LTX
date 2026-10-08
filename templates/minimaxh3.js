@@ -4102,14 +4102,94 @@ function buildGraph(job){
       _meta: { title: "Stitch Face" }
     };
 
+    let currentVideoImages = [N.FACE_STITCH, 0];
+
+    // Frame Interpolation (RIFE / RTX Frame Gen) en FaceRefine On-Demand
+    const rifeState = j ? j.rife : getRifeState();
+    const rifeEnabled = rifeState ? rifeState.enabled : true;
+    const rifeMultiplier = rifeState ? parseInt(rifeState.multiplier || "2", 10) : 2;
+    const rifeModel = rifeState ? (rifeState.model || "rife_v4.26.safetensors") : "rife_v4.26.safetensors";
+    const rifeEngine = rifeState ? (rifeState.engine || "rife") : "rife";
+
+    let finalFps = 24;
+    if(rifeEnabled){
+      if(rifeEngine === "rtx"){
+        delete g[N.RIFE_LOADER];
+        g[N.RIFE_INTERP] = {
+          inputs: {
+            images: currentVideoImages,
+            generation_type: "frame rate multiplier",
+            "generation_type.multiplier": rifeMultiplier,
+            mode: "HIGH",
+            automatic_shot_change_detection: true,
+            shot_change: false,
+            image_encoding: "8-bit RGB"
+          },
+          class_type: "RTXVideoFrameGeneration",
+          _meta: {
+            title: "RTX Video Frame Generation"
+          }
+        };
+      } else {
+        g[N.RIFE_LOADER] = {
+          inputs: {
+            model_name: rifeModel
+          },
+          class_type: "FrameInterpolationModelLoader",
+          _meta: {
+            title: "Frame Interpolation Model Loader"
+          }
+        };
+        g[N.RIFE_INTERP] = {
+          inputs: {
+            multiplier: rifeMultiplier,
+            images: currentVideoImages,
+            interp_model: [N.RIFE_LOADER, 0]
+          },
+          class_type: "FrameInterpolate",
+          _meta: {
+            title: "Frame Interpolate"
+          }
+        };
+      }
+      currentVideoImages = [N.RIFE_INTERP, 0];
+      finalFps = 24 * rifeMultiplier;
+    } else {
+      delete g[N.RIFE_LOADER];
+      delete g[N.RIFE_INTERP];
+    }
+
+    // RTX Video Super Resolution (2x) opcional tras FaceRefine / Frame Gen
+    const rtxState = j ? j.rtx : getRtxState();
+    const rtxEnabled = rtxState ? rtxState.enabled : true;
+    const rtxQuality = rtxState ? (rtxState.quality || "ULTRA") : "ULTRA";
+
+    if(rtxEnabled){
+      g[N.RTX_SR] = {
+        class_type: "RTXVideoSuperResolution",
+        inputs: {
+          resize_type: "scale by multiplier",
+          "resize_type.scale": 2,
+          quality: rtxQuality,
+          images: currentVideoImages
+        },
+        _meta: {
+          title: "RTX Video Super Resolution"
+        }
+      };
+      currentVideoImages = [N.RTX_SR, 0];
+    } else {
+      delete g[N.RTX_SR];
+    }
+
     // Reempaquetar vídeo final nativo
     g[N.CREATE_VIDEO] = {
       class_type: "CreateVideo",
       inputs: {
-        fps: 24,
+        fps: finalFps,
         bit_depth: 8,
         color_space: "sRGB",
-        images: [N.FACE_STITCH, 0],
+        images: currentVideoImages,
         audio: [N.FACE_COMPONENTS, 1]
       },
       _meta: { title: "Create Video (Native)" }
@@ -4158,9 +4238,6 @@ function buildGraph(job){
     delete g[N.DECODE_AUDIO];
     delete g[N.AUDIO_FIRST];
     delete g[N.AUDIO_VOL];
-    delete g[N.RTX_SR];
-    delete g[N.RIFE_LOADER];
-    delete g[N.RIFE_INTERP];
 
     return g;
   }
@@ -4485,6 +4562,7 @@ function buildGraph(job){
       if(g[N.DECODE_AUDIO] && g[N.DECODE_AUDIO].inputs){
         g[N.DECODE_AUDIO].inputs.samples = [N.SAMPLER2, 0];
       }
+      currentModelNode = model2Node;
 
       // 8b. Decodificación y guardado del 1er pase (resolución base) en la galería
       g[N.DECODE_VIDEO_1] = {
