@@ -5143,6 +5143,44 @@ function saveLoraStates(){
   if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
 }
 
+const loraSearchQueries = {};
+
+function buildLoraOptions(loraOptions, currentVal, filterText = ""){
+  const q = (filterText || "").trim().toLowerCase();
+  let opts = '<option value="">-- Ninguno --</option>';
+
+  if(!q){
+    loraOptions.forEach(path => {
+      const selected = (path === currentVal) ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      opts += `<option value="${escapeHtml(path)}" ${selected} title="${escapeHtml(path)}">${escapeHtml(displayName)}</option>`;
+    });
+    return opts;
+  }
+
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const matches = loraOptions.filter(path => {
+    const low = path.toLowerCase();
+    return tokens.every(t => low.includes(t));
+  });
+
+  if(currentVal && !matches.includes(currentVal)){
+    const curName = currentVal.split('/').pop();
+    opts += `<option value="${escapeHtml(currentVal)}" selected title="${escapeHtml(currentVal)}">📌 Actual: ${escapeHtml(curName)}</option>`;
+  }
+
+  if(matches.length === 0){
+    opts += `<option value="" disabled>Sin coincidencias ("${escapeHtml(q)}")</option>`;
+  } else {
+    matches.forEach(path => {
+      const selected = (path === currentVal) ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      opts += `<option value="${escapeHtml(path)}" ${selected} title="${escapeHtml(path)}">${escapeHtml(displayName)}</option>`;
+    });
+  }
+  return opts;
+}
+
 function renderLoraGroup(containerId, list, labelPrefix, onChange){
   const wrap = $(containerId);
   if(!wrap) return;
@@ -5154,17 +5192,18 @@ function renderLoraGroup(containerId, list, labelPrefix, onChange){
     box.className = "lora" + (l.on ? "" : " off");
     box.style.marginBottom = "8px";
 
-    let opts = '<option value="">-- Ninguno --</option>';
-    loraOptions.forEach(path => {
-      const selected = (path === l.lora) ? 'selected' : '';
-      const displayName = path.split('/').pop();
-      opts += `<option value="${escapeHtml(path)}" ${selected} title="${escapeHtml(path)}">${escapeHtml(displayName)}</option>`;
-    });
+    const key = `${containerId}_${i}`;
+    const savedQuery = loraSearchQueries[key] || "";
+    const opts = buildLoraOptions(loraOptions, l.lora, savedQuery);
 
     box.innerHTML = `
       <div class="lora-top">
         <div class="switch ${l.on ? 'on' : ''}" data-idx="${i}"><i></i></div>
         <div class="lname">${labelPrefix} ${i + 1}</div>
+      </div>
+      <div style="position:relative;margin-bottom:5px;">
+        <input type="text" class="lora-search-input" data-idx="${i}" placeholder="🔍 Filtrar LoRA..." value="${escapeHtml(savedQuery)}" spellcheck="false" style="width:100%;font-size:11.5px;padding:4px 22px 4px 7px;height:26px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);box-sizing:border-box;">
+        <span class="lora-search-clear" data-idx="${i}" title="Limpiar filtro" style="position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:11px;color:var(--muted-2);user-select:none;${savedQuery ? '' : 'display:none;'}">✕</span>
       </div>
       <div class="row" style="margin-bottom:6px;">
         <select data-field="lora" data-idx="${i}">${opts}</select>
@@ -5184,9 +5223,77 @@ function renderLoraGroup(containerId, list, labelPrefix, onChange){
     onChange();
   }));
 
+  wrap.querySelectorAll('.lora-search-input').forEach(inp => {
+    const idx = +inp.dataset.idx;
+    const key = `${containerId}_${idx}`;
+    const clearBtn = wrap.querySelector(`.lora-search-clear[data-idx="${idx}"]`);
+    const sel = wrap.querySelector(`select[data-field="lora"][data-idx="${idx}"]`);
+
+    const applyFilter = () => {
+      const q = inp.value.trim();
+      loraSearchQueries[key] = q;
+      if(clearBtn) clearBtn.style.display = q ? "block" : "none";
+      if(sel){
+        sel.innerHTML = buildLoraOptions(loraOptions, list[idx].lora, q);
+      }
+    };
+
+    inp.addEventListener("input", applyFilter);
+
+    inp.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){
+        e.preventDefault();
+        const q = inp.value.trim().toLowerCase();
+        if(!q) return;
+        const tokens = q.split(/\s+/).filter(Boolean);
+        const matches = loraOptions.filter(path => {
+          const low = path.toLowerCase();
+          return tokens.every(t => low.includes(t));
+        });
+        if(matches.length > 0){
+          list[idx].lora = matches[0];
+          if(!list[idx].on){
+            list[idx].on = true;
+            const sw = wrap.querySelector(`.switch[data-idx="${idx}"]`);
+            if(sw) sw.classList.add("on");
+            const box = sw ? sw.closest(".lora") : null;
+            if(box) box.classList.remove("off");
+          }
+          applyFilter();
+          onChange();
+        }
+      } else if(e.key === "Escape"){
+        inp.value = "";
+        applyFilter();
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.lora-search-clear').forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = +btn.dataset.idx;
+      const key = `${containerId}_${idx}`;
+      const inp = wrap.querySelector(`.lora-search-input[data-idx="${idx}"]`);
+      const sel = wrap.querySelector(`select[data-field="lora"][data-idx="${idx}"]`);
+      if(inp) inp.value = "";
+      loraSearchQueries[key] = "";
+      btn.style.display = "none";
+      if(sel){
+        sel.innerHTML = buildLoraOptions(loraOptions, list[idx].lora, "");
+      }
+    });
+  });
+
   wrap.querySelectorAll('select[data-field="lora"]').forEach(sel => sel.addEventListener("change", () => {
     const idx = +sel.dataset.idx;
     list[idx].lora = sel.value;
+    if(sel.value && !list[idx].on){
+      list[idx].on = true;
+      const sw = wrap.querySelector(`.switch[data-idx="${idx}"]`);
+      if(sw) sw.classList.add("on");
+      const box = sw ? sw.closest(".lora") : null;
+      if(box) box.classList.remove("off");
+    }
     onChange();
   }));
 
