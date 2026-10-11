@@ -17,7 +17,7 @@ The project provides four standalone, zero-dependency web applications designed 
 |---|---|---|---|---|
 | **MMH3X2** | `MMH3X2_WebUI.html` | `:8003` | **MiniMax H3 (2 Segments)** | **Continuous narrative video (up to 30s+)**: 2 chained segments, up to 4 reference images + 1 video, visual continuity powered by Ollama (with real-time fused prompt inspection), audio crossfade, flexible attention/optimization pipelines (Standard & BlockATT with AIMDO / Spectrum), **Multi-Target Element Refine** (Face/Hands/Hair/Skin/Body via YOLOv8 & Dual-pass), **Cinematic Color Grading & Post-FX** (3D LUTs, dynamic film grain, vignette), and on-demand player tools. |
 | **MiniMaxH3** | `MiniMaxH3_WebUI.html` | `:8002` | **MiniMax H3** | **Single-segment video generation**: **i2v** (image-to-video), **flf2v** (first-and-last frame), and **r2v** (multi-reference: up to 6 images, 3 videos, 3 audio tracks). Includes **Multi-Target Element Refine** (Face/Hands/Hair/Skin/Body via YOLOv8 with single or dual targets), **Cinematic Color Grading & Post-FX** (3D LUTs, dynamic film grain, vignette), **Sol-H3 SM120 Blackwell Attention**, **3D Latent Upscaler**, and on-demand player frame interpolation (RIFE / RTX). |
-| **LTXV** | `LTXV_WebUI.html` | `:8000` | **LTX-Video / LTX-2.5** | **Ultra-fast video generation**: First Pass & Full Pass pipelines with SageAttention, DMD LoRA, custom VAE selectors, and high-speed distilled transformers. |
+| **LTXV** | `LTXV_WebUI.html` | `:8000` | **LTX-Video / LTX-2.5** | **Ultra-fast video generation**: First Pass & Full Pass pipelines with SageAttention, 4-slot concurrent LoRA stack, custom VAE selectors, high-speed distilled transformers, and full local settings persistence. |
 | **KreaQwen** | `KreaQwen_WebUI.html` | `:8004` | **Qwen 2.1 Image + Krea2 / Flux2** | **Dual-model fusion & guided editing**: Base + Refiner stages with dynamic model inversion, native Qwen Edit mode (img2img / faceswap with multi-reference images), integrated Post-FX suite (LUTs, 35mm grain, vignette, radial blur), RGB smart seed variance, and FaceRefine. |
 | **Krea2** | `Krea2_WebUI.html` | `:8001` | **Krea2 / Flux2** | **First-frame generation**: High-fidelity text-to-image pipeline for Flux2 / Krea2 with RGB variance control and a direct "Send to Video" handoff button. |
 
@@ -62,17 +62,18 @@ The project provides four standalone, zero-dependency web applications designed 
 - Metadata is fully preserved in all generated PNGs and MP4s.
 
 ### 8. Multi-Target Element Refine (YOLOv8 AI Tracking & Seamless Stitching)
-- **Specialized Trackers**: Integrates YOLOv8 detection and segmentation models for fine-grained video inpainting:
+- **Specialized Trackers**: Integrates YOLOv8 detection and segmentation models placed in `ComfyUI/models/ultralytics/` (or `bbox/` / `segm/`):
   - **Faces**: `face_yolov8m.pt` (detailed facial expressions and skin).
   - **Hands**: `hand_yolov8s.pt` (anatomically precise 5 fingers and nails).
-  - **Hair**: `yolov8n-seg_60.pt` (hair flow and individual strands).
-  - **Skin & Body**: `yolov8m-seg.pt` (full-body / garment / posture refinement).
+  - **Hair**: `hair_yolov8n-seg_60.pt` (hair flow and individual strands).
+  - **Skin**: `skin_yolov8m-seg_400.pt` (complexion, textures and blemishes).
+  - **Body / Person**: `person_yolov8m-seg.pt` (full-body, garment and posture refinement).
 - **Targeting Strategies**: Single primary target, centered target, left/right positional priority, or **Dual-Target Mode** (refines two distinct subjects in consecutive passes on the same video).
 - **Memory-Safe Canvas Modes**: Choose between **512x512** (ultra-fast, low VRAM footprint to prevent OOM on long renders) or **768x768** (native high-resolution DiT canvas).
 - **Adaptive Frame Denoising & Feathering**: Customizable per-frame denoise levels and edge feathering to ensure seamless blending without seam lines or flickering.
 
 ### 9. Cinematic Color Grading & Post-FX Suite
-- **100% Video-Safe 3D LUTs**: Color grading powered by GPU lookup tables (`.cube`). 70+ presets auto-detected (e.g. *Teal and Orange, Blade Runner, Casablanca-Noir, Kodak Portra, Matrix, Amelie*), with 0%–100% opacity mixing.
+- **100% Video-Safe 3D LUTs**: Color grading powered by GPU lookup tables (`.cube` files placed in `ComfyUI/models/luts/`). 70+ presets auto-detected (e.g. *Teal and Orange, Blade Runner, Casablanca-Noir, Kodak Portra, Matrix, Amelie*), with 0%–100% opacity mixing.
 - **Dynamic Organic Film Grain**: Real film noise that increments its random seed frame-by-frame (`seed += 1`). Unlike static noise overlays, this completely eliminates the "frozen camera lens dirt" artifact.
 - **Radial Vignette**: Cinematic lens vignette with gentle edge attenuation.
 - **Zero-Overhead Bypass**: When deactivated, post-processing nodes are omitted from the ComfyUI graph entirely.
@@ -139,6 +140,23 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 
 > [!TIP]
 > You can run `python3 diagnostico_comfyui.py` at any time to automatically check which nodes are installed on your backend.
+
+---
+
+## Model Placement & Directory Structure
+
+Place your model weights and assets in the corresponding ComfyUI subdirectories:
+
+| Category | ComfyUI Directory | Example Models / Files |
+|---|---|---|
+| **Diffusion Models** | `models/diffusion_models/` | `ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors`, MiniMax H3 |
+| **Checkpoints** | `models/checkpoints/` | Flux2, Krea2, Qwen 2.1 |
+| **Text Encoders** | `models/text_encoders/` | `gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors`, Qwen3-VL |
+| **VAEs** | `models/vae/` | `ltx-2.5-video-vae-conv-bf16.safetensors`, `qwen_image_vae.safetensors` |
+| **LoRAs** | `models/loras/` | LTXV LoRAs (up to 4 concurrent slots in LTXV), Flux/Qwen LoRAs |
+| **Element Trackers** | `models/ultralytics/` | `face_yolov8m.pt`, `hand_yolov8s.pt`, `hair_yolov8n-seg_60.pt`, `skin_yolov8m-seg_400.pt`, `person_yolov8m-seg.pt` |
+| **3D LUTs** | `models/luts/` | `.cube` color presets (e.g. `Teal and Orange.cube`, `Blade Runner.cube`) |
+| **Interpolation** | `models/frame_interpolation/` | `rife_v4.26.safetensors` |
 
 ---
 
@@ -213,7 +231,7 @@ Launch whichever interface you want to use:
 ./lanzar_krea2.sh
 ```
 
-Open your browser at `http://localhost:8003` (or replace with the port of the interface you launched).
+Open your browser at `http://localhost:8003` (or replace with the port of the interface you launched; e.g. `http://localhost:8000/` automatically opens `LTXV_WebUI.html`).
 
 ---
 
