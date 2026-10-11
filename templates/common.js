@@ -1016,13 +1016,19 @@ function loadModels(){
   const sel = $("modelSelect");
   if(!sel) return;
   sel.innerHTML = "";
+  const modelKey = (CONFIG.UI_TYPE || "common") + "_model_selected";
+  const savedModel = localStorage.getItem(modelKey);
   for(const m of AVAILABLE_MODELS){
     const opt = document.createElement("option");
     opt.value = m;
     opt.textContent = m;
-    if(m === CONFIG.DEFAULT_MODEL) opt.selected = true;
+    const isDefault = CONFIG.DEFAULT_MODEL && (m === CONFIG.DEFAULT_MODEL || m.endsWith("/" + CONFIG.DEFAULT_MODEL) || CONFIG.DEFAULT_MODEL.endsWith("/" + m));
+    if(savedModel ? (m === savedModel) : isDefault) opt.selected = true;
     sel.appendChild(opt);
   }
+  sel.addEventListener("change", () => {
+    try { localStorage.setItem(modelKey, sel.value); } catch(_){}
+  });
 }
 function renderLoras(){
   const wrap=$("loraList");

@@ -733,6 +733,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._proxy("GET", LLAMACPP)
         elif self._is_proxy_route():
             self._proxy("GET", get_backend())
+        elif self.path.split("?")[0] in ("/", "/index.html"):
+            self.send_response(302)
+            self.send_header("Location", "/LTXV_WebUI.html")
+            self.end_headers()
         else:
             super().do_GET()
 

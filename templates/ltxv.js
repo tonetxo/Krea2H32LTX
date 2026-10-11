@@ -9,9 +9,14 @@ const CONFIG = {
   DEFAULT_BACKEND_PORT: "7821",
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
-  DEFAULT_VAE: "Checkpoint",
+  DEFAULT_VAE: "ltx-2.5-video-vae-conv-bf16",
   N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740"},
-  loras: [{on:true, lora:"", strength:1},{on:false, lora:"", strength:0.15},{on:false, lora:"", strength:0.65}],
+  loras: [
+    {on:true, lora:"", strength:1},
+    {on:false, lora:"", strength:0.15},
+    {on:false, lora:"", strength:0.65},
+    {on:false, lora:"", strength:1.0}
+  ],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
       A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for LTXV video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
@@ -31,8 +36,6 @@ let uploadedImage=null, localFile=null, seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
-let dmdBypass = false;
-const DMD_MODEL_SOURCE = "868";
 const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk","comfy kitchen attention"];
 let finalVariantIndex = null;
 // Mapa prompt_id -> índice de variante, para que tanto WS como fallback
@@ -660,7 +663,6 @@ function snapshotJob(firstPassOnly){
     rife: getRifeState(),
     bitDepth: getBitDepth(),
     loras: JSON.parse(JSON.stringify(loras)),
-    dmdBypass: !!dmdBypass,
     chainMode: $("enhancerChainMode")?.value,
     ltx2Temperature: $("ltx2Temperature")?.value,
     ltx2Seed: $("ltx2Seed")?.value,
@@ -1054,8 +1056,8 @@ async function applyWorkflow(workflow, opts={}){
 
   const powerLora = findByClass("Power Lora Loader (rgthree)");
   if(powerLora && powerLora.inputs){
-    for(let i = 0; i < 3; i++){
-      const slot = ["lora_1","lora_2","lora_3"][i];
+    for(let i = 0; i < loras.length; i++){
+      const slot = `lora_${i + 1}`;
       const lora = powerLora.inputs[slot];
       if(!lora) continue;
       const loraName = lora.lora || "";
@@ -1225,11 +1227,16 @@ function updateDzInfo(w, h){
 
 $("segRandom").addEventListener("click",()=>{seedMode="random";$("segRandom").classList.add("on");$("segFixed").classList.remove("on");$("seedVal").disabled=true;});
 $("segFixed").addEventListener("click",()=>{seedMode="fixed";$("segFixed").classList.add("on");$("segRandom").classList.remove("on");$("seedVal").disabled=false;});
-$("fidelitySlider").addEventListener("input",(e)=>{$("fidelityVal").textContent=parseFloat(e.target.value).toFixed(2);});
-$("firstPassSteps")?.addEventListener("input",(e)=>{$("firstPassStepsVal").textContent=e.target.value;});
-$("motionSlider").addEventListener("input",(e)=>{$("motionVal").textContent=parseFloat(e.target.value).toFixed(1);});
-$("mpSlider").addEventListener("input",()=>{recalcResolution();});
-$("frames").addEventListener("input",updateDuration);
+function updateDuration(){
+  const f = parseInt($("frames")?.value || "0", 10);
+  if($("durHint")) $("durHint").textContent = `(${f}/24fps=${(f/24).toFixed(1)}s)`;
+}
+
+$("fidelitySlider")?.addEventListener("input",(e)=>{ if($("fidelityVal")) $("fidelityVal").textContent=parseFloat(e.target.value).toFixed(2); });
+$("firstPassSteps")?.addEventListener("input",(e)=>{ if($("firstPassStepsVal")) $("firstPassStepsVal").textContent=e.target.value; });
+$("motionSlider")?.addEventListener("input",(e)=>{ if($("motionVal")) $("motionVal").textContent=parseFloat(e.target.value).toFixed(1); });
+$("mpSlider")?.addEventListener("input",()=>{ recalcResolution(); });
+$("frames")?.addEventListener("input", updateDuration);
 
 function loadVaes(){
   const selVideo = $("vaeSelect");
@@ -1250,8 +1257,9 @@ function loadVaes(){
       selVideo.appendChild(opt);
     }
     const defaultVae = CONFIG.DEFAULT_VAE || "Checkpoint";
-    if(defaultVae && Array.from(selVideo.options).some(o => o.value === defaultVae)){
-      selVideo.value = defaultVae;
+    const matchedOpt = Array.from(selVideo.options).find(o => o.value.toLowerCase().includes(defaultVae.toLowerCase()));
+    if(matchedOpt){
+      selVideo.value = matchedOpt.value;
     }
   }
 
@@ -1291,50 +1299,216 @@ function loadTextEncoders(){
     opt.title = c;
     sel.appendChild(opt);
   }
-  const saved = localStorage.getItem("ltxv_text_encoder");
-  const fallback = "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors";
-  if(saved && clips.includes(saved)){
-    sel.value = saved;
-  } else if(clips.some(c => c.includes("gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2"))){
-    sel.value = clips.find(c => c.includes("gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2"));
-  } else if(clips.includes(fallback)){
-    sel.value = fallback;
+}
+
+// --- PERSISTENCIA INTEGRAL DE AJUSTES LTXV ---
+const LTXV_SETTINGS_KEY = "ltxv_ui_settings_v1";
+let ltxvSaveTimer = null;
+
+function scheduleSaveLtxvSettings(){
+  clearTimeout(ltxvSaveTimer);
+  ltxvSaveTimer = setTimeout(saveLtxvSettings, 350);
+}
+
+function saveLtxvSettings(){
+  const s = {
+    prompt: $("prompt")?.value || "",
+    filenamePrefix: $("filenamePrefix")?.value?.trim() || "video/LTX_2.5",
+    model: $("modelSelect")?.value || "",
+    textEncoder: $("textEncoderSelect")?.value || "",
+    vae: $("vaeSelect")?.value || "",
+    audioVae: $("audioVaeSelect")?.value || "",
+    seedMode,
+    seedValue: seedMode === "random" ? -1 : parseInt($("seedVal")?.value || "12345", 10),
+    mp: $("mpSlider")?.value || "0.9",
+    width: $("width")?.value || "1280",
+    height: $("height")?.value || "736",
+    frames: $("frames")?.value || "241",
+    batchSize: $("batchSize")?.value || "1",
+    fidelity: $("fidelitySlider")?.value || "0.25",
+    firstPassSteps: $("firstPassSteps")?.value || "9",
+    motion: $("motionSlider")?.value || "1.0",
+    rife: getRifeState(),
+    rtx: getRtxState(),
+    bitDepth: getBitDepth(),
+    sageType: $("sageAttentionType")?.value || "sageattn3",
+    ltx2Temperature: $("ltx2Temperature")?.value || "0.7",
+    ltx2Seed: $("ltx2Seed")?.value || "-1",
+    ltx2PreviewText: $("ltx2PreviewText")?.checked ?? true,
+    aspectRatio: currentAspectRatio,
+    loras: (typeof loras !== "undefined" && Array.isArray(loras)) ? JSON.parse(JSON.stringify(loras)) : undefined
+  };
+  try {
+    localStorage.setItem(LTXV_SETTINGS_KEY, JSON.stringify(s));
+    // Sincronizar claves individuales legacy por compatibilidad
+    localStorage.setItem("ltxv_prompt", s.prompt);
+    localStorage.setItem("ltxv_filename_prefix", s.filenamePrefix);
+    if(s.textEncoder) localStorage.setItem("ltxv_text_encoder", s.textEncoder);
+  } catch(e){
+    console.warn("Error guardando ajustes LTXV:", e);
   }
 }
-loadTextEncoders();
-$("textEncoderSelect")?.addEventListener("change", (e) => {
-  localStorage.setItem("ltxv_text_encoder", e.target.value);
-});
 
+function restoreLtxvSettings(){
+  const raw = localStorage.getItem(LTXV_SETTINGS_KEY);
+  if(!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    if(!s || typeof s !== "object") return false;
+
+    if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
+    if(s.filenamePrefix !== undefined && $("filenamePrefix")) $("filenamePrefix").value = s.filenamePrefix;
+
+    if(s.model && $("modelSelect")){
+      const opt = Array.from($("modelSelect").options).find(o => o.value === s.model);
+      if(opt) $("modelSelect").value = s.model;
+    }
+
+    if(s.textEncoder && $("textEncoderSelect")){
+      const opt = Array.from($("textEncoderSelect").options).find(o => o.value === s.textEncoder);
+      if(opt) $("textEncoderSelect").value = s.textEncoder;
+    }
+
+    if(s.vae && $("vaeSelect")){
+      const opt = Array.from($("vaeSelect").options).find(o => o.value === s.vae);
+      if(opt) $("vaeSelect").value = s.vae;
+    }
+
+    if(s.audioVae && $("audioVaeSelect")){
+      const opt = Array.from($("audioVaeSelect").options).find(o => o.value === s.audioVae);
+      if(opt) $("audioVaeSelect").value = s.audioVae;
+    }
+
+    if(s.seedMode){
+      seedMode = s.seedMode;
+      if(seedMode === "random"){
+        $("segRandom")?.classList.add("on");
+        $("segFixed")?.classList.remove("on");
+        if($("seedVal")) $("seedVal").disabled = true;
+      } else {
+        $("segFixed")?.classList.add("on");
+        $("segRandom")?.classList.remove("on");
+        if($("seedVal")) $("seedVal").disabled = false;
+      }
+    }
+    if(s.seedValue !== undefined && s.seedValue >= 0 && $("seedVal")){
+      $("seedVal").value = s.seedValue;
+    }
+
+    if(s.aspectRatio) currentAspectRatio = s.aspectRatio;
+    if(s.mp !== undefined && $("mpSlider")){
+      $("mpSlider").value = s.mp;
+      if($("mpVal")) $("mpVal").textContent = parseFloat(s.mp).toFixed(2);
+    }
+    if(s.width && $("width")) $("width").value = s.width;
+    if(s.height && $("height")) $("height").value = s.height;
+    if($("arDetectHint") && s.width && s.height){
+      $("arDetectHint").textContent = `(${getFriendlyRatio(parseInt(s.width,10), parseInt(s.height,10))})`;
+    }
+
+    if(s.frames !== undefined && $("frames")){
+      $("frames").value = s.frames;
+      updateDuration();
+    }
+    if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
+
+    if(s.fidelity !== undefined && $("fidelitySlider")){
+      $("fidelitySlider").value = s.fidelity;
+      if($("fidelityVal")) $("fidelityVal").textContent = parseFloat(s.fidelity).toFixed(2);
+    }
+    if(s.firstPassSteps !== undefined && $("firstPassSteps")){
+      $("firstPassSteps").value = s.firstPassSteps;
+      if($("firstPassStepsVal")) $("firstPassStepsVal").textContent = s.firstPassSteps;
+    }
+    if(s.motion !== undefined && $("motionSlider")){
+      $("motionSlider").value = s.motion;
+      if($("motionVal")) $("motionVal").textContent = parseFloat(s.motion).toFixed(1);
+    }
+
+    if(s.rife){ setRifeUI(s.rife); saveRife(s.rife); }
+    if(s.rtx){ setRtxUI(s.rtx); saveRtx(s.rtx); }
+    if(s.bitDepth !== undefined){ setBitDepthUI(s.bitDepth); saveBitDepth(s.bitDepth); }
+
+    if(s.sageType && $("sageAttentionType")) $("sageAttentionType").value = s.sageType;
+
+    if(s.ltx2Temperature !== undefined && $("ltx2Temperature")){
+      $("ltx2Temperature").value = s.ltx2Temperature;
+      if($("ltx2TemperatureVal")) $("ltx2TemperatureVal").textContent = parseFloat(s.ltx2Temperature).toFixed(2);
+    }
+    if(s.ltx2Seed !== undefined && $("ltx2Seed")) $("ltx2Seed").value = s.ltx2Seed;
+    if(s.ltx2PreviewText !== undefined && $("ltx2PreviewText")) $("ltx2PreviewText").checked = !!s.ltx2PreviewText;
+
+    if(Array.isArray(s.loras) && s.loras.length && typeof loras !== "undefined"){
+      s.loras.forEach((l, i) => {
+        if(i < loras.length && l) loras[i] = l;
+      });
+      if(typeof renderLoras === "function") renderLoras();
+      if(typeof saveLoraState === "function") saveLoraState();
+    }
+
+    return true;
+  } catch(e){
+    console.warn("Error restaurando ajustes LTXV:", e);
+    return false;
+  }
+}
+
+// Inicialización de selectores y restauración
+loadVaes();
+loadTextEncoders();
+
+// Restaurar ajustes guardados o fallback legacy
+if(!restoreLtxvSettings()){
+  const legacyPrompt = localStorage.getItem("ltxv_prompt");
+  if(legacyPrompt !== null && $("prompt")) $("prompt").value = legacyPrompt;
+  const legacyPrefix = localStorage.getItem("ltxv_filename_prefix");
+  if(legacyPrefix && $("filenamePrefix")) $("filenamePrefix").value = legacyPrefix;
+}
+
+// Escuchar cambios en todos los controles para autoguardado
+$("prompt")?.addEventListener("input", scheduleSaveLtxvSettings);
+$("filenamePrefix")?.addEventListener("input", scheduleSaveLtxvSettings);
 $("modelSelect")?.addEventListener("change", () => {
   const m = $("modelSelect").value || "";
   const is25 = m.includes("ltx-2.5") || m.includes("transformer");
   if(is25 && typeof AVAILABLE_VAES !== "undefined"){
-    const v25 = AVAILABLE_VAES.find(v => v.includes("ltx-2.5-video-vae-bf16"));
+    const v25 = AVAILABLE_VAES.find(v => v.includes("ltx-2.5-video-vae-conv-bf16")) ||
+                AVAILABLE_VAES.find(v => v.includes("ltx-2.5-video-vae-bf16"));
     const a25 = AVAILABLE_VAES.find(v => v.includes("ltx-2.5-audio-vae-bf16"));
     if(v25 && $("vaeSelect")) $("vaeSelect").value = v25;
     if(a25 && $("audioVaeSelect")) $("audioVaeSelect").value = a25;
     log("ℹ️ Modelo LTX-2.5 seleccionado: VAEs 2.5 de vídeo y audio asignados automáticamente", "l-info");
   }
+  scheduleSaveLtxvSettings();
 });
-const savedLtxvPrefix = localStorage.getItem("ltxv_filename_prefix");
-if(savedLtxvPrefix && $("filenamePrefix")) $("filenamePrefix").value = savedLtxvPrefix;
-$("filenamePrefix")?.addEventListener("input", (e) => {
-  localStorage.setItem("ltxv_filename_prefix", e.target.value.trim());
-});
-function updateDuration(){const f=parseInt($("frames").value||"0",10);$("durHint").textContent=`(${f}/24fps=${(f/24).toFixed(1)}s)`;}
-
-// DMD bypass switch
-$("dmdBypassSwitch").addEventListener("click",()=>{
-  dmdBypass = !dmdBypass;
-  $("dmdBypassSwitch").classList.toggle("on", !dmdBypass);
-  log(dmdBypass ? "DMD LoRA desactivada" : "DMD LoRA activada", "l-ok");
-});
-
-// LTX2 temperature slider label
-$("ltx2Temperature")?.addEventListener("input", (e)=>{
-  $("ltx2TemperatureVal").textContent = parseFloat(e.target.value).toFixed(2);
-});
+$("textEncoderSelect")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("vaeSelect")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("audioVaeSelect")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("segRandom")?.addEventListener("click", () => { seedMode = "random"; $("segRandom").classList.add("on"); $("segFixed").classList.remove("on"); if($("seedVal")) $("seedVal").disabled = true; scheduleSaveLtxvSettings(); });
+$("segFixed")?.addEventListener("click", () => { seedMode = "fixed"; $("segFixed").classList.add("on"); $("segRandom").classList.remove("on"); if($("seedVal")) $("seedVal").disabled = false; scheduleSaveLtxvSettings(); });
+$("seedVal")?.addEventListener("input", scheduleSaveLtxvSettings);
+$("mpSlider")?.addEventListener("input", () => { recalcResolution(); scheduleSaveLtxvSettings(); });
+$("width")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("height")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("frames")?.addEventListener("input", () => { updateDuration(); scheduleSaveLtxvSettings(); });
+$("batchSize")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("fidelitySlider")?.addEventListener("input", (e) => { if($("fidelityVal")) $("fidelityVal").textContent = parseFloat(e.target.value).toFixed(2); scheduleSaveLtxvSettings(); });
+$("firstPassSteps")?.addEventListener("input", (e) => { if($("firstPassStepsVal")) $("firstPassStepsVal").textContent = e.target.value; scheduleSaveLtxvSettings(); });
+$("motionSlider")?.addEventListener("input", (e) => { if($("motionVal")) $("motionVal").textContent = parseFloat(e.target.value).toFixed(1); scheduleSaveLtxvSettings(); });
+$("sageAttentionType")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("ltx2Temperature")?.addEventListener("input", (e) => { if($("ltx2TemperatureVal")) $("ltx2TemperatureVal").textContent = parseFloat(e.target.value).toFixed(2); scheduleSaveLtxvSettings(); });
+$("ltx2Seed")?.addEventListener("input", scheduleSaveLtxvSettings);
+$("ltx2PreviewText")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("segBitDepth8")?.addEventListener("click", () => { setBitDepthUI(8); saveBitDepth(8); scheduleSaveLtxvSettings(); });
+$("segBitDepth10")?.addEventListener("click", () => { setBitDepthUI(10); saveBitDepth(10); scheduleSaveLtxvSettings(); });
+$("segRifeOn")?.addEventListener("click", () => { const r = getRifeState(); r.enabled = true; setRifeUI(r); saveRife(r); scheduleSaveLtxvSettings(); });
+$("segRifeOff")?.addEventListener("click", () => { const r = getRifeState(); r.enabled = false; setRifeUI(r); saveRife(r); scheduleSaveLtxvSettings(); });
+$("rifeEngine")?.addEventListener("change", (e) => { const engine = e.target.value; toggleRifeEngineUI(engine); const r = getRifeState(); r.engine = engine; saveRife(r); scheduleSaveLtxvSettings(); });
+$("rifeMultiplier")?.addEventListener("change", (e) => { const mult = parseInt(e.target.value, 10); if($("rifeFpsHint")) $("rifeFpsHint").textContent = `(24fps → ${24 * mult}fps)`; const r = getRifeState(); r.multiplier = mult; saveRife(r); scheduleSaveLtxvSettings(); });
+$("rifeModel")?.addEventListener("change", (e) => { const r = getRifeState(); r.model = e.target.value; saveRife(r); scheduleSaveLtxvSettings(); });
+$("segRtxOn")?.addEventListener("click", () => { const r = getRtxState(); r.enabled = true; setRtxUI(r); saveRtx(r); scheduleSaveLtxvSettings(); });
+$("segRtxOff")?.addEventListener("click", () => { const r = getRtxState(); r.enabled = false; setRtxUI(r); saveRtx(r); scheduleSaveLtxvSettings(); });
+$("rtxQuality")?.addEventListener("change", (e) => { const r = getRtxState(); r.quality = e.target.value; saveRtx(r); scheduleSaveLtxvSettings(); });
 
 // Zoom/pan/fullscreen para imagen de entrada
 const inputZoom = setupZoomPan("inputWrap", "inputImg", "btnResetZoomInput", "btnFullscreenInput");
@@ -1630,14 +1804,23 @@ function buildGraph(mode, job){
   const mot = j ? parseFloat(j.motion) : parseFloat($("motionSlider").value);
   g[N.MOTION].inputs.Xi=mot;g[N.MOTION].inputs.Xf=mot;
   const jobLoras = j ? j.loras : loras;
-  g[N.LORA].inputs.lora_1={on:jobLoras[0].on,lora:jobLoras[0].lora,strength:jobLoras[0].strength};
-  g[N.LORA].inputs.lora_2={on:jobLoras[1].on,lora:jobLoras[1].lora,strength:jobLoras[1].strength};
-  g[N.LORA].inputs.lora_3={on:jobLoras[2].on,lora:jobLoras[2].lora,strength:jobLoras[2].strength};
+  g[N.LORA].inputs.lora_1={on:jobLoras[0]?.on??false,lora:jobLoras[0]?.lora??"",strength:jobLoras[0]?.strength??1};
+  g[N.LORA].inputs.lora_2={on:jobLoras[1]?.on??false,lora:jobLoras[1]?.lora??"",strength:jobLoras[1]?.strength??1};
+  g[N.LORA].inputs.lora_3={on:jobLoras[2]?.on??false,lora:jobLoras[2]?.lora??"",strength:jobLoras[2]?.strength??1};
+  g[N.LORA].inputs.lora_4={on:jobLoras[3]?.on??false,lora:jobLoras[3]?.lora??"",strength:jobLoras[3]?.strength??1};
+  // Desconectar o saltar el nodo legacy 906 (DMD LoRA) conectando el cargador de LoRAs directamente al modelo fuente (868)
+  g[N.LORA].inputs.model = ["868", 0];
+  delete g["906"];
   const modelChoice = (j ? j.model : $("modelSelect")?.value) || "";
   const isDiffusionModel = modelChoice.startsWith("diffusion_models/") || modelChoice.includes("diffusion_models") || modelChoice.includes("transformer") || modelChoice.includes("int8-convrot");
 
   if(isDiffusionModel){
-    const unetName = modelChoice;
+    // ComfyUI (UNETLoader) busca dentro de la carpeta 'diffusion_models',
+    // por lo que espera la ruta relativa interna (sin el prefijo 'diffusion_models/').
+    const unetName = modelChoice.startsWith("diffusion_models/")
+      ? modelChoice.slice("diffusion_models/".length)
+      : modelChoice;
+
     g[N.CHECKPOINT] = {
       class_type: "UNETLoader",
       inputs: {
@@ -1679,9 +1862,10 @@ function buildGraph(mode, job){
   // activa el VAELoader personalizado y redirige todas las entradas vae.
   let vaeChoice = (j ? j.vae : $("vaeSelect")?.value) || "";
   if(isDiffusionModel && (!vaeChoice || vaeChoice === "Checkpoint")){
-    vaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-bf16")) ||
+    vaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-conv-bf16")) ||
+                (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-bf16")) ||
                 (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("pruna_ltx2.3_vae")) ||
-                "LTX-2/ltx-2.5-video-vae-bf16.safetensors";
+                "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors";
   }
   const useCustomVae = vaeChoice && vaeChoice !== "Checkpoint";
   if(useCustomVae && g[N.CUSTOM_VAE] && g[N.CUSTOM_VAE].inputs){
@@ -1777,12 +1961,6 @@ function buildGraph(mode, job){
   // Eliminamos LTX2_PROMPT y LTX2_PREVIEW para que ComfyUI no ejecute el nodo LLM durante la inferencia de vídeo
   delete g[N.LTX2_PROMPT];
   delete g[N.LTX2_PREVIEW];
-
-  // DMD bypass: saltar el nodo LoraLoaderModelOnly (906) y conectar directamente al modelo fuente (868)
-  const bypass = j ? j.dmdBypass : dmdBypass;
-  if(bypass && g[N.LORA] && g[N.LORA].inputs.model){
-    g[N.LORA].inputs.model = [DMD_MODEL_SOURCE, 0];
-  }
 
   // Model Preview Override (preview animado multi-frame en tiempo real L2RGB / NVENC / WebP)
   const prevMethod = getPreviewMethod();

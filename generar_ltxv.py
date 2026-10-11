@@ -23,7 +23,7 @@ MODELS_PREFIX = "ltxv" if os.path.basename(os.path.normpath(MODELS_DIR)) == "ltx
 
 VAE_DIR = os.environ.get("LTXV_VAE_DIR", config_loader.get_model_subdirs("vae"))
 VAE_PREFIX = os.environ.get("LTXV_VAE_PREFIX", "")
-VAE_FALLBACK = os.environ.get("LTXV_VAE_FALLBACK", "LTX-2/ltx-2.5-video-vae-bf16.safetensors")
+VAE_FALLBACK = os.environ.get("LTXV_VAE_FALLBACK", "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors")
 INTERP_DIR = os.environ.get("LTXV_INTERP_DIR", config_loader.get_model_subdirs("frame_interpolation"))
 CLIP_DIR = os.environ.get("LTXV_CLIP_DIR", config_loader.get_model_subdirs("text_encoders"))
 
@@ -43,9 +43,8 @@ def main():
         'model_dirs': [
             (SD_MODELS_DIR, ''),
             (DIFFUSION_MODELS_DIR, 'diffusion_models'),
-            (MODELS_DIR, MODELS_PREFIX),
         ],
-        'model_fallback': 'ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors',
+        'model_fallback': 'diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors',
         'model_include': ('ltx', 'sulphur'),
         'model_exclude': ('StableAudio/', 'HiDream/', 'sam3.1_multiplex_fp16', 'lens_turbo_bf16', 'sd3.5/', 'sdxl/', 'diffusion_models/minimaxh3/'),
         'clip_dirs': [(CLIP_DIR, '')],

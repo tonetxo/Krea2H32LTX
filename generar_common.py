@@ -24,6 +24,7 @@ def get_file_list(directory, ext='.safetensors', fallback=None):
             entries = list(directory)
         except TypeError:
             return [fallback] if fallback else []
+    exts = tuple(ext) if isinstance(ext, (list, tuple, set)) else (ext,)
     files = []
     for d, prefix in entries:
         if not os.path.exists(d):
@@ -34,7 +35,7 @@ def get_file_list(directory, ext='.safetensors', fallback=None):
         # COMBO del backend sí los ve.
         for root, _, file_list in os.walk(d, followlinks=True):
             for f in file_list:
-                if f.endswith(ext):
+                if f.endswith(exts):
                     rel = os.path.relpath(os.path.join(root, f), d)
                     if rel.startswith('..'):
                         rel = f
@@ -118,7 +119,8 @@ def generate_html(config):
         graph_json = f.read()
 
     # --- Build model, LoRA and VAE lists ---
-    raw_models = get_file_list(config['model_dirs'], fallback=config['model_fallback'])
+    model_ext = config.get('model_ext', '.safetensors')
+    raw_models = get_file_list(config['model_dirs'], ext=model_ext, fallback=config['model_fallback'])
     exclude = config.get('model_exclude', ())
     include = config.get('model_include', None)
     if include:
