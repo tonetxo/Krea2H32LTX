@@ -155,8 +155,12 @@ def generate_html(config):
     if config.get('unet_dirs'):
         raw_unets = get_file_list(config['unet_dirs'], fallback=config.get('unet_fallback'))
         unet_exclude = config.get('unet_exclude', ())
-        # Para UNet/CLIP usamos coincidencia por subcadena, no por prefijo.
-        unet_files = [m for m in raw_unets if not any(x in m for x in unet_exclude)]
+        unet_include = config.get('unet_include')
+        unet_files = [
+            m for m in raw_unets
+            if (not unet_include or any(inc.lower() in m.lower() for inc in unet_include))
+            and not any(x.lower() in m.lower() for x in unet_exclude)
+        ]
     else:
         unet_files = []
     unet_js_array = json.dumps(unet_files)

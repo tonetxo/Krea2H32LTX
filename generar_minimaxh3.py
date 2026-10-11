@@ -45,11 +45,11 @@ def main():
         'interp_fallback': 'rife_v4.26.safetensors',
         # UNet y CLIP sí se exponen como selectores.
         'unet_dirs': [(UNET_DIR, UNET_PREFIX)],
-        'unet_fallback': 'minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors',
         # Conservar solo los modelos de la carpeta minimaxh3.
-        'unet_exclude': ('/flux/', '/flux2/', '/ideogram/', '/boogu/', '/ernie/',
-                         '/nunchaku/', '/qwen/', '/zimage/', 'MelBand', 'wav2vec',
-                         'acestep'),
+        'unet_include': ('minimaxh3', 'minimax_h3'),
+        'unet_exclude': ('flux', 'flux2', 'ideogram', 'boogu', 'ernie',
+                         'nunchaku', 'qwen', 'zimage', 'MelBand', 'wav2vec',
+                         'acestep', 'ltx'),
         'clip_dirs': [(CLIP_DIR, '')],
         'clip_fallback': 'qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors',
         # Conservar solo los CLIP qwen3vl (usados por MiniMaxH3).
