@@ -3929,11 +3929,13 @@ function buildGraph(j){
       _meta: { title: isCombo ? "Face Track Crop" : "Element Track Crop" }
     };
 
-    const baseP = p1 || "";
-    let frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
-    const frPrompt2 = baseP ? `${baseP}, ${elemCfg2.prompt}` : elemCfg2.prompt;
-    if(refFace1Obj && !frPrompt1.includes("<Picture 1>")){
-      frPrompt1 = `<Picture 1> ${frPrompt1}`;
+    // Si hay imagen de referencia, aislar el prompt para conditioning facial y no arrastrar el texto del vídeo completo
+    let frPrompt1;
+    if(refFace1Obj){
+      frPrompt1 = `<Picture 1> photorealistic face of this person, realistic eyes, detailed facial features, natural skin texture`;
+    } else {
+      const baseP = p1 || "";
+      frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
     }
 
     const frRef2vInputs = {
@@ -3978,7 +3980,7 @@ function buildGraph(j){
         av_latent: [N.FACE_INJECT, 0],
         transform: [N.FACE_CROP, 1],
         denoise_multiplier_small_face: 1.0,
-        denoise_multiplier_large_face: frState.denoise || 0.35,
+        denoise_multiplier_large_face: 1.0,
         scale_mode: "absolute_px",
         face_px_small: 30.0,
         face_px_large: 120.0,
@@ -4052,10 +4054,10 @@ function buildGraph(j){
         base_images: [N.FACE_COMPONENTS, 0],
         refined_crops: [N.FACE_DECODE, 0],
         transform: [N.FACE_CROP, 1],
-        paste_region: "face_only",
-        mask_dilation: 16,
+        paste_region: "face_ellipse",
+        mask_dilation: 6,
         feather: frState.feather || 16,
-        colour_match: 1.0,
+        colour_match: 0.5,
         blend: 1.0,
         undetected_frames: "fade_out",
         feather_scales_with_crop: false
@@ -4117,9 +4119,12 @@ function buildGraph(j){
         _meta: { title: isCombo ? "Hand Track Crop 2" : "Element Track Crop 2" }
       };
 
-      let effPrompt2 = frPrompt2;
-      if(useFaceRef2 && !effPrompt2.includes("<Picture 1>")){
-        effPrompt2 = `<Picture 1> ${effPrompt2}`;
+      let effPrompt2;
+      if(useFaceRef2){
+        effPrompt2 = `<Picture 1> photorealistic face of this person, realistic eyes, detailed facial features, natural skin texture`;
+      } else {
+        const baseP = p1 || "";
+        effPrompt2 = baseP ? `${baseP}, ${elemCfg2.prompt}` : elemCfg2.prompt;
       }
 
       const frRef2vInputs2 = {
@@ -4162,7 +4167,7 @@ function buildGraph(j){
           av_latent: [N.FACE_INJECT_2, 0],
           transform: [N.FACE_CROP_2, 1],
           denoise_multiplier_small_face: 1.0,
-          denoise_multiplier_large_face: frState.denoise || 0.35,
+          denoise_multiplier_large_face: 1.0,
           scale_mode: "absolute_px",
           face_px_small: 30.0,
           face_px_large: 120.0,
@@ -4227,10 +4232,10 @@ function buildGraph(j){
           base_images: [N.FACE_STITCH, 0],
           refined_crops: [N.FACE_DECODE_2, 0],
           transform: [N.FACE_CROP_2, 1],
-          paste_region: "face_only",
-          mask_dilation: 16,
+          paste_region: "face_ellipse",
+          mask_dilation: 6,
           feather: frState.feather || 16,
-          colour_match: 1.0,
+          colour_match: 0.5,
           blend: 1.0,
           undetected_frames: "fade_out",
           feather_scales_with_crop: false
@@ -4824,11 +4829,13 @@ function buildGraph(j){
       _meta: { title: isCombo ? "Face Track Crop" : "Element Track Crop" }
     };
 
-    const baseP = p1 || "";
-    let frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
-    const frPrompt2 = baseP ? `${baseP}, ${elemCfg2.prompt}` : elemCfg2.prompt;
-    if(refFace1Obj && !frPrompt1.includes("<Picture 1>")){
-      frPrompt1 = `<Picture 1> ${frPrompt1}`;
+    // Si hay imagen de referencia, aislar el prompt para conditioning facial y no arrastrar el texto del vídeo completo
+    let frPrompt1;
+    if(refFace1Obj){
+      frPrompt1 = `<Picture 1> photorealistic face of this person, realistic eyes, detailed facial features, natural skin texture`;
+    } else {
+      const baseP = p1 || "";
+      frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
     }
 
     const frRef2vInputs = {
@@ -4869,7 +4876,7 @@ function buildGraph(j){
         av_latent: [N.FACE_INJECT, 0],
         transform: [N.FACE_CROP, 1],
         denoise_multiplier_small_face: 1.0,
-        denoise_multiplier_large_face: frState.denoise || 0.35,
+        denoise_multiplier_large_face: 1.0,
         scale_mode: "absolute_px",
         face_px_small: 30.0,
         face_px_large: 120.0,
@@ -4943,10 +4950,10 @@ function buildGraph(j){
         base_images: finalImagesSource,
         refined_crops: [N.FACE_DECODE, 0],
         transform: [N.FACE_CROP, 1],
-        paste_region: "face_only",
-        mask_dilation: 16,
+        paste_region: "face_ellipse",
+        mask_dilation: 6,
         feather: frState.feather || 16,
-        colour_match: 1.0,
+        colour_match: 0.5,
         blend: 1.0,
         undetected_frames: "fade_out",
         feather_scales_with_crop: false
@@ -5008,9 +5015,12 @@ function buildGraph(j){
         _meta: { title: isCombo ? "Hand Track Crop 2" : "Element Track Crop 2" }
       };
 
-      let effPrompt2 = frPrompt2;
-      if(useFaceRef2 && !effPrompt2.includes("<Picture 1>")){
-        effPrompt2 = `<Picture 1> ${effPrompt2}`;
+      let effPrompt2;
+      if(useFaceRef2){
+        effPrompt2 = `<Picture 1> photorealistic face of this person, realistic eyes, detailed facial features, natural skin texture`;
+      } else {
+        const baseP = p1 || "";
+        effPrompt2 = baseP ? `${baseP}, ${elemCfg2.prompt}` : elemCfg2.prompt;
       }
 
       const frRef2vInputs2 = {
@@ -5052,7 +5062,7 @@ function buildGraph(j){
           av_latent: [N.FACE_INJECT_2, 0],
           transform: [N.FACE_CROP_2, 1],
           denoise_multiplier_small_face: 1.0,
-          denoise_multiplier_large_face: frState.denoise || 0.35,
+          denoise_multiplier_large_face: 1.0,
           scale_mode: "absolute_px",
           face_px_small: 30.0,
           face_px_large: 120.0,
@@ -5117,10 +5127,10 @@ function buildGraph(j){
           base_images: [N.FACE_STITCH, 0],
           refined_crops: [N.FACE_DECODE_2, 0],
           transform: [N.FACE_CROP_2, 1],
-          paste_region: "face_only",
-          mask_dilation: 16,
+          paste_region: "face_ellipse",
+          mask_dilation: 6,
           feather: frState.feather || 16,
-          colour_match: 1.0,
+          colour_match: 0.5,
           blend: 1.0,
           undetected_frames: "fade_out",
           feather_scales_with_crop: false
