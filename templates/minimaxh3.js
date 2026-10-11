@@ -1211,7 +1211,8 @@ const FACEREFINE_DEFAULTS = {
   steps: 4,
   denoise: 0.35,
   feather: 16,
-  select: "largest_face"
+  select: "largest_face",
+  postproc: false
 };
 function loadFaceRefine(){
   try { return Object.assign({}, FACEREFINE_DEFAULTS, JSON.parse(localStorage.getItem(FACEREFINE_KEY) || "{}")); }
@@ -1227,6 +1228,7 @@ function getFaceRefineState(){
     denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.35"),
     feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
     select: $("faceRefineSelectMode")?.value || "largest_face",
+    postproc: $("faceRefinePostprocToggle")?.checked ?? false,
     refFace1: uploadedRefFace1 || localRefFace1 || null,
     refFace2: uploadedRefFace2 || localRefFace2 || null
   };
@@ -1268,6 +1270,9 @@ function setFaceRefineUI(s){
   }
   if($("faceRefineSelectMode") && s.select){
     $("faceRefineSelectMode").value = s.select;
+  }
+  if($("faceRefinePostprocToggle")){
+    $("faceRefinePostprocToggle").checked = !!s.postproc;
   }
 }
 const _faceRefineState = loadFaceRefine();
@@ -1328,6 +1333,12 @@ $("faceRefineFeatherSlider")?.addEventListener("input", (e) => {
 $("faceRefineSelectMode")?.addEventListener("change", (e) => {
   const s = getFaceRefineState();
   s.select = e.target.value;
+  saveFaceRefine(s);
+  scheduleSaveH3Settings();
+});
+$("faceRefinePostprocToggle")?.addEventListener("change", (e) => {
+  const s = getFaceRefineState();
+  s.postproc = e.target.checked;
   saveFaceRefine(s);
   scheduleSaveH3Settings();
 });
@@ -4800,14 +4811,15 @@ function buildGraph(job){
       pass2NodeIds.forEach(id => { delete g[id]; });
     }
 
-    // Frame Interpolation (RIFE / RTX Frame Gen) en FaceRefine On-Demand
+    // Frame Interpolation (RIFE / RTX Frame Gen) en FaceRefine On-Demand (solo si frPostproc está activo)
+    const frPostproc = frState.postproc !== undefined ? frState.postproc : false;
     const rifeState = j ? j.rife : getRifeState();
-    const rifeEnabled = rifeState ? rifeState.enabled : true;
+    const rifeEnabled = frPostproc && (rifeState ? rifeState.enabled : false);
     const rifeMultiplier = rifeState ? parseInt(rifeState.multiplier || "2", 10) : 2;
     const rifeModel = rifeState ? (rifeState.model || "rife_v4.26.safetensors") : "rife_v4.26.safetensors";
     const rifeEngine = rifeState ? (rifeState.engine || "rife") : "rife";
 
-    let finalFps = 24;
+    let finalFps = rifeEnabled ? (24 * rifeMultiplier) : [N.FACE_COMPONENTS, 2];
     if(rifeEnabled){
       if(rifeEngine === "rtx"){
         delete g[N.RIFE_LOADER];
@@ -4849,15 +4861,14 @@ function buildGraph(job){
         };
       }
       currentVideoImages = [N.RIFE_INTERP, 0];
-      finalFps = 24 * rifeMultiplier;
     } else {
       delete g[N.RIFE_LOADER];
       delete g[N.RIFE_INTERP];
     }
 
-    // RTX Video Super Resolution (2x) opcional tras FaceRefine / Frame Gen
+    // RTX Video Super Resolution (2x) opcional tras FaceRefine / Frame Gen (solo si frPostproc está activo)
     const rtxState = j ? j.rtx : getRtxState();
-    const rtxEnabled = rtxState ? rtxState.enabled : true;
+    const rtxEnabled = frPostproc && (rtxState ? rtxState.enabled : false);
     const rtxQuality = rtxState ? (rtxState.quality || "ULTRA") : "ULTRA";
 
     // CRÍTICO: Post-FX (LUT/Color) ANTES de RTX Video Super Resolution para evitar procesar a 2.5K/4K en CPU
