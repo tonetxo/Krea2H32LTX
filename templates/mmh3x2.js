@@ -4577,6 +4577,12 @@ function buildGraph(j){
   const frCanvasSize = frState?.canvasSize || 512;
   const frSteps = frState?.steps || 4;
 
+  const pass2NodeIds = [
+    N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
+    N.FACE_SCHEDULER_2, N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2,
+    N.FACE_DECODE_2, N.FACE_STITCH_2
+  ];
+
   if(faceRefineEnabled){
     const frTarget = frState.target || "face";
     const isCombo = (frTarget === "face_hands");
@@ -4598,12 +4604,6 @@ function buildGraph(j){
 
     const pass2Select = "largest_face";
     const pass2Index = isCombo ? 0 : 1;
-
-    const pass2NodeIds = [
-      N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
-      N.FACE_SCHEDULER_2, N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2,
-      N.FACE_DECODE_2, N.FACE_STITCH_2
-    ];
 
     // Sub-grafo FaceRefine — Pasada 1
     g[N.FACE_CROP] = {

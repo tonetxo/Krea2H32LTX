@@ -5192,6 +5192,12 @@ function buildGraph(job){
   const frSteps = frState ? ((typeof frState.steps === "number") ? frState.steps : 4) : 4;
   let currentVideoImages = [N.DECODE_VIDEO, 0];
 
+  const pass2NodeIds = [
+    N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
+    N.FACE_SCHEDULER_2, N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2,
+    N.FACE_DECODE_2, N.FACE_STITCH_2
+  ];
+
   if(faceRefineEnabled){
     const frTarget = frState.target || "face";
     const isCombo = (frTarget === "face_hands");
@@ -5213,12 +5219,6 @@ function buildGraph(job){
 
     const pass2Select = "largest_face";
     const pass2Index = isCombo ? 0 : 1;
-
-    const pass2NodeIds = [
-      N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
-      N.FACE_SCHEDULER_2, N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2,
-      N.FACE_DECODE_2, N.FACE_STITCH_2
-    ];
 
     const sMode = j ? j.seedMode : seedMode;
     const sVal = j ? j.seedValue : parseInt($("seedVal")?.value || "12345", 10);
