@@ -925,6 +925,38 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
               <option value="second_face">1 objetivo (Solo segundo · index 1)</option>
             </select>
           </div>
+          <div class="row" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+            <label>Caras de referencia (Identidad opcional)</label>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <!-- Slot Cara 1 -->
+              <div class="ref-face-slot" style="flex:1;background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px;text-align:center;position:relative;">
+                <input type="file" id="faceRefineImgFile1" accept="image/*" style="display:none;">
+                <div id="faceRefineSlotPlaceholder1" style="cursor:pointer;padding:8px 4px;">
+                  <div style="font-size:16px;">👤</div>
+                  <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">Ref. Cara 1</div>
+                  <div style="font-size:9.5px;color:var(--muted-2);">(clic o arrastrar)</div>
+                </div>
+                <div id="faceRefineSlotPreview1" style="display:none;position:relative;">
+                  <img id="faceRefineSlotImg1" style="max-height:80px;max-width:100%;border-radius:4px;object-fit:cover;display:block;margin:0 auto;">
+                  <button type="button" id="faceRefineSlotClear1" class="ghost btn-mini" title="Quitar referencia 1" style="position:absolute;top:2px;right:2px;padding:2px 5px;font-size:10px;background:rgba(0,0,0,0.6);">✕</button>
+                </div>
+              </div>
+              <!-- Slot Cara 2 -->
+              <div class="ref-face-slot" id="faceRefineSlotWrap2" style="flex:1;background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px;text-align:center;position:relative;">
+                <input type="file" id="faceRefineImgFile2" accept="image/*" style="display:none;">
+                <div id="faceRefineSlotPlaceholder2" style="cursor:pointer;padding:8px 4px;">
+                  <div style="font-size:16px;">👥</div>
+                  <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">Ref. Cara 2 (Dual)</div>
+                  <div style="font-size:9.5px;color:var(--muted-2);">(clic o arrastrar)</div>
+                </div>
+                <div id="faceRefineSlotPreview2" style="display:none;position:relative;">
+                  <img id="faceRefineSlotImg2" style="max-height:80px;max-width:100%;border-radius:4px;object-fit:cover;display:block;margin:0 auto;">
+                  <button type="button" id="faceRefineSlotClear2" class="ghost btn-mini" title="Quitar referencia 2" style="position:absolute;top:2px;right:2px;padding:2px 5px;font-size:10px;background:rgba(0,0,0,0.6);">✕</button>
+                </div>
+              </div>
+            </div>
+            <div class="hint" style="font-size:9.5px;margin-top:4px;">Inyecta fotos de retrato para fijar identidad facial exacta con InsightFace y condicionamiento DiT (&lt;Picture 1&gt;).</div>
+          </div>
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera rostros, manos, pelo o cuerpo con Denoise adaptativo por fotograma. El modo Combo o Dual refina dos elementos en cadena. 512x512 evita OOM en vídeos largos y acelera el render.</div>
       </div>
@@ -4242,9 +4274,11 @@ const CONFIG = {
     FACE_CROP:"301", FACE_REF2V:"302", FACE_INJECT:"303", FACE_PERFRAME_DENOISE:"305",
     FACE_SCHEDULER:"306", FACE_GUIDER:"307", FACE_NOISE:"308", FACE_SAMPLER:"309",
     FACE_DECODE:"310", FACE_STITCH:"311", FACE_LOAD_VIDEO:"312", FACE_COMPONENTS:"313",
+    FACE_REF_IMG_1:"314",
     FACE_CROP_2:"321", FACE_REF2V_2:"322", FACE_INJECT_2:"323", FACE_PERFRAME_DENOISE_2:"325",
     FACE_SCHEDULER_2:"326", FACE_GUIDER_2:"327", FACE_NOISE_2:"328", FACE_SAMPLER_2:"329",
     FACE_DECODE_2:"330", FACE_STITCH_2:"331",
+    FACE_REF_IMG_2:"334",
     RTX_SR:"148", CREATE_VIDEO:"130", SAVE:"92",
   },
   loras: [
@@ -4373,6 +4407,8 @@ initCommon();
 
 let uploadedFirstImage=null, uploadedLastImage=null;
 let localFirstFile=null, localLastFile=null;
+let uploadedRefFace1=null, localRefFace1=null;
+let uploadedRefFace2=null, localRefFace2=null;
 let seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
@@ -5435,7 +5471,9 @@ function getFaceRefineState(){
     steps: parseInt($("faceRefineStepsSlider")?.value || "4", 10),
     denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.35"),
     feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
-    select: $("faceRefineSelectMode")?.value || "largest_face"
+    select: $("faceRefineSelectMode")?.value || "largest_face",
+    refFace1: uploadedRefFace1 || localRefFace1 || null,
+    refFace2: uploadedRefFace2 || localRefFace2 || null
   };
 }
 function setFaceRefineUI(s){
@@ -5537,6 +5575,94 @@ $("faceRefineSelectMode")?.addEventListener("change", (e) => {
   s.select = e.target.value;
   saveFaceRefine(s);
   scheduleSaveH3Settings();
+});
+
+// --- CARAS DE REFERENCIA PARA FACE REFINE ---
+function handleRefFaceFile(f, slotIndex){
+  if(!f) return;
+  const isSlot1 = (slotIndex === 1);
+  const uniqueName = `temp_face_${slotIndex}_${Date.now()}_${f.name}`;
+  const fileObj = new File([f], uniqueName, {type: f.type || "image/png"});
+  if(isSlot1){
+    localRefFace1 = fileObj;
+    uploadedRefFace1 = null;
+  } else {
+    localRefFace2 = fileObj;
+    uploadedRefFace2 = null;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    const imgEl = $(`faceRefineSlotImg${slotIndex}`);
+    const prevEl = $(`faceRefineSlotPreview${slotIndex}`);
+    const phEl = $(`faceRefineSlotPlaceholder${slotIndex}`);
+    if(imgEl) imgEl.src = dataUrl;
+    if(prevEl) prevEl.style.display = "block";
+    if(phEl) phEl.style.display = "none";
+    log(`Foto referencia facial ${slotIndex} cargada: ${f.name}`, "l-ok");
+  };
+  reader.readAsDataURL(f);
+}
+
+function clearRefFace(slotIndex){
+  const isSlot1 = (slotIndex === 1);
+  if(isSlot1){
+    localRefFace1 = null;
+    uploadedRefFace1 = null;
+  } else {
+    localRefFace2 = null;
+    uploadedRefFace2 = null;
+  }
+  const imgEl = $(`faceRefineSlotImg${slotIndex}`);
+  const prevEl = $(`faceRefineSlotPreview${slotIndex}`);
+  const phEl = $(`faceRefineSlotPlaceholder${slotIndex}`);
+  const fileInp = $(`faceRefineImgFile${slotIndex}`);
+  if(imgEl) imgEl.src = "";
+  if(prevEl) prevEl.style.display = "none";
+  if(phEl) phEl.style.display = "block";
+  if(fileInp) fileInp.value = "";
+  log(`Referencia facial ${slotIndex} eliminada.`, "l-info");
+}
+
+[1, 2].forEach(slot => {
+  const fileInp = $(`faceRefineImgFile${slot}`);
+  const ph = $(`faceRefineSlotPlaceholder${slot}`);
+  const clearBtn = $(`faceRefineSlotClear${slot}`);
+  const slotWrap = ph?.closest(".ref-face-slot");
+
+  ph?.addEventListener("click", () => fileInp?.click());
+  fileInp?.addEventListener("change", (e) => {
+    if(e.target.files && e.target.files[0]) handleRefFaceFile(e.target.files[0], slot);
+  });
+  clearBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    clearRefFace(slot);
+  });
+
+  if(slotWrap){
+    ["dragenter", "dragover"].forEach(ev => {
+      slotWrap.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        slotWrap.style.borderColor = "var(--accent)";
+      });
+    });
+    ["dragleave", "drop"].forEach(ev => {
+      slotWrap.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        slotWrap.style.borderColor = "var(--border)";
+      });
+    });
+    slotWrap.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      slotWrap.style.borderColor = "var(--border)";
+      if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]){
+        handleRefFaceFile(e.dataTransfer.files[0], slot);
+      }
+    });
+  }
 });
 
 // --- MODO i2v / flf2v / r2v ---
@@ -6563,6 +6689,10 @@ function snapshotJob(){
     uploadedLastImage: uploadedLastImage ? {...uploadedLastImage} : null,
     localFirstFile: localFirstFile,
     localLastFile: localLastFile,
+    uploadedRefFace1: uploadedRefFace1 ? {...uploadedRefFace1} : null,
+    uploadedRefFace2: uploadedRefFace2 ? {...uploadedRefFace2} : null,
+    localRefFace1: localRefFace1,
+    localRefFace2: localRefFace2,
     refImages: refImages.map(r => ({ local: r.local, uploaded: r.uploaded ? {...r.uploaded} : null })),
     refVideos: refVideos.map(r => ({ file: r.file, local: r.local, uploaded: r.uploaded ? {...r.uploaded} : null, audioUploaded: r.audioUploaded ? {...r.audioUploaded} : null, useAudio: r.useAudio, volume: r.volume, settings: {...r.settings} })),
     refAudios: refAudios.map(r => ({ local: r.local, uploaded: r.uploaded ? {...r.uploaded} : null, volume: r.volume })),
@@ -7884,6 +8014,32 @@ async function _uploadOneHot(_kind, local, name){
 }
 
 async function ensureJobImagesUploaded(job){
+  // Caras de referencia para Face Refine (si se proporcionaron)
+  const frActive = job.isFaceRefineOnly || (job.faceRefine && job.faceRefine.enabled);
+  if(frActive){
+    const f1 = job.localRefFace1 || localRefFace1;
+    if(f1 && !job.uploadedRefFace1){
+      try {
+        job.uploadedRefFace1 = await _uploadOneHot("image", f1, "ref_face_1.png");
+        uploadedRefFace1 = {...job.uploadedRefFace1};
+        log("Foto Ref. Cara 1 subida: " + job.uploadedRefFace1.name, "l-ok");
+      } catch(e){ throw new Error("Fallo al subir cara de referencia 1: " + e.message); }
+    } else if(uploadedRefFace1 && !job.localRefFace1){
+      job.uploadedRefFace1 = {...uploadedRefFace1};
+    }
+
+    const f2 = job.localRefFace2 || localRefFace2;
+    if(f2 && !job.uploadedRefFace2){
+      try {
+        job.uploadedRefFace2 = await _uploadOneHot("image", f2, "ref_face_2.png");
+        uploadedRefFace2 = {...job.uploadedRefFace2};
+        log("Foto Ref. Cara 2 subida: " + job.uploadedRefFace2.name, "l-ok");
+      } catch(e){ throw new Error("Fallo al subir cara de referencia 2: " + e.message); }
+    } else if(uploadedRefFace2 && !job.localRefFace2){
+      job.uploadedRefFace2 = {...uploadedRefFace2};
+    }
+  }
+
   if(job.isFaceRefineOnly) return;
   if(job.mode === "r2v"){
     const rImages = job.refImages || refImages;
@@ -8532,44 +8688,68 @@ function buildGraph(job){
     const pass2NodeIds = [
       N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
       N.FACE_SCHEDULER_2, N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2,
-      N.FACE_DECODE_2, N.FACE_STITCH_2
+      N.FACE_DECODE_2, N.FACE_STITCH_2, N.FACE_REF_IMG_2
     ];
 
+    const refFace1Obj = (j && j.uploadedRefFace1) ? j.uploadedRefFace1 : uploadedRefFace1;
+    const refFace2Obj = (j && j.uploadedRefFace2) ? j.uploadedRefFace2 : uploadedRefFace2;
+
+    if(refFace1Obj){
+      g[N.FACE_REF_IMG_1] = {
+        class_type: "LoadImage",
+        inputs: {
+          image: (refFace1Obj.subfolder ? refFace1Obj.subfolder + "/" : "") + refFace1Obj.name
+        },
+        _meta: { title: "Face Reference Image 1" }
+      };
+    } else {
+      delete g[N.FACE_REF_IMG_1];
+    }
+
     // Sub-grafo FaceRefine — Pasada 1
+    const faceCropInputs1 = {
+      images: [N.FACE_COMPONENTS, 0],
+      detector: elemCfg1.detector,
+      confidence: 0.35,
+      crop_factor: elemCfg1.cropFactor,
+      canvas_width: frCanvas,
+      canvas_height: frCanvas,
+      canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
+      smooth_window: 21,
+      size_smooth_window: 51,
+      smooth_method: "gaussian",
+      size_mode: "per_frame",
+      identity_track: !!refFace1Obj,
+      identity_threshold: 0.28,
+      select: pass1Select,
+      fallback_detector: "none",
+      fallback_head_frac: 0.5,
+      select_index: pass1Index,
+      identity_model: "insightface",
+      cut_detection: "none",
+      cut_threshold: 3.0,
+      absent_shots: "off",
+      X: 0,
+      Y: 0,
+      frame_index: 0
+    };
+    if(refFace1Obj){
+      faceCropInputs1.identity_reference = [N.FACE_REF_IMG_1, 0];
+    }
+
     g[N.FACE_CROP] = {
       class_type: "H3FaceTrackCrop",
-      inputs: {
-        images: [N.FACE_COMPONENTS, 0],
-        detector: elemCfg1.detector,
-        confidence: 0.35,
-        crop_factor: elemCfg1.cropFactor,
-        canvas_width: frCanvas,
-        canvas_height: frCanvas,
-        canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
-        smooth_window: 21,
-        size_smooth_window: 51,
-        smooth_method: "gaussian",
-        size_mode: "per_frame",
-        identity_track: false,
-        identity_threshold: 0.28,
-        select: pass1Select,
-        fallback_detector: "none",
-        fallback_head_frac: 0.5,
-        select_index: pass1Index,
-        identity_model: "insightface",
-        cut_detection: "none",
-        cut_threshold: 3.0,
-        absent_shots: "off",
-        X: 0,
-        Y: 0,
-        frame_index: 0
-      },
+      inputs: faceCropInputs1,
       _meta: { title: isCombo ? "Face Track Crop" : "Element Track Crop" }
     };
 
     const baseP = pVal || "";
-    const frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
+    let frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
     const frPrompt2 = baseP ? `${baseP}, ${elemCfg2.prompt}` : elemCfg2.prompt;
+    if(refFace1Obj && !frPrompt1.includes("<Picture 1>")){
+      frPrompt1 = `<Picture 1> ${frPrompt1}`;
+    }
+
     const frRef2vInputs = {
       clip: [N.CLIP, 0],
       vae: [N.VAE_VIDEO, 0],
@@ -8581,7 +8761,9 @@ function buildGraph(job){
       ref_image_size: "match",
       "ref_audios.ref_audio_0": [N.FACE_COMPONENTS, 1]
     };
-    if(g[N.IMAGE_FIRST]){
+    if(refFace1Obj){
+      frRef2vInputs["ref_images.ref_image_0"] = [N.FACE_REF_IMG_1, 0];
+    } else if(g[N.IMAGE_FIRST]){
       frRef2vInputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
     }
     g[N.FACE_REF2V] = {
@@ -8687,49 +8869,76 @@ function buildGraph(job){
 
     // Sub-grafo FaceRefine — Pasada 2 (Dual / Combo)
     if(isDual){
+      const useFaceRef2 = refFace2Obj || (refFace1Obj && !isCombo ? refFace1Obj : null);
+      if(refFace2Obj){
+        g[N.FACE_REF_IMG_2] = {
+          class_type: "LoadImage",
+          inputs: {
+            image: (refFace2Obj.subfolder ? refFace2Obj.subfolder + "/" : "") + refFace2Obj.name
+          },
+          _meta: { title: "Face Reference Image 2" }
+        };
+      } else {
+        delete g[N.FACE_REF_IMG_2];
+      }
+
+      const faceCropInputs2 = {
+        images: [N.FACE_STITCH, 0],
+        detector: elemCfg2.detector,
+        confidence: 0.35,
+        crop_factor: elemCfg2.cropFactor,
+        canvas_width: frCanvas,
+        canvas_height: frCanvas,
+        canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
+        smooth_window: 21,
+        size_smooth_window: 51,
+        smooth_method: "gaussian",
+        size_mode: "per_frame",
+        identity_track: !!useFaceRef2,
+        identity_threshold: 0.28,
+        select: pass2Select,
+        fallback_detector: "none",
+        fallback_head_frac: 0.5,
+        select_index: pass2Index,
+        identity_model: "insightface",
+        cut_detection: "none",
+        cut_threshold: 3.0,
+        absent_shots: "off",
+        X: 0,
+        Y: 0,
+        frame_index: 0
+      };
+      if(useFaceRef2){
+        const nodeRef2 = refFace2Obj ? N.FACE_REF_IMG_2 : N.FACE_REF_IMG_1;
+        faceCropInputs2.identity_reference = [nodeRef2, 0];
+      }
+
       g[N.FACE_CROP_2] = {
         class_type: "H3FaceTrackCrop",
-        inputs: {
-          images: [N.FACE_STITCH, 0],
-          detector: elemCfg2.detector,
-          confidence: 0.35,
-          crop_factor: elemCfg2.cropFactor,
-          canvas_width: frCanvas,
-          canvas_height: frCanvas,
-          canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
-          smooth_window: 21,
-          size_smooth_window: 51,
-          smooth_method: "gaussian",
-          size_mode: "per_frame",
-          identity_track: false,
-          identity_threshold: 0.28,
-          select: pass2Select,
-          fallback_detector: "none",
-          fallback_head_frac: 0.5,
-          select_index: pass2Index,
-          identity_model: "insightface",
-          cut_detection: "none",
-          cut_threshold: 3.0,
-          absent_shots: "off",
-          X: 0,
-          Y: 0,
-          frame_index: 0
-        },
+        inputs: faceCropInputs2,
         _meta: { title: isCombo ? "Hand Track Crop 2" : "Element Track Crop 2" }
       };
+
+      let effPrompt2 = frPrompt2;
+      if(useFaceRef2 && !effPrompt2.includes("<Picture 1>")){
+        effPrompt2 = `<Picture 1> ${effPrompt2}`;
+      }
 
       const frRef2vInputs2 = {
         clip: [N.CLIP, 0],
         vae: [N.VAE_VIDEO, 0],
         audio_vae: [N.VAE_AUDIO, 0],
-        prompt: frPrompt2,
+        prompt: effPrompt2,
         width: [N.FACE_CROP_2, 4],
         height: [N.FACE_CROP_2, 5],
         length: [N.FACE_CROP_2, 6],
         ref_image_size: "match",
         "ref_audios.ref_audio_0": [N.FACE_COMPONENTS, 1]
       };
-      if(g[N.IMAGE_FIRST]){
+      if(useFaceRef2){
+        const nodeRef2 = refFace2Obj ? N.FACE_REF_IMG_2 : N.FACE_REF_IMG_1;
+        frRef2vInputs2["ref_images.ref_image_0"] = [nodeRef2, 0];
+      } else if(g[N.IMAGE_FIRST]){
         frRef2vInputs2["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
       }
       g[N.FACE_REF2V_2] = {
@@ -9408,10 +9617,25 @@ function buildGraph(job){
   const pass2NodeIds = [
     N.FACE_CROP_2, N.FACE_REF2V_2, N.FACE_INJECT_2, N.FACE_PERFRAME_DENOISE_2,
     N.FACE_SCHEDULER_2, N.FACE_GUIDER_2, N.FACE_NOISE_2, N.FACE_SAMPLER_2,
-    N.FACE_DECODE_2, N.FACE_STITCH_2
+    N.FACE_DECODE_2, N.FACE_STITCH_2, N.FACE_REF_IMG_2
   ];
 
   if(faceRefineEnabled){
+    const refFace1Obj = (j && j.uploadedRefFace1) ? j.uploadedRefFace1 : uploadedRefFace1;
+    const refFace2Obj = (j && j.uploadedRefFace2) ? j.uploadedRefFace2 : uploadedRefFace2;
+
+    if(refFace1Obj){
+      g[N.FACE_REF_IMG_1] = {
+        class_type: "LoadImage",
+        inputs: {
+          image: (refFace1Obj.subfolder ? refFace1Obj.subfolder + "/" : "") + refFace1Obj.name
+        },
+        _meta: { title: "Face Reference Image 1" }
+      };
+    } else {
+      delete g[N.FACE_REF_IMG_1];
+    }
+
     const frTarget = frState.target || "face";
     const isCombo = (frTarget === "face_hands");
     const rawSelect = frState.select || "largest_face";
@@ -9439,40 +9663,49 @@ function buildGraph(job){
     const pass2Seed = (sMode === "random") ? Math.floor(Math.random() * 100000000) : (sVal + 1);
 
     // Sub-grafo FaceRefine — Pasada 1
+    const faceCropInputs1 = {
+      images: [N.DECODE_VIDEO, 0],
+      detector: elemCfg1.detector,
+      confidence: 0.35,
+      crop_factor: elemCfg1.cropFactor,
+      canvas_width: frCanvas,
+      canvas_height: frCanvas,
+      canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
+      smooth_window: 21,
+      size_smooth_window: 51,
+      smooth_method: "gaussian",
+      size_mode: "per_frame",
+      identity_track: !!refFace1Obj,
+      identity_threshold: 0.28,
+      select: pass1Select,
+      fallback_detector: "none",
+      fallback_head_frac: 0.5,
+      select_index: pass1Index,
+      identity_model: "insightface",
+      cut_detection: "none",
+      cut_threshold: 3.0,
+      absent_shots: "off",
+      X: 0,
+      Y: 0,
+      frame_index: 0
+    };
+    if(refFace1Obj){
+      faceCropInputs1.identity_reference = [N.FACE_REF_IMG_1, 0];
+    }
+
     g[N.FACE_CROP] = {
       class_type: "H3FaceTrackCrop",
-      inputs: {
-        images: [N.DECODE_VIDEO, 0],
-        detector: elemCfg1.detector,
-        confidence: 0.35,
-        crop_factor: elemCfg1.cropFactor,
-        canvas_width: frCanvas,
-        canvas_height: frCanvas,
-        canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
-        smooth_window: 21,
-        size_smooth_window: 51,
-        smooth_method: "gaussian",
-        size_mode: "per_frame",
-        identity_track: false,
-        identity_threshold: 0.28,
-        select: pass1Select,
-        fallback_detector: "none",
-        fallback_head_frac: 0.5,
-        select_index: pass1Index,
-        identity_model: "insightface",
-        cut_detection: "none",
-        cut_threshold: 3.0,
-        absent_shots: "off",
-        X: 0,
-        Y: 0,
-        frame_index: 0
-      },
+      inputs: faceCropInputs1,
       _meta: { title: isCombo ? "Face Track Crop" : "Element Track Crop" }
     };
 
     const baseP = pVal || "";
-    const frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
+    let frPrompt1 = baseP ? `${baseP}, ${elemCfg1.prompt}` : elemCfg1.prompt;
     const frPrompt2 = baseP ? `${baseP}, ${elemCfg2.prompt}` : elemCfg2.prompt;
+    if(refFace1Obj && !frPrompt1.includes("<Picture 1>")){
+      frPrompt1 = `<Picture 1> ${frPrompt1}`;
+    }
+
     const frRef2vInputs = {
       clip: [N.CLIP, 0],
       vae: [N.VAE_VIDEO, 0],
@@ -9483,7 +9716,9 @@ function buildGraph(job){
       length: [N.FACE_CROP, 6],
       ref_image_size: "match"
     };
-    if(g[N.IMAGE_FIRST]){
+    if(refFace1Obj){
+      frRef2vInputs["ref_images.ref_image_0"] = [N.FACE_REF_IMG_1, 0];
+    } else if(g[N.IMAGE_FIRST]){
       frRef2vInputs["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
     }
     if(g[N.AUDIO_VOL]){
@@ -9595,48 +9830,75 @@ function buildGraph(job){
 
     // Sub-grafo FaceRefine — Pasada 2 (Dual / Combo)
     if(isDual){
+      const useFaceRef2 = refFace2Obj || (refFace1Obj && !isCombo ? refFace1Obj : null);
+      if(refFace2Obj){
+        g[N.FACE_REF_IMG_2] = {
+          class_type: "LoadImage",
+          inputs: {
+            image: (refFace2Obj.subfolder ? refFace2Obj.subfolder + "/" : "") + refFace2Obj.name
+          },
+          _meta: { title: "Face Reference Image 2" }
+        };
+      } else {
+        delete g[N.FACE_REF_IMG_2];
+      }
+
+      const faceCropInputs2 = {
+        images: [N.FACE_STITCH, 0],
+        detector: elemCfg2.detector,
+        confidence: 0.35,
+        crop_factor: elemCfg2.cropFactor,
+        canvas_width: frCanvas,
+        canvas_height: frCanvas,
+        canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
+        smooth_window: 21,
+        size_smooth_window: 51,
+        smooth_method: "gaussian",
+        size_mode: "per_frame",
+        identity_track: !!useFaceRef2,
+        identity_threshold: 0.28,
+        select: pass2Select,
+        fallback_detector: "none",
+        fallback_head_frac: 0.5,
+        select_index: pass2Index,
+        identity_model: "insightface",
+        cut_detection: "none",
+        cut_threshold: 3.0,
+        absent_shots: "off",
+        X: 0,
+        Y: 0,
+        frame_index: 0
+      };
+      if(useFaceRef2){
+        const nodeRef2 = refFace2Obj ? N.FACE_REF_IMG_2 : N.FACE_REF_IMG_1;
+        faceCropInputs2.identity_reference = [nodeRef2, 0];
+      }
+
       g[N.FACE_CROP_2] = {
         class_type: "H3FaceTrackCrop",
-        inputs: {
-          images: [N.FACE_STITCH, 0],
-          detector: elemCfg2.detector,
-          confidence: 0.35,
-          crop_factor: elemCfg2.cropFactor,
-          canvas_width: frCanvas,
-          canvas_height: frCanvas,
-          canvas_mode: frCanvas >= 768 ? "auto_capped_768" : "auto",
-          smooth_window: 21,
-          size_smooth_window: 51,
-          smooth_method: "gaussian",
-          size_mode: "per_frame",
-          identity_track: false,
-          identity_threshold: 0.28,
-          select: pass2Select,
-          fallback_detector: "none",
-          fallback_head_frac: 0.5,
-          select_index: pass2Index,
-          identity_model: "insightface",
-          cut_detection: "none",
-          cut_threshold: 3.0,
-          absent_shots: "off",
-          X: 0,
-          Y: 0,
-          frame_index: 0
-        },
+        inputs: faceCropInputs2,
         _meta: { title: isCombo ? "Hand Track Crop 2" : "Element Track Crop 2" }
       };
+
+      let effPrompt2 = frPrompt2;
+      if(useFaceRef2 && !effPrompt2.includes("<Picture 1>")){
+        effPrompt2 = `<Picture 1> ${effPrompt2}`;
+      }
 
       const frRef2vInputs2 = {
         clip: [N.CLIP, 0],
         vae: [N.VAE_VIDEO, 0],
         audio_vae: [N.VAE_AUDIO, 0],
-        prompt: frPrompt2,
+        prompt: effPrompt2,
         width: [N.FACE_CROP_2, 4],
         height: [N.FACE_CROP_2, 5],
         length: [N.FACE_CROP_2, 6],
         ref_image_size: "match"
       };
-      if(g[N.IMAGE_FIRST]){
+      if(useFaceRef2){
+        const nodeRef2 = refFace2Obj ? N.FACE_REF_IMG_2 : N.FACE_REF_IMG_1;
+        frRef2vInputs2["ref_images.ref_image_0"] = [nodeRef2, 0];
+      } else if(g[N.IMAGE_FIRST]){
         frRef2vInputs2["ref_images.ref_image_0"] = [N.IMAGE_FIRST, 0];
       }
       if(g[N.AUDIO_VOL]){
@@ -9749,6 +10011,8 @@ function buildGraph(job){
       pass2NodeIds.forEach(id => { delete g[id]; });
     }
   } else {
+    delete g[N.FACE_REF_IMG_1];
+    delete g[N.FACE_REF_IMG_2];
     delete g[N.FACE_CROP];
     delete g[N.FACE_REF2V];
     delete g[N.FACE_INJECT];

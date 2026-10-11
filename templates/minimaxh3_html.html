@@ -383,6 +383,38 @@
               <option value="second_face">1 objetivo (Solo segundo · index 1)</option>
             </select>
           </div>
+          <div class="row" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+            <label>Caras de referencia (Identidad opcional)</label>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <!-- Slot Cara 1 -->
+              <div class="ref-face-slot" style="flex:1;background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px;text-align:center;position:relative;">
+                <input type="file" id="faceRefineImgFile1" accept="image/*" style="display:none;">
+                <div id="faceRefineSlotPlaceholder1" style="cursor:pointer;padding:8px 4px;">
+                  <div style="font-size:16px;">👤</div>
+                  <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">Ref. Cara 1</div>
+                  <div style="font-size:9.5px;color:var(--muted-2);">(clic o arrastrar)</div>
+                </div>
+                <div id="faceRefineSlotPreview1" style="display:none;position:relative;">
+                  <img id="faceRefineSlotImg1" style="max-height:80px;max-width:100%;border-radius:4px;object-fit:cover;display:block;margin:0 auto;">
+                  <button type="button" id="faceRefineSlotClear1" class="ghost btn-mini" title="Quitar referencia 1" style="position:absolute;top:2px;right:2px;padding:2px 5px;font-size:10px;background:rgba(0,0,0,0.6);">✕</button>
+                </div>
+              </div>
+              <!-- Slot Cara 2 -->
+              <div class="ref-face-slot" id="faceRefineSlotWrap2" style="flex:1;background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px;text-align:center;position:relative;">
+                <input type="file" id="faceRefineImgFile2" accept="image/*" style="display:none;">
+                <div id="faceRefineSlotPlaceholder2" style="cursor:pointer;padding:8px 4px;">
+                  <div style="font-size:16px;">👥</div>
+                  <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">Ref. Cara 2 (Dual)</div>
+                  <div style="font-size:9.5px;color:var(--muted-2);">(clic o arrastrar)</div>
+                </div>
+                <div id="faceRefineSlotPreview2" style="display:none;position:relative;">
+                  <img id="faceRefineSlotImg2" style="max-height:80px;max-width:100%;border-radius:4px;object-fit:cover;display:block;margin:0 auto;">
+                  <button type="button" id="faceRefineSlotClear2" class="ghost btn-mini" title="Quitar referencia 2" style="position:absolute;top:2px;right:2px;padding:2px 5px;font-size:10px;background:rgba(0,0,0,0.6);">✕</button>
+                </div>
+              </div>
+            </div>
+            <div class="hint" style="font-size:9.5px;margin-top:4px;">Inyecta fotos de retrato para fijar identidad facial exacta con InsightFace y condicionamiento DiT (&lt;Picture 1&gt;).</div>
+          </div>
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera rostros, manos, pelo o cuerpo con Denoise adaptativo por fotograma. El modo Combo o Dual refina dos elementos en cadena. 512x512 evita OOM en vídeos largos y acelera el render.</div>
       </div>
