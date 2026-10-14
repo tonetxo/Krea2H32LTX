@@ -717,6 +717,84 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera rostros, manos, pelo o cuerpo con Denoise adaptativo por fotograma. El modo Combo o Dual refina dos elementos en cadena. 512x512 evita OOM en vídeos largos y acelera el render.</div>
       </div>
+      <div class="panel">
+        <h2>Interpolación de Frames</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRifeOn" data-value="true">Activo</div>
+          <div class="seg" id="segRifeOff" data-value="false">Desactivado</div>
+        </div>
+        <div class="row">
+          <label>Motor de interpolación</label>
+          <select id="rifeEngine">
+            <option value="rife" selected>RIFE / FILM (Red neuronal IA)</option>
+            <option value="rtx">NVIDIA RTX Frame Gen (Tensor Cores)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Multiplicador FPS <span class="hint" id="rifeFpsHint">(24fps → 48fps)</span></label>
+          <select id="rifeMultiplier">
+            <option value="2" selected>2x (48 fps — Ultra fluido)</option>
+            <option value="3">3x (72 fps — Cine HFR)</option>
+            <option value="4">4x (96 fps — Hyper Smooth)</option>
+          </select>
+        </div>
+        <div class="row" id="rifeModelRow">
+          <label>Modelo RIFE</label>
+          <select id="rifeModel">
+            <option value="rife_v4.26.safetensors" selected>rife_v4.26.safetensors (Recomendado)</option>
+            <option value="rife_v4.26_heavy.safetensors">rife_v4.26_heavy.safetensors (Alta precisión)</option>
+            <option value="rife_v4.25.safetensors">rife_v4.25.safetensors</option>
+            <option value="rife_v4.25_lite.safetensors">rife_v4.25_lite.safetensors (Rápido)</option>
+            <option value="rife_v4.25_heavy.safetensors">rife_v4.25_heavy.safetensors</option>
+            <option value="film_net_fp16.safetensors">film_net_fp16.safetensors (FILM)</option>
+          </select>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes del escalado para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
+      </div>
+
+      <div class="panel">
+        <h2>RTX Video Super Resolution / Limpieza</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRtxOn" data-value="true">Activo</div>
+          <div class="seg" id="segRtxOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="rtxControls" style="display:block; margin-top:8px;">
+          <div class="row">
+            <label>Calidad RTX</label>
+            <select id="rtxQuality">
+              <optgroup label="Escalado">
+                <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
+                <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate equilibrado)</option>
+                <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
+                <option value="HIGH">HIGH (Equilibrado)</option>
+                <option value="MEDIUM">MEDIUM (Rápido)</option>
+                <option value="LOW">LOW (Bajo consumo)</option>
+              </optgroup>
+              <optgroup label="Limpieza sin escalar (misma resolución)">
+                <option value="DENOISE_MEDIUM">DENOISE_MEDIUM (quitar ruido)</option>
+                <option value="DENOISE_HIGH">DENOISE_HIGH (más agresivo)</option>
+                <option value="DENOISE_ULTRA">DENOISE_ULTRA (máximo)</option>
+                <option value="DENOISE_LOW">DENOISE_LOW (suave)</option>
+                <option value="DEBLUR_MEDIUM">DEBLUR_MEDIUM (enfocar)</option>
+                <option value="DEBLUR_HIGH">DEBLUR_HIGH (más nitidez)</option>
+                <option value="DEBLUR_ULTRA">DEBLUR_ULTRA (máximo)</option>
+                <option value="DEBLUR_LOW">DEBLUR_LOW (suave)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="row">
+            <label>Factor de escala</label>
+            <select id="rtxScale">
+              <option value="1.5">1.5×</option>
+              <option value="2" selected>2×</option>
+              <option value="3">3×</option>
+              <option value="4">4×</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Escalado o limpieza por Tensor Cores NVIDIA RTX. Los modos DENOISE/DEBLUR conservan la resolución (no escalan). Si ya usas Latent Upscaler 3D, desactivarlo evita resoluciones excesivas y ahorra tiempo.</div>
+      </div>
+
     </div>
 
     <!-- COLUMNA 2 (CENTRO): AJUSTES, MODELOS Y OPTIMIZACIONES -->
@@ -755,6 +833,58 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           <div id="loraList"></div>
         </div>
       </div>
+      <div class="panel">
+        <h2>Latent Upscaler 3D (MiniMax H3)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segLatentUpscaleOn" data-value="true">Activo</div>
+          <div class="seg on" id="segLatentUpscaleOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="latentUpscaleControls" style="display:none; margin-top:8px;">
+          <div class="row slider-row">
+            <label>Multiplicador de escala <span class="hint" id="latentScaleHint">(1.50x)</span></label>
+            <input type="range" id="latentScaleSlider" min="1.0" max="2.0" step="0.05" value="1.5">
+            <div class="slider-val" id="latentScaleVal">1.50x</div>
+          </div>
+          <div class="hint" id="latentResHint" style="margin-top:4px;font-size:10px;">Latent nativo: 1120×640 px (sin escalado)</div>
+
+          <!-- Pase 2: Refinado con segundo Sampler (Hires-Fix) -->
+          <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border, #333);">
+            <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <label style="font-weight:600;">Segundo Sampler (Refinado Hires-Fix)</label>
+              <div class="seed-toggle" style="margin:0;">
+                <div class="seg on" id="segLatentPass2On" data-value="true">Activo</div>
+                <div class="seg" id="segLatentPass2Off" data-value="false">Desactivado</div>
+              </div>
+            </div>
+            <div id="latentPass2Controls" style="display:block;">
+              <div class="row" style="margin-top:4px;">
+                <label>Modelo UNet Pase 2 <span class="hint">(Default: mismo que pase 1)</span></label>
+                <select id="latentPass2Unet"></select>
+              </div>
+              <div id="latentPass2Warn" class="hint" style="display:none; color:var(--warn,#e6a23c); margin-top:3px; font-size:10px;"></div>
+
+              <div class="row" style="margin-top:6px;">
+                <label>Turbo LoRA Pase 2 <span class="hint">(Acelera el refinado)</span></label>
+                <select id="latentPass2Lora"></select>
+              </div>
+              <div class="row slider-row" style="margin-top:4px;">
+                <label>Fuerza Turbo LoRA</label>
+                <input type="range" id="latentPass2LoraStrength" min="0" max="2" step="0.05" value="1.0">
+                <div class="slider-val" id="latentPass2LoraStrengthVal">1.00</div>
+              </div>
+
+              <div class="row slider-row" style="margin-top:8px;">
+                <label>Denoise Refinado <span class="hint">(Fuerza Pase 2)</span></label>
+                <input type="range" id="latentPass2Denoise" min="0.10" max="1.00" step="0.05" value="0.60">
+                <div class="slider-val" id="latentPass2DenoiseVal">0.60</div>
+              </div>
+              <div class="hint" style="margin-top:3px; font-size:10px;">Denoise nativo del scheduler: 0.40–0.50 (alta fidelidad, sin cambios de escena), 0.60 (balance recomendado), 0.90+ (creativo). Ejecuta siempre 3 pasos exactos con la Turbo LoRA.</div>
+            </div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Escala el espacio latente antes de decodificar VAE con red 3D temporal. Con el segundo sampler activo, elimina la pérdida de textura y el aspecto blando.</div>
+      </div>
+
 
       <div class="panel">
         <h2>Optimizaciones de atención</h2>
@@ -909,136 +1039,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
       </div>
 
       <div class="panel"><h2>Spectrum (MiniMax H3)</h2><div class="seed-toggle"><div class="seg on" id="segSpectrumOn" data-value="true">Activo</div><div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div></div><div class="row slider-row"><label>Blend weight <span class="hint">(peso espectral)</span></label><input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5"><div class="slider-val" id="spectrumBlendVal">0.50</div></div><div class="row slider-row"><label>Flex window <span class="hint">(ajuste intervalo)</span></label><input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75"><div class="slider-val" id="spectrumFlexVal">0.75</div></div><div class="row slider-row"><label>Warmup steps <span class="hint">(pasos nativos iniciales)</span></label><input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="1"><div class="slider-val" id="spectrumWarmupVal">1</div></div><div class="row" style="margin-top:6px;"><label>Bootstrap primer paso <span class="hint">(pronóstico rápido paso 2)</span></label><div class="seed-toggle" style="margin-top:4px;"><div class="seg on" id="segBootstrapOn" data-value="true">Sí</div><div class="seg" id="segBootstrapOff" data-value="false">No</div></div></div><div class="row"><label>Historial en <span class="hint">(VRAM más rápido, aceleración real)</span></label><select id="spectrumHistoryStorage"><option value="vram" selected>VRAM (más rápido, recomendado)</option><option value="system_ram">RAM sistema</option></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div></div>
-
-      <div class="panel">
-        <h2>Latent Upscaler 3D (MiniMax H3)</h2>
-        <div class="seed-toggle">
-          <div class="seg" id="segLatentUpscaleOn" data-value="true">Activo</div>
-          <div class="seg on" id="segLatentUpscaleOff" data-value="false">Desactivado</div>
-        </div>
-        <div id="latentUpscaleControls" style="display:none; margin-top:8px;">
-          <div class="row slider-row">
-            <label>Multiplicador de escala <span class="hint" id="latentScaleHint">(1.50x)</span></label>
-            <input type="range" id="latentScaleSlider" min="1.0" max="2.0" step="0.05" value="1.5">
-            <div class="slider-val" id="latentScaleVal">1.50x</div>
-          </div>
-          <div class="hint" id="latentResHint" style="margin-top:4px;font-size:10px;">Latent nativo: 1120×640 px (sin escalado)</div>
-
-          <!-- Pase 2: Refinado con segundo Sampler (Hires-Fix) -->
-          <div style="margin-top:10px; padding-top:8px; border-top:1px dashed var(--border, #333);">
-            <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:6px;">
-              <label style="font-weight:600;">Segundo Sampler (Refinado Hires-Fix)</label>
-              <div class="seed-toggle" style="margin:0;">
-                <div class="seg on" id="segLatentPass2On" data-value="true">Activo</div>
-                <div class="seg" id="segLatentPass2Off" data-value="false">Desactivado</div>
-              </div>
-            </div>
-            <div id="latentPass2Controls" style="display:block;">
-              <div class="row" style="margin-top:4px;">
-                <label>Modelo UNet Pase 2 <span class="hint">(Default: mismo que pase 1)</span></label>
-                <select id="latentPass2Unet"></select>
-              </div>
-              <div id="latentPass2Warn" class="hint" style="display:none; color:var(--warn,#e6a23c); margin-top:3px; font-size:10px;"></div>
-
-              <div class="row" style="margin-top:6px;">
-                <label>Turbo LoRA Pase 2 <span class="hint">(Acelera el refinado)</span></label>
-                <select id="latentPass2Lora"></select>
-              </div>
-              <div class="row slider-row" style="margin-top:4px;">
-                <label>Fuerza Turbo LoRA</label>
-                <input type="range" id="latentPass2LoraStrength" min="0" max="2" step="0.05" value="1.0">
-                <div class="slider-val" id="latentPass2LoraStrengthVal">1.00</div>
-              </div>
-
-              <div class="row slider-row" style="margin-top:8px;">
-                <label>Denoise Refinado <span class="hint">(Fuerza Pase 2)</span></label>
-                <input type="range" id="latentPass2Denoise" min="0.10" max="1.00" step="0.05" value="0.60">
-                <div class="slider-val" id="latentPass2DenoiseVal">0.60</div>
-              </div>
-              <div class="hint" style="margin-top:3px; font-size:10px;">Denoise nativo del scheduler: 0.40–0.50 (alta fidelidad, sin cambios de escena), 0.60 (balance recomendado), 0.90+ (creativo). Ejecuta siempre 3 pasos exactos con la Turbo LoRA.</div>
-            </div>
-          </div>
-        </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Escala el espacio latente antes de decodificar VAE con red 3D temporal. Con el segundo sampler activo, elimina la pérdida de textura y el aspecto blando.</div>
-      </div>
-
-      <div class="panel">
-        <h2>Interpolación de Frames</h2>
-        <div class="seed-toggle">
-          <div class="seg on" id="segRifeOn" data-value="true">Activo</div>
-          <div class="seg" id="segRifeOff" data-value="false">Desactivado</div>
-        </div>
-        <div class="row">
-          <label>Motor de interpolación</label>
-          <select id="rifeEngine">
-            <option value="rife" selected>RIFE / FILM (Red neuronal IA)</option>
-            <option value="rtx">NVIDIA RTX Frame Gen (Tensor Cores)</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Multiplicador FPS <span class="hint" id="rifeFpsHint">(24fps → 48fps)</span></label>
-          <select id="rifeMultiplier">
-            <option value="2" selected>2x (48 fps — Ultra fluido)</option>
-            <option value="3">3x (72 fps — Cine HFR)</option>
-            <option value="4">4x (96 fps — Hyper Smooth)</option>
-          </select>
-        </div>
-        <div class="row" id="rifeModelRow">
-          <label>Modelo RIFE</label>
-          <select id="rifeModel">
-            <option value="rife_v4.26.safetensors" selected>rife_v4.26.safetensors (Recomendado)</option>
-            <option value="rife_v4.26_heavy.safetensors">rife_v4.26_heavy.safetensors (Alta precisión)</option>
-            <option value="rife_v4.25.safetensors">rife_v4.25.safetensors</option>
-            <option value="rife_v4.25_lite.safetensors">rife_v4.25_lite.safetensors (Rápido)</option>
-            <option value="rife_v4.25_heavy.safetensors">rife_v4.25_heavy.safetensors</option>
-            <option value="film_net_fp16.safetensors">film_net_fp16.safetensors (FILM)</option>
-          </select>
-        </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Interpola fotogramas en resolución base antes del escalado para máxima velocidad y nitidez. Sincroniza automáticamente la pista de audio a los nuevos FPS.</div>
-      </div>
-
-      <div class="panel">
-        <h2>RTX Video Super Resolution / Limpieza</h2>
-        <div class="seed-toggle">
-          <div class="seg on" id="segRtxOn" data-value="true">Activo</div>
-          <div class="seg" id="segRtxOff" data-value="false">Desactivado</div>
-        </div>
-        <div id="rtxControls" style="display:block; margin-top:8px;">
-          <div class="row">
-            <label>Calidad RTX</label>
-            <select id="rtxQuality">
-              <optgroup label="Escalado">
-                <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
-                <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate equilibrado)</option>
-                <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
-                <option value="HIGH">HIGH (Equilibrado)</option>
-                <option value="MEDIUM">MEDIUM (Rápido)</option>
-                <option value="LOW">LOW (Bajo consumo)</option>
-              </optgroup>
-              <optgroup label="Limpieza sin escalar (misma resolución)">
-                <option value="DENOISE_MEDIUM">DENOISE_MEDIUM (quitar ruido)</option>
-                <option value="DENOISE_HIGH">DENOISE_HIGH (más agresivo)</option>
-                <option value="DENOISE_ULTRA">DENOISE_ULTRA (máximo)</option>
-                <option value="DENOISE_LOW">DENOISE_LOW (suave)</option>
-                <option value="DEBLUR_MEDIUM">DEBLUR_MEDIUM (enfocar)</option>
-                <option value="DEBLUR_HIGH">DEBLUR_HIGH (más nitidez)</option>
-                <option value="DEBLUR_ULTRA">DEBLUR_ULTRA (máximo)</option>
-                <option value="DEBLUR_LOW">DEBLUR_LOW (suave)</option>
-              </optgroup>
-            </select>
-          </div>
-          <div class="row">
-            <label>Factor de escala</label>
-            <select id="rtxScale">
-              <option value="1.5">1.5×</option>
-              <option value="2" selected>2×</option>
-              <option value="3">3×</option>
-              <option value="4">4×</option>
-            </select>
-          </div>
-        </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Escalado o limpieza por Tensor Cores NVIDIA RTX. Los modos DENOISE/DEBLUR conservan la resolución (no escalan). Si ya usas Latent Upscaler 3D, desactivarlo evita resoluciones excesivas y ahorra tiempo.</div>
-      </div>
 
       <!-- COLOR GRADING & LOOK CINEMÁTICO -->
       <div class="panel">
