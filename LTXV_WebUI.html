@@ -5542,6 +5542,13 @@ async function loadKrea2ImageAsInput(url, filename){
   const rawName = decodeURIComponent(ref);
   const filename = rawName.replace(/^.*\//, "");
   const subfolder = (rawName.includes("/") && rawName.split("/").slice(0,-1).join("/")) || "krea2";
+  // Limpiamos ?ref de la URL tras procesarlo: al recargar no debe volver a
+  // desplegarse el panel de imágenes Krea2 recientes ni recargarse la imagen.
+  try {
+    const clean = new URL(window.location.href);
+    clean.searchParams.delete("ref");
+    history.replaceState(null, "", clean.pathname + (clean.search ? clean.search : "") + clean.hash);
+  } catch(_){}
   const h = $("krea2RecentToggle");
   const b = $("krea2RecentBody");
   if(h && b && !h.classList.contains("open")){
