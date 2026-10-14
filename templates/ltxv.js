@@ -143,7 +143,7 @@ $("rifeModel")?.addEventListener("change", (e) => { const r = getRifeState(); r.
 
 // --- RTX VIDEO SUPER RESOLUTION (2x) ---
 const RTX_KEY = "ltxv_rtx_state";
-const RTX_DEFAULTS = { enabled: true, quality: "HIGHBITRATE_ULTRA" };
+const RTX_DEFAULTS = { enabled: true, quality: "HIGHBITRATE_ULTRA", scale: 2 };
 function loadRtx(){
   try { return Object.assign({}, RTX_DEFAULTS, JSON.parse(localStorage.getItem(RTX_KEY) || "{}")); }
   catch(_) { return {...RTX_DEFAULTS}; }
@@ -160,11 +160,13 @@ function setRtxUI(r){
     if(panel) panel.style.display = "none";
   }
   if($("rtxQuality") && r.quality) $("rtxQuality").value = r.quality;
+  if($("rtxScale") && r.scale) $("rtxScale").value = String(r.scale);
 }
 function getRtxState(){
   return {
     enabled: $("segRtxOn")?.classList.contains("on") ?? true,
-    quality: $("rtxQuality")?.value || "HIGHBITRATE_ULTRA"
+    quality: $("rtxQuality")?.value || "HIGHBITRATE_ULTRA",
+    scale: parseFloat($("rtxScale")?.value || "2")
   };
 }
 const _rtxState = loadRtx();
@@ -172,6 +174,7 @@ setRtxUI(_rtxState);
 $("segRtxOn")?.addEventListener("click", () => { const r = getRtxState(); r.enabled = true; setRtxUI(r); saveRtx(r); });
 $("segRtxOff")?.addEventListener("click", () => { const r = getRtxState(); r.enabled = false; setRtxUI(r); saveRtx(r); });
 $("rtxQuality")?.addEventListener("change", () => { const r = getRtxState(); saveRtx(r); });
+$("rtxScale")?.addEventListener("change", () => { const r = getRtxState(); saveRtx(r); });
 
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
@@ -2145,18 +2148,22 @@ function buildPostProcessGraph(j){
     };
     fps = ["904_fps", 0];
   } else if(j.isRtxUpscaleOnly){
-    const quality = (j.rtx && j.rtx.quality) || getRtxState().quality || "HIGHBITRATE_ULTRA";
+    const rtx = j.rtx || getRtxState();
+    const quality = rtx.quality || "HIGHBITRATE_ULTRA";
+    // Los modos DENOISE_*/DEBLUR_* conservan la resolución (el nodo ignora el resize).
+    const sameRes = /^(DENOISE|DEBLUR)_/.test(quality);
+    const scale = parseFloat(rtx.scale || 2);
     g["902_sr"] = {
       class_type: "RTXVideoSuperResolution",
       inputs: {
         images,
         resize_type: "scale by multiplier",
-        "resize_type.scale": 2,
+        "resize_type.scale": sameRes ? 1.0 : scale,
         quality,
         strength: 1.0,
         image_encoding: "8-bit RGB"
       },
-      _meta: { title: "RTX Video Super Resolution (2x)" }
+      _meta: { title: sameRes ? "RTX Limpieza (misma resolución)" : `RTX Super Resolution (${scale}x)` }
     };
     images = ["902_sr", 0];
   }
@@ -2173,9 +2180,12 @@ function buildPostProcessGraph(j){
     inputs: { images, fps, audio, bit_depth: 8, color_space: "sRGB", codec: "none" },
     _meta: { title: "Create Video" }
   };
+  const rtxMode = (j.rtx && j.rtx.quality) || "";
   const suffix = j.isInterpolateOnly
     ? `_interp_${(j.rife?.multiplier || 2)}x`
-    : "_rtx2x";
+    : (/^(DENOISE|DEBLUR)_/.test(rtxMode)
+        ? `_${rtxMode.toLowerCase()}`
+        : `_rtx${parseFloat((j.rtx && j.rtx.scale) || 2)}x`);
   // Reutilizamos el id del save final (N.FINAL_SAVE) para que el visor y el
   // manejador de resultados lo muestren en el reproductor final (slot 2).
   g[N.FINAL_SAVE] = {
@@ -2482,10 +2492,11 @@ function buildGraph(mode, job){
     }
   }
 
-  // RTX Video Super Resolution (2x) — opcional tras RIFE/DECODE_VIDEO_2
+  // RTX Video Super Resolution / limpieza — opcional tras RIFE/DECODE_VIDEO_2
   const rtxState = j ? j.rtx : getRtxState();
   const rtxEnabled = rtxState ? rtxState.enabled : true;
   const rtxQuality = rtxState ? (rtxState.quality || "HIGHBITRATE_ULTRA") : "HIGHBITRATE_ULTRA";
+  const rtxScale = rtxState ? parseFloat(rtxState.scale || 2) : 2;
 
   if(rtxEnabled){
     if(!g[N.RTX_SR] || !g[N.RTX_SR].inputs){
@@ -2493,8 +2504,10 @@ function buildGraph(mode, job){
         class_type: "RTXVideoSuperResolution",
         inputs: {
           resize_type: "scale by multiplier",
-          "resize_type.scale": 2,
+          "resize_type.scale": rtxScale,
           quality: rtxQuality,
+          strength: 1.0,
+          image_encoding: "8-bit RGB",
           images: currentVideoSource
         },
         _meta: { title: "RTX Video Super Resolution" }
@@ -2502,6 +2515,7 @@ function buildGraph(mode, job){
     } else {
       g[N.RTX_SR].inputs.images = currentVideoSource;
       g[N.RTX_SR].inputs.quality = rtxQuality;
+      g[N.RTX_SR].inputs["resize_type.scale"] = rtxScale;
     }
     if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
       g[N.CREATE_VIDEO_2].inputs.images = [N.RTX_SR, 0];
@@ -2560,7 +2574,11 @@ function showVideo(slot, media, options={}){
   if(badge){
     const onDemand = activeJob?.isInterpolateOnly
       ? `Interp ${activeJob.rife?.multiplier || 2}x`
-      : (activeJob?.isRtxUpscaleOnly ? "RTX 2x" : null);
+      : (activeJob?.isRtxUpscaleOnly
+          ? (/^(DENOISE|DEBLUR)_/.test(activeJob.rtx?.quality || "")
+              ? activeJob.rtx.quality.replace("_", " ").toLowerCase()
+              : `RTX ${parseFloat(activeJob.rtx?.scale || 2)}x`)
+          : null);
     const typeLabel = slot === 1 ? "1er pase" : "final";
     if(onDemand){
       badge.textContent = onDemand;
@@ -3123,7 +3141,9 @@ async function enqueuePostProcess(kind){
   } else {
     job.isRtxUpscaleOnly = true;
     job.rtx = getRtxState();
-    log(`🔍 Añadido RTX Super Resolution 2x (${job.rtx.quality}) de ${media.filename} a la cola.`, "l-info");
+    const q = job.rtx.quality || "";
+    const mdl = /^(DENOISE|DEBLUR)_/.test(q) ? `limpieza ${q.replace("_"," ").toLowerCase()}` : `escalado ${job.rtx.scale}x`;
+    log(`🔍 Añadido RTX VSR (${mdl}) de ${media.filename} a la cola.`, "l-info");
   }
   if(activeJob){
     jobQueue.push(job);

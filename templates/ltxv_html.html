@@ -116,7 +116,7 @@
       </div>
 
       <div class="panel">
-        <h2>RTX Video Super Resolution (2x)</h2>
+        <h2>RTX Video Super Resolution / Limpieza</h2>
         <div class="seed-toggle">
           <div class="seg on" id="segRtxOn" data-value="true">Activo</div>
           <div class="seg" id="segRtxOff" data-value="false">Desactivado</div>
@@ -125,16 +125,37 @@
           <div class="row">
             <label>Calidad RTX</label>
             <select id="rtxQuality">
-              <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
-              <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
-              <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate Equilibrado)</option>
-              <option value="HIGH">HIGH (Equilibrado)</option>
-              <option value="MEDIUM">MEDIUM (Rápido)</option>
-              <option value="LOW">LOW (Bajo consumo)</option>
+              <optgroup label="Escalado">
+                <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
+                <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate equilibrado)</option>
+                <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
+                <option value="HIGH">HIGH (Equilibrado)</option>
+                <option value="MEDIUM">MEDIUM (Rápido)</option>
+                <option value="LOW">LOW (Bajo consumo)</option>
+              </optgroup>
+              <optgroup label="Limpieza sin escalar (misma resolución)">
+                <option value="DENOISE_MEDIUM">DENOISE_MEDIUM (quitar ruido)</option>
+                <option value="DENOISE_HIGH">DENOISE_HIGH (más agresivo)</option>
+                <option value="DENOISE_ULTRA">DENOISE_ULTRA (máximo)</option>
+                <option value="DENOISE_LOW">DENOISE_LOW (suave)</option>
+                <option value="DEBLUR_MEDIUM">DEBLUR_MEDIUM (enfocar)</option>
+                <option value="DEBLUR_HIGH">DEBLUR_HIGH (más nitidez)</option>
+                <option value="DEBLUR_ULTRA">DEBLUR_ULTRA (máximo)</option>
+                <option value="DEBLUR_LOW">DEBLUR_LOW (suave)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="row">
+            <label>Factor de escala</label>
+            <select id="rtxScale">
+              <option value="1.5">1.5×</option>
+              <option value="2" selected>2×</option>
+              <option value="3">3×</option>
+              <option value="4">4×</option>
             </select>
           </div>
         </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Escalado por Tensor Cores NVIDIA RTX (2x). Proporciona definición cinematográfica final.</div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Escalado o limpieza por Tensor Cores NVIDIA RTX. Los modos DENOISE/DEBLUR conservan la resolución (no escalan). El factor solo aplica a modos de escalado.</div>
       </div>
       <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="sageattn3">sageattn3</option><option value="sageattn2">sageattn2</option><option value="sageattn" selected>sageattn</option><option value="sageattn_qk">sageattn_qk</option><option value="auto">auto</option><option value="comfy kitchen attention">comfy kitchen attention</option></select></div></div>
       <div class="panel"><h2>Color Grading & Look Cinemático</h2>
@@ -247,7 +268,7 @@
           <h3>Vídeo <em style="color:var(--accent)">final</em></h3>
           <div class="vid-actions">
             <button class="vid-action-btn" id="btnInterpolate2" title="Interpolar fotogramas de este clip tras la generación (RIFE / RTX Frame Gen)" style="display:none;" type="button">⚡ Interpolar</button>
-            <button class="vid-action-btn" id="btnRtxUpscale2" title="Reescalar este clip con RTX Video Super Resolution (2x) tras la generación" style="display:none;" type="button">🔍 RTX 2x</button>
+            <button class="vid-action-btn" id="btnRtxUpscale2" title="Aplicar RTX Video Super Resolution (escalado o limpieza) a este clip tras la generación" style="display:none;" type="button">🔍 RTX VSR</button>
             <button class="vid-action-btn" id="btnDownload2" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
             <button class="vid-action-btn" id="btnSaveFrame2" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
             <button class="vid-action-btn" id="btnLoadMeta2" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
