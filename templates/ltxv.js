@@ -861,6 +861,7 @@ function snapshotJob(firstPassOnly){
     filenamePrefix: $("filenamePrefix")?.value,
     sageType: $("sageAttentionType")?.value,
     rife: getRifeState(),
+    rtx: getRtxState(),
     bitDepth: getBitDepth(),
     loras: JSON.parse(JSON.stringify(loras)),
     chainMode: $("enhancerChainMode")?.value,
@@ -2086,9 +2087,112 @@ async function ensureJobImageUploaded(job){
   log("Imagen subida al servidor: "+job.uploadedImage.name,"l-ok");
 }
 
+function buildPostProcessGraph(j){
+  // Grafo mínimo on-demand: cargar el clip final y aplicar SOLO el post-proceso
+  // pedido (interpolación de frames o RTX Super Resolution). El vídeo ya lleva
+  // el Color Grading de la generación, así que aquí no se re-aplica.
+  const sourceMedia = j.sourceMedia || currentMedia[2];
+  if(!sourceMedia || !sourceMedia.filename){
+    throw new Error("No hay vídeo final cargado para el post-proceso.");
+  }
+  const file = (sourceMedia.subfolder ? sourceMedia.subfolder + "/" : "") + sourceMedia.filename + " [output]";
+  const g = {};
+  g["900_load"] = { class_type:"LoadVideo", inputs:{ file }, _meta:{ title:"Load Video (Native)" } };
+  g["901_comp"] = { class_type:"GetVideoComponents", inputs:{ video:["900_load", 0] }, _meta:{ title:"Get Video Components (Native)" } };
+  const audio = ["901_comp", 1];
+  const srcFps = ["901_comp", 2];
+  let images = ["901_comp", 0];
+  let fps = srcFps;
+  const prefix = (j.filenamePrefix || $("filenamePrefix")?.value || "templo/mensaje_botella").trim();
+
+  if(j.isInterpolateOnly){
+    const rife = j.rife || getRifeState();
+    const mult = parseInt(rife.multiplier || "2", 10);
+    const engine = rife.engine || "rife";
+    if(engine === "rtx"){
+      g["902_fg"] = {
+        class_type: "RTXVideoFrameGeneration",
+        inputs: {
+          images,
+          generation_type: "frame rate multiplier",
+          "generation_type.multiplier": mult,
+          mode: "HIGH",
+          automatic_shot_change_detection: true,
+          shot_change: false,
+          image_encoding: "8-bit RGB"
+        },
+        _meta: { title: "RTX Video Frame Generation" }
+      };
+      images = ["902_fg", 0];
+    } else {
+      g["902_rife_load"] = {
+        class_type: "FrameInterpolationModelLoader",
+        inputs: { model_name: rife.model || "rife_v4.26.safetensors" },
+        _meta: { title: "Frame Interpolation Model Loader" }
+      };
+      g["903_rife"] = {
+        class_type: "FrameInterpolate",
+        inputs: { multiplier: mult, images, interp_model: ["902_rife_load", 0] },
+        _meta: { title: "Frame Interpolate" }
+      };
+      images = ["903_rife", 0];
+    }
+    // fps de salida = fps origen × mult
+    g["904_fps"] = {
+      class_type: "ComfyMathExpression",
+      inputs: { expression: "a * b", "values.a": srcFps, "values.b": mult },
+      _meta: { title: "FPS × mult" }
+    };
+    fps = ["904_fps", 0];
+  } else if(j.isRtxUpscaleOnly){
+    const quality = (j.rtx && j.rtx.quality) || getRtxState().quality || "HIGHBITRATE_ULTRA";
+    g["902_sr"] = {
+      class_type: "RTXVideoSuperResolution",
+      inputs: {
+        images,
+        resize_type: "scale by multiplier",
+        "resize_type.scale": 2,
+        quality,
+        strength: 1.0,
+        image_encoding: "8-bit RGB"
+      },
+      _meta: { title: "RTX Video Super Resolution (2x)" }
+    };
+    images = ["902_sr", 0];
+  }
+
+  // Color Grading / Post-FX del panel: se aplica si está activo al pulsar el
+  // botón (así puedes añadirlo a un clip que no lo llevaba). Se aplica TRAS el
+  // post-proceso para que el grano quede nítido a la resolución final.
+  // OJO: si el clip YA llevaba FX de la generación, desactívalo aquí para no
+  // duplicarlo (mismo criterio que MiniMaxH3).
+  images = appendVideoPostFx(g, images, j.postfx, j.seedValue);
+
+  g["905_create"] = {
+    class_type: "CreateVideo",
+    inputs: { images, fps, audio, bit_depth: 8, color_space: "sRGB", codec: "none" },
+    _meta: { title: "Create Video" }
+  };
+  const suffix = j.isInterpolateOnly
+    ? `_interp_${(j.rife?.multiplier || 2)}x`
+    : "_rtx2x";
+  // Reutilizamos el id del save final (N.FINAL_SAVE) para que el visor y el
+  // manejador de resultados lo muestren en el reproductor final (slot 2).
+  g[N.FINAL_SAVE] = {
+    class_type: "SaveVideo",
+    inputs: { filename_prefix: prefix + suffix, format: "auto", codec: "auto", video: ["905_create", 0] },
+    _meta: { title: "Save Video" }
+  };
+  return g;
+}
+
 function buildGraph(mode, job){
   // mode: "first" | "second" | "full"
   const j = job || activeJob || null;
+  // Post-proceso on-demand sobre el clip ya generado (no re-muestrea).
+  if(j && (j.isInterpolateOnly || j.isRtxUpscaleOnly)){
+    return buildPostProcessGraph(j);
+  }
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
   const imgObj = j ? j.uploadedImage : uploadedImage;
   // LoadImage acepta "subfolder/name.ext" (necesario para imágenes restauradas
@@ -2438,6 +2542,7 @@ function showVideo(slot, media, options={}){
   if(!media) return;
   const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}#t=0.1`;
   const v=$("video"+slot), empty=$("empty"+slot), badge=$("badge"+slot), btn=$("btnLoadMeta"+slot), dl=$("btnDownload"+slot), sf=$("btnSaveFrame"+slot);
+  const ip=$("btnInterpolate"+slot), us=$("btnRtxUpscale"+slot);
   const prev=$("previewImg"+slot);
   if(prev) prev.style.display="none";
   v.crossOrigin = "anonymous";
@@ -2448,10 +2553,18 @@ function showVideo(slot, media, options={}){
   if(btn) btn.disabled = false;
   if(dl) dl.style.display="inline-flex";
   if(sf) sf.style.display="inline-flex";
+  // Post-proceso on-demand (solo existe en el reproductor final)
+  if(ip) ip.style.display="inline-flex";
+  if(us) us.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   if(badge){
+    const onDemand = activeJob?.isInterpolateOnly
+      ? `Interp ${activeJob.rife?.multiplier || 2}x`
+      : (activeJob?.isRtxUpscaleOnly ? "RTX 2x" : null);
     const typeLabel = slot === 1 ? "1er pase" : "final";
-    if(options.badge != null){
+    if(onDemand){
+      badge.textContent = onDemand;
+    } else if(options.badge != null){
       badge.textContent = options.badge;
     } else if(options.variantIndex != null){
       badge.textContent = `Var ${options.variantIndex} · ${slot === 1 ? "1er" : "final"}`;
@@ -2883,7 +2996,7 @@ async function runSingleGeneration(index) {
         const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
         const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
         const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
-        graph[N.SEED].inputs.seed = seedUsed;
+        if(graph[N.SEED]) graph[N.SEED].inputs.seed = seedUsed;
 
         // Reservamos un índice de variante global al inicio de cada flujo nuevo.
         if(activeJob && activeJob.currentVariantIndex == null){
@@ -2919,7 +3032,7 @@ async function runSingleGeneration(index) {
         pendingSeeds[data.prompt_id] = seedUsed;
         promptVariantMap[data.prompt_id] = varIndex;
         currentPromptId = data.prompt_id;
-        startTimer(data.prompt_id, 1);
+        startTimer(data.prompt_id, (activeJob?.isInterpolateOnly || activeJob?.isRtxUpscaleOnly) ? 2 : 1);
         pollFallback(data.prompt_id);
     } catch(err) {
         log(`❌ No se pudo encolar: ${err.message || err}`, "l-err");
@@ -2933,7 +3046,7 @@ async function startJob(job){
   updateQueueUI();
   try {
     await ensureSocketConnected();
-    await ensureJobImageUploaded(job);
+    if(!(job.isInterpolateOnly || job.isRtxUpscaleOnly)) await ensureJobImageUploaded(job);
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;
     generationStep = 1;
@@ -2990,6 +3103,37 @@ $("btnClearQueue")?.addEventListener("click", () => {
 
 $("btnFirstPass").addEventListener("click",()=>enqueueGeneration(true));
 $("btnFull").addEventListener("click",()=>enqueueGeneration(false));
+
+// --- POST-PROCESO ON-DEMAND sobre el clip final (slot 2) ---
+async function enqueuePostProcess(kind){
+  const media = currentMedia[2];
+  if(!media || !media.filename){
+    log("No hay vídeo final en el reproductor para procesar.", "l-warn");
+    return;
+  }
+  const job = snapshotJob();
+  job.sourceMedia = { ...media };
+  job.batchSize = 1;
+  job.firstPassOnly = false;
+  if(kind === "interp"){
+    job.isInterpolateOnly = true;
+    job.rife = getRifeState();
+    const r = job.rife;
+    log(`⚡ Añadida interpolación (${(r.engine||"rife").toUpperCase()} ${r.multiplier}x) de ${media.filename} a la cola.`, "l-info");
+  } else {
+    job.isRtxUpscaleOnly = true;
+    job.rtx = getRtxState();
+    log(`🔍 Añadido RTX Super Resolution 2x (${job.rtx.quality}) de ${media.filename} a la cola.`, "l-info");
+  }
+  if(activeJob){
+    jobQueue.push(job);
+    updateQueueUI();
+  } else {
+    await startJob(job);
+  }
+}
+$("btnInterpolate2")?.addEventListener("click", () => enqueuePostProcess("interp"));
+$("btnRtxUpscale2")?.addEventListener("click", () => enqueuePostProcess("rtx"));
 
 // --- ENHANCER (solo Ollama; sin LTX2) ---
 (function initLtxvEnhancerUI(){
