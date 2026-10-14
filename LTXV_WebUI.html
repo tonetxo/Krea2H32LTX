@@ -5549,15 +5549,9 @@ async function loadKrea2ImageAsInput(url, filename){
     clean.searchParams.delete("ref");
     history.replaceState(null, "", clean.pathname + (clean.search ? clean.search : "") + clean.hash);
   } catch(_){}
-  const h = $("krea2RecentToggle");
-  const b = $("krea2RecentBody");
-  if(h && b && !h.classList.contains("open")){
-    h.classList.add("open");
-    b.classList.add("open");
-    const arr = h.querySelector(".arrow"); if(arr) arr.textContent = "▼";
-  }
+  // El panel de "Imágenes Krea2 recientes" NO se despliega automáticamente:
+  // se mantiene colapsado y sus miniaturas se cargan al abrirlo (toggle).
   (async () => {
-    loadKrea2Recent().catch(()=>{});
     const tryLoad = async (sf) => {
       const url = `/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(sf)}&type=${encodeURIComponent("output")}`;
       log("⏳ Cargando imagen Krea2 como entrada: "+filename+" (subfolder="+sf+")", "l-info");
