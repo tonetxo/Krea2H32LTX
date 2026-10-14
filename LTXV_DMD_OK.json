@@ -227,7 +227,7 @@
   },
   "582": {
     "inputs": {
-      "sigmas": "0.92, 0.725, 0.421875, 0.0"
+      "sigmas": "0.909375, 0.725, 0.421875, 0.0"
     },
     "class_type": "ManualSigmas",
     "_meta": {
@@ -294,7 +294,7 @@
   "616": {
     "inputs": {
       "text_encoder": "gemma-3-12b-it-ablit-norms-biproj-fp8mixed.safetensors",
-      "ckpt_name": "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors",
+      "ckpt_name": "Ligazón para Stable-Diffusion/ltx-2.5-av-proj-ref.safetensors",
       "device": "default"
     },
     "class_type": "LTXAVTextEncoderLoader",
@@ -304,7 +304,7 @@
   },
   "617": {
     "inputs": {
-      "ckpt_name": "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors"
+      "ckpt_name": "Ligazón para Stable-Diffusion/ltx-2.5-av-proj-ref.safetensors"
     },
     "class_type": "LTXVAudioVAELoader",
     "_meta": {
@@ -324,7 +324,7 @@
   },
   "646": {
     "inputs": {
-      "ckpt_name": "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors"
+      "ckpt_name": "ltxv/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -378,7 +378,7 @@
     },
     "class_type": "LTXVLatentUpsamplerTiled",
     "_meta": {
-      "title": "\ud83d\udd0d LTX Latent Upsampler (Tiled)"
+      "title": "🔍 LTX Latent Upsampler (Tiled)"
     }
   },
   "770": {
@@ -524,7 +524,7 @@
         "lora": "ltxv/anal-insertion-i2v.safetensors",
         "strength": 0.65
       },
-      "\u2795 Add Lora": "",
+      "➕ Add Lora": "",
       "model": [
         "906",
         0
@@ -563,7 +563,7 @@
     },
     "class_type": "LTXReferenceConditioning",
     "_meta": {
-      "title": "\ud83c\udfb4 LTX Reference Conditioning"
+      "title": "🎴 LTX Reference Conditioning"
     }
   },
   "868": {
@@ -577,7 +577,7 @@
     },
     "class_type": "LTXReferenceEnable",
     "_meta": {
-      "title": "\ud83d\udd17 LTX Reference Enable"
+      "title": "🔗 LTX Reference Enable"
     }
   },
   "870": {
@@ -604,7 +604,7 @@
     },
     "class_type": "LTXReferenceConditioning",
     "_meta": {
-      "title": "\ud83c\udfb4 LTX Reference Conditioning"
+      "title": "🎴 LTX Reference Conditioning"
     }
   },
   "871": {
@@ -840,7 +840,7 @@
   },
   "906": {
     "inputs": {
-      "lora_name": "Ligaz\u00f3n para Lora/ltxv/LTX2.3_DMD_reshaped_r256.safetensors",
+      "lora_name": "Ligazón para Lora/ltxv/LTX2.3_DMD_reshaped_r256.safetensors",
       "strength_model": 1,
       "model": [
         "868",
@@ -888,7 +888,7 @@
   },
   "914": {
     "inputs": {
-      "sigmas": "1.000, 0.955, 0.893, 0.812, 0.715, 0.603, 0.482, 0.241, 0.121, 0.0"
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
     },
     "class_type": "ManualSigmas",
     "_meta": {
@@ -1117,7 +1117,7 @@
   },
   "1005": {
     "inputs": {
-      "vae_name": "pruna_ltx2.3_vae_comfy_bf16.safetensors"
+      "vae_name": "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors"
     },
     "class_type": "VAELoader",
     "_meta": {

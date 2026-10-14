@@ -226,52 +226,34 @@ document.addEventListener("keydown", (e) => {
 outputZoom.onSwipe((dir) => navigateRefVariant(dir));
 refZoom.onSwipe((dir) => navigateRefVariant(dir));
 
-$("btnSendLtxv").addEventListener("click", () => {
+$("btnSendLtxv").addEventListener("click", async () => {
   if(!currentOutputMedia || !currentOutputMedia.filename){
     log("⚠️ Primero genera una imagen para poder enviarla a LTXV.", "l-err");
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
-  const here = window.location;
-  const targetHost = here.hostname;
   const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
-  const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
-  const win = window.open(url, "_blank");
-  if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
-  else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
+  await openExternalWebUIRef(targetPort, "LTXV_WebUI.html", filename, currentOutputMedia.subfolder, "LTXV");
 });
 
-$("btnSendH3")?.addEventListener("click", () => {
+$("btnSendH3")?.addEventListener("click", async () => {
   if(!currentOutputMedia || !currentOutputMedia.filename){
     log("⚠️ Primero genera una imagen para poder enviarla a MiniMax H3.", "l-err");
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
-  const here = window.location;
-  const targetHost = here.hostname;
   const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
-  const url = `${here.protocol}//${targetHost}:${targetPort}/MiniMaxH3_WebUI.html?ref=${ref}`;
-  const win = window.open(url, "_blank");
-  if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
-  else log("↗️ Abriendo MiniMax H3 con la imagen: "+filename, "l-ok");
+  await openExternalWebUIRef(targetPort, "MiniMaxH3_WebUI.html", filename, currentOutputMedia.subfolder, "MiniMax H3");
 });
 
-$("btnSendX2")?.addEventListener("click", () => {
+$("btnSendX2")?.addEventListener("click", async () => {
   if(!currentOutputMedia || !currentOutputMedia.filename){
     log("⚠️ Primero genera una imagen para poder enviarla a MMH3X2.", "l-err");
     return;
   }
   const filename = currentOutputMedia.filename;
-  const ref = buildRefParam(filename, currentOutputMedia.subfolder);
-  const here = window.location;
-  const targetHost = here.hostname;
   const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
-  const url = `${here.protocol}//${targetHost}:${targetPort}/MMH3X2_WebUI.html?ref=${ref}`;
-  const win = window.open(url, "_blank");
-  if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
-  else log("↗️ Abriendo MMH3X2 con la imagen: "+filename, "l-ok");
+  await openExternalWebUIRef(targetPort, "MMH3X2_WebUI.html", filename, currentOutputMedia.subfolder, "MMH3X2");
 });
 
 // Global fullscreen handler removed — setupZoomPan handles enter/exit per wrap.
@@ -1538,12 +1520,8 @@ $("btnSendRefLtxv").addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
-  const openLtxv = (filename, subfolder) => {
-    const ref = buildRefParam(filename, subfolder);
-    const url = `${here.protocol}//${targetHost}:${targetPort}/LTXV_WebUI.html?ref=${ref}`;
-    const win = window.open(url, "_blank");
-    if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
-    else log("↗️ Abriendo LTXV con la imagen: "+filename, "l-ok");
+  const openLtxv = async (filename, subfolder) => {
+    await openExternalWebUIRef(targetPort, "LTXV_WebUI.html", filename, subfolder, "LTXV");
   };
 
   const fromView = refFromViewSrc(src);
@@ -1589,12 +1567,8 @@ $("btnSendRefH3")?.addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
-  const openH3 = (filename, subfolder) => {
-    const ref = buildRefParam(filename, subfolder);
-    const url = `${here.protocol}//${targetHost}:${targetPort}/MiniMaxH3_WebUI.html?ref=${ref}`;
-    const win = window.open(url, "_blank");
-    if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
-    else log("↗️ Abriendo MiniMax H3 con la imagen: "+filename, "l-ok");
+  const openH3 = async (filename, subfolder) => {
+    await openExternalWebUIRef(targetPort, "MiniMaxH3_WebUI.html", filename, subfolder, "MiniMax H3");
   };
 
   const fromView = refFromViewSrc(src);
@@ -1637,12 +1611,8 @@ $("btnSendRefX2")?.addEventListener("click", async () => {
   const here = window.location;
   const targetHost = here.hostname;
   const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
-  const openX2 = (filename, subfolder) => {
-    const ref = buildRefParam(filename, subfolder);
-    const url = `${here.protocol}//${targetHost}:${targetPort}/MMH3X2_WebUI.html?ref=${ref}`;
-    const win = window.open(url, "_blank");
-    if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
-    else log("↗️ Abriendo MMH3X2 con la imagen: "+filename, "l-ok");
+  const openX2 = async (filename, subfolder) => {
+    await openExternalWebUIRef(targetPort, "MMH3X2_WebUI.html", filename, subfolder, "MMH3X2");
   };
 
   const fromView = refFromViewSrc(src);

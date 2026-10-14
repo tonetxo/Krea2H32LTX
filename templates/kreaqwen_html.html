@@ -80,6 +80,13 @@
             <label for="qwenEditEnabled" style="margin:0;font-size:11px;cursor:pointer;">Usar la imagen de referencia como guía de edición (Qwen 2.1)</label>
           </div>
           <div class="row" style="margin-bottom:8px;">
+            <label>Método</label>
+            <select id="qwenEditMethod" style="margin-top:4px;">
+              <option value="edit" selected>Edit Qwen 2.1 (render guiado)</option>
+              <option value="reactor">Faceswap ReActor (pose exacta, recomendado p/ caras)</option>
+            </select>
+          </div>
+          <div class="row" style="margin-bottom:8px;" data-editmode="edit">
             <label>Etapa de edición</label>
             <select id="qwenEditStage" style="margin-top:4px;">
               <option value="refiner" selected>Refiner (recomendado: conserva composición del Base)</option>
@@ -87,25 +94,85 @@
               <option value="both">Ambas etapas</option>
             </select>
           </div>
-          <div class="row" style="margin-bottom:8px;">
-            <label>Instrucción de edición <span class="hint">(qué cambiar)</span></label>
-            <textarea id="qwenEditPrompt" rows="3" placeholder="Face swap: sustituye el rostro por el de la imagen de referencia, mantén el resto igual..."></textarea>
+          <div class="row" style="margin-bottom:8px;" data-editmode="edit">
+            <label>Integración tras el edit (anti-"pegada")</label>
+            <select id="qwenEditIntegrate" style="margin-top:4px;">
+              <option value="face" selected>Rostro sobre el borrador (stitch facial, recomendado)</option>
+              <option value="global">Mezcla global edit ↔ borrador (LatentBlend)</option>
+              <option value="none">Sin integración (edit puro)</option>
+            </select>
           </div>
-          <div class="row slider-row" style="margin-bottom:6px;">
+          <div class="row slider-row" style="margin-bottom:6px;" data-editmode="edit">
+            <label style="min-width:110px;">Fuerza (blend)</label>
+            <input type="range" id="qwenEditIntBlend" min="0" max="100" step="5" value="100" style="flex:1;">
+            <div class="slider-val" id="qwenEditIntBlendVal">100</div>
+          </div>
+          <div class="row slider-row" style="margin-bottom:6px;" data-editmode="edit">
+            <label style="min-width:110px;">Feather (px)</label>
+            <input type="range" id="qwenEditIntFeather" min="0" max="128" step="2" value="20" style="flex:1;">
+            <div class="slider-val" id="qwenEditIntFeatherVal">20</div>
+          </div>
+          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <input type="checkbox" id="qwenEditIntColor" checked style="margin:0;">
+            <label for="qwenEditIntColor" style="margin:0;font-size:11px;cursor:pointer;">Igualar color/luz del rostro a la escena (color match)</label>
+          </div>
+          <div class="hint" style="font-size:10px;margin-bottom:6px;">
+            El color match sirve en ambos métodos: en «Rostro» iguala el rostro integrado; en ReActor iguala la cara transplantada contra la imagen de origen. Desactívalo si el rostro debe conservar el tono/luz de la referencia.
+          </div>
+          <div class="row" style="margin-bottom:8px;" data-editmode="reactor">
+            <label>Momento del swap</label>
+            <select id="qwenEditReactorTiming" style="margin-top:4px;">
+              <option value="after" selected>Tras el Refiner (sobre la imagen final)</option>
+              <option value="before">Sobre el borrador, antes del Refiner (el refiner lo funde: usa denoise 0.3–0.5)</option>
+            </select>
+          </div>
+          <div class="row" style="margin-bottom:8px;" data-editmode="reactor">
+            <label>Modelo swap (ReActor)</label>
+            <select id="qwenEditReactorModel" style="margin-top:4px;">
+              <option value="hyperswap_1c_256.onnx" selected>HyperSwap 1c 256 (mayor calidad)</option>
+              <option value="hyperswap_1b_256.onnx">HyperSwap 1b 256</option>
+              <option value="hyperswap_1a_256.onnx">HyperSwap 1a 256</option>
+              <option value="inswapper_128.onnx">InSwapper 128 (clásico)</option>
+              <option value="reswapper_128.onnx">ReSwapper 128</option>
+              <option value="reswapper_256.onnx">ReSwapper 256</option>
+            </select>
+          </div>
+          <div class="row" style="margin-bottom:8px;" data-editmode="reactor">
+            <label>Restaurador facial (ReActor)</label>
+            <select id="qwenEditReactorRestore" style="margin-top:4px;">
+              <option value="none" selected>Ninguno</option>
+              <option value="GFPGANv1.4.pth">GFPGAN v1.4</option>
+              <option value="GFPGANv1.3.pth">GFPGAN v1.3</option>
+              <option value="codeformer-v0.1.0.pth">CodeFormer</option>
+              <option value="GPEN-BFR-512.onnx">GPEN 512</option>
+              <option value="GPEN-BFR-1024.onnx">GPEN 1024</option>
+              <option value="GPEN-BFR-2048.onnx">GPEN 2048</option>
+            </select>
+          </div>
+          <div class="row" style="margin-bottom:8px;" data-editmode="edit">
+            <label>Instrucción de edición <span class="hint">(qué cambiar)</span></label>
+            <textarea id="qwenEditPrompt" rows="3" placeholder="Ej. faceswap: replace the face in <image1> with the face from <image2>, keep everything else identical..."></textarea>
+          </div>
+          <div class="row slider-row" style="margin-bottom:6px;" data-editmode="edit">
             <label style="min-width:110px;">Resolución referencia</label>
             <input type="range" id="qwenEditResolution" min="0" max="2048" step="32" value="1024" style="flex:1;">
             <div class="slider-val" id="qwenEditResolutionVal">1024</div>
           </div>
-          <div class="hint" style="font-size:10px;margin-bottom:6px;">
-            Solo aplica a etapas con Qwen 2.1. En modo refiner la edición se ancla al borrador del Base; en modo base/ambas la salida adopta la resolución de la referencia.
+          <div class="hint" style="font-size:10px;margin-bottom:6px;" data-editmode="edit">
+            Solo aplica a etapas con Qwen 2.1. Vía oficial: el borrador del Base entra como <code>&lt;image1&gt;</code> (objetivo del edit: la salida conserva su composición) y tus referencias como <code>&lt;image2&gt;</code>+ — cita ambas en la instrucción, p. ej. <i>replace the face in &lt;image1&gt; with the face from &lt;image2&gt;</i>. La etapa editada fuerza denoise 1.0 / CFG 1 (recomendado ~25 pasos euler/simple; el modelo Turbo usa su horario de 8 pasos). En modo base la salida adopta la resolución de la referencia (image_1). «Rostro»: todo el cuadro vuelve al píxel del borrador y solo la cara del edit (igualada en color, bordes con feather) queda encima — usa el slider «Fuerza» para mezclar («Mezcla global» solo en modo refiner; ambos alinean automáticamente la resolución). Es solo para edición facial: para otros cambios usa «Sin integración».
           </div>
-          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <div class="hint" style="font-size:10px;margin-bottom:6px;" data-editmode="reactor">
+            ReActor detecta el rostro en la imagen final y trasplanta la identidad de la referencia conservando pose, ángulo y luz del original — sin re-render. Funciona con cualquier combo; no usa etapa ni resolución, respeta el denoise del Refiner normal, y solo usa la imagen principal (las extras se ignoran). Modelos HyperSwap 256 dan la mejor calidad en 2K; un restaurador (GFPGAN/GPEN) afina si la cara sale blanda.
+          </div>
+          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
             <label>Referencias</label>
             <span class="hint" id="qwenEditRefStatus" style="font-size:10px;">sin imagen de referencia</span>
           </div>
+          <div class="hint" style="font-size:10px;margin-bottom:6px;" id="qwenEditMapHint">
+            La imagen principal es la del panel de referencia (arriba): entra como <code>&lt;image2&gt;</code> tras el borrador <code>&lt;image1&gt;</code> en modo refiner, y como <code>&lt;image1&gt;</code> en modo base. Las extras siguen la numeración (<code>&lt;image3&gt;</code>, <code>&lt;image4&gt;</code>) — citan en la instrucción.
+          </div>
           <div class="row" style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button id="btnQwenEditUseRef" class="ghost btn-mini" style="flex:1;min-width:120px;">Usar imagen de referencia</button>
-            <button id="btnQwenEditClearRef" class="ghost btn-mini" style="flex:1;min-width:120px;">Quitar referencia</button>
+            <button id="btnQwenEditClearRef" class="ghost btn-mini" style="flex:1;min-width:120px;">Desactivar edición</button>
           </div>
           <div class="row" style="margin-top:8px;">
             <label>Referencias extra (hasta 2)</label>
@@ -829,106 +896,65 @@
         </div>
       </div>
 
-      <!-- POST-PROCESADO (POST RENDER TORCHED) -->
+      <!-- COLOR GRADING & LOOK CINEMÁTICO (implementación MiniMaxH3) -->
       <div class="panel">
-        <div class="collapsible-header" id="postfxToggle">
-          <span class="arrow">▶</span> Efectos Post-Render (ProPost Torched)
+        <h2>Color Grading & Look Cinemático</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segPostFxOn" data-value="true">Activo</div>
+          <div class="seg on" id="segPostFxOff" data-value="false">Desactivado</div>
         </div>
-        <div class="collapsible-body" id="postfxBody">
-          <div class="hint" style="font-size:10px;margin-bottom:6px;">
-            Se aplican a la imagen final, tras el refiner y el upscale. Requiere los nodos ProPost Torched en ComfyUI.
-          </div>
-
-          <!-- VIGNETTE -->
-          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin:0;cursor:pointer;">
-              <input type="checkbox" id="vigEnabled" style="margin:0;"> Vignette
-            </label>
-            <span class="hint" id="vigVal" style="font-size:10px;">1.00</span>
-          </div>
-          <div class="row slider-row" style="margin-bottom:8px;">
-            <label style="font-size:10px;min-width:70px;">Intensidad</label>
-            <input type="range" id="vigIntensity" min="0" max="3" step="0.05" value="1.0" style="flex:1;">
-          </div>
-          <div class="two-col" style="margin-bottom:10px;">
-            <div class="slider-row"><label style="font-size:10px;">Centro X</label><input type="range" id="vigCX" min="0" max="1" step="0.01" value="0.5" style="flex:1;"></div>
-            <div class="slider-row"><label style="font-size:10px;">Centro Y</label><input type="range" id="vigCY" min="0" max="1" step="0.01" value="0.5" style="flex:1;"></div>
-          </div>
-
-          <!-- FILM GRAIN -->
-          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;border-top:1px solid var(--border);padding-top:8px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin:0;cursor:pointer;">
-              <input type="checkbox" id="grainEnabled" style="margin:0;"> Film Grain
-            </label>
-          </div>
+        <div id="postFxControls" style="display:none; margin-top:8px;">
+          <!-- 3D LUT (Color Grading) -->
           <div class="row" style="margin-bottom:6px;">
-            <label style="font-size:10px;">Tipo</label>
-            <select id="grainType" style="width:100%;margin-top:3px;">
-              <option value="Fine">Fine</option>
-              <option value="Fine Simple" selected>Fine Simple</option>
-              <option value="Coarse">Coarse</option>
-              <option value="Coarser">Coarser</option>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+              <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="postFxLutToggle" checked> <span style="font-size:11px;font-weight:600;">LUT (3D Color Grade)</span>
+              </label>
+              <span class="hint" id="postFxLutVal" style="font-size:10px;">80%</span>
+            </div>
+            <select id="postFxLutSelect" style="width:100%;margin-top:4px;">
+              <option value="">-- Seleccionar LUT (.cube) --</option>
             </select>
-          </div>
-          <div class="two-col" style="margin-bottom:6px;">
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Sat</label><input type="range" id="grainSat" min="0" max="1" step="0.01" value="0.3" style="flex:1;"></div>
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Power</label><input type="range" id="grainPower" min="0" max="1" step="0.01" value="0.3" style="flex:1;"></div>
-          </div>
-          <div class="two-col" style="margin-bottom:6px;">
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Shadows</label><input type="range" id="grainShadows" min="0" max="1" step="0.01" value="0.35" style="flex:1;"></div>
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Highs</label><input type="range" id="grainHighs" min="0" max="1" step="0.01" value="0.1" style="flex:1;"></div>
-          </div>
-          <div class="two-col" style="margin-bottom:10px;">
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Scale</label><input type="range" id="grainScale" min="0.5" max="4" step="0.1" value="1" style="flex:1;"></div>
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Sharpen</label><input type="number" id="grainSharpen" min="0" max="10" step="1" value="0" style="width:100%;"></div>
-          </div>
-          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;margin:0;cursor:pointer;">
-              <input type="checkbox" id="grainGray" style="margin:0;"> Escala de grises
-            </label>
+            <div class="row slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;min-width:65px;">Intensidad</label>
+              <input type="range" id="postFxLutStrength" min="0" max="1" step="0.01" value="0.8" style="flex:1;">
+            </div>
           </div>
 
-          <!-- RADIAL BLUR -->
-          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;border-top:1px solid var(--border);padding-top:8px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin:0;cursor:pointer;">
-              <input type="checkbox" id="radialEnabled" style="margin:0;"> Radial Blur
+          <!-- Viñeta y Grano dinámico en 2 columnas -->
+          <div class="row two-col" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <!-- Viñeta -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                  <input type="checkbox" id="postFxVigToggle"> <span style="font-size:10.5px;font-weight:600;">Viñeta</span>
+                </label>
+                <span class="hint" id="postFxVigVal" style="font-size:10px;">0.25</span>
+              </div>
+              <input type="range" id="postFxVigIntensity" min="0" max="0.6" step="0.02" value="0.25" style="width:100%;margin-top:4px;">
+            </div>
+            <!-- Grano dinámico -->
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                  <input type="checkbox" id="postFxGrainToggle"> <span style="font-size:10.5px;font-weight:600;">Grano Dinámico</span>
+                </label>
+                <span class="hint" id="postFxGrainVal" style="font-size:10px;">0.15</span>
+              </div>
+              <input type="range" id="postFxGrainPower" min="0" max="0.4" step="0.01" value="0.15" style="width:100%;margin-top:4px;">
+            </div>
+          </div>
+
+          <!-- Desenfoque radial (óptica lente, opcional) -->
+          <div class="row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+              <input type="checkbox" id="radialEnabled" style="margin:0;"> <span style="font-size:10.5px;font-weight:600;">Desenfoque Radial (óptica)</span>
             </label>
             <span class="hint" id="radialVal" style="font-size:10px;">64</span>
+            <input type="range" id="radialStrength" min="0" max="256" step="1" value="64" style="width:100%;margin-top:4px;">
           </div>
-          <div class="row slider-row" style="margin-bottom:6px;">
-            <label style="font-size:10px;min-width:70px;">Fuerza</label>
-            <input type="range" id="radialStrength" min="0" max="256" step="1" value="64" style="flex:1;">
-          </div>
-          <div class="two-col" style="margin-bottom:6px;">
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Centro X</label><input type="range" id="radialCX" min="0" max="1" step="0.01" value="0.5" style="flex:1;"></div>
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Centro Y</label><input type="range" id="radialCY" min="0" max="1" step="0.01" value="0.5" style="flex:1;"></div>
-          </div>
-          <div class="two-col" style="margin-bottom:10px;">
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Foco</label><input type="range" id="radialSpread" min="0.1" max="8" step="0.1" value="1" style="flex:1;"></div>
-            <div class="slider-row"><label style="font-size:10px;min-width:46px;">Steps</label><input type="number" id="radialSteps" min="1" max="32" step="1" value="5" style="width:100%;"></div>
-          </div>
-
-          <!-- LUT -->
-          <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;border-top:1px solid var(--border);padding-top:8px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin:0;cursor:pointer;">
-              <input type="checkbox" id="lutEnabled" style="margin:0;"> LUT (Color Grading)
-            </label>
-            <span class="hint" id="lutVal" style="font-size:10px;">0.80</span>
-          </div>
-          <div class="row" style="margin-bottom:6px;">
-            <label style="font-size:10px;">LUT</label>
-            <select id="lutName" style="width:100%;margin-top:3px;">
-              <option value="">Cargando LUTs...</option>
-            </select>
-          </div>
-          <div class="row slider-row" style="margin-bottom:6px;">
-            <label style="font-size:10px;min-width:70px;">Strength</label>
-            <input type="range" id="lutStrength" min="0" max="1" step="0.01" value="0.8" style="flex:1;">
-          </div>
-          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;margin:0;cursor:pointer;">
-              <input type="checkbox" id="lutLog" style="margin:0;"> LOG space
-            </label>
+          <div class="hint" style="font-size:10px;margin-top:6px;">
+            Gradación de color precisa por 3D LUT, viñeta y textura cinematográfica sin grano congelado (LayerStyle/LayerColor). Se aplican sobre la imagen final, tras el edit/refiner/upscale.
           </div>
         </div>
       </div>
@@ -952,8 +978,9 @@
             <div class="row">
               <label>Resolución de recorte</label>
               <select id="faceRefineCanvasMode">
+                <option value="auto" selected>Auto (sin downscale — recomendado)</option>
                 <option value="512">512x512 (Ultra rápido · 2x velocidad)</option>
-                <option value="768" selected>768x768 (Alta resolución)</option>
+                <option value="768">768x768 (Alta resolución)</option>
               </select>
             </div>
             <div class="row slider-row">

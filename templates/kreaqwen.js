@@ -915,7 +915,7 @@ function getFaceRefineState(){
     enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
     denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.40"),
     steps: parseInt($("faceRefineStepsSlider")?.value || "10", 10),
-    canvasSize: parseInt($("faceRefineCanvasMode")?.value || "768", 10),
+    canvasSize: ($("faceRefineCanvasMode")?.value || "auto"),
     feather: parseInt($("faceRefineFeatherSlider")?.value || "12", 10),
     select: $("faceRefineSelectMode")?.value || "largest_face"
   };
@@ -1020,48 +1020,30 @@ function snapshotJob(isBaseOnly = false){
     // Edición con Qwen 2.1 (img2img / faceswap)
     qwenEdit: {
       enabled: !!$("qwenEditEnabled")?.checked,
+      // Método: "edit" (render guiado vía TextEncodeQwenImage21) o "reactor"
+      // (ReActor directo sobre la imagen final: pose exacta sin re-render).
+      method: $("qwenEditMethod")?.value || "edit",
       stage: $("qwenEditStage")?.value || "refiner",
       prompt: $("qwenEditPrompt")?.value || "",
       resolution: parseInt($("qwenEditResolution")?.value || "1024", 10),
+      // Integración anti-"pegada" del resultado del edit con la imagen objetivo:
+      // "face" (stitch facial con feather + color match), "global" (LatentBlend) o "none".
+      integrate: $("qwenEditIntegrate")?.value || "face",
+      intBlend: parseInt($("qwenEditIntBlend")?.value ?? "100", 10),
+      intFeather: parseInt($("qwenEditIntFeather")?.value ?? "20", 10),
+      intColor: !!$("qwenEditIntColor")?.checked,
+      reactorModel: $("qwenEditReactorModel")?.value || "hyperswap_1c_256.onnx",
+      reactorRestore: $("qwenEditReactorRestore")?.value || "none",
+      reactorTiming: $("qwenEditReactorTiming")?.value || "after",
+      refW: ($("refImg")?.naturalWidth) || null,
+      refH: ($("refImg")?.naturalHeight) || null,
       refSrc: (!!$("qwenEditEnabled")?.checked ? getRefImageSrc() : null),
       extraRefSrcs: (!!$("qwenEditEnabled")?.checked ? qwenEditExtraRefs.slice() : []),
       refB64: null,
       extraRefB64: [],
     },
-    // Post-procesado (ProPost Torched)
-    postfx: {
-      vignette: {
-        enabled: !!$("vigEnabled")?.checked,
-        intensity: parseFloat($("vigIntensity")?.value || "1.0"),
-        cx: parseFloat($("vigCX")?.value || "0.5"),
-        cy: parseFloat($("vigCY")?.value || "0.5"),
-      },
-      grain: {
-        enabled: !!$("grainEnabled")?.checked,
-        type: $("grainType")?.value || "Fine Simple",
-        gray: !!$("grainGray")?.checked,
-        sat: parseFloat($("grainSat")?.value || "0.3"),
-        power: parseFloat($("grainPower")?.value || "0.3"),
-        shadows: parseFloat($("grainShadows")?.value || "0.35"),
-        highs: parseFloat($("grainHighs")?.value || "0.1"),
-        scale: parseFloat($("grainScale")?.value || "1"),
-        sharpen: parseInt($("grainSharpen")?.value || "0", 10),
-      },
-      radial: {
-        enabled: !!$("radialEnabled")?.checked,
-        strength: parseFloat($("radialStrength")?.value || "64"),
-        cx: parseFloat($("radialCX")?.value || "0.5"),
-        cy: parseFloat($("radialCY")?.value || "0.5"),
-        spread: parseFloat($("radialSpread")?.value || "1"),
-        steps: parseInt($("radialSteps")?.value || "5", 10),
-      },
-      lut: {
-        enabled: !!$("lutEnabled")?.checked,
-        name: $("lutName")?.value || "",
-        strength: parseFloat($("lutStrength")?.value || "0.8"),
-        log: !!$("lutLog")?.checked,
-      },
-    },
+    // Color Grading & Look Cinemático (misma implementación que MiniMaxH3)
+    postfx: getPostFxState(),
     createdAt: Date.now()
   };
 }
@@ -1129,29 +1111,25 @@ function saveKreaQwenSettings(){
     spectrumLam: $("spectrumLam")?.value || "0.1",
 
     qwenEditEnabled: !!$("qwenEditEnabled")?.checked,
+    qwenEditMethod: $("qwenEditMethod")?.value || "edit",
     qwenEditStage: $("qwenEditStage")?.value || "refiner",
     qwenEditPrompt: $("qwenEditPrompt")?.value || "",
     qwenEditResolution: $("qwenEditResolution")?.value || "1024",
+    qwenEditIntegrate: $("qwenEditIntegrate")?.value || "face",
+    qwenEditIntBlend: $("qwenEditIntBlend")?.value || "100",
+    qwenEditIntFeather: $("qwenEditIntFeather")?.value || "20",
+    qwenEditIntColor: !!$("qwenEditIntColor")?.checked,
+    qwenEditReactorModel: $("qwenEditReactorModel")?.value || "hyperswap_1c_256.onnx",
+    qwenEditReactorRestore: $("qwenEditReactorRestore")?.value || "none",
+    qwenEditReactorTiming: $("qwenEditReactorTiming")?.value || "after",
 
     faceRefine: getFaceRefineState(),
 
     evolveMode: $("evolveMode")?.value,
     evolveStrength: $("evolveStrength")?.value,
 
-    // Post-fx
-    vigEnabled: !!$("vigEnabled")?.checked,
-    vigIntensity: $("vigIntensity")?.value || "1.0",
-    grainEnabled: !!$("grainEnabled")?.checked,
-    grainType: $("grainType")?.value || "Fine Simple",
-    grainPower: $("grainPower")?.value || "0.3",
-    grainSat: $("grainSat")?.value || "0.3",
-    grainGray: !!$("grainGray")?.checked,
-    radialEnabled: !!$("radialEnabled")?.checked,
-    radialStrength: $("radialStrength")?.value || "64",
-    lutEnabled: !!$("lutEnabled")?.checked,
-    lutName: $("lutName")?.value || "",
-    lutStrength: $("lutStrength")?.value || "0.8",
-    lutLog: !!$("lutLog")?.checked,
+    // Color Grading & Look Cinemático
+    postfx: getPostFxState(),
 
     keepModelInRam: $("keepModelInRam")?.checked ?? true,
     batchSize: $("batchSize")?.value || "1",
@@ -1281,12 +1259,27 @@ function restoreKreaQwenSettings(){
 
     // Qwen Edit
     if(s.qwenEditEnabled !== undefined && $("qwenEditEnabled")) $("qwenEditEnabled").checked = !!s.qwenEditEnabled;
+    if(s.qwenEditMethod && $("qwenEditMethod")) $("qwenEditMethod").value = s.qwenEditMethod;
     if(s.qwenEditStage && $("qwenEditStage")) $("qwenEditStage").value = s.qwenEditStage;
     if(s.qwenEditPrompt !== undefined && $("qwenEditPrompt")) $("qwenEditPrompt").value = s.qwenEditPrompt;
     if(s.qwenEditResolution !== undefined && $("qwenEditResolution")){
       $("qwenEditResolution").value = s.qwenEditResolution;
       if($("qwenEditResolutionVal")) $("qwenEditResolutionVal").textContent = s.qwenEditResolution;
     }
+    if(s.qwenEditIntegrate && $("qwenEditIntegrate")) $("qwenEditIntegrate").value = s.qwenEditIntegrate;
+    if(s.qwenEditIntBlend !== undefined && $("qwenEditIntBlend")){
+      $("qwenEditIntBlend").value = s.qwenEditIntBlend;
+      if($("qwenEditIntBlendVal")) $("qwenEditIntBlendVal").textContent = s.qwenEditIntBlend;
+    }
+    if(s.qwenEditIntFeather !== undefined && $("qwenEditIntFeather")){
+      $("qwenEditIntFeather").value = s.qwenEditIntFeather;
+      if($("qwenEditIntFeatherVal")) $("qwenEditIntFeatherVal").textContent = s.qwenEditIntFeather;
+    }
+    if(s.qwenEditIntColor !== undefined && $("qwenEditIntColor")) $("qwenEditIntColor").checked = !!s.qwenEditIntColor;
+    if(s.qwenEditReactorModel && $("qwenEditReactorModel")) $("qwenEditReactorModel").value = s.qwenEditReactorModel;
+    if(s.qwenEditReactorRestore && $("qwenEditReactorRestore")) $("qwenEditReactorRestore").value = s.qwenEditReactorRestore;
+    if(s.qwenEditReactorTiming && $("qwenEditReactorTiming")) $("qwenEditReactorTiming").value = s.qwenEditReactorTiming;
+    if(typeof updateQwenEditMethodUI === "function") updateQwenEditMethodUI();
 
     // FaceRefine
     if(s.faceRefine){
@@ -1301,31 +1294,8 @@ function restoreKreaQwenSettings(){
     }
 
     // Post-fx
-    if(s.vigEnabled !== undefined && $("vigEnabled")) $("vigEnabled").checked = !!s.vigEnabled;
-    if(s.vigIntensity !== undefined && $("vigIntensity")){
-      $("vigIntensity").value = s.vigIntensity;
-      if($("vigVal")) $("vigVal").textContent = parseFloat(s.vigIntensity).toFixed(2);
-    }
-    if(s.grainEnabled !== undefined && $("grainEnabled")) $("grainEnabled").checked = !!s.grainEnabled;
-    if(s.grainType && $("grainType")) $("grainType").value = s.grainType;
-    if(s.grainPower !== undefined && $("grainPower")){
-      $("grainPower").value = s.grainPower;
-      if($("grainVal")) $("grainVal").textContent = parseFloat(s.grainPower).toFixed(2);
-    }
-    if(s.grainSat !== undefined && $("grainSat")) $("grainSat").value = s.grainSat;
-    if(s.grainGray !== undefined && $("grainGray")) $("grainGray").checked = !!s.grainGray;
-    if(s.radialEnabled !== undefined && $("radialEnabled")) $("radialEnabled").checked = !!s.radialEnabled;
-    if(s.radialStrength !== undefined && $("radialStrength")){
-      $("radialStrength").value = s.radialStrength;
-      if($("radialVal")) $("radialVal").textContent = s.radialStrength;
-    }
-    if(s.lutEnabled !== undefined && $("lutEnabled")) $("lutEnabled").checked = !!s.lutEnabled;
-    if(s.lutName && $("lutName")) $("lutName").value = s.lutName;
-    if(s.lutStrength !== undefined && $("lutStrength")){
-      $("lutStrength").value = s.lutStrength;
-      if($("lutVal")) $("lutVal").textContent = parseFloat(s.lutStrength).toFixed(2);
-    }
-    if(s.lutLog !== undefined && $("lutLog")) $("lutLog").checked = !!s.lutLog;
+    // Color Grading & Look Cinemático
+    if(s.postfx) setPostFxUI(s.postfx);
 
     // Varios
     if(s.keepModelInRam !== undefined && $("keepModelInRam")) $("keepModelInRam").checked = !!s.keepModelInRam;
@@ -1357,14 +1327,20 @@ function appendQwenCacheOff(g, stage, modelRef){
 // --- EDICIÓN CON QWEN 2.1 (nodos en el grafo) ---
 // Añade el encoder de edición y carga las referencias base64. Devuelve las
 // referencias de conditioning/latent a usar en la etapa, o null si no aplica.
+// `draftImage` (ref [id, slot] de un IMAGE ya presente en el grafo, p.ej. el
+// borrador post-upscale del Base) se conecta como images.image_1: en la vía
+// oficial de Qwen 2.1 (template image_qwen_image_2_1_image_edit de ComfyUI),
+// image_1 es el objetivo del edit y la salida sigue su composición/tamaño; las
+// referencias del usuario entran a partir de image_2 (se citan como <image2>...).
 function appendQwenEditStage(g, stage, opts){
   const qe = opts.job.qwenEdit;
   if(!qe || !qe.enabled) return null;
   const b64s = [];
   if(qe.refB64) b64s.push(qe.refB64);
   if(Array.isArray(qe.extraRefB64)) b64s.push(...qe.extraRefB64);
-  if(b64s.length === 0) return null;
+  if(b64s.length === 0 && !opts.draftImage) return null;
 
+  const nameStart = opts.draftImage ? 2 : 1;
   const loadIds = b64s.map((b64, i) => {
     const id = `qwen_edit_img_${stage}_${i + 1}`;
     g[id] = {
@@ -1375,22 +1351,209 @@ function appendQwenEditStage(g, stage, opts){
     return id;
   });
 
+  // integración de rostro activa → resolución de referencia forzada a 'auto' para alinear el stitch
+  // (la salida del edit debe cuadrar 1:1 con la imagen objetivo en coordenadas de píxel).
+  const forceAutoRes = !!opts.integrateFace && qe.resolution !== 0;
+  if(forceAutoRes){
+    log(`ℹ️ Edición Qwen 2.1 (${stage}): integración de rostro activa → resolución de referencia forzada a 'auto' para alinear el stitch.`, "l-info");
+  }
+
   const encId = `qwen_edit_encode_${stage}`;
   const inputs = {
     clip: opts.clipRef,
     prompt: qe.prompt || opts.prompt || "",
     negative_prompt: opts.negative || "",
-    resolution: qe.resolution,
+    resolution: forceAutoRes ? 0 : qe.resolution,
     vae: opts.vaeRef,
   };
-  loadIds.forEach((id, i) => { inputs[`images.image_${i + 1}`] = [id, 0]; });
+  if(opts.draftImage) inputs["images.image_1"] = opts.draftImage;
+  loadIds.forEach((id, i) => { inputs[`images.image_${nameStart + i}`] = [id, 0]; });
 
   g[encId] = {
     class_type: "TextEncodeQwenImage21",
     inputs,
     _meta: { title: `Edición Qwen 2.1 (${stage})` }
   };
-  return { encoder: encId, latent: [encId, 2] };
+  // targetImage: la imagen que hizo de images.image_1 (borrador en refiner, o la
+  // primera referencia en base) — es la base de la integración de rostro.
+  const targetImage = opts.draftImage || (loadIds.length ? [loadIds[0], 0] : null);
+  return { encoder: encId, latent: [encId, 2], targetImage };
+}
+
+// --- INTEGRACIÓN ANTI-"PEGADA" DEL RESULTADO DEL EDIT ---
+// El swap puede lucir pegado (tono/luz del rostro distintos a la escena). Dos
+// modos sobre la imagen final de la etapa editada:
+//  - "face": recorta el rostro con H3FaceTrackCrop sobre el resultado del edit,
+//    lo iguala en color (colour_match) y lo recompone con feather sobre la imagen
+//    objetivo (borrador del Base, o la referencia en modo base); el resto del
+//    cuadro vuelve a ser píxel original. intBlend (0-100) = opacidad del rostro
+//    pegado (H3FaceStitch.blend) — 100% rostro nuevo, 30% mayormente original.
+//  - "global": LatentBlend entre el latent editado y el latent del borrador.
+// Devuelve la referencia de imagen resultante, o null si no aplica.
+function applyQwenEditIntegration(g, editImageRef, job, stage, opts){
+  const qe = job.qwenEdit || {};
+  const mode = qe.integrate || "face";
+  if(mode === "none") return null;
+  const blendPct = Math.min(100, Math.max(0, parseInt(qe.intBlend ?? 100, 10) || 0));
+
+  if(mode === "global"){
+    if(!opts.editLatentRef || !opts.draftLatentRef){
+      log(`ℹ️ Edición Qwen 2.1 (${stage}): la mezcla global necesita un borrador en latente (solo disponible en modo refiner); se omite.`, "l-info");
+      return null;
+    }
+    const bl = `qwen_edit_int_blend_${stage}`;
+    g[bl] = {
+      class_type: "LatentBlend",
+      inputs: {
+        samples1: opts.editLatentRef,
+        samples2: opts.draftLatentRef,
+        blend_factor: blendPct / 100,
+      },
+      _meta: { title: `Edit Integration Blend (${stage})` }
+    };
+    const dc = `qwen_edit_int_decode_${stage}`;
+    g[dc] = {
+      class_type: "VAEDecode",
+      inputs: { samples: [bl, 0], vae: opts.vaeRef },
+      _meta: { title: `Edit Integration Decode (${stage})` }
+    };
+    return [dc, 0];
+  }
+
+  // mode === "face"
+  if(!opts.baseImageRef) return null;
+  // El transform del crop se expresa en el espacio de la imagen que lo generó
+  // (la salida del edit, cuyo tamaño es el de la referencia redondeado a
+  // múltiplos de 32 con round() de Python, esto es, mitad hacia el par). El
+  // H3FaceStitch exige que base_images tenga ese tamaño exacto: se reescala la
+  // imagen objetivo a las mismas dimensiones con ImageScale.
+  let baseRef = opts.baseImageRef;
+  if(opts.baseDims && opts.baseDims.w && opts.baseDims.h){
+    const roundPy = (x) => {
+      const f = Math.floor(x), d = x - f;
+      if(d > 0.5) return f + 1;
+      if(d < 0.5) return f;
+      return (f % 2 === 0) ? f : f + 1;
+    };
+    const bsc = `qwen_edit_int_base_${stage}`;
+    g[bsc] = {
+      class_type: "ImageScale",
+      inputs: {
+        image: opts.baseImageRef,
+        upscale_method: "bicubic",
+        crop: "disabled",
+        width: roundPy(opts.baseDims.w / 32) * 32,
+        height: roundPy(opts.baseDims.h / 32) * 32,
+      },
+      _meta: { title: `Edit Integration Base Resize (${stage})` }
+    };
+    baseRef = [bsc, 0];
+  }
+  const cr = `qwen_edit_int_crop_${stage}`;
+  g[cr] = {
+    class_type: "H3FaceTrackCrop",
+    inputs: {
+      images: editImageRef,
+      detector: "face_yolov8m.pt",
+      confidence: 0.35,
+      crop_factor: 3.0,
+      canvas_width: 768,
+      canvas_height: 768,
+      canvas_mode: "auto_no_downscale",
+      smooth_window: 21,
+      size_smooth_window: 51,
+      smooth_method: "gaussian",
+      size_mode: "per_frame",
+      identity_track: false,
+      identity_threshold: 0.28,
+      select: "largest_face",
+      fallback_detector: "none",
+      fallback_head_frac: 0.5,
+      select_index: 0,
+      identity_model: "insightface",
+      cut_detection: "none",
+      cut_threshold: 3.0,
+      absent_shots: "off",
+      X: 0,
+      Y: 0,
+      frame_index: 0
+    },
+    _meta: { title: `Edit Integration Crop (${stage})` }
+  };
+  const st = `qwen_edit_int_stitch_${stage}`;
+  g[st] = {
+    class_type: "H3FaceStitch",
+    inputs: {
+      base_images: baseRef,
+      refined_crops: [cr, 0],
+      transform: [cr, 1],
+      paste_region: "face_ellipse",
+      mask_dilation: 16,
+      feather: Math.min(128, Math.max(0, parseInt(qe.intFeather ?? 20, 10) || 0)),
+      colour_match: qe.intColor === false ? 0.0 : 1.0,
+      blend: blendPct / 100,
+      undetected_frames: "fade_out",
+      feather_scales_with_crop: false,
+    },
+    _meta: { title: `Edit Integration Stitch (${stage})` }
+  };
+  return [st, 0];
+}
+
+// --- FACESWAP DIRECTO VIA REACTOR (pose exacta, sin re-render) ---
+// Detecta el rostro en `imageRef` (imagen final de la etapa) y trasplanta la
+// identidad de la referencia con insightface (HyperSwap/InSwapper), que deforma
+// el rostro nuevo a la GEOMETRÍA/Pose del original — sin la deriva de pose que
+// tiene el render del edit. Sigue un ColorMatch contra la propia imagen para
+// clavar tono/luz. Devuelve la referencia de imagen final, o null sin refs.
+function applyReActorSwap(g, imageRef, job, stage){
+  const qe = job.qwenEdit || {};
+  if(!qe.refB64){
+    log("⚠️ Faceswap ReActor: carga primero una imagen de referencia (source).", "l-warn");
+    return null;
+  }
+  const lid = `qwen_edit_img_reactor_${stage}`;
+  g[lid] = {
+    class_type: "SwarmLoadImageB64",
+    inputs: { image_base64: qe.refB64 },
+    _meta: { title: `ReActor Source (${stage})` }
+  };
+  if(job.faceRefine?.enabled){
+    log("⚠️ Faceswap ReActor + FaceRefine activos: el rostro ya transplantado se re-muestreará otra vez (denoise del FaceRefine). Funde tono/texture pero puede repintar y desviar la identidad; si la cara sale 'repintada', desactiva FaceRefine.", "l-warn");
+  }
+  const sw = `reactor_swap_${stage}`;
+  g[sw] = {
+    class_type: "ReActorFaceSwapOpt",
+    inputs: {
+      enabled: true,
+      input_image: imageRef,
+      source_image: [lid, 0],
+      swap_model: qe.reactorModel || "hyperswap_1c_256.onnx",
+      facedetection: "retinaface_resnet50",
+      face_restore_model: qe.reactorRestore || "none",
+      face_restore_visibility: 1.0,
+      codeformer_weight: 0.5,
+    },
+    _meta: { title: `ReActor Swap (${stage})` }
+  };
+  // ColorMatch del swap contra la imagen de origen (tono/luz de la escena), a
+  // menos que el usuario lo desactive (el rostro conserva el tono de la ref).
+  if(qe.intColor === false){
+    return [sw, 0];
+  }
+  const cm = `reactor_colormatch_${stage}`;
+  g[cm] = {
+    class_type: "ColorMatch",
+    inputs: {
+      image_ref: imageRef,
+      image_target: [sw, 0],
+      method: "mkl",
+      strength: 1.0,
+      multithread: true,
+    },
+    _meta: { title: `ReActor ColorMatch (${stage})` }
+  };
+  return [cm, 0];
 }
 
 // --- POST-PROCESADO (ProPost Torched) ---
@@ -1398,72 +1561,72 @@ function appendQwenEditStage(g, stage, opts){
 // referencia de salida a conectar a SaveImage. Solo añade nodos para efectos activos.
 // Orden: Radial Blur (óptica) -> LUT (color) -> Film Grain (película) -> Vignette (lente).
 function appendPostFx(g, imageRef, job){
-  const fx = job.postfx || {};
+  const fx = job.postfx || getPostFxState();
+  if(!fx || !fx.enabled) return imageRef;
   let cur = imageRef;
 
-  if(fx.radial?.enabled){
+  // 0. Desenfoque radial opcional (óptica de lente, ProPost Torched)
+  if(fx.radial?.enabled && Number(fx.radial.strength) > 0){
     g["post_radialblur"] = {
       class_type: "ProPostRadialBlur",
       inputs: {
         image: cur,
-        blur_strength: fx.radial.strength,
-        center_x: fx.radial.cx,
-        center_y: fx.radial.cy,
-        focus_spread: fx.radial.spread,
-        steps: fx.radial.steps,
+        blur_strength: Number(fx.radial.strength || 64),
+        center_x: 0.5,
+        center_y: 0.5,
+        focus_spread: 2.2,
+        steps: 5,
       },
       _meta: { title: "ProPost Radial Blur" }
     };
     cur = ["post_radialblur", 0];
   }
 
-  if(fx.lut?.enabled && fx.lut.name){
+  // 1. 3D LUT Color Grading
+  if(fx.lut?.enabled && fx.lut?.name){
     g["post_lut"] = {
-      class_type: "ProPostApplyLUT",
+      class_type: "LayerColor: LUT Apply",
       inputs: {
         image: cur,
-        lut_name: fx.lut.name,
-        strength: fx.lut.strength,
-        log: fx.lut.log,
+        LUT: fx.lut.name,
+        color_space: "linear",
+        strength: Math.round((fx.lut.strength ?? 0.8) * 100)
       },
-      _meta: { title: "ProPost Apply LUT" }
+      _meta: { title: "LayerColor: LUT Apply" }
     };
     cur = ["post_lut", 0];
+  } else {
+    delete g["post_lut"];
   }
 
-  if(fx.grain?.enabled){
-    g["post_filmgrain"] = {
-      class_type: "ProPostFilmGrain",
-      inputs: {
-        image: cur,
-        gray_scale: fx.grain.gray,
-        grain_type: fx.grain.type,
-        grain_sat: fx.grain.sat,
-        grain_power: fx.grain.power,
-        shadows: fx.grain.shadows,
-        highs: fx.grain.highs,
-        scale: fx.grain.scale,
-        sharpen: fx.grain.sharpen,
-        src_gamma: 1.0,
-        seed: job.seedValue || 1,
-      },
-      _meta: { title: "ProPost Film Grain" }
-    };
-    cur = ["post_filmgrain", 0];
-  }
+  // 2. Viñeta y/o Grano dinámico (un solo nodo)
+  const hasVig = !!(fx.vignette?.enabled && (Number(fx.vignette.intensity) > 0));
+  const hasGrain = !!(fx.grain?.enabled && (Number(fx.grain.power) > 0));
 
-  if(fx.vignette?.enabled){
-    g["post_vignette"] = {
-      class_type: "ProPostVignette",
+  if(hasVig || hasGrain){
+    g["post_film"] = {
+      class_type: "LayerFilter: FilmV2",
       inputs: {
         image: cur,
-        intensity: fx.vignette.intensity,
-        center_x: fx.vignette.cx,
-        center_y: fx.vignette.cy,
+        center_x: 0.5,
+        center_y: 0.5,
+        saturation: 1.0,
+        vignette_intensity: hasVig ? parseFloat(fx.vignette.intensity || 0.25) : 0.0,
+        grain_method: "fastgrain",
+        grain_power: hasGrain ? parseFloat(fx.grain.power || 0.15) : 0.0,
+        grain_scale: 1.0,
+        grain_sat: 0.5,
+        filmgrainer_shadows: 0.6,
+        filmgrainer_highs: 0.2,
+        blur_strength: 0,
+        blur_focus_spread: 2.2,
+        focal_depth: 0.9
       },
-      _meta: { title: "ProPost Vignette" }
+      _meta: { title: "LayerFilter: Film V2 (Vignette & Grain)" }
     };
-    cur = ["post_vignette", 0];
+    cur = ["post_film", 0];
+  } else {
+    delete g["post_film"];
   }
 
   return cur;
@@ -1480,7 +1643,10 @@ function appendFaceRefine(g, imageRef, job, opts){
   if(!fr || !fr.enabled) return imageRef;
   if(!opts || !opts.modelRef || !opts.vaeRef || !opts.posRef || !opts.negRef) return imageRef;
 
-  const canvas = fr.canvasSize || 768;
+  // "auto" (recomendado): el canvas sale del propio recorte, sin never downscale
+  // el rostro; valores numéricos mantienen el canvas manual (512/768, rápido).
+  const canvasAuto = (fr.canvasSize || "auto") === "auto";
+  const canvas = canvasAuto ? 512 : (parseInt(fr.canvasSize, 10) || 768);
 
   g[N.FACE_CROP] = {
     class_type: "H3FaceTrackCrop",
@@ -1491,7 +1657,7 @@ function appendFaceRefine(g, imageRef, job, opts){
       crop_factor: 3.0,
       canvas_width: canvas,
       canvas_height: canvas,
-      canvas_mode: "manual",
+      canvas_mode: canvasAuto ? "auto_no_downscale" : "manual",
       smooth_window: 21,
       size_smooth_window: 51,
       smooth_method: "gaussian",
@@ -1585,6 +1751,18 @@ function buildGraph(job){
   const isKreaBase = (famBase === "krea2");
   const isQwenRefiner = (famRefiner === "qwen21");
   const isKreaRefiner = (famRefiner === "krea2");
+
+  // --- EDICIÓN QWEN 2.1: etapas afectadas ---
+  // Vía oficial (template image_qwen_image_2_1_image_edit de ComfyUI): conditioning
+  // del encoder de edición + latent del encoder + denoise 1.0 + CFG 1 en la etapa
+  // editada. Los pasos/denoise que muestre la UI son del usuario (el template
+  // oficial recomienda ~25 pasos euler/simple; un UNET Turbo usa su horario propio).
+  const editMethod = (j.qwenEdit?.enabled) ? (j.qwenEdit.method || "edit") : null;
+  const reactorMode = (editMethod === "reactor");
+  const qwenEditStage = (!reactorMode && j.qwenEdit?.enabled) ? (j.qwenEdit.stage || "refiner") : null;
+  const qwenEditWantsBase = !!(qwenEditStage && (qwenEditStage === "base" || qwenEditStage === "both"));
+  const qwenEditWantsRefiner = !!(qwenEditStage && (qwenEditStage === "refiner" || qwenEditStage === "both"));
+  const qwenEditIntegrate = (!reactorMode && j.qwenEdit?.enabled) ? (j.qwenEdit.integrate || "face") : "none";
 
   // --- VALIDACIÓN DE COMPATIBILIDAD VAE/UNET (por canales latentes) ---
   // El Wan2.1_VAE_upscale2x_imageonly_real_v1 es un VAE especial de upscaling 2x para
@@ -1681,8 +1859,8 @@ function buildGraph(job){
   g[N.NEG_BASE].inputs.text = isKreaBase ? "" : (j.negPrompt || "").trim();
 
   // Edición con Qwen 2.1 en la etapa Base (solo si el Base es Qwen).
-  const qwenEditBase = (isQwenBase && j.qwenEdit?.enabled && (j.qwenEdit.stage === "base" || j.qwenEdit.stage === "both"))
-    ? appendQwenEditStage(g, "base", { job: j, clipRef: [N.CLIP_BASE, 0], vaeRef: [N.VAE_BASE, 0], prompt: j.prompt, negative: j.negPrompt })
+  const qwenEditBase = (isQwenBase && qwenEditWantsBase)
+    ? appendQwenEditStage(g, "base", { job: j, clipRef: [N.CLIP_BASE, 0], vaeRef: [N.VAE_BASE, 0], prompt: j.prompt, negative: j.negPrompt, integrateFace: qwenEditIntegrate === "face" })
     : null;
 
   // RBG Smart Seed Variance Base (solo si la etapa contiene Krea2)
@@ -1750,9 +1928,35 @@ function buildGraph(job){
     delete g[N.NEG_REFINER];
     delete g[N.SAMPLER_REFINER];
     delete g[N.DECODE_REFINER];
+    // Faceswap directo (ReActor) sobre la imagen final, o integración
+    // anti-"pegada" del edit: en solo-base la imagen objetivo es la primera
+    // referencia; no hay latent de borrador que mezclar.
+    let baseOutRef = [N.DECODE_BASE, 0];
+    if(reactorMode){
+      const sw = applyReActorSwap(g, baseOutRef, j, "base");
+      if(sw) baseOutRef = sw;
+    } else if(qwenEditBase){
+      const integ = applyQwenEditIntegration(g, baseOutRef, j, "base", {
+        editLatentRef: null,
+        draftLatentRef: null,
+        baseImageRef: qwenEditBase.targetImage,
+        baseDims: { w: j.qwenEdit?.refW, h: j.qwenEdit?.refH },
+        vaeRef: [N.VAE_BASE, 0],
+      });
+      if(integ) baseOutRef = integ;
+    } else if(j.qwenEdit?.enabled){
+      // En bypass no se llega a los avisos de la vía completa: avisos propios.
+      if(qwenEditWantsRefiner && !qwenEditWantsBase){
+        log(`⚠️ Edición Qwen 2.1: la etapa elegida es 'Refiner', pero el Refiner está desactivado (solo base) → la edición no se aplicará. Cambia la etapa a 'Base' o activa el Refiner.`, "l-warn");
+      } else if(qwenEditWantsBase && !isQwenBase){
+        log(`⚠️ Edición Qwen 2.1: la etapa Base no usa un modelo Qwen (comprueba el modo o el UNET) → la edición no se aplicará.`, "l-warn");
+      } else {
+        log(`⚠️ Edición Qwen 2.1: sin imagen de referencia cargada → usa 'Referencias → Usar imagen de referencia'.`, "l-warn");
+      }
+    }
     // Refinado facial opcional (reutiliza el modelo de la etapa Base) y
     // post-procesado cosmético sobre la imagen resultante.
-    const baseFinalRef = appendFaceRefine(g, [N.DECODE_BASE, 0], j, {
+    const baseFinalRef = appendFaceRefine(g, baseOutRef, j, {
       modelRef: g[N.SAMPLER_BASE].inputs.model,
       vaeRef: [N.VAE_BASE, 0],
       posRef: [N.POS_BASE, 0],
@@ -1845,19 +2049,23 @@ function buildGraph(job){
   // Krea 2 (Flux) no soporta prompt negativo, lo vaciamos. Qwen UC sí lo soporta.
   g[N.NEG_REFINER].inputs.text = isKreaRefiner ? "" : (j.negPrompt || "").trim();
 
-  // Edición con Qwen 2.1 en la etapa Refiner: mantiene el latent del borrador
-  // (VAEEncode de la etapa intermedia) y sustituye el conditioning por el encoder
-  // de edición, que aporta los latentes de referencia.
-  const qwenEditRefiner = (isQwenRefiner && j.qwenEdit?.enabled && (j.qwenEdit.stage === "refiner" || j.qwenEdit.stage === "both"))
-    ? appendQwenEditStage(g, "refiner", { job: j, clipRef: [N.CLIP_REFINER, 0], vaeRef: [N.VAE_REFINER, 0], prompt: j.prompt, negative: j.negPrompt })
+  // Edición con Qwen 2.1 en la etapa Refiner vía oficial: el borrador intermedio
+  // (IMAGE del nodo 26) entra como <image1> (objetivo del edit, la salida sigue su
+  // composición), las referencias del usuario como <image2>+; el latent sale del
+  // encoder (vacío, a tamaño del objetivo) y el sampler va a denoise 1.0.
+  const qwenEditRefiner = (isQwenRefiner && qwenEditWantsRefiner)
+    ? appendQwenEditStage(g, "refiner", { job: j, clipRef: [N.CLIP_REFINER, 0], vaeRef: [N.VAE_REFINER, 0], prompt: j.prompt, negative: j.negPrompt, draftImage: [N.IMAGE_SCALE, 0], integrateFace: qwenEditIntegrate === "face" })
     : null;
 
   // Aviso: edición activada sin ninguna etapa Qwen compatible.
-  if(j.qwenEdit?.enabled && !qwenEditBase && !qwenEditRefiner){
-    const stage = j.qwenEdit.stage;
-    const stageIsQwen = stage === "base" ? isQwenBase : (stage === "refiner" ? isQwenRefiner : (isQwenBase || isQwenRefiner));
-    if(!stageIsQwen){
-      console.warn("Edición Qwen 2.1 activada pero la etapa seleccionada no usa un modelo Qwen.");
+  if(j.qwenEdit?.enabled && !reactorMode && !qwenEditBase && !qwenEditRefiner){
+    const stage = qwenEditStage || "refiner";
+    if(qwenEditWantsRefiner && !isQwenRefiner && !qwenEditWantsBase){
+      log(`⚠️ Edición Qwen 2.1: el Refiner no usa un modelo Qwen, así que la edición en esa etapa no se aplicará. Elige un UNET Qwen 2.1 en el Refiner (o modo Base→Refiner con Qwen en la etapa editada).`, "l-warn");
+    } else if(qwenEditWantsBase && !isQwenBase && !qwenEditWantsRefiner){
+      log(`⚠️ Edición Qwen 2.1: la etapa Base no usa un modelo Qwen, así que la edición ahí no se aplicará. La edición solo actúa en etapas con Qwen 2.1.`, "l-warn");
+    } else {
+      log(`⚠️ Edición Qwen 2.1: sin imagen de referencia cargada en modo base/ambas (el Refiner sí puede editar el borrador sin referencias). Usa 'Referencias → Usar imagen de referencia'.`, "l-warn");
     }
   }
 
@@ -1896,15 +2104,59 @@ function buildGraph(job){
   g[N.VAE_REFINER].inputs.vae_name = j.refinerVae;
 
   g[N.SAMPLER_REFINER].inputs.steps = j.refinerSteps;
-  g[N.SAMPLER_REFINER].inputs.cfg = j.refinerCfg;
+  g[N.SAMPLER_REFINER].inputs.cfg = qwenEditRefiner ? 1 : j.refinerCfg;
   g[N.SAMPLER_REFINER].inputs.sampler_name = j.refinerSampler;
   g[N.SAMPLER_REFINER].inputs.scheduler = j.refinerScheduler;
-  g[N.SAMPLER_REFINER].inputs.denoise = j.refinerDenoise;
+  g[N.SAMPLER_REFINER].inputs.denoise = qwenEditRefiner ? 1.0 : j.refinerDenoise;
   g[N.SAMPLER_REFINER].inputs.seed = j.seedValue + 1;
+  // Con edición el latent sale del encoder de edición (vacío, a tamaño del
+  // objetivo editado): muestrear sobre el latent del borrador (VAEEncode 1488px)
+  // descompensaría el espacio del conditioning y la integración (1472px).
+  if(qwenEditRefiner){
+    g[N.SAMPLER_REFINER].inputs.latent_image = qwenEditRefiner.latent;
+  }
 
   // Refinado facial opcional (reutiliza el modelo de la etapa Refiner) y
   // post-procesado cosmético sobre la imagen resultante.
-  const refinerFinalRef = appendFaceRefine(g, [N.DECODE_REFINER, 0], j, {
+  // Faceswap directo (ReActor) sobre el final o sobre el borrador antes del
+  // refiner; o integración anti-"pegada": el rostro del edit se recompone sobre
+  // el borrador (o el latent editado se mezcla con el del borrador) antes del
+  // FaceRefine/PostFx.
+  let refinerOutRef = [N.DECODE_REFINER, 0];
+  if(reactorMode){
+    if((j.qwenEdit.reactorTiming || "after") === "before" && g[N.ENCODE_REFINER]){
+      // Swap ANTES del refiner: el refiner muestrea el latent del borrador ya
+      // trasplantado (denoise bajo del usuario funde el rostro con la escena).
+      const sw = applyReActorSwap(g, [N.IMAGE_SCALE, 0], j, "draft");
+      if(sw){
+        g[N.ENCODE_REFINER].inputs.pixels = sw;
+        // El visor "Borrador" (nodo 50) ahora debe enseñar el borrador ya con el
+        // swap, que es lo que el Refiner muestrea, no el decode pre-swap.
+        if(g[N.PREVIEW_BASE]) g[N.PREVIEW_BASE].inputs.images = sw;
+      } else {
+        const sw2 = applyReActorSwap(g, refinerOutRef, j, "refiner");
+        if(sw2) refinerOutRef = sw2;
+      }
+    } else {
+      const sw = applyReActorSwap(g, refinerOutRef, j, "refiner");
+      if(sw) refinerOutRef = sw;
+    }
+  } else if(qwenEditBase || qwenEditRefiner){
+    if(qwenEditIntegrate !== "none"){
+      const integ = applyQwenEditIntegration(g, refinerOutRef, j, "refiner", {
+        editLatentRef: [N.SAMPLER_REFINER, 0],
+        draftLatentRef: [N.ENCODE_REFINER, 0],
+        baseImageRef: (qwenEditRefiner?.targetImage) || [N.IMAGE_SCALE, 0],
+        baseDims: {
+          w: g[N.IMAGE_SCALE]?.inputs?.width,
+          h: g[N.IMAGE_SCALE]?.inputs?.height,
+        },
+        vaeRef: [N.VAE_REFINER, 0],
+      });
+      if(integ) refinerOutRef = integ;
+    }
+  }
+  const refinerFinalRef = appendFaceRefine(g, refinerOutRef, j, {
     modelRef: g[N.SAMPLER_REFINER].inputs.model,
     vaeRef: [N.VAE_REFINER, 0],
     posRef: [N.POS_REFINER, 0],
@@ -2785,11 +3037,17 @@ async function resolveQwenEditRefs(job){
 function updateQwenEditRefStatus(){
   const st = $("qwenEditRefStatus");
   const ex = $("qwenEditExtraStatus");
+  const map = $("qwenEditMapHint");
   const hasRef = getRefImageSrc();
-  if(st) st.textContent = hasRef ? "1 imagen de referencia cargada" : "sin imagen de referencia";
+  if(st) st.textContent = hasRef
+    ? (qwenEditExtraRefs.length ? "1 imagen principal + " + qwenEditExtraRefs.length + " extra" : "1 imagen de referencia cargada")
+    : "sin imagen de referencia";
   if(ex) ex.textContent = qwenEditExtraRefs.length
     ? `${qwenEditExtraRefs.length} referencia(s) extra`
     : "sin referencias extra";
+  if(map) map.textContent = (!hasRef && $("qwenEditEnabled")?.checked)
+    ? "⚠️ Edición activada sin imagen principal: cárgala en el panel de referencia (arriba)."
+    : "La imagen principal es la del panel de referencia (arriba): entra como <image2> tras el borrador <image1> en modo refiner, y como <image1> en modo base. Las extras siguen la numeración (<image3>, <image4>) — cita en la instrucción.";
 }
 
 // --- METADATOS DE IMAGEN (cargar parámetros) ---
@@ -2995,11 +3253,37 @@ function applyKreaQwenWorkflow(workflow){
 
   // --- Edición Qwen 2.1 ---
   const qwenEnc = Object.values(g).find(n => n.class_type === "TextEncodeQwenImage21");
-  if(qwenEnc?.inputs){
+  const reactorNode = Object.entries(g).find(([k, n]) => k.startsWith("reactor_swap_") && n.class_type === "ReActorFaceSwapOpt");
+  if(reactorNode){
     if($("qwenEditEnabled")) $("qwenEditEnabled").checked = true;
+    if($("qwenEditMethod")) $("qwenEditMethod").value = "reactor";
+    if($("qwenEditReactorModel")) $("qwenEditReactorModel").value = reactorNode[1].inputs.swap_model || "hyperswap_1c_256.onnx";
+    if($("qwenEditReactorRestore")) $("qwenEditReactorRestore").value = reactorNode[1].inputs.face_restore_model || "none";
+    if($("qwenEditReactorTiming")) $("qwenEditReactorTiming").value = reactorNode[0].endsWith("reactor_swap_draft") ? "before" : "after";
+    if($("qwenEditIntColor")) $("qwenEditIntColor").checked = !!Object.keys(g).some(k => k.startsWith("reactor_colormatch_"));
+    log("ℹ️ Faceswap ReActor detectado: revisa/carga de nuevo la imagen de referencia (source).", "l-info");
+    applied.push("faceswap ReActor");
+  } else if(qwenEnc?.inputs){
+    if($("qwenEditEnabled")) $("qwenEditEnabled").checked = true;
+    if($("qwenEditMethod")) $("qwenEditMethod").value = "edit";
     set("qwenEditPrompt", qwenEnc.inputs.prompt);
     set("qwenEditResolution", qwenEnc.inputs.resolution);
     if($("qwenEditResolutionVal")) $("qwenEditResolutionVal").textContent = (parseInt(qwenEnc.inputs.resolution,10) === 0) ? "auto" : qwenEnc.inputs.resolution;
+    // Integración anti-"pegada" (stitch facial / LatentBlend), si el grafo la lleva.
+    const intStitch = Object.entries(g).find(([k, n]) => k.startsWith("qwen_edit_int_stitch_"));
+    const intGBlend = Object.entries(g).find(([k, n]) => k.startsWith("qwen_edit_int_blend_"));
+    if(intStitch && intStitch[1]?.inputs){
+      if($("qwenEditIntegrate")) $("qwenEditIntegrate").value = "face";
+      const inp = intStitch[1].inputs;
+      set("qwenEditIntBlend", Math.round((inp.blend ?? 1.0) * 100), (el) => { if($("qwenEditIntBlendVal")) $("qwenEditIntBlendVal").textContent = el.value; });
+      set("qwenEditIntFeather", inp.feather ?? 20, (el) => { if($("qwenEditIntFeatherVal")) $("qwenEditIntFeatherVal").textContent = el.value; });
+      if($("qwenEditIntColor")) $("qwenEditIntColor").checked = (inp.colour_match == null) ? true : inp.colour_match > 0;
+    } else if(intGBlend && intGBlend[1]?.inputs){
+      if($("qwenEditIntegrate")) $("qwenEditIntegrate").value = "global";
+      set("qwenEditIntBlend", Math.round((intGBlend[1].inputs.blend_factor ?? 1.0) * 100), (el) => { if($("qwenEditIntBlendVal")) $("qwenEditIntBlendVal").textContent = el.value; });
+    } else if(qwenEnc && $("qwenEditIntegrate")){
+      $("qwenEditIntegrate").value = "none";
+    }
     // La imagen de referencia no se puede reconstruir de forma fiable; se avisa.
     log("ℹ️ Edición Qwen 2.1 detectada: revisa/carga de nuevo la imagen de referencia.", "l-info");
     applied.push("edición Qwen");
@@ -3011,7 +3295,8 @@ function applyKreaQwenWorkflow(workflow){
   if(frCrop?.class_type === "H3FaceTrackCrop"){
     const fr = loadFaceRefine();
     fr.enabled = true;
-    if(frCrop.inputs.canvas_width != null) fr.canvasSize = parseInt(frCrop.inputs.canvas_width, 10);
+    if(frCrop.inputs.canvas_mode === "auto_no_downscale"){ fr.canvasSize = "auto"; }
+    else if(frCrop.inputs.canvas_width != null) fr.canvasSize = parseInt(frCrop.inputs.canvas_width, 10);
     if(frCrop.inputs.select != null) fr.select = frCrop.inputs.select;
     if(frSampler?.inputs){
       if(frSampler.inputs.steps != null) fr.steps = parseInt(frSampler.inputs.steps, 10);
@@ -3023,25 +3308,43 @@ function applyKreaQwenWorkflow(workflow){
     applied.push("FaceRefine");
   }
 
-  // --- Post-procesado (ProPost) ---
-  const postTypes = {
-    ProPostVignette: { id: "vigEnabled", params: { intensity: "vigIntensity", center_x: "vigCX", center_y: "vigCY" } },
-    ProPostFilmGrain: { id: "grainEnabled", params: { grain_type: "grainType", grain_sat: "grainSat", grain_power: "grainPower", shadows: "grainShadows", highs: "grainHighs", scale: "grainScale", sharpen: "grainSharpen" } },
-    ProPostRadialBlur: { id: "radialEnabled", params: { blur_strength: "radialStrength", center_x: "radialCX", center_y: "radialCY", focus_spread: "radialSpread", steps: "radialSteps" } },
-    ProPostApplyLUT: { id: "lutEnabled", params: { lut_name: "lutName", strength: "lutStrength" } },
+  // --- Color Grading & Look Cinemático (nodos nuevos y legacy ProPost) ---
+  const setMasterOn = () => {
+    const on = $("segPostFxOn"), off = $("segPostFxOff"), panel = $("postFxControls");
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "block";
   };
   Object.values(g).forEach(node => {
-    const conf = node?.class_type && postTypes[node.class_type];
-    if(!conf) return;
-    if($(conf.id)) $(conf.id).checked = true;
-    for(const [param, ctrl] of Object.entries(conf.params)){
-      if(node.inputs[param] != null) set(ctrl, node.inputs[param]);
+    const t = node?.class_type;
+    if(t === "LayerColor: LUT Apply"){
+      setMasterOn();
+      if(node.inputs.LUT != null && $("postFxLutSelect")) $("postFxLutSelect").value = node.inputs.LUT;
+      if(node.inputs.strength != null){
+        set("postFxLutStrength", Math.max(0, Math.min(1, Number(node.inputs.strength) / 100)), (el) => { if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat(el.value) * 100) + "%"; });
+      }
+      if($("postFxLutToggle")) $("postFxLutToggle").checked = true;
+      applied.push("post-fx (LUT)");
+    } else if(t === "LayerFilter: FilmV2"){
+      const vi = Number(node.inputs.vignette_intensity ?? 0);
+      const gp = Number(node.inputs.grain_power ?? 0);
+      if(vi > 0){
+        if($("postFxVigToggle")) $("postFxVigToggle").checked = true;
+        set("postFxVigIntensity", Math.min(0.6, vi), (el) => { if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat(el.value).toFixed(2); });
+      }
+      if(gp > 0){
+        if($("postFxGrainToggle")) $("postFxGrainToggle").checked = true;
+        set("postFxGrainPower", Math.min(0.4, gp), (el) => { if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat(el.value).toFixed(2); });
+      }
+      if(vi > 0 || gp > 0) setMasterOn();
+      applied.push("post-fx (film)");
+    } else if(t === "ProPostRadialBlur"){
+      if($( "radialEnabled")) $("radialEnabled").checked = true;
+      if(node.inputs.blur_strength != null) set("radialStrength", node.inputs.blur_strength, (el) => { if($("radialVal")) $("radialVal").textContent = el.value; });
+      applied.push("post-fx (radial)");
     }
-    if(node.class_type === "ProPostApplyLUT" && node.inputs.log != null && $("lutLog")) $("lutLog").checked = !!node.inputs.log;
-    if(node.class_type === "ProPostFilmGrain" && node.inputs.gray_scale != null && $("grainGray")) $("grainGray").checked = !!node.inputs.gray_scale;
-    applied.push("post-fx");
   });
   if(typeof updateQwenEditRefStatus === "function") updateQwenEditRefStatus();
+  if(typeof updateQwenEditMethodUI === "function") updateQwenEditMethodUI();
   if(typeof updateDimensionHints === "function") updateDimensionHints();
   if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
 
@@ -3450,62 +3753,180 @@ document.addEventListener("click", (e) => {
   e.stopPropagation();
 }, true);
 
-// --- POST-PROCESADO: carga de LUTs y listeners de UI ---
-function loadAvailableLuts(){
-  const sel = $("lutName");
+// --- COLOR GRADING & LOOK CINEMÁTICO (implementación MiniMaxH3) ---
+// Estado unificado: master on/off + LUT (LayerColor: LUT Apply) + Viñeta y Grano
+// dinámico juntos en "LayerFilter: FilmV2" + desenfoque radial (ProPost opcional).
+const KREAQWEN_COLORFX_KEY = 'kreaqwen_colorfx_v1';
+function loadColorFx(){
+  try { return JSON.parse(localStorage.getItem(KREAQWEN_COLORFX_KEY) || "null") || null; }
+  catch(_){ return null; }
+}
+function saveColorFx(s){
+  try { localStorage.setItem(KREAQWEN_COLORFX_KEY, JSON.stringify(s)); } catch(_){}
+}
+// Estado por defecto (los settings legacy de ProPost se ignoran; se usa la clave nueva).
+function defaultPostFxState(){
+  return {
+    enabled: false,
+    lut: { enabled: true, name: "", strength: 0.8 },
+    vignette: { enabled: false, intensity: 0.25 },
+    grain: { enabled: false, power: 0.15 },
+    radial: { enabled: false, strength: 64 },
+  };
+}
+function getPostFxState(){
+  return {
+    enabled: $("segPostFxOn")?.classList.contains("on") ?? false,
+    lut: {
+      enabled: $("postFxLutToggle")?.checked ?? true,
+      name: $("postFxLutSelect")?.value || "",
+      strength: parseFloat($("postFxLutStrength")?.value || "0.8")
+    },
+    vignette: {
+      enabled: $("postFxVigToggle")?.checked ?? false,
+      intensity: parseFloat($("postFxVigIntensity")?.value || "0.25")
+    },
+    grain: {
+      enabled: $("postFxGrainToggle")?.checked ?? false,
+      power: parseFloat($("postFxGrainPower")?.value || "0.15")
+    },
+    radial: {
+      enabled: $("radialEnabled")?.checked ?? false,
+      strength: parseFloat($("radialStrength")?.value || "64")
+    }
+  };
+}
+function setPostFxUI(s){
+  if(!s) return;
+  const on = $("segPostFxOn"), off = $("segPostFxOff");
+  const panel = $("postFxControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "block";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("postFxLutToggle")) $("postFxLutToggle").checked = s.lut?.enabled ?? true;
+  if($("postFxLutSelect") && s.lut?.name) $("postFxLutSelect").value = s.lut.name;
+  if($("postFxLutStrength")){
+    $("postFxLutStrength").value = s.lut?.strength ?? 0.8;
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+  }
+  if($("postFxVigToggle")) $("postFxVigToggle").checked = !!s.vignette?.enabled;
+  if($("postFxVigIntensity")){
+    $("postFxVigIntensity").value = s.vignette?.intensity ?? 0.25;
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat($("postFxVigIntensity").value).toFixed(2);
+  }
+  if($("postFxGrainToggle")) $("postFxGrainToggle").checked = !!s.grain?.enabled;
+  if($("postFxGrainPower")){
+    $("postFxGrainPower").value = s.grain?.power ?? 0.15;
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat($("postFxGrainPower").value).toFixed(2);
+  }
+  if($("radialEnabled")) $("radialEnabled").checked = !!s.radial?.enabled;
+  if($("radialStrength")){
+    $("radialStrength").value = s.radial?.strength ?? 64;
+    if($("radialVal")) $("radialVal").textContent = s.radial?.strength ?? 64;
+  }
+}
+function populatePostFxLuts(){
+  const sel = $("postFxLutSelect");
   if(!sel) return;
   const luts = (typeof AVAILABLE_LUTS !== "undefined" && Array.isArray(AVAILABLE_LUTS)) ? AVAILABLE_LUTS : [];
   const prev = sel.value;
-  sel.innerHTML = '<option value="">-- Seleccionar LUT --</option>';
+  sel.innerHTML = '<option value="">-- Seleccionar LUT (.cube) --</option>';
   for(const name of luts){
     const opt = document.createElement("option");
-    opt.value = name; opt.textContent = name;
+    opt.value = name;
+    opt.textContent = name.endsWith(".cube") ? name.slice(0, -5) : name;
     sel.appendChild(opt);
   }
   if(luts.length === 0){
     sel.innerHTML = '<option value="">-- Sin LUTs (.cube) disponibles --</option>';
   }
-  if(prev){ sel.value = prev; }
+  if(prev && luts.includes(prev)){
+    sel.value = prev;
+  }
 }
-
 function initPostFxListeners(){
-  if(typeof makeCollapsible === "function") makeCollapsible("postfxToggle", "postfxBody");
+  const persist = () => { saveColorFx(getPostFxState()); if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings(); };
+  $("segPostFxOn")?.addEventListener("click", () => {
+    const s = getPostFxState(); s.enabled = true;
+    setPostFxUI(s); persist();
+  });
+  $("segPostFxOff")?.addEventListener("click", () => {
+    const s = getPostFxState(); s.enabled = false;
+    setPostFxUI(s); persist();
+  });
+  $("postFxLutToggle")?.addEventListener("change", persist);
+  $("postFxLutSelect")?.addEventListener("change", persist);
+  $("postFxLutStrength")?.addEventListener("input", (e) => {
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
+    persist();
+  });
+  $("postFxVigToggle")?.addEventListener("change", persist);
+  $("postFxVigIntensity")?.addEventListener("input", (e) => {
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat(e.target.value).toFixed(2);
+    persist();
+  });
+  $("postFxGrainToggle")?.addEventListener("change", persist);
+  $("postFxGrainPower")?.addEventListener("input", (e) => {
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat(e.target.value).toFixed(2);
+    persist();
+  });
+  $("radialStrength")?.addEventListener("input", (e) => {
+    if($("radialVal")) $("radialVal").textContent = e.target.value;
+    persist();
+  });
+  $("radialEnabled")?.addEventListener("change", persist);
 
-  // Sincroniza el valor numérico mostrado junto a cada slider.
-  const sync = (sliderId, valId, decimals) => {
-    const s = $(sliderId), v = $(valId);
-    if(!s) return;
-    const upd = () => { if(v) v.textContent = parseFloat(s.value).toFixed(decimals); };
-    s.addEventListener("input", upd);
-    upd();
-  };
-  sync("vigIntensity", "vigVal", 2);
-  sync("radialStrength", "radialVal", 0);
-  sync("lutStrength", "lutVal", 2);
-
-  loadAvailableLuts();
+  populatePostFxLuts();
+  // Solo restaura de la clave propia si existe (deja el estado ya aplicado por
+  // restoreKreaQwenSettings si este es el único almacén con datos).
+  const st = loadColorFx();
+  if(st) setPostFxUI(st);
 }
 
 // --- EDICIÓN CON QWEN 2.1: listeners de UI ---
 function initQwenEditListeners(){
+  $("qwenEditEnabled")?.addEventListener("change", updateQwenEditRefStatus);
+
   $("qwenEditResolution")?.addEventListener("input", (e) => {
     const v = $("qwenEditResolutionVal");
     if(v) v.textContent = (parseInt(e.target.value, 10) === 0) ? "auto" : e.target.value;
   });
 
-  $("btnQwenEditUseRef")?.addEventListener("click", () => {
-    const src = getRefImageSrc();
-    if(!src){ log("⚠️ No hay imagen de referencia cargada.", "l-err"); return; }
-    if($("qwenEditEnabled")) $("qwenEditEnabled").checked = true;
-    updateQwenEditRefStatus();
-    log("✅ Imagen de referencia fijada para la edición Qwen 2.1.", "l-ok");
+  // Cambio de método (edit / reactor): alterna los bloques de la sección
+  // marcados con data-editmode="edit"|"reactor".
+  const updateQwenEditMethodUI = () => {
+    const m = $("qwenEditMethod")?.value || "edit";
+    document.querySelectorAll("#qwenEditBody [data-editmode]").forEach(el => {
+      el.style.display = (el.dataset.editmode === m) ? "" : "none";
+    });
+  };
+  window.updateQwenEditMethodUI = updateQwenEditMethodUI;
+  $("qwenEditMethod")?.addEventListener("change", () => {
+    updateQwenEditMethodUI();
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+  updateQwenEditMethodUI();
+
+  // Sliders de la integración anti-"pegada"
+  $("qwenEditIntBlend")?.addEventListener("input", (e) => {
+    const v = $("qwenEditIntBlendVal");
+    if(v) v.textContent = e.target.value;
+  });
+  $("qwenEditIntFeather")?.addEventListener("input", (e) => {
+    const v = $("qwenEditIntFeatherVal");
+    if(v) v.textContent = e.target.value;
   });
 
+  // "Desactivar edición": apaga el checkbox y limpia las extra.
   $("btnQwenEditClearRef")?.addEventListener("click", () => {
     qwenEditExtraRefs = [];
     if($("qwenEditEnabled")) $("qwenEditEnabled").checked = false;
     updateQwenEditRefStatus();
-    log("Referencia de edición Qwen 2.1 desactivada.", "l-info");
+    log("Edición Qwen 2.1 desactivada (referencias extra limpiadas).", "l-info");
   });
 
   $("btnQwenEditAddRef")?.addEventListener("click", () => {
@@ -3792,18 +4213,12 @@ function initKreaQwenUI() {
     log("🗑️ Cola de trabajos vaciada y estado restablecido a reposo.", "l-info");
   });
 
-  // --- Envío entre WebUIs ---
-  function openExternalWebUI(targetPort, targetPage, filename, subfolder, label){
-    const ref = buildRefParam(filename, subfolder);
-    const here = window.location;
-    const targetHost = here.hostname;
-    const url = `${here.protocol}//${targetHost}:${targetPort}/${targetPage}?ref=${ref}`;
-    const win = window.open(url, "_blank");
-    if(!win) log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
-    else log(`↗️ Abriendo ${label} con la imagen: ${filename}`, "l-ok");
+  // --- Envío entre WebUIs (con arranque automático del destino) ---
+  async function openExternalWebUI(targetPort, targetPage, filename, subfolder, label){
+    await openExternalWebUIRef(targetPort, targetPage, filename, subfolder, label);
   }
 
-  function sendOutputToExternalUI(targetPort, targetPage, label){
+  async function sendOutputToExternalUI(targetPort, targetPage, label){
     const mediaObj = (currentViewMode === "final") ? currentFinalMedia : currentBaseMedia;
     if(!mediaObj || !mediaObj.media || !mediaObj.media.filename){
       log(`⚠️ Primero genera una imagen para poder enviarla a ${label}.`, "l-err");
@@ -3811,7 +4226,7 @@ function initKreaQwenUI() {
     }
     const filename = mediaObj.media.filename;
     const subfolder = mediaObj.media.subfolder || "kreaqwen/imagen";
-    openExternalWebUI(targetPort, targetPage, filename, subfolder, label);
+    await openExternalWebUI(targetPort, targetPage, filename, subfolder, label);
   }
 
   async function sendRefToExternalUI(targetPort, targetPage, label){
@@ -3823,7 +4238,7 @@ function initKreaQwenUI() {
     const src = refImgEl.src;
     const fromView = refFromViewSrc(src);
     if(fromView){
-      openExternalWebUI(targetPort, targetPage, fromView.filename, fromView.subfolder, label);
+      await openExternalWebUI(targetPort, targetPage, fromView.filename, fromView.subfolder, label);
       return;
     }
     if(!src.startsWith("data:")){
@@ -3844,7 +4259,7 @@ function initKreaQwenUI() {
       if(data.error) throw new Error(data.error);
       const finalName = (data.name || filename).replace(/^.*\//, "");
       log(`✅ Imagen subida a output/krea2/${finalName}`, "l-ok");
-      openExternalWebUI(targetPort, targetPage, finalName, "krea2", label);
+      await openExternalWebUI(targetPort, targetPage, finalName, "krea2", label);
     } catch(e){
       log(`❌ No se pudo enviar la imagen a ${label}: ` + e.message, "l-err");
     }

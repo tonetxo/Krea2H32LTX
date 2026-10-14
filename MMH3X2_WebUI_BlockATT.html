@@ -5229,6 +5229,56 @@ function enableInterUIDrop(el, onFile){
     }
   });
 }
+// --- ARRANQUE AUTOMÁTICO DE OTRAS WEBUIS ---
+// Los botones de envío cruzado (→LTXV / →H3 / →X2 ...) no deben fallar si la
+// WebUI de destino no está en pie: comprueba si responde (fetch no-cors, que
+// resuelve con cualquier respuesta HTTP y rechaza con conexión rechazada) y,
+// si no, pide a esta misma serve.py que la lance (/api/ui_launch) esperando
+// hasta ~40s antes de abrir la pestaña.
+function externalWebUINameFor(page){
+  return ({
+    "LTXV_WebUI.html": "ltxv",
+    "Krea2_WebUI.html": "krea2",
+    "MiniMaxH3_WebUI.html": "minimaxh3",
+    "MMH3X2_WebUI.html": "mmh3x2",
+    "MMH3X2_WebUI_BlockATT.html": "mmh3x2",
+    "KreaQwen_WebUI.html": "kreaqwen",
+  })[page] || null;
+}
+async function externalWebUIBaseUrl(targetPort, targetPage){
+  const here = window.location;
+  const base = `${here.protocol}//${here.hostname}:${targetPort}`;
+  try {
+    await fetch(`${base}/${targetPage}`, { mode: "no-cors", signal: AbortSignal.timeout(2000) });
+    return base;
+  } catch(_){}
+  const name = externalWebUINameFor(targetPage);
+  if(!name) return base; // página sin mapping: comportamiento clásico
+  try {
+    const r = await fetch(`/api/ui_launch?target=${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(40000) });
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    if(d.started) log(`✅ WebUI ${name} arrancada automáticamente (puerto ${d.port}).`, "l-ok");
+    else log(`ℹ️ ${name} ya estaba en pie (puerto ${d.port}).`, "l-info");
+  } catch(e){
+    log(`⚠️ No se pudo arrancar ${name} (${e.message || e}); abriendo igualmente...`, "l-warn");
+  }
+  return base;
+}
+async function openExternalWebUIRef(targetPort, targetPage, filename, subfolder, label){
+  const sf = (subfolder || "").replace(/^\/+|\/+$/g, "");
+  const ref = encodeURIComponent((sf ? sf + "/" : "") + filename);
+  const base = await externalWebUIBaseUrl(targetPort, targetPage);
+  const url = `${base}/${targetPage}?ref=${ref}`;
+  const win = window.open(url, "_blank");
+  if(!win){
+    log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
+  } else if(label){
+    log(`↗️ Abriendo ${label} con la imagen: ${filename}`, "l-ok");
+  }
+  return win;
+}
+
 // mmh3x2.js — MMH3X2-specific JavaScript (2 segmentos, 4 imágenes, 1 vídeo, RTX y RIFE).
 // Injected AFTER common.js. CONFIG must be defined before initCommon().
 

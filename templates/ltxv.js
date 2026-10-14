@@ -639,6 +639,65 @@ $("queueItemsToggle")?.addEventListener("click", () => {
 });
 
 let jobCounter = 0;
+// --- DIÁLOGO / AUDIO NATIVO (LTX-2.5 genera audio con el vídeo) ---
+// Términos que desalientan la voz, aplicados dinámicamente al negativo:
+// "Sin diálogo" los añade; "Con diálogo" los retira junto a newscast/interview...
+const DIALOGUE_NEG_TERMS = "dialogue, speech, talking, voices, conversation, chatter, murmuring, whispering, monologue, lip-sync";
+const DIALOGUE_STRIP_FOR_SPEECH = ["yelling", "newscast", "interview", "podcast"];
+const DIALOGUE_STRIP_RE = new RegExp(",?\\s*\\b(dialogue|speech|talking|voices|conversation|chatter|murmuring|whispering|monologue|lip-sync)\\b", "gi");
+
+function getDialogueMode(){
+  const byId = { "segDlgAuto": "auto", "segDlgSilence": "no_dialogue", "segDlgSpeak": "dialogue" };
+  for(const [id, val] of Object.entries(byId)){
+    if($(id)?.classList.contains("on")) return val;
+  }
+  return "no_dialogue";
+}
+function setDialogueModeUI(mode){
+  const map = { "auto": "segDlgAuto", "no_dialogue": "segDlgSilence", "dialogue": "segDlgSpeak" };
+  for(const [val, id] of Object.entries(map)){
+    $(id)?.classList.toggle("on", val === (mode || "no_dialogue"));
+  }
+}
+function initDialogueListeners(){
+  $("segDlgAuto")?.addEventListener("click", () => {
+    setDialogueModeUI("auto");
+    if(typeof scheduleSaveLtxvSettings === "function") scheduleSaveLtxvSettings();
+  });
+  $("segDlgSilence")?.addEventListener("click", () => {
+    setDialogueModeUI("no_dialogue");
+    if(typeof scheduleSaveLtxvSettings === "function") scheduleSaveLtxvSettings();
+  });
+  $("segDlgSpeak")?.addEventListener("click", () => {
+    setDialogueModeUI("dialogue");
+    if(typeof scheduleSaveLtxvSettings === "function") scheduleSaveLtxvSettings();
+  });
+}
+// Aplica el modo al negativo (nodo 537 CLIPTextEncode estático del workflow) y al volumen de audio (551/598).
+function applyDialogueMode(g, mode){
+  mode = mode || "no_dialogue";
+  const negNode = g["537"];
+  if(negNode && negNode.inputs && typeof negNode.inputs.text === "string"){
+    let neg = negNode.inputs.text.replace(DIALOGUE_STRIP_RE, "");
+    neg = neg.replace(/\s+,/g, ",").replace(/,\s*,/g, ",");
+    if(mode === "no_dialogue"){
+      if(!neg.toLowerCase().includes("dialogue")) neg = neg.replace("yelling", "yelling, " + DIALOGUE_NEG_TERMS);
+    } else if(mode === "dialogue"){
+      for(const t of DIALOGUE_STRIP_FOR_SPEECH){
+        neg = neg.replace(new RegExp(",?\\s*\\b" + t + "\\b", "gi"), "");
+      }
+      neg = neg.replace(/\s+,/g, ",").replace(/,\s*,/g, ",");
+    }
+    negNode.inputs.text = neg.replace(/,\s*$/, "");
+  }
+  // Audio en la salida: -100 dB silencia; el resto suena tal cual se generó.
+  for(const vid of ["551", "598"]){
+    if(g[vid] && g[vid].class_type === "AudioAdjustVolume"){
+      g[vid].inputs.volume = (mode === "no_dialogue") ? -100 : 1;
+    }
+  }
+}
+
 function snapshotJob(firstPassOnly){
   // Captura inmutable de todos los parámetros necesarios para reproducir el job
   return {
@@ -653,7 +712,8 @@ function snapshotJob(firstPassOnly){
     mp: $("mpSlider").value,
     fidelity: $("fidelitySlider").value,
     motion: $("motionSlider").value,
-    firstPassSteps: $("firstPassSteps")?.value || "10",
+    dialogueMode: getDialogueMode(),
+    firstPassSteps: $("firstPassSteps")?.value || "8",
     model: $("modelSelect")?.value,
     textEncoder: $("textEncoderSelect")?.value,
     vae: $("vaeSelect")?.value,
@@ -1054,6 +1114,37 @@ async function applyWorkflow(workflow, opts={}){
     setApplied("prompt");
   }
 
+  // Restaurar modo diálogo: negativo con términos de ban o volumen -100 → "Sin diálogo".
+  let dlgSet = false;
+  {
+    const negNodes = [];
+    for(const k of Object.keys(workflow)){
+      const n = workflow[k];
+      if(n && n.class_type === "CLIPTextEncode" && n.inputs && typeof n.inputs.text === "string") negNodes.push(n);
+    }
+    const neg = negNodes.map(n => n.inputs.text).join(" ");
+    if(/\b(dialogue|speech|talking|voices|chatter)\b/i.test(neg)){ setDialogueModeUI("no_dialogue"); dlgSet = true; }
+  }
+  {
+    const avNodes = [];
+    for(const k of Object.keys(workflow)){
+      const n = workflow[k];
+      if(n && n.class_type === "AudioAdjustVolume" && n.inputs && n.inputs.volume != null) avNodes.push(n);
+    }
+    if(avNodes.some(n => Number(n.inputs.volume) <= -90)){ setDialogueModeUI("no_dialogue"); dlgSet = true; }
+    else if(avNodes.some(n => Number(n.inputs.volume) >= 1) && !dlgSet){
+      const negNodes2 = [];
+      for(const k of Object.keys(workflow)){
+        const n = workflow[k];
+        if(n && n.class_type === "CLIPTextEncode" && n.inputs && typeof n.inputs.text === "string") negNodes2.push(n);
+      }
+      const neg2 = negNodes2.map(n => n.inputs.text).join(" ").toLowerCase();
+      if(!/(newscast|podcast|yelling)/.test(neg2)){ setDialogueModeUI("dialogue"); dlgSet = true; }
+      else { setDialogueModeUI("auto"); dlgSet = true; }
+    }
+    if(dlgSet) setApplied("diálogo");
+  }
+
   const powerLora = findByClass("Power Lora Loader (rgthree)");
   if(powerLora && powerLora.inputs){
     for(let i = 0; i < loras.length; i++){
@@ -1326,8 +1417,9 @@ function saveLtxvSettings(){
     frames: $("frames")?.value || "241",
     batchSize: $("batchSize")?.value || "1",
     fidelity: $("fidelitySlider")?.value || "0.25",
-    firstPassSteps: $("firstPassSteps")?.value || "9",
+    firstPassSteps: $("firstPassSteps")?.value || "8",
     motion: $("motionSlider")?.value || "1.0",
+    dialogueMode: getDialogueMode(),
     rife: getRifeState(),
     rtx: getRtxState(),
     bitDepth: getBitDepth(),
@@ -1412,6 +1504,7 @@ function restoreLtxvSettings(){
     }
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
 
+    if(s.dialogueMode) setDialogueModeUI(s.dialogueMode);
     if(s.fidelity !== undefined && $("fidelitySlider")){
       $("fidelitySlider").value = s.fidelity;
       if($("fidelityVal")) $("fidelityVal").textContent = parseFloat(s.fidelity).toFixed(2);
@@ -1458,6 +1551,7 @@ loadVaes();
 loadTextEncoders();
 
 // Restaurar ajustes guardados o fallback legacy
+initDialogueListeners();
 if(!restoreLtxvSettings()){
   const legacyPrompt = localStorage.getItem("ltxv_prompt");
   if(legacyPrompt !== null && $("prompt")) $("prompt").value = legacyPrompt;
@@ -1841,7 +1935,7 @@ function buildGraph(mode, job){
       if (base === diffBase) return false;
       return !m.includes("diffusion_models") && (base.includes("ltx-") || base.includes("ltx_") || base.includes("sulphur"));
     };
-    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt) || "ltxv/sulphur_distil_bf16.safetensors";
+    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt) || "Ligazón para Stable-Diffusion/ltx-2.5-av-proj-ref.safetensors";
 
     const textEncoderChoice = (j ? j.textEncoder : $("textEncoderSelect")?.value) || "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors";
     if(g[N.LTXAV_TEXT_ENCODER] && g[N.LTXAV_TEXT_ENCODER].inputs){
@@ -1864,7 +1958,6 @@ function buildGraph(mode, job){
   if(isDiffusionModel && (!vaeChoice || vaeChoice === "Checkpoint")){
     vaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-conv-bf16")) ||
                 (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-bf16")) ||
-                (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("pruna_ltx2.3_vae")) ||
                 "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors";
   }
   const useCustomVae = vaeChoice && vaeChoice !== "Checkpoint";
@@ -1887,7 +1980,6 @@ function buildGraph(mode, job){
   let audioVaeChoice = (j ? j.audioVae : $("audioVaeSelect")?.value) || "";
   if(isDiffusionModel && (!audioVaeChoice || audioVaeChoice === "Checkpoint")){
     audioVaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-audio-vae-bf16")) ||
-                     (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("LTX23_audio_vae")) ||
                      "LTX-2/ltx-2.5-audio-vae-bf16.safetensors";
   }
   if(audioVaeChoice && audioVaeChoice !== "Checkpoint" && g["617"]){
@@ -1906,18 +1998,14 @@ function buildGraph(mode, job){
       if (base === diffBase2) return false;
       return !m.includes("diffusion_models") && (base.includes("ltx-") || base.includes("ltx_") || base.includes("sulphur"));
     };
-    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt2) || "ltxv/sulphur_distil_bf16.safetensors";
+    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt2) || "Ligazón para Stable-Diffusion/ltx-2.5-av-proj-ref.safetensors";
     g["617"].class_type = "LTXVAudioVAELoader";
     g["617"].inputs.ckpt_name = isDiffusionModel ? baseCkpt : modelChoice;
   }
 
-  // Latent Upscaler Model (nodo 743 para el 2º pase)
+  // Latent Upscaler Model (nodo 743 para el 2º pase) — exclusivo LTX 2.5
   if(g["743"] && g["743"].inputs){
-    if(isDiffusionModel || modelChoice.includes("ltx-2.5")){
-      g["743"].inputs.model_name = "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors";
-    } else {
-      g["743"].inputs.model_name = "ltx-2.3-spatial-upscaler-x2-1.1.safetensors";
-    }
+    g["743"].inputs.model_name = "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors";
   }
 
   const bitDepth = j ? j.bitDepth : getBitDepth();
@@ -1946,11 +2034,13 @@ function buildGraph(mode, job){
     }
   }
 
-  // Steps del primer pase: regenerar sigmas interpolando desde la curva base 10-step
-  const firstSteps = parseInt((j ? j.firstPassSteps : $("firstPassSteps")?.value) || 10, 10);
+  // Steps del primer pase: regenerar sigmas interpolando desde la curva base oficial 8-step
+  const firstSteps = parseInt((j ? j.firstPassSteps : $("firstPassSteps")?.value) || 8, 10);
   if(g[N.FIRST_SIGMAS] && g[N.FIRST_SIGMAS].inputs){
     g[N.FIRST_SIGMAS].inputs.sigmas = buildFirstPassSigmas(firstSteps);
   }
+  // Diálogo / audio nativo: negativo dinámico + volumen de la salida (551/598).
+  applyDialogueMode(g, j ? j.dialogueMode : getDialogueMode());
 
   // El prompt de entrada para CLIPTextEncode procede siempre de RAW_PROMPT (el texto de #prompt).
   const rawPrompt = promptText.trim();
@@ -2744,14 +2834,30 @@ updateDuration();
 updateQueueUI();
 if(!$("enhancerChainMode").value) $("enhancerChainMode").value = "ollama";
 
+// Guía de prompt para el audio nativo de LTX-2.5 (hint en el panel Prompt compartido).
+(function addLtxvPromptAudioHint(){
+  const ta = $("prompt");
+  if(!ta) return;
+  const panel = ta.closest(".panel");
+  if(!panel) return;
+  if(panel.querySelector(".ltxv-audio-hint")) return;
+  const hint = document.createElement("div");
+  hint.className = "hint ltxv-audio-hint";
+  hint.style.cssText = "font-size:10px;margin-top:6px;";
+  hint.innerHTML = "LTX-2.5 genera audio nativo: describe el ambiente sonoro en positivo (olas, viento, cristales, música de bar). Frases tipo \u00abno dialogue is spoken\u00bb <b>promueven</b> el murmullo (labios en movimiento); los t\u00e9rminos de di\u00e1logo van en el negativo (ya incluidos). En i2v, \u00abFidelidad\u00bb es el anclaje a la imagen: b\u00e1jala (0.4\u20130.7) para darle protagonismo a las acciones del prompt (besar, caminar\u2026).";
+  panel.appendChild(hint);
+})();
+
 // --- FIRST PASS SIGMAS ---
-// Curva base 10-step tal como está en el workflow original.
-const BASE_FIRST_SIGMAS = [1.000, 0.955, 0.893, 0.812, 0.715, 0.603, 0.482, 0.241, 0.121, 0.0];
+// Curva base oficial 8-step de la receta distill LTX-2.5:
+// 1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0
+const BASE_FIRST_SIGMAS = [1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0];
 function lerp(a, b, t){ return a + (b - a) * t; }
 function buildFirstPassSigmas(steps){
+  // `steps` = pasos reales del sampler; ManualSigmas necesita steps+1 entradas
+  // (la última siempre 0). Con steps=8 reproduce la curva oficial exacta.
   steps = Math.max(4, Math.min(12, steps));
-  if(steps === BASE_FIRST_SIGMAS.length) return BASE_FIRST_SIGMAS.join(", ");
-  const positions = steps;
+  const positions = steps + 1;
   const out = [];
   const maxIdx = BASE_FIRST_SIGMAS.length - 1;
   for(let i = 0; i < positions; i++){
@@ -2760,9 +2866,11 @@ function buildFirstPassSigmas(steps){
     const t = rawPos - idx;
     const a = BASE_FIRST_SIGMAS[idx];
     const b = BASE_FIRST_SIGMAS[Math.min(idx + 1, maxIdx)];
-    out.push(lerp(a, b, t));
+    let s = (t === 0) ? a : lerp(a, b, t);
+    if(i === positions - 1) s = 0;
+    out.push(s);
   }
-  return out.map(s => s.toFixed(4).replace(/\.?0+$/,"")).join(", ");
+  return out.map(s => s.toFixed(6).replace(/\.?0+$/,"")).join(", ");
 }
 
 // --- EVOLVE / TRANSMUTAR PROMPT ---

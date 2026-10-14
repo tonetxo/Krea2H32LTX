@@ -400,6 +400,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         return path == "/api/video_preprocess"
 
+    def _is_ui_launch(self):
+        return self.path.split("?")[0] == "/api/ui_launch"
+
     # Tope de body multipart: validar el Content-Length ANTES de leer el body,
     # para que un Content-Length arbitrario no OOMee el proceso.
     MAX_MULTIPART_BODY = 256 * 1024 * 1024  # 256 MB (vídeo preprocesado)
@@ -712,6 +715,58 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
 
     def _is_ws(self):
         return self.path.split("?")[0].startswith(WS_PREFIX)
+
+    # Arranque automático de otras WebUIs: /api/ui_launch?target=<name>.
+    # Comprueba si el puerto de la WebUI pedida responde; si no, lanza otra
+    # instancia de serve.py para ella (misma sintaxis que los lanzar_*.sh) y
+    # espera a que esté en pie antes de responder.
+    UI_PORTS = {}
+    def _resolve_ui_ports(self):
+        return {
+            "ltxv": config_loader.get_port("ltxv", 8000),
+            "krea2": config_loader.get_port("krea2", 8001),
+            "minimaxh3": config_loader.get_port("minimaxh3", 8002),
+            "mmh3x2": config_loader.get_port("mmh3x2", 8003),
+            "kreaqwen": config_loader.get_port("kreaqwen", 8004),
+        }
+    UI_PAGES = {
+        "ltxv": "LTXV_WebUI.html",
+        "krea2": "Krea2_WebUI.html",
+        "minimaxh3": "MiniMaxH3_WebUI.html",
+        "mmh3x2": "MMH3X2_WebUI.html",
+        "kreaqwen": "KreaQwen_WebUI.html",
+    }
+    def _port_usable(self, port, host="127.0.0.1", timeout=1.0):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            return s.connect_ex((host, int(port))) == 0
+    def _do_ui_launch(self):
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        name = (qs.get("target") or [""])[0].lower().strip()
+        ports = self._resolve_ui_ports()
+        page = self.UI_PAGES.get(name)
+        if(not page) or name not in ports:
+            self._send_json(400, {"error": f"webui desconocida: {name or '(vacía)'}"})
+            return
+        port = int(ports[name])
+        if(port == PORT or self._port_usable(port)):
+            self._send_json(200, {"ok": True, "already_running": True, "port": port, "page": page})
+            return
+        args = [sys.executable, os.path.join(os.path.dirname(os.path.realpath(__file__)), "serve.py"), str(port)]
+        # conservar BACKEND_URL (argv2) y KREA2_OUTPUT_DIR (argv3) si se lanzaron así
+        if len(sys.argv) > 2: args.append(sys.argv[2])
+        if len(sys.argv) > 3: args.append(sys.argv[3])
+        env = dict(os.environ)
+        env.setdefault("HOST", "0.0.0.0")
+        proc = subprocess.Popen(args, cwd=os.path.dirname(os.path.realpath(__file__)),
+                                env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                start_new_session=True)
+        for _ in range(30):  # espera hasta 15s
+            time.sleep(0.5)
+            if self._port_usable(port):
+                self._send_json(200, {"ok": True, "started": True, "pid": proc.pid, "port": port, "page": page})
+                return
+        self._send_json(500, {"error": f"no quedó en pie la WebUI '{name}' (:{port}) tras el arranque"})
     def do_GET(self):
         if self._is_ws():
             self._ws_proxy()
@@ -727,6 +782,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._do_mmh3x2_list()
         elif self._is_prompts_route():
             self._do_prompts_get()
+        elif self._is_ui_launch():
+            self._do_ui_launch()
         elif self._is_ollama_route():
             self._proxy("GET", OLLAMA)
         elif self._is_llamacpp_route():
@@ -753,6 +810,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(405, {"error": "method not allowed"})
         elif self._is_prompts_route():
             self._do_prompts_post()
+        elif self._is_ui_launch():
+            self._send_json(405, {"error": "method not allowed"})
         elif self._is_file_delete():
             self._do_file_delete()
         elif self._is_krea2_upload():
@@ -778,7 +837,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self._cors_preflight()
         elif self._is_proxy_route():
             self._proxy("OPTIONS", get_backend())
-        elif self._is_krea2_upload() or self._is_file_delete() or self._is_video_preprocess() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list() or self._is_mmh3x2_list():
+        elif self._is_krea2_upload() or self._is_file_delete() or self._is_video_preprocess() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list() or self._is_mmh3x2_list() or self._is_ui_launch():
             # Endpoints custom también necesitan preflight same-origin.
             self._cors_preflight()
         else:

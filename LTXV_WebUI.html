@@ -564,14 +564,24 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
     <!-- COLUMNA 2 (CENTRO): AJUSTES, MODELOS Y PIPELINE -->
     <div class="settings-col">
       <div class="panel"><h2>Modelo</h2><div class="row"><select id="modelSelect"></select></div></div>
-      <div class="panel" id="textEncoderPanel"><h2>Text Encoder (Gemma)</h2><div class="row"><select id="textEncoderSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Text Encoder para LTX-2.5 (UNet/diffusion model). LTX-2.3 utiliza su encoder integrado.</div></div>
+      <div class="panel" id="textEncoderPanel"><h2>Text Encoder (Gemma)</h2><div class="row"><select id="textEncoderSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">Text Encoder Gemma4 para LTX-2.5 (UNet/diffusion model). Recargador del proyecto si cambias de encoder.</div></div>
       <div class="panel"><h2>VAE Vídeo</h2><div class="row"><select id="vaeSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">"Checkpoint" usa el VAE integrado. Para UNet/LTX-2.5 se utiliza el VAE de vídeo seleccionado.</div></div>
       <div class="panel"><h2>VAE Audio</h2><div class="row"><select id="audioVaeSelect"></select></div><div class="hint" style="margin-top:4px;font-size:10px;">"Checkpoint" usa el Audio VAE integrado. O selecciona un Audio VAE dedicado (ej: ltx-2.5-audio-vae).</div></div>
       <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="12345" step="1" disabled></div>
       <div class="panel"><h2>Resolución &amp; duración</h2><div class="row slider-row"><label>Megapíxeles <span class="hint" id="arDetectHint">(16:9)</span></label><input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.9"><div class="slider-val" id="mpVal">0.90</div></div><div class="row two-col"><div><label>Ancho</label><input type="number" id="width" value="1280" step="32" min="256" class="ro" readonly></div><div><label>Alto</label><input type="number" id="height" value="736" step="32" min="256" class="ro" readonly></div></div><div class="row"><label>Frames <span class="hint" id="durHint">(600 / 24fps = 25.0s)</span></label><input type="number" id="frames" value="600" step="8" min="8"></div>
       <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" min="1" max="16"></div></div>
       <div class="panel"><h2>Fidelidad</h2><div class="row slider-row"><input type="range" id="fidelitySlider" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="fidelityVal">1.00</div></div></div>
-      <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="10"><div class="slider-val" id="firstPassStepsVal">10</div></div></div>
+      <div class="panel"><h2>Diálogo (audio nativo)</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segDlgSilence" data-value="no_dialogue">Sin diálogo</div>
+          <div class="seg" id="segDlgAuto" data-value="auto">Auto (el prompt)</div>
+          <div class="seg" id="segDlgSpeak" data-value="dialogue">Con diálogo</div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:6px;">
+          <b>Sin diálogo</b>: silencia el audio (-100 dB) y refuerza el negativo con términos de habla. <b>Auto</b>: audio audible y decision del modelo según el prompt — describe el ambiente en positivo (olas, viento, música); «no dialogue is spoken» en el prompt <i>promueve</i> el murmullo. <b>Con diálogo</b>: audio audible y negativo sin los términos que frenan la voz (yelling/newscast/interview/podcast); escribe la línea hablada en el prompt y el modelo la sincroniza con los labios.
+        </div>
+      </div>
+      <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="8"><div class="slider-val" id="firstPassStepsVal">8</div></div></div>
       <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
       <div class="panel">
         <div class="collapsible-header" id="loraToggle">
@@ -986,7 +996,7 @@ const BASE_GRAPH = {
   },
   "582": {
     "inputs": {
-      "sigmas": "0.92, 0.725, 0.421875, 0.0"
+      "sigmas": "0.909375, 0.725, 0.421875, 0.0"
     },
     "class_type": "ManualSigmas",
     "_meta": {
@@ -1053,7 +1063,7 @@ const BASE_GRAPH = {
   "616": {
     "inputs": {
       "text_encoder": "gemma-3-12b-it-ablit-norms-biproj-fp8mixed.safetensors",
-      "ckpt_name": "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors",
+      "ckpt_name": "Ligazón para Stable-Diffusion/ltx-2.5-av-proj-ref.safetensors",
       "device": "default"
     },
     "class_type": "LTXAVTextEncoderLoader",
@@ -1063,7 +1073,7 @@ const BASE_GRAPH = {
   },
   "617": {
     "inputs": {
-      "ckpt_name": "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors"
+      "ckpt_name": "Ligazón para Stable-Diffusion/ltx-2.5-av-proj-ref.safetensors"
     },
     "class_type": "LTXVAudioVAELoader",
     "_meta": {
@@ -1083,7 +1093,7 @@ const BASE_GRAPH = {
   },
   "646": {
     "inputs": {
-      "ckpt_name": "ltxv/ltx-2.3-22b-dev-fp8mixed.safetensors"
+      "ckpt_name": "ltxv/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -1137,7 +1147,7 @@ const BASE_GRAPH = {
     },
     "class_type": "LTXVLatentUpsamplerTiled",
     "_meta": {
-      "title": "\ud83d\udd0d LTX Latent Upsampler (Tiled)"
+      "title": "🔍 LTX Latent Upsampler (Tiled)"
     }
   },
   "770": {
@@ -1283,7 +1293,7 @@ const BASE_GRAPH = {
         "lora": "ltxv/anal-insertion-i2v.safetensors",
         "strength": 0.65
       },
-      "\u2795 Add Lora": "",
+      "➕ Add Lora": "",
       "model": [
         "906",
         0
@@ -1322,7 +1332,7 @@ const BASE_GRAPH = {
     },
     "class_type": "LTXReferenceConditioning",
     "_meta": {
-      "title": "\ud83c\udfb4 LTX Reference Conditioning"
+      "title": "🎴 LTX Reference Conditioning"
     }
   },
   "868": {
@@ -1336,7 +1346,7 @@ const BASE_GRAPH = {
     },
     "class_type": "LTXReferenceEnable",
     "_meta": {
-      "title": "\ud83d\udd17 LTX Reference Enable"
+      "title": "🔗 LTX Reference Enable"
     }
   },
   "870": {
@@ -1363,7 +1373,7 @@ const BASE_GRAPH = {
     },
     "class_type": "LTXReferenceConditioning",
     "_meta": {
-      "title": "\ud83c\udfb4 LTX Reference Conditioning"
+      "title": "🎴 LTX Reference Conditioning"
     }
   },
   "871": {
@@ -1599,7 +1609,7 @@ const BASE_GRAPH = {
   },
   "906": {
     "inputs": {
-      "lora_name": "Ligaz\u00f3n para Lora/ltxv/LTX2.3_DMD_reshaped_r256.safetensors",
+      "lora_name": "Ligazón para Lora/ltxv/LTX2.3_DMD_reshaped_r256.safetensors",
       "strength_model": 1,
       "model": [
         "868",
@@ -1647,7 +1657,7 @@ const BASE_GRAPH = {
   },
   "914": {
     "inputs": {
-      "sigmas": "1.000, 0.955, 0.893, 0.812, 0.715, 0.603, 0.482, 0.241, 0.121, 0.0"
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
     },
     "class_type": "ManualSigmas",
     "_meta": {
@@ -1876,7 +1886,7 @@ const BASE_GRAPH = {
   },
   "1005": {
     "inputs": {
-      "vae_name": "pruna_ltx2.3_vae_comfy_bf16.safetensors"
+      "vae_name": "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors"
     },
     "class_type": "VAELoader",
     "_meta": {
@@ -1884,9 +1894,9 @@ const BASE_GRAPH = {
     }
   }
 };
-const AVAILABLE_MODELS = ["diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "diffusion_models/ltx2.5-Stubelius_remix_v1_int8_convrot.safetensors", "ltxv/sulphur_distil_bf16.safetensors"];
+const AVAILABLE_MODELS = ["diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors", "diffusion_models/ltx2.5-Stubelius_remix_v1_int8_convrot.safetensors", "ltx-2.5-av-proj-ref.safetensors"];
 const AVAILABLE_LORAS = ["Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "DR34ML4Y_LTXXX_V2.safetensors", "HeroCam_LTX2_bucket113_step_02000.safetensors", "IvoriLTX_000000250.safetensors", "IvoriLTX_000000750.safetensors", "IvoriLTX_000001000.safetensors", "IvoriLTX_000001250.safetensors", "IvoriLTX_000001500.safetensors", "LTX-2 - She Struts.safetensors", "LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "LTX-2.3-RL-Lora.safetensors", "LTX2-i2v-SexThrust.safetensors", "LTX2.3-MysticXXX.safetensors", "LTX2.3Animated.safetensors", "LTX2.3_666asslick.safetensors", "LTX2.3_Crisp_Enhance.safetensors", "LTX2.3_DMD_reshaped_r256.safetensors", "LTX2.3_Soft_Enhance.safetensors", "LTX23_Multipurpose_NSFW_v2.safetensors", "LTX23_SexFromBehind_v0_1.safetensors", "Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "Post_Apocalyptic.safetensors", "anal-insertion-i2v.safetensors", "beauty_of_rain_ltx23.safetensors", "cowgirl-ride-withfuta.safetensors", "cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "doggystyle_ltx_000004200.safetensors", "full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltx2.3-transition.safetensors", "ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltx23_srx_scififilm_lora.safetensors", "ltx2_fnelson-5000steps.k3nk.safetensors", "nsfw_anal_insertion_ltx23_v1.0.safetensors", "phool-realism-ltx-2.3-v1.0.safetensors", "plora_sulfer_v1.2-step00008500.safetensors", "realisdance_ltx2.3_ic-lora_step_02000.safetensors", "sulphur_experimental_lora_v1.safetensors", "traxegal/traxegalltxv.safetensors", "traxegal/traxegalltxv_000002100.safetensors", "traxegal/traxegalltxv_000003300.safetensors", "uxiltxv2.3_UP_merged.safetensors", "vbvr-ltx2.3.safetensors", "xaliyo/aliyo.safetensors", "xaliyo/aliyo_000001800.safetensors", "xaliyo/aliyo_000003900.safetensors", "xaliyo/aliyo_000005700.safetensors", "xgeva/evaltxv.safetensors", "xgeva/evaltxv2.safetensors", "xgeva/evaltxv3.safetensors", "xgisa/isaltxv_000001500.safetensors", "xgliz/lizltxv.safetensors", "xgliz/lizltxv2.safetensors", "xgliz/lizltxv3.safetensors", "xguxi/sheltxv2.safetensors", "xguxi/uxi3ltxv.safetensors", "xguxi/uxiltxv.safetensors", "xguxi/uxiltxv2.3.safetensors", "xgvir/virltxv_000001000.safetensors", "xsab/latxSab.safetensors", "xsab/latxSab_000001000.safetensors", "xsab/latxSab_000001500.safetensors", "xsab/latxSab_merged.safetensors", "xyol/yoltx.safetensors", "xyol/yoltx_merged.safetensors"];
-const AVAILABLE_VAES = ["AceStep/ace_1.5_vae.safetensors", "Flux/ae.safetensors", "Flux/flux2-vae.safetensors", "Flux/ultra_flux1.safetensors", "LTX-2/LTX23_audio_vae_bf16.safetensors", "LTX-2/LTX23_video_vae_bf16.safetensors", "LTX-2/ltx-2.5-audio-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors", "LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors", "LTX2/LTX23_audio_vae_bf16.safetensors", "LTX2/LTX23_video_vae_bf16.safetensors", "LTX2/LTX2_audio_vae.safetensors", "MingImage/ming_image_vae_bf16.safetensors", "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors", "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors", "MiniMaxMusic3/minimax_music3_dav.safetensors", "QwenImage/REPA-E_qwen.safetensors", "QwenImage/qwen_image_2.1_vae_bf16.safetensors", "QwenImage/qwen_image_vae.safetensors", "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors", "SeedVR2/seedvr2_ema_vae_fp16.safetensors", "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Wan/wan_2.1_vae.safetensors", "ace_1.5_vae.safetensors", "ema_vae_fp16.safetensors", "flux2-vae.safetensors", "lumina2_vae_fp32.safetensors", "qwenImageVAESharpKrea2_sharpFp32.safetensors", "qwen_image_vae.safetensors", "sd3_vae.safetensors", "sdxl_vae.safetensors", "taeltx2_3.safetensors", "wan/wan_2.1_vae.safetensors"];
+const AVAILABLE_VAES = ["AceStep/ace_1.5_vae.safetensors", "Flux/ae.safetensors", "Flux/flux2-vae.safetensors", "Flux/ultra_flux1.safetensors", "LTX-2/ltx-2.5-audio-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-bf16.safetensors", "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors", "LTX2/LTX2_audio_vae.safetensors", "MingImage/ming_image_vae_bf16.safetensors", "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors", "MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors", "MiniMaxMusic3/minimax_music3_dav.safetensors", "QwenImage/REPA-E_qwen.safetensors", "QwenImage/qwen_image_2.1_vae_bf16.safetensors", "QwenImage/qwen_image_vae.safetensors", "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors", "SeedVR2/seedvr2_ema_vae_fp16.safetensors", "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Wan/wan_2.1_vae.safetensors", "ace_1.5_vae.safetensors", "ema_vae_fp16.safetensors", "flux2-vae.safetensors", "lumina2_vae_fp32.safetensors", "qwenImageVAESharpKrea2_sharpFp32.safetensors", "qwen_image_vae.safetensors", "sd3_vae.safetensors", "sdxl_vae.safetensors", "wan/wan_2.1_vae.safetensors"];
 const AVAILABLE_UNETS = [];
 const AVAILABLE_CLIPS = ["LTX-2/gemma4_e2b_it_bf16.safetensors", "gemma-3-12b-it-ablit-norms-biproj-fp8mixed.safetensors", "gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors", "gemma4_e4b_it_fp8_scaled.safetensors", "gemma_3_12B_it.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
@@ -4370,6 +4380,56 @@ function enableInterUIDrop(el, onFile){
     }
   });
 }
+// --- ARRANQUE AUTOMÁTICO DE OTRAS WEBUIS ---
+// Los botones de envío cruzado (→LTXV / →H3 / →X2 ...) no deben fallar si la
+// WebUI de destino no está en pie: comprueba si responde (fetch no-cors, que
+// resuelve con cualquier respuesta HTTP y rechaza con conexión rechazada) y,
+// si no, pide a esta misma serve.py que la lance (/api/ui_launch) esperando
+// hasta ~40s antes de abrir la pestaña.
+function externalWebUINameFor(page){
+  return ({
+    "LTXV_WebUI.html": "ltxv",
+    "Krea2_WebUI.html": "krea2",
+    "MiniMaxH3_WebUI.html": "minimaxh3",
+    "MMH3X2_WebUI.html": "mmh3x2",
+    "MMH3X2_WebUI_BlockATT.html": "mmh3x2",
+    "KreaQwen_WebUI.html": "kreaqwen",
+  })[page] || null;
+}
+async function externalWebUIBaseUrl(targetPort, targetPage){
+  const here = window.location;
+  const base = `${here.protocol}//${here.hostname}:${targetPort}`;
+  try {
+    await fetch(`${base}/${targetPage}`, { mode: "no-cors", signal: AbortSignal.timeout(2000) });
+    return base;
+  } catch(_){}
+  const name = externalWebUINameFor(targetPage);
+  if(!name) return base; // página sin mapping: comportamiento clásico
+  try {
+    const r = await fetch(`/api/ui_launch?target=${encodeURIComponent(name)}`, { signal: AbortSignal.timeout(40000) });
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    if(d.started) log(`✅ WebUI ${name} arrancada automáticamente (puerto ${d.port}).`, "l-ok");
+    else log(`ℹ️ ${name} ya estaba en pie (puerto ${d.port}).`, "l-info");
+  } catch(e){
+    log(`⚠️ No se pudo arrancar ${name} (${e.message || e}); abriendo igualmente...`, "l-warn");
+  }
+  return base;
+}
+async function openExternalWebUIRef(targetPort, targetPage, filename, subfolder, label){
+  const sf = (subfolder || "").replace(/^\/+|\/+$/g, "");
+  const ref = encodeURIComponent((sf ? sf + "/" : "") + filename);
+  const base = await externalWebUIBaseUrl(targetPort, targetPage);
+  const url = `${base}/${targetPage}?ref=${ref}`;
+  const win = window.open(url, "_blank");
+  if(!win){
+    log("⚠️ El navegador bloqueó la nueva pestaña. Permite popups y reintenta.", "l-err");
+  } else if(label){
+    log(`↗️ Abriendo ${label} con la imagen: ${filename}`, "l-ok");
+  }
+  return win;
+}
+
 // ltxv.js — LTXV-specific JavaScript.
 // Injected AFTER common.js. CONFIG must be defined before initCommon().
 
@@ -5011,6 +5071,65 @@ $("queueItemsToggle")?.addEventListener("click", () => {
 });
 
 let jobCounter = 0;
+// --- DIÁLOGO / AUDIO NATIVO (LTX-2.5 genera audio con el vídeo) ---
+// Términos que desalientan la voz, aplicados dinámicamente al negativo:
+// "Sin diálogo" los añade; "Con diálogo" los retira junto a newscast/interview...
+const DIALOGUE_NEG_TERMS = "dialogue, speech, talking, voices, conversation, chatter, murmuring, whispering, monologue, lip-sync";
+const DIALOGUE_STRIP_FOR_SPEECH = ["yelling", "newscast", "interview", "podcast"];
+const DIALOGUE_STRIP_RE = new RegExp(",?\\s*\\b(dialogue|speech|talking|voices|conversation|chatter|murmuring|whispering|monologue|lip-sync)\\b", "gi");
+
+function getDialogueMode(){
+  const byId = { "segDlgAuto": "auto", "segDlgSilence": "no_dialogue", "segDlgSpeak": "dialogue" };
+  for(const [id, val] of Object.entries(byId)){
+    if($(id)?.classList.contains("on")) return val;
+  }
+  return "no_dialogue";
+}
+function setDialogueModeUI(mode){
+  const map = { "auto": "segDlgAuto", "no_dialogue": "segDlgSilence", "dialogue": "segDlgSpeak" };
+  for(const [val, id] of Object.entries(map)){
+    $(id)?.classList.toggle("on", val === (mode || "no_dialogue"));
+  }
+}
+function initDialogueListeners(){
+  $("segDlgAuto")?.addEventListener("click", () => {
+    setDialogueModeUI("auto");
+    if(typeof scheduleSaveLtxvSettings === "function") scheduleSaveLtxvSettings();
+  });
+  $("segDlgSilence")?.addEventListener("click", () => {
+    setDialogueModeUI("no_dialogue");
+    if(typeof scheduleSaveLtxvSettings === "function") scheduleSaveLtxvSettings();
+  });
+  $("segDlgSpeak")?.addEventListener("click", () => {
+    setDialogueModeUI("dialogue");
+    if(typeof scheduleSaveLtxvSettings === "function") scheduleSaveLtxvSettings();
+  });
+}
+// Aplica el modo al negativo (nodo 537 CLIPTextEncode estático del workflow) y al volumen de audio (551/598).
+function applyDialogueMode(g, mode){
+  mode = mode || "no_dialogue";
+  const negNode = g["537"];
+  if(negNode && negNode.inputs && typeof negNode.inputs.text === "string"){
+    let neg = negNode.inputs.text.replace(DIALOGUE_STRIP_RE, "");
+    neg = neg.replace(/\s+,/g, ",").replace(/,\s*,/g, ",");
+    if(mode === "no_dialogue"){
+      if(!neg.toLowerCase().includes("dialogue")) neg = neg.replace("yelling", "yelling, " + DIALOGUE_NEG_TERMS);
+    } else if(mode === "dialogue"){
+      for(const t of DIALOGUE_STRIP_FOR_SPEECH){
+        neg = neg.replace(new RegExp(",?\\s*\\b" + t + "\\b", "gi"), "");
+      }
+      neg = neg.replace(/\s+,/g, ",").replace(/,\s*,/g, ",");
+    }
+    negNode.inputs.text = neg.replace(/,\s*$/, "");
+  }
+  // Audio en la salida: -100 dB silencia; el resto suena tal cual se generó.
+  for(const vid of ["551", "598"]){
+    if(g[vid] && g[vid].class_type === "AudioAdjustVolume"){
+      g[vid].inputs.volume = (mode === "no_dialogue") ? -100 : 1;
+    }
+  }
+}
+
 function snapshotJob(firstPassOnly){
   // Captura inmutable de todos los parámetros necesarios para reproducir el job
   return {
@@ -5025,7 +5144,8 @@ function snapshotJob(firstPassOnly){
     mp: $("mpSlider").value,
     fidelity: $("fidelitySlider").value,
     motion: $("motionSlider").value,
-    firstPassSteps: $("firstPassSteps")?.value || "10",
+    dialogueMode: getDialogueMode(),
+    firstPassSteps: $("firstPassSteps")?.value || "8",
     model: $("modelSelect")?.value,
     textEncoder: $("textEncoderSelect")?.value,
     vae: $("vaeSelect")?.value,
@@ -5426,6 +5546,37 @@ async function applyWorkflow(workflow, opts={}){
     setApplied("prompt");
   }
 
+  // Restaurar modo diálogo: negativo con términos de ban o volumen -100 → "Sin diálogo".
+  let dlgSet = false;
+  {
+    const negNodes = [];
+    for(const k of Object.keys(workflow)){
+      const n = workflow[k];
+      if(n && n.class_type === "CLIPTextEncode" && n.inputs && typeof n.inputs.text === "string") negNodes.push(n);
+    }
+    const neg = negNodes.map(n => n.inputs.text).join(" ");
+    if(/\b(dialogue|speech|talking|voices|chatter)\b/i.test(neg)){ setDialogueModeUI("no_dialogue"); dlgSet = true; }
+  }
+  {
+    const avNodes = [];
+    for(const k of Object.keys(workflow)){
+      const n = workflow[k];
+      if(n && n.class_type === "AudioAdjustVolume" && n.inputs && n.inputs.volume != null) avNodes.push(n);
+    }
+    if(avNodes.some(n => Number(n.inputs.volume) <= -90)){ setDialogueModeUI("no_dialogue"); dlgSet = true; }
+    else if(avNodes.some(n => Number(n.inputs.volume) >= 1) && !dlgSet){
+      const negNodes2 = [];
+      for(const k of Object.keys(workflow)){
+        const n = workflow[k];
+        if(n && n.class_type === "CLIPTextEncode" && n.inputs && typeof n.inputs.text === "string") negNodes2.push(n);
+      }
+      const neg2 = negNodes2.map(n => n.inputs.text).join(" ").toLowerCase();
+      if(!/(newscast|podcast|yelling)/.test(neg2)){ setDialogueModeUI("dialogue"); dlgSet = true; }
+      else { setDialogueModeUI("auto"); dlgSet = true; }
+    }
+    if(dlgSet) setApplied("diálogo");
+  }
+
   const powerLora = findByClass("Power Lora Loader (rgthree)");
   if(powerLora && powerLora.inputs){
     for(let i = 0; i < loras.length; i++){
@@ -5698,8 +5849,9 @@ function saveLtxvSettings(){
     frames: $("frames")?.value || "241",
     batchSize: $("batchSize")?.value || "1",
     fidelity: $("fidelitySlider")?.value || "0.25",
-    firstPassSteps: $("firstPassSteps")?.value || "9",
+    firstPassSteps: $("firstPassSteps")?.value || "8",
     motion: $("motionSlider")?.value || "1.0",
+    dialogueMode: getDialogueMode(),
     rife: getRifeState(),
     rtx: getRtxState(),
     bitDepth: getBitDepth(),
@@ -5784,6 +5936,7 @@ function restoreLtxvSettings(){
     }
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
 
+    if(s.dialogueMode) setDialogueModeUI(s.dialogueMode);
     if(s.fidelity !== undefined && $("fidelitySlider")){
       $("fidelitySlider").value = s.fidelity;
       if($("fidelityVal")) $("fidelityVal").textContent = parseFloat(s.fidelity).toFixed(2);
@@ -5830,6 +5983,7 @@ loadVaes();
 loadTextEncoders();
 
 // Restaurar ajustes guardados o fallback legacy
+initDialogueListeners();
 if(!restoreLtxvSettings()){
   const legacyPrompt = localStorage.getItem("ltxv_prompt");
   if(legacyPrompt !== null && $("prompt")) $("prompt").value = legacyPrompt;
@@ -6213,7 +6367,7 @@ function buildGraph(mode, job){
       if (base === diffBase) return false;
       return !m.includes("diffusion_models") && (base.includes("ltx-") || base.includes("ltx_") || base.includes("sulphur"));
     };
-    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt) || "ltxv/sulphur_distil_bf16.safetensors";
+    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt) || "Ligazón para Stable-Diffusion/ltx-2.5-av-proj-ref.safetensors";
 
     const textEncoderChoice = (j ? j.textEncoder : $("textEncoderSelect")?.value) || "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors";
     if(g[N.LTXAV_TEXT_ENCODER] && g[N.LTXAV_TEXT_ENCODER].inputs){
@@ -6236,7 +6390,6 @@ function buildGraph(mode, job){
   if(isDiffusionModel && (!vaeChoice || vaeChoice === "Checkpoint")){
     vaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-conv-bf16")) ||
                 (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-video-vae-bf16")) ||
-                (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("pruna_ltx2.3_vae")) ||
                 "LTX-2/ltx-2.5-video-vae-conv-bf16.safetensors";
   }
   const useCustomVae = vaeChoice && vaeChoice !== "Checkpoint";
@@ -6259,7 +6412,6 @@ function buildGraph(mode, job){
   let audioVaeChoice = (j ? j.audioVae : $("audioVaeSelect")?.value) || "";
   if(isDiffusionModel && (!audioVaeChoice || audioVaeChoice === "Checkpoint")){
     audioVaeChoice = (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("ltx-2.5-audio-vae-bf16")) ||
-                     (typeof AVAILABLE_VAES !== "undefined" ? AVAILABLE_VAES : []).find(v => v.includes("LTX23_audio_vae")) ||
                      "LTX-2/ltx-2.5-audio-vae-bf16.safetensors";
   }
   if(audioVaeChoice && audioVaeChoice !== "Checkpoint" && g["617"]){
@@ -6278,18 +6430,14 @@ function buildGraph(mode, job){
       if (base === diffBase2) return false;
       return !m.includes("diffusion_models") && (base.includes("ltx-") || base.includes("ltx_") || base.includes("sulphur"));
     };
-    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt2) || "ltxv/sulphur_distil_bf16.safetensors";
+    const baseCkpt = availableLtxvModels.find(looksLikeLtxCkpt2) || "Ligazón para Stable-Diffusion/ltx-2.5-av-proj-ref.safetensors";
     g["617"].class_type = "LTXVAudioVAELoader";
     g["617"].inputs.ckpt_name = isDiffusionModel ? baseCkpt : modelChoice;
   }
 
-  // Latent Upscaler Model (nodo 743 para el 2º pase)
+  // Latent Upscaler Model (nodo 743 para el 2º pase) — exclusivo LTX 2.5
   if(g["743"] && g["743"].inputs){
-    if(isDiffusionModel || modelChoice.includes("ltx-2.5")){
-      g["743"].inputs.model_name = "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors";
-    } else {
-      g["743"].inputs.model_name = "ltx-2.3-spatial-upscaler-x2-1.1.safetensors";
-    }
+    g["743"].inputs.model_name = "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors";
   }
 
   const bitDepth = j ? j.bitDepth : getBitDepth();
@@ -6318,11 +6466,13 @@ function buildGraph(mode, job){
     }
   }
 
-  // Steps del primer pase: regenerar sigmas interpolando desde la curva base 10-step
-  const firstSteps = parseInt((j ? j.firstPassSteps : $("firstPassSteps")?.value) || 10, 10);
+  // Steps del primer pase: regenerar sigmas interpolando desde la curva base oficial 8-step
+  const firstSteps = parseInt((j ? j.firstPassSteps : $("firstPassSteps")?.value) || 8, 10);
   if(g[N.FIRST_SIGMAS] && g[N.FIRST_SIGMAS].inputs){
     g[N.FIRST_SIGMAS].inputs.sigmas = buildFirstPassSigmas(firstSteps);
   }
+  // Diálogo / audio nativo: negativo dinámico + volumen de la salida (551/598).
+  applyDialogueMode(g, j ? j.dialogueMode : getDialogueMode());
 
   // El prompt de entrada para CLIPTextEncode procede siempre de RAW_PROMPT (el texto de #prompt).
   const rawPrompt = promptText.trim();
@@ -7116,14 +7266,30 @@ updateDuration();
 updateQueueUI();
 if(!$("enhancerChainMode").value) $("enhancerChainMode").value = "ollama";
 
+// Guía de prompt para el audio nativo de LTX-2.5 (hint en el panel Prompt compartido).
+(function addLtxvPromptAudioHint(){
+  const ta = $("prompt");
+  if(!ta) return;
+  const panel = ta.closest(".panel");
+  if(!panel) return;
+  if(panel.querySelector(".ltxv-audio-hint")) return;
+  const hint = document.createElement("div");
+  hint.className = "hint ltxv-audio-hint";
+  hint.style.cssText = "font-size:10px;margin-top:6px;";
+  hint.innerHTML = "LTX-2.5 genera audio nativo: describe el ambiente sonoro en positivo (olas, viento, cristales, música de bar). Frases tipo \u00abno dialogue is spoken\u00bb <b>promueven</b> el murmullo (labios en movimiento); los t\u00e9rminos de di\u00e1logo van en el negativo (ya incluidos). En i2v, \u00abFidelidad\u00bb es el anclaje a la imagen: b\u00e1jala (0.4\u20130.7) para darle protagonismo a las acciones del prompt (besar, caminar\u2026).";
+  panel.appendChild(hint);
+})();
+
 // --- FIRST PASS SIGMAS ---
-// Curva base 10-step tal como está en el workflow original.
-const BASE_FIRST_SIGMAS = [1.000, 0.955, 0.893, 0.812, 0.715, 0.603, 0.482, 0.241, 0.121, 0.0];
+// Curva base oficial 8-step de la receta distill LTX-2.5:
+// 1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0
+const BASE_FIRST_SIGMAS = [1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0];
 function lerp(a, b, t){ return a + (b - a) * t; }
 function buildFirstPassSigmas(steps){
+  // `steps` = pasos reales del sampler; ManualSigmas necesita steps+1 entradas
+  // (la última siempre 0). Con steps=8 reproduce la curva oficial exacta.
   steps = Math.max(4, Math.min(12, steps));
-  if(steps === BASE_FIRST_SIGMAS.length) return BASE_FIRST_SIGMAS.join(", ");
-  const positions = steps;
+  const positions = steps + 1;
   const out = [];
   const maxIdx = BASE_FIRST_SIGMAS.length - 1;
   for(let i = 0; i < positions; i++){
@@ -7132,9 +7298,11 @@ function buildFirstPassSigmas(steps){
     const t = rawPos - idx;
     const a = BASE_FIRST_SIGMAS[idx];
     const b = BASE_FIRST_SIGMAS[Math.min(idx + 1, maxIdx)];
-    out.push(lerp(a, b, t));
+    let s = (t === 0) ? a : lerp(a, b, t);
+    if(i === positions - 1) s = 0;
+    out.push(s);
   }
-  return out.map(s => s.toFixed(4).replace(/\.?0+$/,"")).join(", ");
+  return out.map(s => s.toFixed(6).replace(/\.?0+$/,"")).join(", ");
 }
 
 // --- EVOLVE / TRANSMUTAR PROMPT ---
