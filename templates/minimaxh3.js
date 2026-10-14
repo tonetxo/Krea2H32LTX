@@ -958,7 +958,7 @@ $("rifeModel")?.addEventListener("change", (e) => { const r = getRifeState(); r.
 
 // --- RTX VIDEO SUPER RESOLUTION (2x) ---
 const RTX_KEY = "minimaxh3_rtx_state";
-const RTX_DEFAULTS = { enabled: true, quality: "HIGHBITRATE_ULTRA" };
+const RTX_DEFAULTS = { enabled: true, quality: "HIGHBITRATE_ULTRA", scale: 2 };
 function loadRtx(){
   try { return Object.assign({}, RTX_DEFAULTS, JSON.parse(localStorage.getItem(RTX_KEY) || "{}")); }
   catch(_) { return {...RTX_DEFAULTS}; }
@@ -975,11 +975,13 @@ function setRtxUI(r){
     if(panel) panel.style.display = "none";
   }
   if($("rtxQuality") && r.quality) $("rtxQuality").value = r.quality;
+  if($("rtxScale") && r.scale) $("rtxScale").value = String(r.scale);
 }
 function getRtxState(){
   return {
     enabled: $("segRtxOn")?.classList.contains("on") ?? true,
-    quality: $("rtxQuality")?.value || "ULTRA"
+    quality: $("rtxQuality")?.value || "ULTRA",
+    scale: parseFloat($("rtxScale")?.value || "2")
   };
 }
 const _rtxState = loadRtx();
@@ -1004,6 +1006,12 @@ $("rtxQuality")?.addEventListener("change", () => {
   const r = getRtxState();
   saveRtx(r);
   scheduleSaveH3Settings();
+});
+$("rtxScale")?.addEventListener("change", () => {
+  const r = getRtxState();
+  saveRtx(r);
+  scheduleSaveH3Settings();
+  if(typeof recalcResolution === "function") recalcResolution();
 });
 
 // --- COLOR GRADING & LOOK CINEMÁTICO (POST-FX) ---
@@ -2281,18 +2289,20 @@ function recalcResolution(){
     }
   }
 
-  const rtxState = (typeof getRtxState === "function") ? getRtxState() : { enabled: true, quality: "ULTRA" };
-  const rtxMultiplier = rtxState.enabled ? 2 : 1;
+  const rtxState = (typeof getRtxState === "function") ? getRtxState() : { enabled: true, quality: "ULTRA", scale: 2 };
+  const rtxSameRes = /^(DENOISE|DEBLUR)_/.test(rtxState.quality || "");
+  const rtxMultiplier = (rtxState.enabled && !rtxSameRes) ? parseFloat(rtxState.scale || 2) : 1;
   const finalW = latentW * rtxMultiplier;
   const finalH = latentH * rtxMultiplier;
   const currentRatioName = getFriendlyRatio(w, h);
   if($("resFinalHint")){
+    const rtxLabel = rtxSameRes ? "limpieza RTX (misma resolución)" : `RTX ${rtxMultiplier}x`;
     if(latentState.enabled && rtxState.enabled){
-      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras Latent ${latentScale.toFixed(2)}x + RTX 2x`;
+      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras Latent ${latentScale.toFixed(2)}x + ${rtxLabel}`;
     } else if(latentState.enabled && !rtxState.enabled){
       $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras Latent ${latentScale.toFixed(2)}x (sin RTX)`;
     } else if(!latentState.enabled && rtxState.enabled){
-      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras RTX 2x`;
+      $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) tras ${rtxLabel}`;
     } else {
       $("resFinalHint").textContent = `Vídeo final: ${finalW}×${finalH} px (${currentRatioName}) nativo (sin escalados)`;
     }
@@ -3230,12 +3240,13 @@ async function applyWorkflow(workflow, opts={}){
   const rtxNode = findByClass("RTXVideoSuperResolution");
   if(rtxNode && rtxNode.inputs){
     const q = rtxNode.inputs.quality || "ULTRA";
-    const rtx = { enabled: true, quality: q };
+    const sc = parseFloat(rtxNode.inputs["resize_type.scale"] || rtxNode.inputs.scale || 2) || 2;
+    const rtx = { enabled: true, quality: q, scale: sc };
     setRtxUI(rtx);
     saveRtx(rtx);
-    setApplied(`RTX Super Resolution (calidad ${q})`);
+    setApplied(`RTX Super Resolution (calidad ${q}, ${/^(DENOISE|DEBLUR)_/.test(q) ? "misma resolución" : sc + "x"})`);
   } else if(rtxNode === null){
-    const rtx = { enabled: false, quality: "ULTRA" };
+    const rtx = { enabled: false, quality: "ULTRA", scale: 2 };
     setRtxUI(rtx);
     saveRtx(rtx);
   }
@@ -4875,6 +4886,8 @@ function buildGraph(job){
     const rtxState = j ? j.rtx : getRtxState();
     const rtxEnabled = frPostproc && (rtxState ? rtxState.enabled : false);
     const rtxQuality = rtxState ? (rtxState.quality || "ULTRA") : "ULTRA";
+    const rtxSameRes = /^(DENOISE|DEBLUR)_/.test(rtxQuality);
+    const rtxScale = rtxSameRes ? 1.0 : (rtxState ? parseFloat(rtxState.scale || 2) : 2);
 
     // CRÍTICO: Post-FX (LUT/Color) ANTES de RTX Video Super Resolution para evitar procesar a 2.5K/4K en CPU
     currentVideoImages = appendVideoPostFx(g, currentVideoImages, j?.postFx);
@@ -4884,12 +4897,14 @@ function buildGraph(job){
         class_type: "RTXVideoSuperResolution",
         inputs: {
           resize_type: "scale by multiplier",
-          "resize_type.scale": 2,
+          "resize_type.scale": rtxScale,
           quality: rtxQuality,
+          strength: 1.0,
+          image_encoding: "8-bit RGB",
           images: currentVideoImages
         },
         _meta: {
-          title: "RTX Video Super Resolution"
+          title: rtxSameRes ? "RTX Limpieza (misma resolución)" : `RTX Super Resolution (${rtxScale}x)`
         }
       };
       currentVideoImages = [N.RTX_SR, 0];
@@ -5870,18 +5885,22 @@ function buildGraph(job){
   const rtxState = j ? j.rtx : getRtxState();
   const rtxEnabled = rtxState ? rtxState.enabled : true;
   const rtxQuality = rtxState ? (rtxState.quality || "ULTRA") : "ULTRA";
+  const rtxSameRes = /^(DENOISE|DEBLUR)_/.test(rtxQuality);
+  const rtxScale = rtxSameRes ? 1.0 : (rtxState ? parseFloat(rtxState.scale || 2) : 2);
 
   if(rtxEnabled){
     g[N.RTX_SR] = {
       class_type: "RTXVideoSuperResolution",
       inputs: {
         resize_type: "scale by multiplier",
-        "resize_type.scale": 2,
+        "resize_type.scale": rtxScale,
         quality: rtxQuality,
+        strength: 1.0,
+        image_encoding: "8-bit RGB",
         images: currentVideoImages
       },
       _meta: {
-        title: "RTX Video Super Resolution"
+        title: rtxSameRes ? "RTX Limpieza (misma resolución)" : `RTX Super Resolution (${rtxScale}x)`
       }
     };
     if(g[N.CREATE_VIDEO] && g[N.CREATE_VIDEO].inputs){

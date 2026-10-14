@@ -707,19 +707,37 @@
           <!-- RTX Video Super Resolution -->
           <div class="row">
             <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution (2x)</span>
+              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution / Limpieza</span>
             </label>
             <div id="rtxControls" style="margin-top:4px;">
               <select id="rtxQuality">
-                <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
-                <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
-                <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate Equilibrado)</option>
-                <option value="HIGH">HIGH (Equilibrado)</option>
-                <option value="MEDIUM">MEDIUM (Rápido)</option>
-                <option value="LOW">LOW (Bajo consumo)</option>
+                <optgroup label="Escalado">
+                  <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
+                  <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate equilibrado)</option>
+                  <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
+                  <option value="HIGH">HIGH (Equilibrado)</option>
+                  <option value="MEDIUM">MEDIUM (Rápido)</option>
+                  <option value="LOW">LOW (Bajo consumo)</option>
+                </optgroup>
+                <optgroup label="Limpieza sin escalar (misma resolución)">
+                  <option value="DENOISE_MEDIUM">DENOISE_MEDIUM (quitar ruido)</option>
+                  <option value="DENOISE_HIGH">DENOISE_HIGH (más agresivo)</option>
+                  <option value="DENOISE_ULTRA">DENOISE_ULTRA (máximo)</option>
+                  <option value="DENOISE_LOW">DENOISE_LOW (suave)</option>
+                  <option value="DEBLUR_MEDIUM">DEBLUR_MEDIUM (enfocar)</option>
+                  <option value="DEBLUR_HIGH">DEBLUR_HIGH (más nitidez)</option>
+                  <option value="DEBLUR_ULTRA">DEBLUR_ULTRA (máximo)</option>
+                  <option value="DEBLUR_LOW">DEBLUR_LOW (suave)</option>
+                </optgroup>
+              </select>
+              <select id="rtxScale" style="margin-top:4px;">
+                <option value="1.5">1.5×</option>
+                <option value="2" selected>2×</option>
+                <option value="3">3×</option>
+                <option value="4">4×</option>
               </select>
             </div>
-            <div class="hint" style="font-size:10px;margin-top:2px;">Escala por hardware con Tensor Cores manteniendo detalles nítidos.</div>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Escalado o limpieza por Tensor Cores. Los modos DENOISE/DEBLUR conservan la resolución.</div>
           </div>
 
           <!-- Interpolación de Frames (RIFE / RTX Frame Gen) -->
