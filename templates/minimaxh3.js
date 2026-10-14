@@ -603,6 +603,8 @@ function setSpectrumUI(s){
   const on = $("segSpectrumOn"), off = $("segSpectrumOff");
   if(s.enabled){ on?.classList.add("on"); off?.classList.remove("on"); }
   else { off?.classList.add("on"); on?.classList.remove("on"); }
+  const panel = $("spectrumControls");
+  if(panel) panel.style.display = s.enabled ? "" : "none";
   if($("spectrumBlend")){ $("spectrumBlend").value = s.blend; $("spectrumBlendVal").textContent = parseFloat(s.blend).toFixed(2); }
   if($("spectrumFlex")){ $("spectrumFlex").value = s.flex; $("spectrumFlexVal").textContent = parseFloat(s.flex).toFixed(2); }
   if($("spectrumWarmup")){ $("spectrumWarmup").value = s.warmup; $("spectrumWarmupVal").textContent = s.warmup; }
@@ -920,6 +922,8 @@ function setRifeUI(r){
   const on = $("segRifeOn"), off = $("segRifeOff");
   if(r.enabled){ on?.classList.add("on"); off?.classList.remove("on"); }
   else { off?.classList.add("on"); on?.classList.remove("on"); }
+  const panel = $("rifeControls");
+  if(panel) panel.style.display = r.enabled ? "" : "none";
   if($("rifeEngine") && r.engine){
     $("rifeEngine").value = r.engine;
     toggleRifeEngineUI(r.engine);
