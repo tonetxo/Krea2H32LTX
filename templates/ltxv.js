@@ -698,6 +698,145 @@ function applyDialogueMode(g, mode){
   }
 }
 
+// --- COLOR GRADING & LOOK CINEMÁTICO (implementación MiniMaxH3) ---
+const LTXV_COLORFX_KEY = "ltxv_colorfx_v1";
+function loadLtxvColorFx(){
+  try { return JSON.parse(localStorage.getItem(LTXV_COLORFX_KEY) || "null") || null; }
+  catch(_){ return null; }
+}
+function saveLtxvColorFx(s){
+  try { localStorage.setItem(LTXV_COLORFX_KEY, JSON.stringify(s)); } catch(_){}
+}
+function getPostFxState(){
+  return {
+    enabled: $("segPostFxOn")?.classList.contains("on") ?? false,
+    lut: {
+      enabled: $("postFxLutToggle")?.checked ?? true,
+      name: $("postFxLutSelect")?.value || "",
+      strength: parseFloat($("postFxLutStrength")?.value || "0.8")
+    },
+    vignette: {
+      enabled: $("postFxVigToggle")?.checked ?? false,
+      intensity: parseFloat($("postFxVigIntensity")?.value || "0.25")
+    },
+    grain: {
+      enabled: $("postFxGrainToggle")?.checked ?? false,
+      power: parseFloat($("postFxGrainPower")?.value || "0.15")
+    }
+  };
+}
+function setPostFxUI(s){
+  if(!s) return;
+  const on = $("segPostFxOn"), off = $("segPostFxOff");
+  const panel = $("postFxControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "block";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("postFxLutToggle")) $("postFxLutToggle").checked = s.lut?.enabled ?? true;
+  if($("postFxLutSelect") && s.lut?.name) $("postFxLutSelect").value = s.lut.name;
+  if($("postFxLutStrength")){
+    $("postFxLutStrength").value = s.lut?.strength ?? 0.8;
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+  }
+  if($("postFxVigToggle")) $("postFxVigToggle").checked = !!s.vignette?.enabled;
+  if($("postFxVigIntensity")){
+    $("postFxVigIntensity").value = s.vignette?.intensity ?? 0.25;
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat($("postFxVigIntensity").value).toFixed(2);
+  }
+  if($("postFxGrainToggle")) $("postFxGrainToggle").checked = !!s.grain?.enabled;
+  if($("postFxGrainPower")){
+    $("postFxGrainPower").value = s.grain?.power ?? 0.15;
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat($("postFxGrainPower").value).toFixed(2);
+  }
+}
+function populatePostFxLuts(){
+  const sel = $("postFxLutSelect");
+  if(!sel) return;
+  const luts = (typeof AVAILABLE_LUTS !== "undefined" && Array.isArray(AVAILABLE_LUTS)) ? AVAILABLE_LUTS : [];
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Seleccionar LUT (.cube) --</option>';
+  for(const name of luts){
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name.endsWith(".cube") ? name.slice(0, -5) : name;
+    sel.appendChild(opt);
+  }
+  if(luts.length === 0){
+    sel.innerHTML = '<option value="">-- Sin LUTs (.cube) disponibles --</option>';
+  }
+  if(prev && luts.includes(prev)){
+    sel.value = prev;
+  }
+}
+function initPostFxListeners(){
+  const persist = () => {
+    saveLtxvColorFx(getPostFxState());
+    if(typeof scheduleSaveLtxvSettings === "function") scheduleSaveLtxvSettings();
+  };
+  $("segPostFxOn")?.addEventListener("click", () => { const s = getPostFxState(); s.enabled = true; setPostFxUI(s); persist(); });
+  $("segPostFxOff")?.addEventListener("click", () => { const s = getPostFxState(); s.enabled = false; setPostFxUI(s); persist(); });
+  $("postFxLutToggle")?.addEventListener("change", persist);
+  $("postFxLutSelect")?.addEventListener("change", persist);
+  $("postFxLutStrength")?.addEventListener("input", (e) => {
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
+    persist();
+  });
+  $("postFxVigToggle")?.addEventListener("change", persist);
+  $("postFxVigIntensity")?.addEventListener("input", (e) => {
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat(e.target.value).toFixed(2);
+    persist();
+  });
+  $("postFxGrainToggle")?.addEventListener("change", persist);
+  $("postFxGrainPower")?.addEventListener("input", (e) => {
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat(e.target.value).toFixed(2);
+    persist();
+  });
+  populatePostFxLuts();
+  const st = loadLtxvColorFx();
+  if(st) setPostFxUI(st);
+}
+function appendVideoPostFx(g, imageRef, postFxState, seedHint){
+  const fx = postFxState || getPostFxState();
+  if(fx && fx.enabled){
+    const grainSeed = 1 + (Math.abs(parseInt(seedHint || 1, 10) || 1) % 1000);
+    const useLut = !!(fx.lut?.enabled && fx.lut?.name);
+    // El slider de viñeta (0–0.6) se escala ×4 como en h3; el nodo recorta
+    // internamente la opacidad a 0..1 (igual que ProPostVignette).
+    const vig = fx.vignette?.enabled ? Math.min(2.0, parseFloat(fx.vignette.intensity || 0) * 4) : 0;
+    const grain = fx.grain?.enabled ? parseFloat(fx.grain.power || 0) : 0;
+    if(useLut || vig > 0 || grain > 0){
+      // Nodo propio (vectorizado + chunking + in-place): los nodos ProPost
+      // (comfyui-propost) hacen bucle Python por frame/píxel y reservan el batch
+      // completo (zeros_like) → RAM disparada y reinicio de ComfyUI con vídeos
+      // de 360-1200 frames. Este nodo hace LUT+viñeta+grano en segundos y acota RAM.
+      g["post_fx"] = {
+        class_type: "LTXWebVideoFX",
+        inputs: {
+          image: imageRef,
+          lut_name: useLut ? fx.lut.name : "",
+          lut_strength: useLut ? parseFloat(fx.lut.strength ?? 0.8) : 0.8,
+          vignette: vig,
+          vignette_cx: 0.5,
+          vignette_cy: 0.5,
+          grain: grain,
+          grain_size: 1.0,
+          grain_seed: grainSeed,
+          grain_mono: true,
+          chunk_mb: 1024,
+        },
+        _meta: { title: "LTXWeb Video FX (LUT/Viñeta/Grano)" }
+      };
+      return ["post_fx", 0];
+    }
+  }
+  delete g["post_fx"];
+  return imageRef;
+}
+
 function snapshotJob(firstPassOnly){
   // Captura inmutable de todos los parámetros necesarios para reproducir el job
   return {
@@ -713,6 +852,7 @@ function snapshotJob(firstPassOnly){
     fidelity: $("fidelitySlider").value,
     motion: $("motionSlider").value,
     dialogueMode: getDialogueMode(),
+    postfx: getPostFxState(),
     firstPassSteps: $("firstPassSteps")?.value || "8",
     model: $("modelSelect")?.value,
     textEncoder: $("textEncoderSelect")?.value,
@@ -1191,6 +1331,84 @@ async function applyWorkflow(workflow, opts={}){
     setMissing("semilla");
   }
 
+  // Color Grading & Look Cinemático
+  const lutNode = findByClass("LayerColor: LUT Apply");
+  if(lutNode && lutNode.inputs){
+    setPostFxUI(Object.assign(getPostFxState(), { enabled: true }));
+    if($("postFxLutToggle")) $("postFxLutToggle").checked = true;
+    if(lutNode.inputs.LUT != null && $("postFxLutSelect")) $("postFxLutSelect").value = lutNode.inputs.LUT;
+    if(lutNode.inputs.strength != null){
+      $("postFxLutStrength").value = Math.max(0, Math.min(1, Number(lutNode.inputs.strength) / 100));
+      if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+    }
+    setApplied("color grading (LUT)");
+  }
+  const lutNodePP = findByClass("ProPostApplyLUT");
+  if(lutNodePP && lutNodePP.inputs){
+    setPostFxUI(Object.assign(getPostFxState(), { enabled: true }));
+    if($("postFxLutToggle")) $("postFxLutToggle").checked = true;
+    if(lutNodePP.inputs.lut_name != null && $("postFxLutSelect")) $("postFxLutSelect").value = lutNodePP.inputs.lut_name;
+    if(lutNodePP.inputs.strength != null){
+      $("postFxLutStrength").value = lutNodePP.inputs.strength;
+      if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+    }
+    setApplied("color grading (LUT GPU)");
+  }
+  const grainNodePP = findByClass("ProPostFilmGrain");
+  if(grainNodePP && grainNodePP.inputs && Number(grainNodePP.inputs.grain_power ?? 0) > 0){
+    setPostFxUI(Object.assign(getPostFxState(), { enabled: true }));
+    if($("postFxGrainToggle")) $("postFxGrainToggle").checked = true;
+    $("postFxGrainPower").value = Math.min(0.4, Number(grainNodePP.inputs.grain_power));
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = Math.min(0.4, Number(grainNodePP.inputs.grain_power)).toFixed(2);
+    setApplied("grano (GPU)");
+  }
+  const filmNode = findByClass("LayerFilter: FilmV2");
+  if(filmNode && filmNode.inputs){
+    setPostFxUI(Object.assign(getPostFxState(), { enabled: true }));
+    const vi = Number(filmNode.inputs.vignette_intensity ?? 0);
+    const gp = Number(filmNode.inputs.grain_power ?? 0);
+    if(vi > 0 && $("postFxVigToggle")){ $("postFxVigToggle").checked = true; $("postFxVigIntensity").value = Math.min(0.6, vi); if($("postFxVigVal")) $("postFxVigVal").textContent = Math.min(0.6, vi).toFixed(2); }
+    if(gp > 0 && $("postFxGrainToggle")){ $("postFxGrainToggle").checked = true; $("postFxGrainPower").value = Math.min(0.4, gp); if($("postFxGrainVal")) $("postFxGrainVal").textContent = Math.min(0.4, gp).toFixed(2); }
+    setApplied("viñeta/grano (FilmV2)");
+  }
+  const fxNode = findByClass("LTXWebVideoFX");
+  if(fxNode && fxNode.inputs){
+    setPostFxUI(Object.assign(getPostFxState(), { enabled: true }));
+    const inps = fxNode.inputs;
+    const lutName = inps.lut_name && inps.lut_name !== "" ? String(inps.lut_name) : "";
+    if(lutName){
+      if($("postFxLutToggle")) $("postFxLutToggle").checked = true;
+      if($("postFxLutSelect")){
+        $("postFxLutSelect").value = lutName;
+        if($("postFxLutSelect").value !== lutName){
+          const opt = document.createElement("option");
+          opt.value = lutName; opt.textContent = lutName.endsWith(".cube") ? lutName.slice(0, -5) : lutName;
+          $("postFxLutSelect").appendChild(opt);
+          $("postFxLutSelect").value = lutName;
+        }
+      }
+      if(inps.lut_strength != null){
+        $("postFxLutStrength").value = inps.lut_strength;
+        if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+      }
+      setApplied("color grading (LUT)");
+    }
+    const vig = Number(inps.vignette ?? 0) / 4;
+    if(vig > 0 && $("postFxVigToggle")){
+      $("postFxVigToggle").checked = true;
+      $("postFxVigIntensity").value = Math.min(0.6, vig);
+      if($("postFxVigVal")) $("postFxVigVal").textContent = Math.min(0.6, vig).toFixed(2);
+      setApplied("viñeta");
+    }
+    const gp = Number(inps.grain ?? 0);
+    if(gp > 0 && $("postFxGrainToggle")){
+      $("postFxGrainToggle").checked = true;
+      $("postFxGrainPower").value = Math.min(0.4, gp);
+      if($("postFxGrainVal")) $("postFxGrainVal").textContent = Math.min(0.4, gp).toFixed(2);
+      setApplied("grano");
+    }
+  }
+
   const appliedMsg = applied.length ? "✅ Usados: " + applied.join(", ") : "";
   const missingMsg = missing.length ? "⚠️ Sin coincidencia: " + missing.join(", ") : "";
 
@@ -1420,6 +1638,7 @@ function saveLtxvSettings(){
     firstPassSteps: $("firstPassSteps")?.value || "8",
     motion: $("motionSlider")?.value || "1.0",
     dialogueMode: getDialogueMode(),
+    postfx: getPostFxState(),
     rife: getRifeState(),
     rtx: getRtxState(),
     bitDepth: getBitDepth(),
@@ -1505,6 +1724,7 @@ function restoreLtxvSettings(){
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
 
     if(s.dialogueMode) setDialogueModeUI(s.dialogueMode);
+    if(s.postfx) setPostFxUI(s.postfx);
     if(s.fidelity !== undefined && $("fidelitySlider")){
       $("fidelitySlider").value = s.fidelity;
       if($("fidelityVal")) $("fidelityVal").textContent = parseFloat(s.fidelity).toFixed(2);
@@ -2189,6 +2409,13 @@ function buildGraph(mode, job){
     }
   }
 
+  // Color Grading & Look Cinemático sobre los fotogramas del vídeo final
+  const postFxState = j ? j.postfx : getPostFxState();
+  if(postFxState && postFxState.enabled && g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
+    const fxSeed = (j ? j.seedValue : parseInt($("seedVal")?.value || "1", 10) || 1);
+    g[N.CREATE_VIDEO_2].inputs.images = appendVideoPostFx(g, g[N.CREATE_VIDEO_2].inputs.images, postFxState, fxSeed);
+  }
+
   if(mode === "first"){
     // Solo 1er pase: el sampler 888 genera el preview y lo guarda en 923.
     delete g[N.FINAL_SAVE];
@@ -2847,6 +3074,8 @@ if(!$("enhancerChainMode").value) $("enhancerChainMode").value = "ollama";
   hint.innerHTML = "LTX-2.5 genera audio nativo: describe el ambiente sonoro en positivo (olas, viento, cristales, música de bar). Frases tipo \u00abno dialogue is spoken\u00bb <b>promueven</b> el murmullo (labios en movimiento); los t\u00e9rminos de di\u00e1logo van en el negativo (ya incluidos). En i2v, \u00abFidelidad\u00bb es el anclaje a la imagen: b\u00e1jala (0.4\u20130.7) para darle protagonismo a las acciones del prompt (besar, caminar\u2026).";
   panel.appendChild(hint);
 })();
+
+initPostFxListeners();
 
 // --- FIRST PASS SIGMAS ---
 // Curva base oficial 8-step de la receta distill LTX-2.5:

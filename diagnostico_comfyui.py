@@ -102,6 +102,14 @@ REQUIRED_PACKAGES = [
         "workflows": ["MMH3X2", "MiniMaxH3"],
     },
     {
+        "name": "LTXWeb-VideoFX (incluido)",
+        "repo": "",
+        "bundled": True,
+        "nodes": ["LTXWebVideoFX"],
+        "critical": False,
+        "workflows": ["LTXV / KreaQwen / MiniMaxH3 (Post-FX: LUT/Viñeta/Grano)"],
+    },
+    {
         "name": "ComfyUI-ProPost",
         "repo": "https://github.com/digitaljohn/comfyui-propost",
         "nodes": ["ProPostApplyLUT", "ProPostFilmGrain", "ProPostRadialBlur", "ProPostVignette"],
@@ -173,6 +181,8 @@ def check_custom_nodes(installed_nodes, comfy_root):
             print(f"      Usado en: {', '.join(pkg['workflows'])}")
             if pkg["repo"].startswith("http"):
                 print(f"      Instalación: git clone {pkg['repo']}")
+            elif pkg.get("bundled"):
+                print("      Instalación: copia 'comfy_nodes/ltxweb_videofx' de este repo en custom_nodes/")
             missing_packages.append(pkg)
 
     if missing_packages and comfy_root and os.path.isdir(os.path.join(comfy_root, "custom_nodes")):
