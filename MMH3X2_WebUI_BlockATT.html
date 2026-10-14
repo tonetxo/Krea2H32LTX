@@ -1237,19 +1237,37 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <!-- RTX Video Super Resolution -->
           <div class="row">
             <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution (2x)</span>
+              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution / Limpieza</span>
             </label>
             <div id="rtxControls" style="margin-top:4px;">
               <select id="rtxQuality">
-                <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
-                <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
-                <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate Equilibrado)</option>
-                <option value="HIGH">HIGH (Equilibrado)</option>
-                <option value="MEDIUM">MEDIUM (Rápido)</option>
-                <option value="LOW">LOW (Bajo consumo)</option>
+                <optgroup label="Escalado">
+                  <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
+                  <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate equilibrado)</option>
+                  <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
+                  <option value="HIGH">HIGH (Equilibrado)</option>
+                  <option value="MEDIUM">MEDIUM (Rápido)</option>
+                  <option value="LOW">LOW (Bajo consumo)</option>
+                </optgroup>
+                <optgroup label="Limpieza sin escalar (misma resolución)">
+                  <option value="DENOISE_MEDIUM">DENOISE_MEDIUM (quitar ruido)</option>
+                  <option value="DENOISE_HIGH">DENOISE_HIGH (más agresivo)</option>
+                  <option value="DENOISE_ULTRA">DENOISE_ULTRA (máximo)</option>
+                  <option value="DENOISE_LOW">DENOISE_LOW (suave)</option>
+                  <option value="DEBLUR_MEDIUM">DEBLUR_MEDIUM (enfocar)</option>
+                  <option value="DEBLUR_HIGH">DEBLUR_HIGH (más nitidez)</option>
+                  <option value="DEBLUR_ULTRA">DEBLUR_ULTRA (máximo)</option>
+                  <option value="DEBLUR_LOW">DEBLUR_LOW (suave)</option>
+                </optgroup>
+              </select>
+              <select id="rtxScale" style="margin-top:4px;">
+                <option value="1.5">1.5×</option>
+                <option value="2" selected>2×</option>
+                <option value="3">3×</option>
+                <option value="4">4×</option>
               </select>
             </div>
-            <div class="hint" style="font-size:10px;margin-top:2px;">Escala por hardware con Tensor Cores manteniendo detalles nítidos.</div>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Escalado o limpieza por Tensor Cores. Los modos DENOISE/DEBLUR conservan la resolución.</div>
           </div>
 
           <!-- Interpolación de Frames (RIFE / RTX Frame Gen) -->
@@ -1425,7 +1443,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
     <div class="results-col">
       <!-- PANEL DE EJECUCIÓN Y COLAS -->
       <div class="panel" style="margin-bottom:0;">
-        <h2>Ejecución</h2>
+        <h2>Ejecución <button type="button" id="btnCloseUI" class="ghost btn-mini" style="margin-left:auto;" title="Cerrar esta ventana de la WebUI">✕ Cerrar UI</button></h2>
         <div class="row" style="margin-bottom:8px;">
           <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
           <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
@@ -5279,6 +5297,24 @@ async function openExternalWebUIRef(targetPort, targetPage, filename, subfolder,
   return win;
 }
 
+// --- Cerrar la WebUI (ventana/pestaña) desde el botón "✕ Cerrar UI" ---
+// KreaQwen abre estas UIs con window.open(), por lo que window.close() funciona.
+// Si la pestaña se abrió manualmente, el navegador puede bloquear el cierre: en
+// ese caso mostramos una ayuda para cerrarla con el teclado.
+document.addEventListener("click", (e) => {
+  const btn = e.target && e.target.closest && e.target.closest("#btnCloseUI");
+  if(!btn) return;
+  e.preventDefault();
+  try { if(window.opener) window.opener = null; } catch(_){}
+  try { window.close(); } catch(_){}
+  // Si sigue viva tras intentar cerrarla, no se pudo (pestaña abierta a mano).
+  setTimeout(() => {
+    if(typeof log === "function"){
+      log("No se pudo cerrar automáticamente. Usa Ctrl+W (Cmd+W en Mac) o el aspa ✕ de la pestaña.", "l-warn");
+    }
+  }, 300);
+});
+
 // mmh3x2.js — MMH3X2-specific JavaScript (2 segmentos, 4 imágenes, 1 vídeo, RTX y RIFE).
 // Injected AFTER common.js. CONFIG must be defined before initCommon().
 
@@ -6343,7 +6379,7 @@ CONFIG.variantMeta = function(seedValue, timeText){
       const mult = $("rifeMultiplier")?.value || "2";
       return ["Interpolación", (engine === "rtx") ? `RTX Frame Gen ${mult}x` : `RIFE ${mult}x`];
     })(),
-    ["RTX Super Resolution", $("rtxToggle")?.checked ? `on (2x ${$("rtxQuality")?.value || "HIGHBITRATE_ULTRA"})` : "off"]
+    ["RTX Super Resolution", $("rtxToggle")?.checked ? (/^(DENOISE|DEBLUR)_/.test($("rtxQuality")?.value || "") ? `on (limpieza ${$("rtxQuality").value.replace("_"," ").toLowerCase()})` : `on (${$("rtxScale")?.value || 2}x ${$("rtxQuality")?.value || "HIGHBITRATE_ULTRA"})`) : "off"]
   ].filter(Boolean);
 
   if(timingVal) rows.unshift(["Tiempo gen.", timingVal]);
@@ -6620,7 +6656,7 @@ CONFIG.onNodeExecuting = function(data){
   } else if(node === String(N.FACE_STITCH) || node === "311"){
     log("Componiendo rostros refinados sobre el vídeo continuo (Face Stitch)...", "l-busy");
   } else if(node === String(N.RTX) || node === "71"){
-    log("🚀 Aplicando RTX Video Super Resolution (2x)...", "l-busy");
+    log("🚀 Aplicando RTX Video Super Resolution / limpieza...", "l-busy");
     const tFin = $("previewStepTextFinal");
     if(tFin) tFin.textContent = "RTX Super Resolution...";
   } else if(node === String(N.RIFE) || node === "72"){
@@ -7343,6 +7379,10 @@ function applyWorkflow(workflow){
   if(rtxNode?.inputs?.quality && $("rtxQuality")){
     $("rtxQuality").value = rtxNode.inputs.quality;
   }
+  if(rtxNode?.inputs && $("rtxScale")){
+    const sc = parseFloat(rtxNode.inputs["resize_type.scale"] || 2) || 2;
+    $("rtxScale").value = String(sc);
+  }
   const vtbNode = findByClass("VideoTemporalBlend");
   if($("blendToggle")) $("blendToggle").checked = !!vtbNode;
   if(vtbNode && vtbNode.inputs){
@@ -7804,6 +7844,7 @@ function saveSettings(){
     blendFrames: $("blendFrames")?.value || "4",
     rtxToggle: $("rtxToggle") ? $("rtxToggle").checked : true,
     rtxQuality: $("rtxQuality")?.value || "HIGHBITRATE_ULTRA",
+    rtxScale: $("rtxScale")?.value || "2",
     rifeToggle: $("rifeToggle") ? $("rifeToggle").checked : true,
     rifeEngine: $("rifeEngine")?.value || "rife",
     rifeMultiplier: $("rifeMultiplier")?.value || "2",
@@ -7942,6 +7983,7 @@ function restoreSettings(){
     if(typeof updateBlendControlsVisibility === "function") updateBlendControlsVisibility();
     if(s.rtxToggle !== undefined && $("rtxToggle")) $("rtxToggle").checked = s.rtxToggle;
     if(s.rtxQuality && $("rtxQuality")) $("rtxQuality").value = s.rtxQuality;
+    if(s.rtxScale && $("rtxScale")) $("rtxScale").value = s.rtxScale;
     if(s.rifeToggle !== undefined && $("rifeToggle")) $("rifeToggle").checked = s.rifeToggle;
     if(s.rifeEngine && $("rifeEngine")){
       $("rifeEngine").value = s.rifeEngine;
@@ -8029,7 +8071,7 @@ function attachAutoSaveListeners(){
     "unetModel", "clipModel", "vaeModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
     "lora1Toggle", "lora1Select",
     "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle", "blendStrength", "blendFrames", "blendMode",
-    "rtxToggle", "rtxQuality", "rifeToggle", "rifeEngine", "rifeMultiplier", "rifeModel", "audioMode",
+    "rtxToggle", "rtxQuality", "rtxScale", "rifeToggle", "rifeEngine", "rifeMultiplier", "rifeModel", "audioMode",
     "postFxMasterToggle", "postFxLutToggle", "postFxLutSelect", "postFxLutStrength", "postFxVigToggle", "postFxVigIntensity", "postFxGrainToggle", "postFxGrainPower",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
     "audioGuideVolume", "audioUserVolume", "audioNormalizeToggle", "shareRefsToggle", "refImageSize",
@@ -9536,7 +9578,13 @@ function buildGraph(j){
     faceFinalImages = appendVideoPostFx(g, faceFinalImages, j?.postFx);
 
     if(rtxOn && g[N.RTX]?.inputs){
+      const frQ = $("rtxQuality")?.value || "HIGHBITRATE_ULTRA";
+      const frSame = /^(DENOISE|DEBLUR)_/.test(frQ);
       g[N.RTX].inputs.images = faceFinalImages;
+      g[N.RTX].inputs.quality = frQ;
+      g[N.RTX].inputs["resize_type.scale"] = frSame ? 1.0 : (parseFloat($("rtxScale")?.value || "2") || 2);
+      g[N.RTX].inputs.strength = 1.0;
+      g[N.RTX].inputs.image_encoding = "8-bit RGB";
       faceFinalImages = [N.RTX, 0];
     } else {
       delete g[N.RTX];
@@ -10446,9 +10494,14 @@ function buildGraph(j){
   finalImagesSource = appendVideoPostFx(g, finalImagesSource, j?.postFx);
 
   const rtxQuality = (j ? j.rtxQuality : $("rtxQuality")?.value) || "HIGHBITRATE_ULTRA";
+  const rtxSameRes = /^(DENOISE|DEBLUR)_/.test(rtxQuality);
+  const rtxScale = rtxSameRes ? 1.0 : (parseFloat((j ? j.rtxScale : $("rtxScale")?.value) || "2") || 2);
   if(rtxOn && g[N.RTX]?.inputs){
     g[N.RTX].inputs.images = finalImagesSource;
     g[N.RTX].inputs.quality = rtxQuality;
+    g[N.RTX].inputs["resize_type.scale"] = rtxScale;
+    g[N.RTX].inputs.strength = 1.0;
+    g[N.RTX].inputs.image_encoding = "8-bit RGB";
     finalImagesSource = [N.RTX, 0];
   } else {
     delete g[N.RTX];
@@ -10646,6 +10699,13 @@ async function queueJob(runMode){
     uploadedRefFace1: uploadedRefFace1 ? {...uploadedRefFace1} : null,
     uploadedRefFace2: uploadedRefFace2 ? {...uploadedRefFace2} : null,
     postFx: getPostFxState(),
+    rtxToggle: $("rtxToggle") ? $("rtxToggle").checked : true,
+    rtxQuality: $("rtxQuality")?.value || "HIGHBITRATE_ULTRA",
+    rtxScale: $("rtxScale")?.value || "2",
+    rifeToggle: $("rifeToggle") ? $("rifeToggle").checked : true,
+    rifeEngine: $("rifeEngine")?.value || "rife",
+    rifeMultiplier: $("rifeMultiplier")?.value || "2",
+    rifeModel: $("rifeModel")?.value || "rife_v4.26.safetensors",
     blendToggle: $("blendToggle") ? $("blendToggle").checked : true,
     blendStrength: parseFloat($("blendStrength")?.value || "0.35"),
     blendFrames: parseInt($("blendFrames")?.value || "4", 10),
