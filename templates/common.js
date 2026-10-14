@@ -2521,3 +2521,21 @@ async function openExternalWebUIRef(targetPort, targetPage, filename, subfolder,
   }
   return win;
 }
+
+// --- Cerrar la WebUI (ventana/pestaña) desde el botón "✕ Cerrar UI" ---
+// KreaQwen abre estas UIs con window.open(), por lo que window.close() funciona.
+// Si la pestaña se abrió manualmente, el navegador puede bloquear el cierre: en
+// ese caso mostramos una ayuda para cerrarla con el teclado.
+document.addEventListener("click", (e) => {
+  const btn = e.target && e.target.closest && e.target.closest("#btnCloseUI");
+  if(!btn) return;
+  e.preventDefault();
+  try { if(window.opener) window.opener = null; } catch(_){}
+  try { window.close(); } catch(_){}
+  // Si sigue viva tras intentar cerrarla, no se pudo (pestaña abierta a mano).
+  setTimeout(() => {
+    if(typeof log === "function"){
+      log("No se pudo cerrar automáticamente. Usa Ctrl+W (Cmd+W en Mac) o el aspa ✕ de la pestaña.", "l-warn");
+    }
+  }, 300);
+});

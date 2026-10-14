@@ -1153,7 +1153,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
     <div class="results-col">
       <!-- PANEL DE EJECUCIÓN Y COLAS -->
       <div class="panel" style="margin-bottom:0;">
-        <h2>Ejecución</h2>
+        <h2>Ejecución <button type="button" id="btnCloseUI" class="ghost btn-mini" style="margin-left:auto;" title="Cerrar esta ventana de la WebUI">✕ Cerrar UI</button></h2>
         <div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3)</span></label><input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3"></div>
         <div class="btn-row"><button id="btnGenerate" class="primary">Generar vídeo</button></div>
         <div class="btn-row" style="margin-top:6px">
@@ -4351,6 +4351,24 @@ async function openExternalWebUIRef(targetPort, targetPage, filename, subfolder,
   }
   return win;
 }
+
+// --- Cerrar la WebUI (ventana/pestaña) desde el botón "✕ Cerrar UI" ---
+// KreaQwen abre estas UIs con window.open(), por lo que window.close() funciona.
+// Si la pestaña se abrió manualmente, el navegador puede bloquear el cierre: en
+// ese caso mostramos una ayuda para cerrarla con el teclado.
+document.addEventListener("click", (e) => {
+  const btn = e.target && e.target.closest && e.target.closest("#btnCloseUI");
+  if(!btn) return;
+  e.preventDefault();
+  try { if(window.opener) window.opener = null; } catch(_){}
+  try { window.close(); } catch(_){}
+  // Si sigue viva tras intentar cerrarla, no se pudo (pestaña abierta a mano).
+  setTimeout(() => {
+    if(typeof log === "function"){
+      log("No se pudo cerrar automáticamente. Usa Ctrl+W (Cmd+W en Mac) o el aspa ✕ de la pestaña.", "l-warn");
+    }
+  }, 300);
+});
 
 // minimaxh3.js — MiniMaxH3-specific JavaScript.
 // Injected AFTER common.js. CONFIG must be defined before initCommon().
