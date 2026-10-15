@@ -5,7 +5,9 @@
 commitada; ver "Ronda de revisión" más abajo. Después: plan de optimización
 de velocidad/memoria (puntos 0–5 hechos, ver "Optimización"); base de KreaQwen = int8mixed;
 luego fix de text encoder para Flux2/Flux3 Klein en KreaQwen
-(ver "Otros fixes"); pendiente KreaQwen + RTX SR.
+(ver "Otros fixes"); 2026-10-16: lanzadores esperan a serve.py, alfa del VAE
+Qwen 2.1 antes del post-FX y panel de color en la columna derecha (ver
+"Fixes 2026-10-16"); pendiente KreaQwen + RTX SR.
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
 ComfyUI con LUT+grano en vídeos grandes queda corregido y verificado.
@@ -258,6 +260,24 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
   `buildGraph` rechaza combinaciones incompatibles con mensaje claro.
   Verificado en :7821: Klein 9B int8 + `qwen3vl_8b`/flux2 y Flux3 Klein int8 +
   `qwen3vl_4b`/flux3, 512² 4 pasos → success.
+
+## Fixes 2026-10-16
+- **Lanzadores** (`aae3140`): abrían Chrome antes de arrancar `serve.py`; con
+  `google-chrome` (desde `8ebd776`) la pestaña llegaba antes que el servidor
+  (~60 ms) y mostraba "No se puede acceder a este sitio web". Ahora un
+  subproceso sondea `/dev/tcp/127.0.0.1/$PORT` (máx. 10 s) y luego abre el
+  navegador; el servidor sigue en primer plano (Ctrl+C igual).
+- **KreaQwen color grading** (`1d205bf`): el VAE de Qwen Image 2.1
+  (`texture_fix_vae_for_qwen_image_2.1`) decodifica en **RGBA** (ComfyUI:
+  `output_channels = 4`) y `LayerColor: LUT Apply` (librería `colour`) solo
+  acepta RGB → `too many values to unpack (expected 3)`. `appendPostFx` mete
+  `SplitImageWithAlpha` (core, nodo `post_rgb`) al inicio si hay algún efecto
+  activo. Verificado en :7821 con grafo mínimo (VAE texture_fix → Split → LUT →
+  FilmV2): OK; sin Split reproduce el error. MiniMaxH3/MMH3X2 usan el mismo
+  nodo LUT pero con VAE de vídeo; no probado.
+- Panel "Color Grading & Look Cinemático" de KreaQwen movido a la columna de
+  resultados, entre Galería de Variantes e Historial (`margin-bottom:0` porque
+  `.results-col` ya tiene `gap`).
 
 ## Pendiente / siguientes pasos
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
