@@ -18,6 +18,7 @@ Usage: python3 serve.py [PORT] [BACKEND_URL] [KREA2_OUTPUT_DIR] [HOST]
   HOST              default 127.0.0.1 (use 0.0.0.0 for LAN access)
 """
 import glob
+import heapq
 import http.server
 import json
 import os
@@ -49,9 +50,6 @@ BACKEND = get_backend()
 OLLAMA = config_loader.get_ollama_url()
 LLAMACPP = config_loader.get_llamacpp_url()
 
-# Custom routes that should be served locally (not proxied).
-CUSTOM_PREFIXES = ("/api/krea2_list", "/api/ltxv_list", "/api/minimaxh3_list", "/api/mmh3x2_list", "/api/file_delete", "/api/krea2_upload", "/api/video_preprocess", "/api/prompts", "/view")
-
 # ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
 # Override via env var KREA2_OUTPUT_DIR or third CLI arg.
 def _resolve_krea2_dir():
@@ -81,6 +79,62 @@ ALLOWED_DELETE_DIRS = (
     os.path.realpath(os.path.join(COMFYUI_ROOT, "output")),
     os.path.realpath(os.path.join(COMFYUI_ROOT, "temp")),
 )
+
+# Listados de galería (/api/*_list): carpeta bajo output/, patrones glob, máximo
+# de elementos y subcadenas a excluir. LTXV y MiniMaxH3 listan lo mismo (todos
+# los MP4 de output/), así que comparten entrada y caché.
+MEDIA_LISTS = {
+    "krea2": {
+        "subdir": None,
+        "patterns": ("**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"),
+        "limit": 60,
+        # Imágenes auxiliares de diagnóstico (last frame / refgrid de MMH3X2),
+        # que no son salidas de Krea2.
+        "exclude": ("_lastframe", "_refgrid"),
+    },
+    "videos": {"subdir": None, "patterns": ("**/*.mp4",), "limit": 100, "exclude": ()},
+    # MMH3X2 guarda en output/video/ con prefijos variados (plano1_cont, ...):
+    # se listan todos los MP4 de ahí, no solo los "MiniMax_H3_*".
+    "mmh3x2": {"subdir": "video", "patterns": ("**/*.mp4",), "limit": 100, "exclude": ()},
+}
+
+
+def _build_media_list(spec):
+    """Ficheros más recientes primero, con rutas relativas a output/."""
+    output_dir = os.path.join(COMFYUI_ROOT, "output")
+    root = output_dir
+    if spec["subdir"] and os.path.isdir(os.path.join(output_dir, spec["subdir"])):
+        root = os.path.join(output_dir, spec["subdir"])
+    entries = []  # (mtime, size, path)
+    seen = set()  # alias por symlink o .jpg/.jpeg del mismo fichero
+    try:
+        for pattern in spec["patterns"]:
+            for p in glob.glob(os.path.join(root, pattern), recursive=True):
+                if any(x in p for x in spec["exclude"]):
+                    continue
+                rp = os.path.realpath(p)
+                if rp in seen:
+                    continue
+                seen.add(rp)
+                try:
+                    st = os.stat(p)
+                except OSError:
+                    continue
+                entries.append((st.st_mtime, st.st_size, p))
+    except OSError as e:
+        sys.stderr.write(f"[serve] media list error ({root}): {e}\n")
+    items = []
+    # nlargest == sorted(reverse=True)[:n] (mismo orden estable), sin ordenar todo.
+    for mtime, size, p in heapq.nlargest(spec["limit"], entries, key=lambda e: e[0]):
+        parts = os.path.relpath(p, output_dir).split(os.sep)
+        items.append({
+            "filename": parts[-1],
+            "subfolder": "/".join(parts[:-1]),
+            "type": "output",
+            "mtime": int(mtime),
+            "size": size,
+        })
+    return {"dir": output_dir, "count": len(items), "items": items}
 
 
 
@@ -441,69 +495,83 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         path = self.path.split("?")[0]
         return path in ("/", "/index.html") or bool(STATIC_PAGE_RE.match(path))
 
-    def do_HEAD(self):
-        if not self._is_page_route() and self._deny_foreign():
+    # ---- Enrutado ----
+    # Rutas exactas atendidas por este servidor: path -> {método: (método, args)}.
+    # Lo que no esté aquí pasa a los prefijos del proxy y, si tampoco encaja,
+    # a las páginas estáticas.
+    EXACT_ROUTES = {
+        "/view":                 {"GET": ("_do_view", ("GET",)), "HEAD": ("_do_view", ("HEAD",))},
+        "/api/krea2_list":       {"GET": ("_do_media_list", ("krea2",))},
+        "/api/ltxv_list":        {"GET": ("_do_media_list", ("videos",))},
+        "/api/minimaxh3_list":   {"GET": ("_do_media_list", ("videos",))},
+        "/api/mmh3x2_list":      {"GET": ("_do_media_list", ("mmh3x2",))},
+        "/api/prompts":          {"GET": ("_do_prompts_get", ()), "POST": ("_do_prompts_post", ())},
+        "/api/ui_launch":        {"GET": ("_do_ui_launch", ())},
+        "/api/file_delete":      {"POST": ("_do_file_delete", ())},
+        "/api/krea2_upload":     {"POST": ("_do_krea2_upload", ())},
+        "/api/video_preprocess": {"POST": ("_do_video_preprocess", ())},
+    }
+    # Prefijos reenviados, por prioridad: (prefijos, backend, preflight_local).
+    # El preflight CORS de Ollama / llama.cpp lo respondemos aquí; el de
+    # ComfyUI se reenvía.
+    PROXY_ROUTES = (
+        (OLLAMA_PREFIXES, lambda: OLLAMA, True),
+        (LLAMACPP_PREFIXES, lambda: LLAMACPP, True),
+        (PROXY_PREFIXES, get_backend, False),
+    )
+
+    def _dispatch(self, method):
+        path = self.path.split("?")[0]
+        # Páginas: se pueden abrir desde un enlace externo, sin filtro de origen.
+        if method in ("GET", "HEAD") and self._is_page_route():
+            if path in ("/", "/index.html"):
+                self.send_response(302)
+                self.send_header("Location", "/LTXV_WebUI.html")
+                # Sin cuerpo: Content-Length explícito para no dejar colgado un
+                # cliente HTTP/1.1 keep-alive esperando el body.
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+            else:
+                self._serve_static(method)
             return
-        if self._is_ws():
+        if self._deny_foreign():
+            return
+        if path.startswith(WS_PREFIX):
             self._ws_proxy()
-        elif self._is_view_route():
-            self._do_view("HEAD")
-        elif self._is_ollama_route():
-            self._proxy("HEAD", OLLAMA)
-        elif self._is_llamacpp_route():
-            self._proxy("HEAD", LLAMACPP)
-        elif self._is_proxy_route():
-            self._proxy("HEAD", get_backend())
+            return
+        handlers = self.EXACT_ROUTES.get(path)
+        if handlers is not None:
+            if method == "OPTIONS":
+                self._cors_preflight()  # endpoints propios: preflight same-origin
+            elif method in handlers:
+                name, args = handlers[method]
+                getattr(self, name)(*args)
+            else:
+                self._send_json(405, {"error": "method not allowed"})
+            return
+        for prefixes, backend, local_preflight in self.PROXY_ROUTES:
+            if any(path.startswith(p) for p in prefixes):
+                if method == "OPTIONS" and local_preflight:
+                    self._cors_preflight()
+                else:
+                    self._proxy(method, backend())
+                return
+        if method in ("GET", "HEAD"):
+            self._serve_static(method)
         else:
-            self._serve_static("HEAD")
+            self.send_error(405, "Method Not Allowed")
 
-    # ---- helpers ----
-    def _is_view_route(self):
-        path = self.path.split("?")[0]
-        return path == "/view"
+    def do_GET(self):
+        self._dispatch("GET")
 
-    def _is_proxy_route(self):
-        path = self.path.split("?")[0]
-        return any(path.startswith(p) for p in PROXY_PREFIXES)
+    def do_HEAD(self):
+        self._dispatch("HEAD")
 
-    def _is_ollama_route(self):
-        path = self.path.split("?")[0]
-        return any(path.startswith(p) for p in OLLAMA_PREFIXES)
+    def do_POST(self):
+        self._dispatch("POST")
 
-    def _is_llamacpp_route(self):
-        path = self.path.split("?")[0]
-        return any(path.startswith(p) for p in LLAMACPP_PREFIXES)
-
-    def _is_krea2_list(self):
-        path = self.path.split("?")[0]
-        return path == "/api/krea2_list"
-
-    def _is_ltxv_list(self):
-        path = self.path.split("?")[0]
-        return path == "/api/ltxv_list"
-
-    def _is_minimaxh3_list(self):
-        path = self.path.split("?")[0]
-        return path == "/api/minimaxh3_list"
-
-    def _is_mmh3x2_list(self):
-        path = self.path.split("?")[0]
-        return path == "/api/mmh3x2_list"
-
-    def _is_krea2_upload(self):
-        path = self.path.split("?")[0]
-        return path == "/api/krea2_upload"
-
-    def _is_file_delete(self):
-        path = self.path.split("?")[0]
-        return path == "/api/file_delete"
-
-    def _is_video_preprocess(self):
-        path = self.path.split("?")[0]
-        return path == "/api/video_preprocess"
-
-    def _is_ui_launch(self):
-        return self.path.split("?")[0] == "/api/ui_launch"
+    def do_OPTIONS(self):
+        self._dispatch("OPTIONS")
 
     # Tope de body multipart: validar el Content-Length ANTES de leer el body,
     # para que un Content-Length arbitrario no OOMee el proceso.
@@ -813,14 +881,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             except OSError:
                 pass
 
-    def _is_ws(self):
-        return self.path.split("?")[0].startswith(WS_PREFIX)
-
     # Arranque automático de otras WebUIs: /api/ui_launch?target=<name>.
     # Comprueba si el puerto de la WebUI pedida responde; si no, lanza otra
     # instancia de serve.py para ella (misma sintaxis que los lanzar_*.sh) y
     # espera a que esté en pie antes de responder.
-    UI_PORTS = {}
     def _resolve_ui_ports(self):
         return {
             "ltxv": config_loader.get_port("ltxv", 8000),
@@ -867,302 +931,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(200, {"ok": True, "started": True, "pid": proc.pid, "port": port, "page": page})
                 return
         self._send_json(500, {"error": f"no quedó en pie la WebUI '{name}' (:{port}) tras el arranque"})
-    def do_GET(self):
-        if not self._is_page_route() and self._deny_foreign():
-            return
-        if self._is_ws():
-            self._ws_proxy()
-        elif self._is_view_route():
-            self._do_view("GET")
-        elif self._is_krea2_list():
-            self._do_krea2_list()
-        elif self._is_ltxv_list():
-            self._do_ltxv_list()
-        elif self._is_minimaxh3_list():
-            self._do_minimaxh3_list()
-        elif self._is_mmh3x2_list():
-            self._do_mmh3x2_list()
-        elif self._is_prompts_route():
-            self._do_prompts_get()
-        elif self._is_ui_launch():
-            self._do_ui_launch()
-        elif self._is_ollama_route():
-            self._proxy("GET", OLLAMA)
-        elif self._is_llamacpp_route():
-            self._proxy("GET", LLAMACPP)
-        elif self._is_proxy_route():
-            self._proxy("GET", get_backend())
-        elif self.path.split("?")[0] in ("/", "/index.html"):
-            self.send_response(302)
-            self.send_header("Location", "/LTXV_WebUI.html")
-            # Sin cuerpo: Content-Length explícito para no dejar colgado un
-            # cliente HTTP/1.1 keep-alive esperando el body.
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-        else:
-            self._serve_static("GET")
-
-    def do_POST(self):
-        if self._deny_foreign():
-            return
-        if self._is_ws():
-            self._ws_proxy()
-        elif self._is_krea2_list():
-            self._send_json(405, {"error": "method not allowed"})
-        elif self._is_ltxv_list():
-            self._send_json(405, {"error": "method not allowed"})
-        elif self._is_minimaxh3_list():
-            self._send_json(405, {"error": "method not allowed"})
-        elif self._is_mmh3x2_list():
-            self._send_json(405, {"error": "method not allowed"})
-        elif self._is_prompts_route():
-            self._do_prompts_post()
-        elif self._is_ui_launch():
-            self._send_json(405, {"error": "method not allowed"})
-        elif self._is_file_delete():
-            self._do_file_delete()
-        elif self._is_krea2_upload():
-            self._do_krea2_upload()
-        elif self._is_video_preprocess():
-            self._do_video_preprocess()
-        elif self._is_ollama_route():
-            self._proxy("POST", OLLAMA)
-        elif self._is_llamacpp_route():
-            self._proxy("POST", LLAMACPP)
-        elif self._is_proxy_route():
-            self._proxy("POST", get_backend())
-        else:
-            self.send_error(405, "Method Not Allowed")
-
-    def do_OPTIONS(self):
-        if self._deny_foreign():
-            return
-        if self._is_ws():
-            self._ws_proxy()
-        elif self._is_ollama_route() or self._is_llamacpp_route():
-            # Rechazar o preflight CORS desde orígenes no-localhost.
-            # Respondemos nosotros con los headers CORS correctos para que el
-            # navegador deje pasar la petición real.
-            self._cors_preflight()
-        elif self._is_proxy_route():
-            self._proxy("OPTIONS", get_backend())
-        elif self._is_krea2_upload() or self._is_file_delete() or self._is_video_preprocess() or self._is_krea2_list() or self._is_ltxv_list() or self._is_minimaxh3_list() or self._is_mmh3x2_list() or self._is_ui_launch():
-            # Endpoints custom también necesitan preflight same-origin.
-            self._cors_preflight()
-        else:
-            self.send_error(405, "Method Not Allowed")
-
-    def _do_krea2_list(self):
-        """List PNGs in KREA2_OUTPUT_DIR, newest first, max 50."""
-        cached = _LIST_CACHE.get("krea2")
+    def _do_media_list(self, name):
+        """Listado de galería con caché corta (ver MEDIA_LISTS)."""
+        cached = _LIST_CACHE.get(name)
         if cached and cached[0] > time.time():
             self._send_json(200, cached[1])
             return
-        result = self._build_krea2_list()
-        _LIST_CACHE["krea2"] = (time.time() + LIST_CACHE_TTL, result)
+        result = _build_media_list(MEDIA_LISTS[name])
+        _LIST_CACHE[name] = (time.time() + LIST_CACHE_TTL, result)
         self._send_json(200, result)
-
-    def _build_krea2_list(self):
-        items = []
-        output_dir = os.path.join(COMFYUI_ROOT, "output")
-        # Imágenes auxiliares de diagnóstico (last frame / refgrid de MMH3X2, etc.)
-        # que no son salidas de Krea2: se excluyen del listado.
-        excluded_substrings = ("_lastframe", "_refgrid")
-        try:
-            paths = []
-            for pattern in ("**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"):
-                paths.extend(glob.glob(os.path.join(output_dir, pattern), recursive=True))
-            # eliminar duplicados si hay alias .jpg/.jpeg
-            seen = set()
-            unique_paths = []
-            for p in paths:
-                rp = os.path.realpath(p)
-                if rp not in seen:
-                    seen.add(rp)
-                    unique_paths.append(p)
-            paths_with_time = []
-            for p in unique_paths:
-                try:
-                    paths_with_time.append((os.path.getmtime(p), p))
-                except OSError:
-                    continue
-            paths_with_time.sort(key=lambda x: x[0], reverse=True)
-            paths = [p for _, p in paths_with_time][:60]
-
-            for p in paths:
-                try:
-                    if any(s in p for s in excluded_substrings):
-                        continue
-                    st = os.stat(p)
-                    rel = os.path.relpath(p, output_dir)
-                    parts = rel.split(os.sep)
-                    filename = parts[-1]
-                    subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
-                    items.append({
-                        "filename": filename,
-                        "subfolder": subfolder,
-                        "type": "output",
-                        "mtime": int(st.st_mtime),
-                        "size": st.st_size,
-                    })
-                except OSError:
-                    continue
-        except OSError as e:
-            sys.stderr.write(f"[serve] krea2_list error: {e}\n")
-        return {
-            "dir": output_dir,
-            "count": len(items),
-            "items": items,
-        }
-
-    def _do_ltxv_list(self):
-        """List MP4s in ComfyUI output dir (recursive), newest first, max 100."""
-        cached = _LIST_CACHE.get("ltxv")
-        if cached and cached[0] > time.time():
-            self._send_json(200, cached[1])
-            return
-        result = self._build_ltxv_list()
-        _LIST_CACHE["ltxv"] = (time.time() + LIST_CACHE_TTL, result)
-        self._send_json(200, result)
-
-    def _build_ltxv_list(self):
-        items = []
-        output_dir = os.path.join(COMFYUI_ROOT, "output")
-        try:
-            paths = glob.glob(os.path.join(output_dir, "**", "*.mp4"), recursive=True)
-            paths_with_time = []
-            for p in paths:
-                try:
-                    paths_with_time.append((os.path.getmtime(p), p))
-                except OSError:
-                    continue
-            paths_with_time.sort(key=lambda x: x[0], reverse=True)
-            paths = [p for _, p in paths_with_time][:100]
-
-            for p in paths:
-                try:
-                    st = os.stat(p)
-                    rel = os.path.relpath(p, output_dir)
-                    parts = rel.split(os.sep)
-                    filename = parts[-1]
-                    subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
-                    items.append({
-                        "filename": filename,
-                        "subfolder": subfolder,
-                        "type": "output",
-                        "mtime": int(st.st_mtime),
-                        "size": st.st_size,
-                    })
-                except OSError:
-                    continue
-        except OSError as e:
-            sys.stderr.write(f"[serve] ltxv_list error: {e}\n")
-        return {
-            "dir": output_dir,
-            "count": len(items),
-            "items": items,
-        }
-
-    def _do_minimaxh3_list(self):
-        """List MP4s in ComfyUI output dir (recursive), newest first, max 100."""
-        cached = _LIST_CACHE.get("minimaxh3")
-        if cached and cached[0] > time.time():
-            self._send_json(200, cached[1])
-            return
-        result = self._build_minimaxh3_list()
-        _LIST_CACHE["minimaxh3"] = (time.time() + LIST_CACHE_TTL, result)
-        self._send_json(200, result)
-
-    def _build_minimaxh3_list(self):
-        items = []
-        output_dir = os.path.join(COMFYUI_ROOT, "output")
-        try:
-            paths = glob.glob(os.path.join(output_dir, "**", "*.mp4"), recursive=True)
-            paths_with_time = []
-            for p in paths:
-                try:
-                    paths_with_time.append((os.path.getmtime(p), p))
-                except OSError:
-                    continue
-            paths_with_time.sort(key=lambda x: x[0], reverse=True)
-            paths = [p for _, p in paths_with_time][:100]
-
-            for p in paths:
-                try:
-                    st = os.stat(p)
-                    rel = os.path.relpath(p, output_dir)
-                    parts = rel.split(os.sep)
-                    filename = parts[-1]
-                    subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
-                    items.append({
-                        "filename": filename,
-                        "subfolder": subfolder,
-                        "type": "output",
-                        "mtime": int(st.st_mtime),
-                        "size": st.st_size,
-                    })
-                except OSError:
-                    continue
-        except OSError as e:
-            sys.stderr.write(f"[serve] minimaxh3_list error: {e}\n")
-        return {
-            "dir": output_dir,
-            "count": len(items),
-            "items": items,
-        }
-
-    def _do_mmh3x2_list(self):
-        """List MMH3X2 MP4s under output/video/ (MiniMax_H3_* prefixes), newest first, max 100."""
-        cached = _LIST_CACHE.get("mmh3x2")
-        if cached and cached[0] > time.time():
-            self._send_json(200, cached[1])
-            return
-        result = self._build_mmh3x2_list()
-        _LIST_CACHE["mmh3x2"] = (time.time() + LIST_CACHE_TTL, result)
-        self._send_json(200, result)
-
-    def _build_mmh3x2_list(self):
-        items = []
-        output_dir = os.path.join(COMFYUI_ROOT, "output")
-        video_dir = os.path.join(output_dir, "video")
-        try:
-            search_root = video_dir if os.path.isdir(video_dir) else output_dir
-            paths = glob.glob(os.path.join(search_root, "**", "*.mp4"), recursive=True)
-            paths_with_time = []
-            for p in paths:
-                # Listar todos los MP4 de output/video/ (incluyendo subcarpetas),
-                # no solo los cuyo nombre contenga "MiniMax_H3_". Los vídeos
-                # recientes usan prefijos personalizados (plano1_cont, etc.).
-                try:
-                    paths_with_time.append((os.path.getmtime(p), p))
-                except OSError:
-                    continue
-            paths_with_time.sort(key=lambda x: x[0], reverse=True)
-            paths = [p for _, p in paths_with_time][:100]
-
-            for p in paths:
-                try:
-                    st = os.stat(p)
-                    rel = os.path.relpath(p, output_dir)
-                    parts = rel.split(os.sep)
-                    filename = parts[-1]
-                    subfolder = "/".join(parts[:-1]) if len(parts) > 1 else ""
-                    items.append({
-                        "filename": filename,
-                        "subfolder": subfolder,
-                        "type": "output",
-                        "mtime": int(st.st_mtime),
-                        "size": st.st_size,
-                    })
-                except OSError:
-                    continue
-        except OSError as e:
-            sys.stderr.write(f"[serve] mmh3x2_list error: {e}\n")
-        return {
-            "dir": output_dir,
-            "count": len(items),
-            "items": items,
-        }
 
     def _do_view(self, method="GET"):
         """Serve media files directly from ComfyUI output/temp/input directories with Range support,
@@ -1338,16 +1115,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             os.remove(target)
             sys.stderr.write(f"[serve] file_delete: {target}\n")
             # Invalidar cachés de listado para que el siguiente /api/*_list refleje el borrado.
-            _LIST_CACHE.pop("krea2", None)
-            _LIST_CACHE.pop("ltxv", None)
-            _LIST_CACHE.pop("minimaxh3", None)
-            _LIST_CACHE.pop("mmh3x2", None)
+            _LIST_CACHE.clear()
             self._send_json(200, {"ok": True, "deleted": target})
         except OSError as e:
             self._send_json(500, {"error": str(e)})
-
-    def _is_prompts_route(self):
-        return self.path.split("?")[0] == "/api/prompts"
 
     def _do_prompts_get(self):
         query = urllib.parse.urlparse(self.path).query
