@@ -3,7 +3,7 @@
 Última actuación (2026-10-15): ronda de revisión con `REVISION.md` (seguridad de
 `serve.py`, polling, prompts, restauración de modelos, refactors), toda
 commitada; ver "Ronda de revisión" más abajo. Después: plan de optimización
-de velocidad/memoria (puntos 0–3 y 5 hechos, ver "Optimización"); queda el 4 (KreaQwen base cuantizado, el usuario busca int8/nvfp4);
+de velocidad/memoria (puntos 0–5 hechos, ver "Optimización"); falta elegir la base por defecto de KreaQwen;
 luego KreaQwen + RTX SR.
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
@@ -159,7 +159,7 @@ Refactors (salida byte-idéntica salvo lo indicado en cada commit):
 - `ff91b92` generadores: `filter_names()` (substring, sin mayúsculas) para
   modelos/VAE/UNET/CLIP.
 
-## Optimización velocidad/memoria (plan aprobado: 0–3 y 5 hechos)
+## Optimización velocidad/memoria (plan aprobado: 0–5 hechos)
 **0. `bench_comfyui.py`**: reenvía el grafo API embebido en una salida (mp4/png)
 o un .json, con variantes como JSON Merge Patch (`--variant N='{...}'`, `--set`
 común). Mide el tiempo total y por nodo (vía WebSocket), el pico de VRAM
@@ -218,9 +218,36 @@ stderr. **NVENC descartado**: 2.7 vs 3.0 s en un clip entero de 2 min, y más
 lento en clips cortos. Sin cambiar: con skip>1 el vídeo dura 1/skip del tramo
 (se acelera) y el audio dura el tramo entero.
 
+**4. KreaQwen: base cuantizada** (`diffusion_models/K2/`; misma semilla, 3 rondas):
+
+| Base | Por imagen | KSampler base | Carga en frío | RSS | PSNR vs bf16 |
+|---|---|---|---|---|---|
+| bf16 `flux2/jibMixKrea2_v40Habanero` (24 GB) | 18.5 s | 9.6 s | 70.9 s | 39.5 GB | – |
+| `K2/..._int8_convrot` (todas las lineales) | 15.0 s | 6.1 s | 19.5 s | 18.5 GB | 26.1 dB |
+| `K2/..._int8mixed_convrot` (40 lineales en bf16) | 14.9 s | 6.1 s | 17.1 s | 20.0 GB | 26.5 dB |
+| `K2/..._fp8Scaled` (167 FP8 + 96 NVFP4) | 14.5 s | 5.6 s | 16.6 s | 15.7 GB | 18.4 dB |
+
+Los int8 conservan composición/pose; fp8+nvfp4 cambia más el encuadre. Recomendado:
+int8mixed (pendiente de que el usuario elija el default). Los int8 se renombraron
+(eran IDs de Civitai `_3135300`/`_3152830`): `resolveWeightDtype` decide por el
+nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
+
+## Otros fixes de esta tanda (2026-10-15)
+- KreaQwen: los selects de sampler tenían la lista de RES4LYF (ClownsharKSampler)
+  copiada de Krea2; ahora las 64 opciones de `KSampler` (incluye `er_sde`).
+- Krea2/KreaQwen listan también `diffusion_models/K2/`. Krea2 usa nombres con
+  carpeta y `loadModels()` (common.js) reconoce nombres guardados sin carpeta.
+- **Historial de imágenes (Krea2/KreaQwen) colgaba Chrome** tras cada variante:
+  `_evictOldGalleryEntries()` hacía `getAll()` de toda la base (KreaQwen: 2.7 GB
+  de base64) para contar. Ahora `createImageHistory()` en common.js: esquema v2
+  con store `thumbs` (índice ts) aparte de `images` (full), evicción con
+  count() + key cursor, full bajo demanda. Migración v1→v2 verificada con la base
+  real del usuario (segundos; 4 variantes seguidas sin bloqueos).
+
 ## Pendiente / siguientes pasos
+- Elegir la base por defecto de KreaQwen (recomendado int8mixed).
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
-  (hoy solo upscale 4xPurePhoto). En curso.
+  (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
 - Probar el Post-FX con un vídeo real del usuario; ajustar la calibración del
   **grano** (`amp = power * 0.18` en `add_grain`, `video_fx.py:233`) si el look
   difiere del de ProPost.
