@@ -756,7 +756,8 @@ const LATENT_UPSCALE_DEFAULTS = {
   pass2Unet: "", // "" = "mismo que pase 1"
   pass2Lora: "h3/taomate_h3_3step_comfy.safetensors",
   pass2LoraStrength: 1.0,
-  pass2Denoise: 0.60
+  pass2Denoise: 0.60,
+  savePass1: true
 };
 
 function loadLatentUpscale(){
@@ -772,7 +773,8 @@ function getLatentUpscaleState(){
     pass2Unet: $("latentPass2Unet")?.value || "",
     pass2Lora: $("latentPass2Lora")?.value || "",
     pass2LoraStrength: parseFloat($("latentPass2LoraStrength")?.value || "1.0"),
-    pass2Denoise: parseFloat($("latentPass2Denoise")?.value || "0.60")
+    pass2Denoise: parseFloat($("latentPass2Denoise")?.value || "0.60"),
+    savePass1: $("latentSavePass1")?.checked ?? true
   };
 }
 function checkLatentPass2Warnings(){
@@ -817,6 +819,7 @@ function setLatentUpscaleUI(s){
     p2Off?.classList.add("on"); p2On?.classList.remove("on");
     if(p2Controls) p2Controls.style.display = "none";
   }
+  if($("latentSavePass1") && s.savePass1 !== undefined) $("latentSavePass1").checked = s.savePass1 !== false;
   if($("latentPass2Unet") && s.pass2Unet !== undefined){
     $("latentPass2Unet").value = s.pass2Unet;
   }
@@ -895,6 +898,10 @@ $("latentPass2LoraStrength")?.addEventListener("input", (e) => {
   const s = getLatentUpscaleState();
   s.pass2LoraStrength = st;
   saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+});
+$("latentSavePass1")?.addEventListener("change", () => {
+  saveLatentUpscale(getLatentUpscaleState());
   scheduleSaveH3Settings();
 });
 $("latentPass2Denoise")?.addEventListener("input", (e) => {
@@ -5299,7 +5306,9 @@ function buildGraph(job){
       }
       currentModelNode = model2Node;
 
-      // 8b. Decodificación y guardado del 1er pase (resolución base) en la galería
+      // 8b. Decodificación y guardado del 1er pase (resolución base) en la galería.
+      // Opcional: decode + guardado cuestan ~17 s en un clip de 15 s.
+      if(latentState.savePass1 !== false){
       g[N.DECODE_VIDEO_1] = {
         class_type: "VAEDecode",
         inputs: {
@@ -5338,6 +5347,12 @@ function buildGraph(job){
         },
         _meta: { title: "Save Video Pass 1" }
       };
+      } else {
+        delete g[N.DECODE_VIDEO_1];
+        delete g[N.DECODE_AUDIO_1];
+        delete g[N.CREATE_VIDEO_1];
+        delete g[N.FIRST_SAVE];
+      }
 
     } else {
       // Latent upscale sin 2º pase (decodificación directa de latente interpolado)

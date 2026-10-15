@@ -470,6 +470,8 @@ CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId, timings
         displayVariantMedia(media1, 1, promptId, t1, { allowShow: false });
       }
       paint(1, "1er", t1 || "—");
+    } else if(job && job.savePreview === false){
+      paint(1, "1er", "sin preview");
     }
     if(media2){
       if(!already2){
@@ -867,6 +869,7 @@ function snapshotJob(firstPassOnly){
     filenamePrefix: $("filenamePrefix")?.value,
     sageType: $("sageAttentionType")?.value,
     purgeVram: !!$("purgeVram")?.checked,
+    savePreview: $("savePreview")?.checked ?? true,
     rife: getRifeState(),
     rtx: getRtxState(),
     bitDepth: getBitDepth(),
@@ -1653,6 +1656,7 @@ function saveLtxvSettings(){
     bitDepth: getBitDepth(),
     sageType: $("sageAttentionType")?.value || SAGE_DEFAULT,
     purgeVram: !!$("purgeVram")?.checked,
+    savePreview: $("savePreview")?.checked ?? true,
     ltx2Temperature: $("ltx2Temperature")?.value || "0.7",
     ltx2Seed: $("ltx2Seed")?.value || "-1",
     ltx2PreviewText: $("ltx2PreviewText")?.checked ?? true,
@@ -1754,6 +1758,7 @@ function restoreLtxvSettings(){
 
     setSelectIfPresent("sageAttentionType", s.sageType);
     if(s.purgeVram !== undefined && $("purgeVram")) $("purgeVram").checked = !!s.purgeVram;
+    if(s.savePreview !== undefined && $("savePreview")) $("savePreview").checked = !!s.savePreview;
 
     if(s.ltx2Temperature !== undefined && $("ltx2Temperature")){
       $("ltx2Temperature").value = s.ltx2Temperature;
@@ -1822,6 +1827,7 @@ $("firstPassSteps")?.addEventListener("input", (e) => { if($("firstPassStepsVal"
 $("motionSlider")?.addEventListener("input", (e) => { if($("motionVal")) $("motionVal").textContent = parseFloat(e.target.value).toFixed(1); scheduleSaveLtxvSettings(); });
 $("sageAttentionType")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("purgeVram")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("savePreview")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("ltx2Temperature")?.addEventListener("input", (e) => { if($("ltx2TemperatureVal")) $("ltx2TemperatureVal").textContent = parseFloat(e.target.value).toFixed(2); scheduleSaveLtxvSettings(); });
 $("ltx2Seed")?.addEventListener("input", scheduleSaveLtxvSettings);
 $("ltx2PreviewText")?.addEventListener("change", scheduleSaveLtxvSettings);
@@ -2550,6 +2556,14 @@ function buildGraph(mode, job){
   if(!purgeVram){
     delete g[N.CLEAN_GPU];
     delete g[N.PURGE_VRAM];
+  }
+
+  // Preview del 1er pase en modo full: decode de vídeo (552) + volumen (551) +
+  // CreateVideo (922) + save (923), ~5 s. El decode de audio (550) se conserva:
+  // el 2º pase lo re-codifica (274). En modo "first" el preview es la salida.
+  const savePreview = j ? j.savePreview !== false : ($("savePreview")?.checked ?? true);
+  if(!savePreview && mode !== "first"){
+    ["552", "551", N.CREATE_VIDEO_1, N.FIRST_SAVE].forEach(id => { delete g[id]; });
   }
 
   if(mode === "first"){

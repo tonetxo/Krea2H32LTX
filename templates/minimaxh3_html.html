@@ -339,6 +339,12 @@
                 <div class="slider-val" id="latentPass2DenoiseVal">0.60</div>
               </div>
               <div class="hint" style="margin-top:3px; font-size:10px;">Denoise nativo del scheduler: 0.40–0.50 (alta fidelidad, sin cambios de escena), 0.60 (balance recomendado), 0.90+ (creativo). Ejecuta siempre 3 pasos exactos con la Turbo LoRA.</div>
+              <div class="row" style="margin-top:8px;">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
+                  <input type="checkbox" id="latentSavePass1" checked> <span>Guardar vídeo del 1er pase</span>
+                </label>
+                <div class="hint" style="font-size:10px;margin-top:2px;">Desactivado ahorra el decode + guardado del 1er pase (~17 s en un clip de 15 s).</div>
+              </div>
             </div>
           </div>
         </div>

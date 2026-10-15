@@ -3,7 +3,7 @@
 Última actuación (2026-10-15): ronda de revisión con `REVISION.md` (seguridad de
 `serve.py`, polling, prompts, restauración de modelos, refactors), toda
 commitada; ver "Ronda de revisión" más abajo. Después: plan de optimización
-de velocidad/memoria (puntos 0–2 hechos, ver "Optimización"); quedan 3–5;
+de velocidad/memoria (puntos 0–3 hechos, ver "Optimización"); quedan 4–5;
 luego KreaQwen + RTX SR.
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
@@ -159,7 +159,7 @@ Refactors (salida byte-idéntica salvo lo indicado en cada commit):
 - `ff91b92` generadores: `filter_names()` (substring, sin mayúsculas) para
   modelos/VAE/UNET/CLIP.
 
-## Optimización velocidad/memoria (plan aprobado: 0–2 hechos)
+## Optimización velocidad/memoria (plan aprobado: 0–3 hechos)
 **0. `bench_comfyui.py`**: reenvía el grafo API embebido en una salida (mp4/png)
 o un .json, con variantes como JSON Merge Patch (`--variant N='{...}'`, `--set`
 común). Mide el tiempo total y por nodo (vía WebSocket), el pico de VRAM
@@ -201,9 +201,12 @@ variantes que solo quitan nodos de salida salen de caché y miden ~6 s, falso):
   efecto en velocidad en Gen5 y 0 blocks usa menos VRAM (10 GB vs 15.9) → se
   mantiene el default.
 
-Hallazgos para los siguientes puntos:
-- H3: decode del pase 1 (preview) 15.4 s + decode final 24.8 s, de 236 s. El
-  preview opcional (punto 3) ahorraría más aquí que en LTXV (~7 s de 102 s).
+**3. Preview del 1er pase opcional** (checkbox, activado por defecto):
+- LTXV "Guardar vídeo del 1er pase (preview)" (`savePreview`): en modo full
+  quita 552/551/922/923; el decode de audio 550 se conserva (lo re-codifica
+  274). 1280×736×321: 99.5 → 93.9 s (−5.6 s).
+- MiniMaxH3 "Guardar vídeo del 1er pase" (`latentUpscale.savePass1`): no
+  inyecta 420–423. Clip de 15 s: 242.2 → 223.9 s (−18.3 s, −7.6 %).
 
 ## Pendiente / siguientes pasos
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR

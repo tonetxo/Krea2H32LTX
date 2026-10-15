@@ -70,7 +70,7 @@
           <b>Sin diálogo</b>: silencia el audio (-100 dB) y refuerza el negativo con términos de habla. <b>Auto</b>: audio audible y decision del modelo según el prompt — describe el ambiente en positivo (olas, viento, música); «no dialogue is spoken» en el prompt <i>promueve</i> el murmullo. <b>Con diálogo</b>: audio audible y negativo sin los términos que frenan la voz (yelling/newscast/interview/podcast); escribe la línea hablada en el prompt y el modelo la sincroniza con los labios.
         </div>
       </div>
-      <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="8"><div class="slider-val" id="firstPassStepsVal">8</div></div></div>
+      <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="8"><div class="slider-val" id="firstPassStepsVal">8</div></div><div class="row" style="margin-top:6px;"><label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;"><input type="checkbox" id="savePreview" checked> <span>Guardar vídeo del 1er pase (preview)</span></label><div class="hint" style="font-size:10px;margin-top:2px;">Desactivado ahorra ~5 s por trabajo (decode + guardado del preview).</div></div></div>
       <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
       <div class="panel">
         <div class="collapsible-header" id="loraToggle">
