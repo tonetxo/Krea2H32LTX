@@ -2626,27 +2626,51 @@ function _readOpenState(){
   } catch(e){ return {}; }
 }
 
-async function _syncPromptsWithServer(){
+// Lee la biblioteca del servidor. Devuelve { data, exists } o null si el
+// servidor no responde. exists=false: nunca se guardó nada en el servidor.
+async function _fetchServerPrompts(){
   try {
     const res = await fetch("/api/prompts?key=" + encodeURIComponent(CONFIG.PROMPTS_KEY));
-    if(res.ok){
-      const serverData = await res.json();
-      if(serverData && typeof serverData === "object" && !Array.isArray(serverData)){
-        const local = _readPromptStore();
-        if(Object.keys(serverData).length > 0){
-          localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(serverData));
-          return serverData;
-        } else if(Object.keys(local).length > 0){
-          // El servidor no tenía prompts pero este cliente sí: subimos al servidor
-          _savePromptsToServer(local);
-          return local;
-        }
-      }
-    }
+    if(!res.ok) return null;
+    const data = await res.json();
+    if(!data || typeof data !== "object" || Array.isArray(data)) return null;
+    // Sin cabecera (serve.py antiguo): se asume que existe si trae prompts.
+    const hdr = res.headers.get("X-Prompts-Exists");
+    const exists = hdr == null ? Object.keys(data).length > 0 : hdr === "1";
+    return { data, exists };
   } catch(e){
     console.warn("[Prompts Sync] No se pudo conectar con el servidor de prompts:", e);
+    return null;
   }
-  return _readPromptStore();
+}
+
+async function _syncPromptsWithServer(){
+  const srv = await _fetchServerPrompts();
+  if(!srv) return _readPromptStore();
+  if(srv.exists){
+    // El servidor manda (también si está vacío: se borraron todos y no deben
+    // resucitar desde la copia local de este dispositivo).
+    localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(srv.data));
+    return srv.data;
+  }
+  // El servidor nunca tuvo prompts pero este cliente sí: los subimos.
+  const local = _readPromptStore();
+  if(Object.keys(local).length > 0) await _savePromptsToServer(local);
+  return local;
+}
+
+// Aplica un cambio sobre la versión MÁS RECIENTE del servidor (no sobre la
+// copia local, que puede estar desfasada si otro dispositivo guardó después)
+// y la sube. Así un móvil con la página abierta desde hace rato no pisa los
+// prompts guardados entretanto desde el PC. `mutator(store)` modifica el
+// objeto in-place; si devuelve false se cancela sin escribir nada.
+async function _mutatePrompts(mutator){
+  const srv = await _fetchServerPrompts();
+  const store = (srv && srv.exists) ? srv.data : _readPromptStore();
+  if(mutator(store) === false) return false;
+  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(store));
+  if(srv) await _savePromptsToServer(store);
+  return true;
 }
 
 async function _savePromptsToServer(data){
@@ -2723,18 +2747,17 @@ async function loadPrompts(skipSync = false){
       delFolder.title = 'Eliminar carpeta y todo su contenido';
       label.appendChild(delFolder);
 
-      delFolder.addEventListener("click", (e) => {
+      delFolder.addEventListener("click", async (e) => {
         e.stopPropagation();
         if(!confirm(`¿Eliminar la carpeta "${folderPath}" y todos los prompts que contiene?`)) return;
-        const saved = _readPromptStore();
         let count = 0;
-        for(const key of Object.keys(saved)){
-          if(key === folderPath || key.startsWith(folderPath + '/')){
-            delete saved[key]; count++;
+        await _mutatePrompts(saved => {
+          for(const key of Object.keys(saved)){
+            if(key === folderPath || key.startsWith(folderPath + '/')){
+              delete saved[key]; count++;
+            }
           }
-        }
-        localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
-        _savePromptsToServer(saved);
+        });
         loadPrompts(true);
         log(`Carpeta "${folderPath}" eliminada (${count} prompt(s)).`, "l-ok");
       });
@@ -2777,19 +2800,19 @@ async function loadPrompts(skipSync = false){
   renderNode(root, tree, '');
 }
 
-function savePrompt(){
+async function savePrompt(){
   const defaultName = selectedPromptKey || (lastPromptDir ? lastPromptDir + "/" : "");
   const name = prompt("Nombre/ruta para este prompt (usa / para clasificar, ej: casa/pasillo/noche):", defaultName);
   if(!name) return;
   const text = $("prompt").value;
-  const saved = _readPromptStore();
-  if(saved[name] && name !== selectedPromptKey){
-    const preview = saved[name].slice(0, 80);
-    if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return;
-  }
-  saved[name] = text;
-  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
-  _savePromptsToServer(saved);
+  const ok = await _mutatePrompts(saved => {
+    if(saved[name] && name !== selectedPromptKey){
+      const preview = saved[name].slice(0, 80);
+      if(!confirm(`Ya existe "${name}". ¿Sobrescribir?\n\nContenido actual:\n${preview}...`)) return false;
+    }
+    saved[name] = text;
+  });
+  if(!ok) return;
   selectedPromptKey = name;
   const parts = name.split('/');
   if(parts.length > 1) lastPromptDir = parts.slice(0, -1).join('/');
@@ -2797,31 +2820,37 @@ function savePrompt(){
   log(`Prompt "${name}" guardado.`, "l-ok");
 }
 
-function movePrompt(){
+async function movePrompt(){
   if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para mover.", "l-err"); return; }
   const oldName = selectedPromptKey;
   const newName = prompt(`Mover/renombrar "${oldName}" a:`, oldName);
   if(!newName || newName === oldName) return;
-  const saved = _readPromptStore();
-  if(saved[newName]){
-    if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return;
+  let missing = false;
+  const ok = await _mutatePrompts(saved => {
+    // Otro dispositivo pudo borrarlo o moverlo entretanto.
+    if(!(oldName in saved)){ missing = true; return false; }
+    if(saved[newName]){
+      if(!confirm(`Ya existe "${newName}". ¿Sobrescribir?`)) return false;
+    }
+    saved[newName] = saved[oldName];
+    delete saved[oldName];
+  });
+  if(missing){
+    log(`⚠️ "${oldName}" ya no existe (¿borrado o movido desde otro dispositivo?).`, "l-err");
+    loadPrompts(true);
+    return;
   }
-  saved[newName] = saved[oldName];
-  delete saved[oldName];
-  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
-  _savePromptsToServer(saved);
+  if(!ok) return;
   selectedPromptKey = newName;
   loadPrompts(true);
   log(`Prompt movido: "${oldName}" → "${newName}"`, "l-ok");
 }
 
-function deletePrompt(){
+async function deletePrompt(){
   if(!selectedPromptKey){ log("⚠️ Selecciona un prompt para eliminar.", "l-err"); return; }
   if(!confirm(`¿Eliminar "${selectedPromptKey}"?`)) return;
-  const saved = _readPromptStore();
-  delete saved[selectedPromptKey];
-  localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
-  _savePromptsToServer(saved);
+  const key = selectedPromptKey;
+  await _mutatePrompts(saved => { delete saved[key]; });
   selectedPromptKey = null;
   loadPrompts(true);
   log(`Prompt eliminado.`, "l-ok");
@@ -3971,23 +4000,26 @@ function initCommon(){
     log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
   });
 
-  $("btnSaveEnhanced").addEventListener("click", () => {
+  $("btnSaveEnhanced").addEventListener("click", async () => {
     let text = $("enhancerOutput").value.trim();
     text = text.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
     if(!text){ log("⚠️ No hay resultado que guardar", "l-err"); return; }
     const defaultName = lastPromptDir ? lastPromptDir + "/" : "";
     const name = prompt("Nombre/ruta para este prompt mejorado (usa / para agrupar):", defaultName);
     if(!name) return;
-    const saved = _readPromptStore();
-    if(saved[name]){
-      if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return;
-    }
-    saved[name] = text;
-    localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
+    // Antes solo se escribía en localStorage y el loadPrompts() posterior lo
+    // machacaba con la copia del servidor: el prompt se perdía al instante.
+    const ok = await _mutatePrompts(saved => {
+      if(saved[name]){
+        if(!confirm(`Ya existe "${name}". ¿Sobrescribir?`)) return false;
+      }
+      saved[name] = text;
+    });
+    if(!ok) return;
     selectedPromptKey = name;
     const parts = name.split('/');
     if(parts.length > 1) lastPromptDir = parts.slice(0, -1).join('/');
-    loadPrompts();
+    loadPrompts(true);
     log(`Prompt "${name}" guardado desde enhancer.`, "l-ok");
   });
 
@@ -4089,21 +4121,23 @@ function initCommon(){
       const file = e.target.files[0];
       if(!file) return;
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         try {
           const imported = JSON.parse(ev.target.result);
-          if(typeof imported !== 'object' || Array.isArray(imported)){
+          if(!imported || typeof imported !== 'object' || Array.isArray(imported)){
             throw new Error("formato inválido (se esperaba un objeto)");
           }
-          const saved = _readPromptStore();
           let added = 0, overwritten = 0;
-          for(const [key, val] of Object.entries(imported)){
-            if(typeof val !== 'string') continue;
-            if(saved[key]) overwritten++; else added++;
-            saved[key] = val;
-          }
-          localStorage.setItem(CONFIG.PROMPTS_KEY, JSON.stringify(saved));
-          loadPrompts();
+          // Igual que btnSaveEnhanced: hay que subirlo al servidor, si no el
+          // loadPrompts() siguiente descartaba lo importado.
+          await _mutatePrompts(saved => {
+            for(const [key, val] of Object.entries(imported)){
+              if(typeof val !== 'string') continue;
+              if(saved[key]) overwritten++; else added++;
+              saved[key] = val;
+            }
+          });
+          loadPrompts(true);
           log(`📤 ${added} prompts importados (${overwritten} sobrescritos).`, "l-ok");
         } catch(err){
           log("❌ Error importando: " + err.message, "l-err");

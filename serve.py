@@ -91,8 +91,10 @@ def _parse_time_arg(value):
       - Segundos (int o float): 5, 5.5, "12.34"
       - Formato sexagesimal: HH:MM:SS[.mmm], MM:SS[.mmm], H:MM:SS[.mmm]
 
-    Devuelve (normalized_string, error_message). Si value está vacío,
-    devuelve ("", None). En caso de error, normalized_string es "".
+    Devuelve (segundos_como_string, error_message): siempre en segundos, para
+    que el llamador pueda operar con float() (p.ej. calcular la duración -t).
+    Si value está vacío, devuelve ("", None). En caso de error, el primer
+    elemento es "".
     """
     if not value:
         return "", None
@@ -105,22 +107,16 @@ def _parse_time_arg(value):
         return str(f), None
     except ValueError:
         pass
-    # Formato sexagesimal: HH:MM:SS[.mmm] o variantes
-    m = re.fullmatch(r"(\d+):(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?", value)
+    # Formato sexagesimal: HH:MM:SS[.mmm] o MM:SS[.mmm]
+    m = (re.fullmatch(r"(\d+):(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?", value)
+         or re.fullmatch(r"()(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?", value))
     if m:
         h, mn, s, ms = m.groups()
-        h, mn, s = int(h), int(mn), int(s)
+        h, mn, s = int(h or 0), int(mn), int(s)
         if mn >= 60 or s >= 60:
             return "", "minutos/segundos fuera de rango"
-        return value, None
-    # Formato MM:SS[.mmm]
-    m = re.fullmatch(r"(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?", value)
-    if m:
-        mn, s, ms = m.groups()
-        mn, s = int(mn), int(s)
-        if mn >= 60 or s >= 60:
-            return "", "minutos/segundos fuera de rango"
-        return value, None
+        frac = float("0." + ms) if ms else 0.0
+        return str(h * 3600 + mn * 60 + s + frac), None
     return "", "formato no reconocido (usa segundos o HH:MM:SS.mmm)"
 
 
@@ -1332,15 +1328,17 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         key = params.get("key", ["default"])[0]
         safe_key = re.sub(r"[^a-zA-Z0-9_]", "", key) or "default"
         filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"prompts_{safe_key}.json")
+        # X-Prompts-Exists distingue "nunca se guardó nada" (el cliente puede
+        # subir sus prompts locales) de "se borraron todos" (no resucitarlos).
         if os.path.isfile(filepath):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                self._send_json(200, data)
+                self._send_json(200, data, {"X-Prompts-Exists": "1"})
                 return
             except Exception as e:
                 sys.stderr.write(f"[serve] Error leyendo {filepath}: {e}\n")
-        self._send_json(200, {})
+        self._send_json(200, {}, {"X-Prompts-Exists": "0"})
 
     def _do_prompts_post(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -1367,12 +1365,14 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             sys.stderr.write(f"[serve] Error guardando prompts: {e}\n")
             self._send_json(500, {"error": str(e)})
 
-    def _send_json(self, status, obj):
+    def _send_json(self, status, obj, extra_headers=None):
         body = json.dumps(obj).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
+        for k, v in (extra_headers or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
