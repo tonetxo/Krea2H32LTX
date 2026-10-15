@@ -5375,6 +5375,253 @@ function initCommon(){
 
 const LTXV_MEDIA_MIME = "application/x-ltxv-media";
 
+// --- HISTORIAL DE IMÁGENES EN INDEXEDDB (Krea2, KreaQwen) ---
+// Esquema v2: las miniaturas viven en "thumbs" (índice por ts) y la imagen
+// completa en "images" (hash -> full). En v1 todo estaba en "images" y cada
+// imagen nueva leía la base entera (getAll, varios GB con 500 imágenes 2K) en
+// el hilo principal: la página se colgaba tras cada variante. La migración
+// v1→v2 copia las miniaturas una sola vez dentro de la transacción de
+// upgrade, que es atómica (si falla, la base queda en v1 intacta).
+function createImageHistory({ dbName, gridId, filePrefix, onSelect, maxRecords = 500, thumbWidth = 260 }){
+  const FULL = "images", THUMBS = "thumbs";
+  const EMPTY_HINT = `<div class="hint" style="grid-column:1/-1;">sin imágenes guardadas</div>`;
+  let dbPromise = null;
+  let prefetched = null; // { hash, data } — imagen completa precargada para arrastrar
+
+  function openDB(){
+    if(dbPromise) return dbPromise;
+    dbPromise = new Promise((resolve, reject) => {
+      if(!window.indexedDB){ reject(new Error("IndexedDB no disponible en este navegador")); return; }
+      const req = indexedDB.open(dbName, 2);
+      req.onupgradeneeded = (ev) => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(FULL)) db.createObjectStore(FULL, { keyPath: "hash" });
+        if(db.objectStoreNames.contains(THUMBS)) return;
+        const thumbs = db.createObjectStore(THUMBS, { keyPath: "hash" });
+        thumbs.createIndex("ts", "ts");
+        if(ev.oldVersion < 1) return;
+        log("🗂️ Actualizando el historial de imágenes (solo esta vez)…", "l-warn");
+        req.transaction.objectStore(FULL).openCursor().onsuccess = (e) => {
+          const cur = e.target.result;
+          if(!cur) return;
+          const r = cur.value;
+          if(r && r.hash && r.thumb){
+            thumbs.put({ hash: r.hash, thumb: r.thumb, width: r.width, height: r.height,
+                         ts: r.ts || 0, legacy: !!r.legacy || !r.full });
+          }
+          cur.continue();
+        };
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        db.onversionchange = () => { db.close(); dbPromise = null; };
+        resolve(db);
+      };
+      req.onerror = () => { dbPromise = null; reject(req.error); };
+      req.onblocked = () => log("⚠️ Historial: cierra las otras pestañas de esta UI para actualizar la base de datos.", "l-warn");
+    });
+    return dbPromise;
+  }
+
+  function txDone(tx){
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  }
+  function reqResult(r){
+    return new Promise((resolve, reject) => {
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    });
+  }
+
+  async function hashOf(thumb){
+    try {
+      if(!crypto?.subtle?.digest) throw new Error("crypto.subtle no disponible (HTTP)");
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(thumb + "|" + thumb.length));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("").substring(0, 16);
+    } catch(_){
+      return "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+  }
+
+  function makeThumb(dataUrl){
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = thumbWidth;
+        canvas.height = Math.round(img.height * thumbWidth / img.width);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve({ dataUrl: canvas.toDataURL("image/jpeg", 0.78), width: img.width, height: img.height });
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }
+
+  async function getFull(hash){
+    const db = await openDB();
+    const rec = await reqResult(db.transaction(FULL, "readonly").objectStore(FULL).get(hash));
+    return rec?.full || null;
+  }
+
+  // Borra los registros más antiguos por encima de maxRecords sin leer las
+  // imágenes: count() + cursor de claves sobre el índice ts. Devuelve los hash.
+  function evict(db){
+    return new Promise((resolve) => {
+      const tx = db.transaction([THUMBS, FULL], "readwrite");
+      const thumbs = tx.objectStore(THUMBS), full = tx.objectStore(FULL);
+      const removed = [];
+      thumbs.count().onsuccess = (e) => {
+        let excess = e.target.result - maxRecords;
+        if(excess <= 0) return;
+        thumbs.index("ts").openKeyCursor().onsuccess = (ev) => {
+          const cur = ev.target.result;
+          if(!cur || excess <= 0) return;
+          thumbs.delete(cur.primaryKey);
+          full.delete(cur.primaryKey);
+          removed.push(cur.primaryKey);
+          excess--;
+          cur.continue();
+        };
+      };
+      tx.oncomplete = () => resolve(removed);
+      tx.onerror = tx.onabort = () => { console.warn("Historial: limpieza fallida", tx.error); resolve([]); };
+    });
+  }
+
+  function itemElement(item){
+    if(!/^data:image\/(png|jpe?g|webp);/.test(item.thumb || "")){
+      console.warn("Historial: miniatura inválida descartada", item.hash);
+      return null;
+    }
+    const div = document.createElement("div");
+    div.className = "gallery-item";
+    div.dataset.hash = item.hash;
+    let infoHtml = "";
+    if(item.width && item.height){
+      const w = parseInt(item.width, 10), h = parseInt(item.height, 10), d = gcd(w, h) || 1;
+      infoHtml = `<div class="info-tag">${w}×${h} · ${w / d}:${h / d}</div>`;
+    }
+    const lqBadge = item.legacy
+      ? `<div class="lq-badge" title="Guardada antes de la actualización: solo hay disponible en baja resolución">LQ</div>`
+      : "";
+    div.innerHTML = `<button class="del-btn" title="Eliminar del historial">×</button>${lqBadge}<img src="${item.thumb}" alt="">${infoHtml}`;
+
+    div.querySelector(".del-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      remove(item.hash);
+    });
+    div.addEventListener("click", async () => {
+      document.querySelectorAll(".gallery-item").forEach(i => i.classList.remove("selected"));
+      div.classList.add("selected");
+      let full = null;
+      try { full = await getFull(item.hash); } catch(e){ console.warn("Historial: no se pudo leer la imagen", e); }
+      onSelect(full || item.thumb);
+    });
+
+    // dragstart tiene que rellenar dataTransfer de forma síncrona, así que la
+    // imagen completa se precarga al pasar el puntero (solo la última).
+    div.addEventListener("pointerenter", () => {
+      if(prefetched && prefetched.hash === item.hash) return;
+      const entry = { hash: item.hash, data: null };
+      prefetched = entry;
+      getFull(item.hash).then(d => { entry.data = d; }).catch(() => {});
+    });
+    div.setAttribute("draggable", "true");
+    div.addEventListener("dragstart", (e) => {
+      const dataUrl = (prefetched && prefetched.hash === item.hash && prefetched.data) || item.thumb;
+      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData("text/uri-list", dataUrl);
+      e.dataTransfer.setData("text/plain", dataUrl);
+      const fakeName = `${filePrefix}_${item.hash}.png`;
+      e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify({ filename: fakeName, subfolder: "", type: "input", _dataUrl: dataUrl }));
+      // DownloadURL no admite dataURLs grandes; el navegador lo ignora si no cabe.
+      try { e.dataTransfer.setData("DownloadURL", `image/png:${fakeName}:${dataUrl}`); } catch(_){}
+    });
+    return div;
+  }
+
+  async function render(){
+    const grid = $(gridId);
+    if(!grid) return;
+    let items = [];
+    try {
+      const db = await openDB();
+      items = await reqResult(db.transaction(THUMBS, "readonly").objectStore(THUMBS).index("ts").getAll());
+    } catch(e){ console.warn("No se pudo leer el historial de imágenes:", e); }
+    grid.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    for(let i = items.length - 1; i >= 0; i--){
+      const el = itemElement(items[i]);
+      if(el) frag.appendChild(el);
+    }
+    if(!frag.childNodes.length){ grid.innerHTML = EMPTY_HINT; return; }
+    grid.appendChild(frag);
+  }
+
+  async function add(dataUrl){
+    try {
+      const thumb = await makeThumb(dataUrl);
+      if(!thumb) return;
+      const rec = { hash: await hashOf(thumb.dataUrl), thumb: thumb.dataUrl, width: thumb.width, height: thumb.height, ts: Date.now() };
+      const db = await openDB();
+      const tx = db.transaction([THUMBS, FULL], "readwrite");
+      tx.objectStore(THUMBS).put(rec);
+      tx.objectStore(FULL).put({ hash: rec.hash, full: dataUrl });
+      await txDone(tx);
+      const removed = await evict(db);
+      const grid = $(gridId);
+      if(grid){
+        grid.querySelector(".hint")?.remove();
+        grid.querySelector(`[data-hash="${rec.hash}"]`)?.remove();
+        const el = itemElement(rec);
+        if(el) grid.prepend(el);
+        removed.forEach(h => grid.querySelector(`[data-hash="${h}"]`)?.remove());
+      }
+    } catch(err){
+      console.warn("No se pudo guardar en galería:", err);
+      log("⚠️ No se pudo guardar la imagen en el historial: " + err.message, "l-err");
+    }
+  }
+
+  async function remove(hash){
+    try {
+      const db = await openDB();
+      const tx = db.transaction([THUMBS, FULL], "readwrite");
+      tx.objectStore(THUMBS).delete(hash);
+      tx.objectStore(FULL).delete(hash);
+      await txDone(tx);
+      if(prefetched && prefetched.hash === hash) prefetched = null;
+      const grid = $(gridId);
+      grid?.querySelector(`[data-hash="${hash}"]`)?.remove();
+      if(grid && !grid.querySelector(".gallery-item")) grid.innerHTML = EMPTY_HINT;
+    } catch(e){
+      console.warn("Fallo borrando de galería:", e);
+      await render();
+    }
+  }
+
+  async function clear(){
+    if(!confirm("¿Vaciar todo el historial de imágenes? No se puede deshacer.")) return;
+    try {
+      const db = await openDB();
+      const tx = db.transaction([THUMBS, FULL], "readwrite");
+      tx.objectStore(THUMBS).clear();
+      tx.objectStore(FULL).clear();
+      await txDone(tx);
+    } catch(e){ console.warn(e); }
+    prefetched = null;
+    await render();
+    log("🗑️ Historial de imágenes vaciado.", "l-ok");
+  }
+
+  return { add, render, remove, clear };
+}
+
 // Registra un elemento <video>/<img> como fuente arrastrable.
 // `getMedia` debe devolver un objeto {filename, subfolder, type} o null.
 function makeDragSource(el, getMedia){
