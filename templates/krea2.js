@@ -482,7 +482,7 @@ function applySwarmParams(swarm){
     const sel = $("modelSelect");
     let found = false;
     for(const opt of sel.options){
-      if(opt.value === p.model || p.model.endsWith("/"+opt.value) || opt.value === p.model.replace("flux2/","")){
+      if(opt.value === p.model || opt.value === "flux2/" + p.model || p.model.endsWith("/"+opt.value) || opt.value === p.model.replace("flux2/","")){
         opt.selected = true; found = true; break;
       }
     }
@@ -524,7 +524,7 @@ function applyWorkflow(workflow){
     const name = g[N.UNET].inputs.unet_name || "";
     const sel = $("modelSelect");
     for(const opt of sel.options){
-      if(opt.value === name || name.endsWith("/"+opt.value) || opt.value === name.replace("flux2/","")){
+      if(opt.value === name || opt.value === "flux2/" + name || name.endsWith("/"+opt.value) || opt.value === name.replace("flux2/","")){
         opt.selected = true; break;
       }
     }
@@ -1167,7 +1167,9 @@ function buildGraph(job){
   const j = job || activeJob || null;
   const g=JSON.parse(JSON.stringify(BASE_GRAPH));
   const modelChoice = (j ? j.model : $("modelSelect")?.value) || "";
-  g[N.UNET].inputs.unet_name = "flux2/" + modelChoice;
+  // Las listas nuevas traen la carpeta ("flux2/x", "K2/x"); un nombre sin
+  // carpeta (ajustes o prompts guardados antes) sigue siendo de flux2/.
+  g[N.UNET].inputs.unet_name = modelChoice.includes("/") ? modelChoice : "flux2/" + modelChoice;
 
   // Backend de atención (Comfy Kitchen INT8 / PyTorch)
   const attnChoice = (j ? j.attentionBackend : $("attentionBackend")?.value) || "comfy kitchen attention";

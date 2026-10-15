@@ -7,7 +7,16 @@ JSON_FILE = os.environ.get("KREA2_JSON", "Krea2_OK.json")
 OUTPUT_HTML = os.environ.get("KREA2_OUTPUT_HTML", "Krea2_WebUI.html")
 _diff_base = config_loader.get_model_subdirs("diffusion_models")
 _diff_flux2 = os.path.join(_diff_base, "flux2")
-MODELS_DIR = os.environ.get("KREA2_MODELS_DIR", _diff_flux2 if os.path.isdir(_diff_flux2) else _diff_base)
+_diff_k2 = os.path.join(_diff_base, "K2")
+if os.environ.get("KREA2_MODELS_DIR"):
+    MODELS_DIR = os.environ["KREA2_MODELS_DIR"]
+elif os.path.isdir(_diff_flux2):
+    # Nombres con prefijo de carpeta ("flux2/x", "K2/x"): krea2.js los usa tal cual.
+    MODELS_DIR = [(_diff_flux2, "flux2")]
+    if os.path.isdir(_diff_k2):
+        MODELS_DIR.append((_diff_k2, "K2"))
+else:
+    MODELS_DIR = _diff_base
 
 _loras_base = config_loader.get_model_subdirs("loras")
 _loras_k2 = os.path.join(_loras_base, "K2")

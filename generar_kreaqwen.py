@@ -9,11 +9,14 @@ OUTPUT_HTML = os.environ.get("KREAQWEN_OUTPUT_HTML", "KreaQwen_WebUI.html")
 _diff_base = config_loader.get_model_subdirs("diffusion_models")
 _diff_flux2 = os.path.join(_diff_base, "flux2")
 _diff_qwen = os.path.join(_diff_base, "qwen")
+_diff_k2 = os.path.join(_diff_base, "K2")
 
 UNET_DIRS = [
     (_diff_flux2, "flux2") if os.path.isdir(_diff_flux2) else (_diff_base, ""),
     (_diff_qwen, "qwen") if os.path.isdir(_diff_qwen) else (_diff_base, "")
 ]
+if os.path.isdir(_diff_k2):
+    UNET_DIRS.append((_diff_k2, "K2"))
 
 _loras_base = config_loader.get_model_subdirs("loras")
 LORAS_DIR = os.environ.get("KREAQWEN_LORAS_DIR", _loras_base)
