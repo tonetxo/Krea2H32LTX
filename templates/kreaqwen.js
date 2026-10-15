@@ -1176,7 +1176,7 @@ function restoreKreaQwenSettings(){
     if(s.baseAttn && $("baseAttentionBackend")) $("baseAttentionBackend").value = s.baseAttn;
     if(s.baseSteps !== undefined && $("baseSteps")) $("baseSteps").value = s.baseSteps;
     if(s.baseCfg !== undefined && $("baseCfg")) $("baseCfg").value = s.baseCfg;
-    if(s.baseSampler && $("baseSamplerName")) $("baseSamplerName").value = s.baseSampler;
+    setSelectIfPresent("baseSamplerName", s.baseSampler);
     if(s.baseScheduler && $("baseSchedulerName")) $("baseSchedulerName").value = s.baseScheduler;
 
     if(Array.isArray(s.baseLoras) && s.baseLoras.length){
@@ -1195,7 +1195,7 @@ function restoreKreaQwenSettings(){
     }
     if(s.refinerSteps !== undefined && $("refinerSteps")) $("refinerSteps").value = s.refinerSteps;
     if(s.refinerCfg !== undefined && $("refinerCfg")) $("refinerCfg").value = s.refinerCfg;
-    if(s.refinerSampler && $("refinerSamplerName")) $("refinerSamplerName").value = s.refinerSampler;
+    setSelectIfPresent("refinerSamplerName", s.refinerSampler);
     if(s.refinerScheduler && $("refinerSchedulerName")) $("refinerSchedulerName").value = s.refinerScheduler;
 
     // Actualizar selectores VAE según UNet restaurado y asignar VAEs
