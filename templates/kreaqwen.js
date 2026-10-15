@@ -348,7 +348,7 @@ function populateModelSelects(){
   const clips = typeof AVAILABLE_CLIPS !== "undefined" ? AVAILABLE_CLIPS : [];
   const upscales = typeof AVAILABLE_UPSCALE_MODELS !== "undefined" ? AVAILABLE_UPSCALE_MODELS : [];
 
-  fill("baseUnetSelect", unets, "habanero");
+  fill("baseUnetSelect", unets, "habanero_int8mixed");
   fill("refinerUnetSelect", unets, "qwen-image-2.1-UC");
   fill("baseClipSelect", clips, "qwen3vl_4b");
   fill("refinerClipSelect", clips, "qwen3vl_8b_nvfp4_heretic");
@@ -484,20 +484,20 @@ function applyComboMode(mode){
   }
 
   if(mode === "krea_qwen"){
-    setStage(selBaseU, selBaseC, "krea2", "base", "habanero");
+    setStage(selBaseU, selBaseC, "krea2", "base", "habanero_int8mixed");
     setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC");
     if(hint) hint.textContent = "Krea2 compone la escena con estética fotográfica cinematográfica; Qwen 2.1 refina microtexturas y nitidez tras el reescalado.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "qwen_krea"){
     setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC");
-    setStage(selRefU, selRefC, "krea2", "refiner", "habanero");
+    setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
     if(hint) hint.textContent = "Qwen 2.1 genera la composición con adherencia profunda al prompt; Krea2 aporta riqueza tonal y grano en la pasada de refinamiento.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "krea_krea"){
-    setStage(selBaseU, selBaseC, "krea2", "base", "habanero");
-    setStage(selRefU, selRefC, "krea2", "refiner", "habanero");
+    setStage(selBaseU, selBaseC, "krea2", "base", "habanero_int8mixed");
+    setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
     if(hint) hint.textContent = "Pipeline homogéneo Krea2: generación inicial y refinado en superresolución dentro del modelo Flux2.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";

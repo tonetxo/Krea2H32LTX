@@ -1,7 +1,7 @@
 {
   "4": {
     "inputs": {
-      "unet_name": "flux2/jibMixKrea2_v40Habanero.safetensors",
+      "unet_name": "K2/jibMixKrea2_v40Habanero_int8mixed_convrot.safetensors",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",

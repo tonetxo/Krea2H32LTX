@@ -3,7 +3,7 @@
 Última actuación (2026-10-15): ronda de revisión con `REVISION.md` (seguridad de
 `serve.py`, polling, prompts, restauración de modelos, refactors), toda
 commitada; ver "Ronda de revisión" más abajo. Después: plan de optimización
-de velocidad/memoria (puntos 0–5 hechos, ver "Optimización"); falta elegir la base por defecto de KreaQwen;
+de velocidad/memoria (puntos 0–5 hechos, ver "Optimización"); base de KreaQwen = int8mixed;
 luego KreaQwen + RTX SR.
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
@@ -228,7 +228,7 @@ lento en clips cortos. Sin cambiar: con skip>1 el vídeo dura 1/skip del tramo
 | `K2/..._fp8Scaled` (167 FP8 + 96 NVFP4) | 14.5 s | 5.6 s | 16.6 s | 15.7 GB | 18.4 dB |
 
 Los int8 conservan composición/pose; fp8+nvfp4 cambia más el encuadre. Recomendado:
-int8mixed (pendiente de que el usuario elija el default). Los int8 se renombraron
+int8mixed (elegido como default). Los int8 se renombraron
 (eran IDs de Civitai `_3135300`/`_3152830`): `resolveWeightDtype` decide por el
 nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
 
@@ -245,7 +245,7 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
   real del usuario (segundos; 4 variantes seguidas sin bloqueos).
 
 ## Pendiente / siguientes pasos
-- Elegir la base por defecto de KreaQwen (recomendado int8mixed).
+- (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
   (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
 - Probar el Post-FX con un vídeo real del usuario; ajustar la calibración del
