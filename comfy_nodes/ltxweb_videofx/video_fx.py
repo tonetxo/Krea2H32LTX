@@ -7,8 +7,9 @@ vídeos LTXV de 360-1200 frames a 2-4K eso provoca picos de RAM de decenas de GB
 (bloqueo/reinicio de ComfyUI) y tiempos de decenas de minutos.
 
 Este nodo aplica la misma cadena sobre GPU de forma vectorizada, troceando el
-batch por presupuesto de memoria y escribiendo **in-place** para no duplicar el
-batch. El resultado es de segundos y con RAM acotada.
+batch por presupuesto de memoria y volcando cada chunk en un buffer de salida
+nuevo (nunca muta la entrada, que puede ser un output cacheado por ComfyUI).
+El resultado es de segundos y con RAM acotada.
 """
 
 import os
@@ -63,13 +64,15 @@ def _candidate_lut_dirs():
 def _ensure_luts_folder():
     """Registra las carpetas de LUTs conocidas (por si comfyui-propost no está
     cargado) para que el combo del nodo incluya todas las .cube del panel."""
+    # Se AÑADEN a las ya registradas (comfyui-propost, extra_model_paths.yaml...)
+    # en vez de sustituirlas, para no perder ninguna carpeta.
     try:
-        existing = list(folder_paths.get_folder_paths("luts"))
-    except Exception:
-        existing = []
-    cands = _candidate_lut_dirs()
-    try:
-        folder_paths.folder_names_and_paths["luts"] = (cands, {".cube"})
+        paths, exts = folder_paths.folder_names_and_paths.get("luts", ([], set()))
+        merged = list(paths)
+        for c in _candidate_lut_dirs():
+            if c not in merged:
+                merged.append(c)
+        folder_paths.folder_names_and_paths["luts"] = (merged, set(exts) | {".cube"})
     except Exception:
         pass
 
@@ -167,17 +170,21 @@ def apply_lut_tensor(rgb, lut, size, is_1d, domain, strength):
     """rgb: (..., H, W, 3) float32 en [0,1] en device. Devuelve mismo shape."""
     x = rgb
     if domain is not None:
+        # DOMAIN_MIN/MAX delimitan el rango de ENTRADA que cubre la tabla:
+        # se normaliza la entrada a [0,1] dentro de ese rango (como `colour`).
+        # La salida de la tabla ya está en espacio de salida: no se reescala.
         dmin = torch.as_tensor(domain[0], device=rgb.device, dtype=rgb.dtype)
         dmax = torch.as_tensor(domain[1], device=rgb.device, dtype=rgb.dtype)
-        x = x * (dmax - dmin) + dmin
+        x = (x - dmin) / (dmax - dmin)
     if is_1d:
         n = lut.shape[0]
         pos = x.clamp(0.0, 1.0) * (n - 1)
         lo = pos.floor().long().clamp(0, n - 1)
         hi = (lo + 1).clamp(0, n - 1)
         frac = (pos - lo.to(pos.dtype))
-        vlo = lut[lo]  # (...,H,W,3) gather per channel
-        vhi = lut[hi]
+        # Cada canal indexa su propia columna de la tabla (N,3).
+        vlo = torch.stack([lut[lo[..., k], k] for k in range(3)], dim=-1)
+        vhi = torch.stack([lut[hi[..., k], k] for k in range(3)], dim=-1)
         out = vlo + (vhi - vlo) * frac
     else:
         # grid_sample: input (1,3,Nr,Ng,Nb); grid (...,W=...) coords (b,g,r)
@@ -190,10 +197,6 @@ def apply_lut_tensor(rgb, lut, size, is_1d, domain, strength):
                             align_corners=True)
         # out (1,3,n,H,W) -> (n,H,W,3)
         out = out[0].permute(1, 2, 3, 0)
-    if domain is not None:
-        dmin = torch.as_tensor(domain[0], device=rgb.device, dtype=rgb.dtype)
-        dmax = torch.as_tensor(domain[1], device=rgb.device, dtype=rgb.dtype)
-        out = (out - dmin) / (dmax - dmin)
     if strength < 1.0:
         out = rgb + strength * (out - rgb)
     return out
