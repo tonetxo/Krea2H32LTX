@@ -130,6 +130,19 @@ OLLAMA_PREFIXES = ("/api",)
 LLAMACPP_PREFIXES = ("/llamacpp",)
 WS_PREFIX = "/ws"
 
+# Únicos ficheiros estáticos que se sirven: las páginas generadas
+# (LTXV_WebUI.html, MMH3X2_WebUI_BlockATT.html, ...). El resto del repo
+# (.git/, config.json, prompts_*.json, notas) no debe quedar expuesto en la LAN.
+STATIC_PAGE_RE = re.compile(r"^/[A-Za-z0-9]+_WebUI(?:_[A-Za-z0-9]+)?\.html$")
+
+# Puertos de las WebUIs de este equipo: un Origin con el mismo hostname y uno
+# de estos puertos se considera propio (envío cruzado entre UIs).
+UI_PORTS = {str(PORT)} | {
+    str(config_loader.get_port(name, default))
+    for name, default in (("ltxv", 8000), ("krea2", 8001), ("minimaxh3", 8002),
+                          ("mmh3x2", 8003), ("kreaqwen", 8004))
+}
+
 
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -305,23 +318,80 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         return host, port
 
     def _allowed_origin(self):
-        """Devuelve el Origin del cliente si coincide con el host de esta petición
-        (same-origin estricto). Bloquea que webs externas llamadas desde el mismo
-        navegador puedan reachar el proxy o los endpoints locales con credenciales.
-        Devuelve None si el origen no está permitido."""
+        """Devuelve el Origin del cliente si es propio, o None si no lo es.
+
+        Propio = mismo Host (host:port) que esta petición, o mismo hostname con
+        el puerto de otra de nuestras WebUIs. Funciona igual en local y en LAN
+        (móvil / otro PC abren http://<IP>:<puerto>, y Origin y Host coinciden).
+        Bloquea que webs externas abiertas en el mismo navegador alcancen el
+        proxy o los endpoints locales."""
         origin = self.headers.get("Origin")
         if not origin:
             return None
         host = self.headers.get("Host")
         if not host:
             return None
-        # Orígenes válidos: mismo esquema (http/https) + mismo Host (host:port).
         # El Host header ya contiene el puerto que el navegador usó para llegar.
         for scheme in ("http", "https"):
-            expected = f"{scheme}://{host}"
-            if origin == expected:
+            if origin == f"{scheme}://{host}":
                 return origin
+        try:
+            o = urllib.parse.urlsplit(origin)
+            h = urllib.parse.urlsplit("//" + host)
+            if (o.scheme in ("http", "https") and o.hostname and h.hostname
+                    and o.hostname.lower() == h.hostname.lower()
+                    and str(o.port) in UI_PORTS):
+                return origin
+        except ValueError:
+            pass
         return None
+
+    def _request_allowed(self):
+        """Filtro anti-CSRF / lectura cruzada para proxy y endpoints locales.
+
+        Rechaza lo que el navegador marca como cross-site y cualquier Origin
+        ajeno. Las peticiones sin Origin (navegación directa, <video src>,
+        curl) se permiten: un navegador siempre envía Origin en los fetch/POST
+        cross-origin, y sin cabeceras CORS la web ajena no puede leer la
+        respuesta."""
+        if self.headers.get("Sec-Fetch-Site", "").lower() == "cross-site":
+            return False
+        if self.headers.get("Origin") is None:
+            return True
+        return self._allowed_origin() is not None
+
+    def _deny_foreign(self):
+        """Responde 403 y devuelve True si la petición viene de una web ajena."""
+        if self._request_allowed():
+            return False
+        sys.stderr.write(
+            f"[serve] Rechazado (origen ajeno): {self.command} {self.path.split('?')[0]} "
+            f"Origin={self.headers.get('Origin')!r} Sec-Fetch-Site={self.headers.get('Sec-Fetch-Site')!r}\n")
+        try:
+            self._send_json(403, {"error": "forbidden: petición desde un origen no permitido"})
+        except OSError:
+            pass
+        return True
+
+    def _send_cors_headers(self, client_origin):
+        """Cabeceras CORS solo para orígenes propios (nunca '*')."""
+        if client_origin:
+            self.send_header("Access-Control-Allow-Origin", client_origin)
+            self.send_header("Access-Control-Allow-Credentials", "true")
+            self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
+            self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
+        self.send_header("Vary", "Origin")
+
+    def _serve_static(self, method):
+        """Sirve solo las páginas *_WebUI*.html; todo lo demás, 404."""
+        path = urllib.parse.urlsplit(self.path).path
+        if not STATIC_PAGE_RE.match(path):
+            self.send_error(404, "Not Found")
+            return
+        if method == "HEAD":
+            super().do_HEAD()
+        else:
+            super().do_GET()
 
     def _cors_preflight(self):
         origin = self._allowed_origin()
@@ -341,7 +411,15 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Credentials", "true")
         self.end_headers()
 
+    def _is_page_route(self):
+        """Páginas HTML (y la raíz que redirige a ellas): se pueden abrir desde
+        un enlace externo, así que no pasan por el filtro de origen."""
+        path = self.path.split("?")[0]
+        return path in ("/", "/index.html") or bool(STATIC_PAGE_RE.match(path))
+
     def do_HEAD(self):
+        if not self._is_page_route() and self._deny_foreign():
+            return
         if self._is_ws():
             self._ws_proxy()
         elif self._is_view_route():
@@ -353,7 +431,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         elif self._is_proxy_route():
             self._proxy("HEAD", get_backend())
         else:
-            super().do_HEAD()
+            self._serve_static("HEAD")
 
     # ---- helpers ----
     def _is_view_route(self):
@@ -768,6 +846,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 return
         self._send_json(500, {"error": f"no quedó en pie la WebUI '{name}' (:{port}) tras el arranque"})
     def do_GET(self):
+        if not self._is_page_route() and self._deny_foreign():
+            return
         if self._is_ws():
             self._ws_proxy()
         elif self._is_view_route():
@@ -793,11 +873,16 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path.split("?")[0] in ("/", "/index.html"):
             self.send_response(302)
             self.send_header("Location", "/LTXV_WebUI.html")
+            # Sin cuerpo: Content-Length explícito para no dejar colgado un
+            # cliente HTTP/1.1 keep-alive esperando el body.
+            self.send_header("Content-Length", "0")
             self.end_headers()
         else:
-            super().do_GET()
+            self._serve_static("GET")
 
     def do_POST(self):
+        if self._deny_foreign():
+            return
         if self._is_ws():
             self._ws_proxy()
         elif self._is_krea2_list():
@@ -828,6 +913,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(405, "Method Not Allowed")
 
     def do_OPTIONS(self):
+        if self._deny_foreign():
+            return
         if self._is_ws():
             self._ws_proxy()
         elif self._is_ollama_route() or self._is_llamacpp_route():
@@ -1064,23 +1151,27 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         subfolder = qs.get("subfolder", [""])[0]
         ftype = qs.get("type", ["output"])[0]
 
+        # Parámetros inválidos: 400, no se reenvían al backend.
         if not filename or ".." in filename or "/" in filename or "\\" in filename:
-            self._proxy(method, get_backend())
+            self._send_json(400, {"error": "filename inválido"})
             return
-        if ".." in subfolder:
-            self._proxy(method, get_backend())
+        # Sin rutas absolutas: os.path.join("/x/output", "/etc") descartaría la base.
+        if ".." in subfolder or subfolder.startswith(("/", "\\")) or os.path.isabs(subfolder):
+            self._send_json(400, {"error": "subfolder inválido"})
             return
         if ftype not in ("output", "temp", "input"):
-            self._proxy(method, get_backend())
+            self._send_json(400, {"error": "type inválido"})
             return
 
-        base = os.path.join(COMFYUI_ROOT, ftype)
-        if subfolder:
-            base = os.path.join(base, subfolder)
+        # El fichero debe quedar dentro de su carpeta de tipo (output/temp/input),
+        # no en cualquier parte de la raíz de ComfyUI.
+        type_root = os.path.realpath(os.path.join(COMFYUI_ROOT, ftype))
+        base = os.path.join(type_root, subfolder) if subfolder else type_root
         target = os.path.realpath(os.path.join(base, filename))
 
-        comfy_root_real = os.path.realpath(COMFYUI_ROOT)
-        if not (target.startswith(comfy_root_real + os.sep) or target == comfy_root_real) or not os.path.isfile(target):
+        if not target.startswith(type_root + os.sep) or not os.path.isfile(target):
+            # No está en disco local (o es un symlink fuera): que lo sirva ComfyUI,
+            # que aplica sus propias validaciones.
             self._proxy(method, get_backend())
             return
 
@@ -1127,14 +1218,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Range", f"bytes {start}-{end}/{total_size}")
                 self.send_header("Content-Length", str(length))
                 self.send_header("Accept-Ranges", "bytes")
-                if client_origin:
-                    self.send_header("Access-Control-Allow-Origin", client_origin)
-                    self.send_header("Access-Control-Allow-Credentials", "true")
-                else:
-                    self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
-                self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
-                self.send_header("Vary", "Origin")
+                self._send_cors_headers(client_origin)
                 self.send_header("Connection", "close")
                 self.close_connection = True
                 self.end_headers()
@@ -1164,14 +1248,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(total_size))
             self.send_header("Accept-Ranges", "bytes")
-            if client_origin:
-                self.send_header("Access-Control-Allow-Origin", client_origin)
-                self.send_header("Access-Control-Allow-Credentials", "true")
-            else:
-                self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
-            self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
-            self.send_header("Vary", "Origin")
+            self._send_cors_headers(client_origin)
             self.send_header("Connection", "close")
             self.close_connection = True
             self.end_headers()
@@ -1370,14 +1447,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                     if not self.path.split("?")[0].startswith("/view"):
                         self.send_header("Connection", "close")
                         self.close_connection = True
-                    if client_origin:
-                        self.send_header("Access-Control-Allow-Origin", client_origin)
-                        self.send_header("Access-Control-Allow-Credentials", "true")
-                    else:
-                        self.send_header("Access-Control-Allow-Origin", "*")
-                    self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
-                    self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
-                    self.send_header("Vary", "Origin")
+                    self._send_cors_headers(client_origin)
                     self.end_headers()
                     chunk = e.read(65536)
                     while chunk:
@@ -1413,14 +1483,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Connection", "close")
             self.close_connection = True
             
-            if client_origin:
-                self.send_header("Access-Control-Allow-Origin", client_origin)
-                self.send_header("Access-Control-Allow-Credentials", "true")
-            else:
-                self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
-            self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
-            self.send_header("Vary", "Origin")
+            self._send_cors_headers(client_origin)
             self.end_headers()
 
             # Stream the body
