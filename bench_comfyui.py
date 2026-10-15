@@ -13,11 +13,16 @@ Ejemplos:
 
 Los parches siguen JSON Merge Patch (RFC 7386): los objetos se fusionan y un
 valor null borra la clave (o el nodo entero). --set se aplica a todas las
-variantes, antes que el parche de cada una.
+variantes, antes que el parche de cada una. La clave especial "_free" de un
+parche (p. ej. {"_free":{"unload_models":true}}) no toca el grafo: se envía a
+/free antes de cada ejecución de esa variante, como hacen MiniMaxH3/MMH3X2 al
+encolar.
 
 En cada ronda todas las variantes usan la misma semilla (comparables entre sí)
 y semillas distintas a las de otras rondas (para que ComfyUI no devuelva la
-salida de caché). Las salidas se guardan en output/bench/<etiqueta>/.
+salida de caché). Si una variante solo quita nodos de salida o no toca el grafo,
+reutilizaría la caché de la anterior: usa --seed-mode unique (semilla distinta
+por variante) para comparar tiempos de gestión de memoria. Las salidas se guardan en output/bench/<etiqueta>/.
 """
 
 import argparse
@@ -242,6 +247,14 @@ def post_prompt(base_url, graph, client_id):
         raise RuntimeError(f"ComfyUI rechazó el grafo: {e.read().decode()[:1500]}") from None
 
 
+def post_free(base_url, body):
+    req = urllib.request.Request(base_url + "/free", json.dumps(body).encode(),
+                                 {"Content-Type": "application/json"})
+    urllib.request.urlopen(req).close()
+    # El worker de ComfyUI aplica los flags en su bucle (~1 s en reposo).
+    time.sleep(2)
+
+
 def run_once(base_url, graph, port, ws, client_id):
     sampler = MemSampler(comfy_pid(port))
     sampler.start()
@@ -294,6 +307,8 @@ def main():
     ap.add_argument("--runs", type=int, default=2, help="rondas medidas (def. 2)")
     ap.add_argument("--warmup", type=int, default=1, help="rondas de calentamiento sin contar (def. 1)")
     ap.add_argument("--seed", type=int, default=1000, help="semilla base")
+    ap.add_argument("--seed-mode", choices=("round", "unique"), default="round",
+                    help="round: misma semilla por ronda; unique: distinta por variante")
     ap.add_argument("--tag", default=datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
     ap.add_argument("--url", default=None, help="URL de ComfyUI (def. config_loader)")
     ap.add_argument("--top", type=int, default=6, help="nodos más lentos a mostrar")
@@ -324,8 +339,15 @@ def main():
 def _rounds(args, base_url, port, graph, common, variants, results, total_rounds, ws, client_id):
     for rnd in range(total_rounds):
         warm = rnd < args.warmup
-        for name, patch in variants:
-            g = prepare(graph, common, patch, args.seed + rnd, f"bench/{args.tag}/{name}_r{rnd}")
+        for vi, (name, patch) in enumerate(variants):
+            seed = args.seed + rnd * (len(variants) if args.seed_mode == "unique" else 1)
+            if args.seed_mode == "unique":
+                seed += vi
+            patch = dict(patch)
+            free = patch.pop("_free", None)
+            g = prepare(graph, common, patch, seed, f"bench/{args.tag}/{name}_r{rnd}")
+            if free:
+                post_free(base_url, free)
             label = "calentamiento" if warm else f"ronda {rnd - args.warmup + 1}/{args.runs}"
             print(f"▶ {name:<16} {label} …", end="", flush=True)
             r = run_once(base_url, g, port, ws, client_id)
@@ -358,7 +380,8 @@ def _summary(args, graph, common, variants, results):
             for nid, t in r["nodes"].items():
                 acc[nid] = acc.get(nid, 0.0) + t / len(rs)
         top = sorted(acc.items(), key=lambda x: -x[1])[:args.top]
-        g = prepare(graph, common, dict(variants)[name], 0, "")
+        patch = {k: v for k, v in dict(variants)[name].items() if k != "_free"}
+        g = prepare(graph, common, patch, 0, "")
         desc = ", ".join(f"{nid}:{g.get(nid, {}).get('class_type', '?')} {t:.1f}s" for nid, t in top)
         print(f"  {name}: {desc}")
 

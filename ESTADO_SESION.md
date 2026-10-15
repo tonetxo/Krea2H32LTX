@@ -3,7 +3,7 @@
 Última actuación (2026-10-15): ronda de revisión con `REVISION.md` (seguridad de
 `serve.py`, polling, prompts, restauración de modelos, refactors), toda
 commitada; ver "Ronda de revisión" más abajo. Después: plan de optimización
-de velocidad/memoria (puntos 0 y 1 hechos, ver "Optimización"); quedan 2–5;
+de velocidad/memoria (puntos 0–2 hechos, ver "Optimización"); quedan 3–5;
 luego KreaQwen + RTX SR.
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
@@ -159,7 +159,7 @@ Refactors (salida byte-idéntica salvo lo indicado en cada commit):
 - `ff91b92` generadores: `filter_names()` (substring, sin mayúsculas) para
   modelos/VAE/UNET/CLIP.
 
-## Optimización velocidad/memoria (plan aprobado: 0 y 1 hechos)
+## Optimización velocidad/memoria (plan aprobado: 0–2 hechos)
 **0. `bench_comfyui.py`**: reenvía el grafo API embebido en una salida (mp4/png)
 o un .json, con variantes como JSON Merge Patch (`--variant N='{...}'`, `--set`
 común). Mide el tiempo total y por nodo (vía WebSocket), el pico de VRAM
@@ -186,10 +186,24 @@ variantes. Salidas en `output/bench/<tag>/`; resultados en
   los acepte). Ahora: kitchen (default), sageattn3, auto (avisa de que es más
   lento); los valores antiguos se mapean a kitchen.
 
+**2. Descargas de modelos** (`--seed-mode unique`; con la misma semilla las
+variantes que solo quitan nodos de salida salen de caché y miden ~6 s, falso):
+- LTXV 1280×736×321: `PurgeVRAM` final (925) → el **siguiente** trabajo tarda
+  ~5.5 s más en el 1er pase (recarga del modelo); `cleanGpuUsed` entre pases
+  (918) → +2.4 s en el 2º pase. Total ~8 s/trabajo (~8 %). Pico de VRAM igual
+  (~15.8 GB, DynamicVRAM llena la VRAM siempre); 0 OOM en ~40 runs sin purgas.
+  → **Quitadas por defecto**; toggle "Liberar VRAM entre pases y al final"
+  (`purgeVram`, desactivado) para renders extremos. MMH3X2: mismo toggle para
+  su `PurgeVRAM` final (87). Su `VRAM_Debug` (52) se mantiene: libera VRAM
+  para Ollama (misma GPU) en el modo seg2 con Ollama.
+- H3 8 s: `/free` al encolar 110.1 s vs 109.0 s sin él (~1 s) → se mantiene.
+  Residencia AIMDO: 0 blocks 108.8 s / 4 blocks 109.1 s / stock 111.2 s; sin
+  efecto en velocidad en Gen5 y 0 blocks usa menos VRAM (10 GB vs 15.9) → se
+  mantiene el default.
+
 Hallazgos para los siguientes puntos:
 - H3: decode del pase 1 (preview) 15.4 s + decode final 24.8 s, de 236 s. El
   preview opcional (punto 3) ahorraría más aquí que en LTXV (~7 s de 102 s).
-- H3: `H3AIMDOResidencyLimiter residency="0 blocks"` → revisar en memoria (punto 2).
 
 ## Pendiente / siguientes pasos
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
