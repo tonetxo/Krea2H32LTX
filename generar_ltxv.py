@@ -57,7 +57,7 @@ def main():
         'vae_fallback': VAE_FALLBACK,
         # Exclusivo LTX 2.5: fuera VAEs/decoders de la era 2.3 (los LoRAs 2.3 se
         # quedan: la mayoría son compatibles con el transformer 2.5 destilado).
-        'vae_exclude': ('ltx23', 'LTX23', 'ltx2.3', 'Ltx2.3', 'taeltx2_3', 'pruna'),
+        'vae_exclude': ('ltx23', 'ltx2.3', 'taeltx2_3', 'pruna'),  # sin distinguir mayúsculas
         # Frame Interpolation (RIFE / FILM)
         'interp_dir': INTERP_DIR,
         'interp_fallback': 'rife_v4.26.safetensors',

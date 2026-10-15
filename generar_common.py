@@ -69,6 +69,22 @@ def get_lora_list(directory, fallback="ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safet
     return [fallback] if fallback else []
 
 
+def filter_names(names, include=None, exclude=None):
+    """Filtra nombres de modelo (rutas relativas): si hay `include`, deben
+    contener alguna de esas subcadenas; y no deben contener ninguna de
+    `exclude`. Siempre subcadena y sin distinguir mayúsculas: antes cada lista
+    usaba un criterio distinto (prefijo, o sensible a mayúsculas), y p.ej. un
+    model_exclude '/boogu/' nunca coincidía con un nombre relativo.
+    """
+    inc = [x.lower() for x in (include or ())]
+    exc = [x.lower() for x in (exclude or ())]
+    return [
+        n for n in names
+        if (not inc or any(x in n.lower() for x in inc))
+        and not any(x in n.lower() for x in exc)
+    ]
+
+
 def get_vae_list(directory, fallback="LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors"):
     return get_file_list(directory, fallback=fallback)
 
@@ -96,15 +112,14 @@ def generate_html(config):
         ui_js:           'ltxv.js' or 'krea2.js'
         model_dirs:      dir or list of (dir, prefix) tuples for models
         model_fallback:  fallback model name
-        model_exclude:   tuple of prefixes to exclude from model list
+        model_include/model_exclude, vae_*, unet_*, clip_*: substrings
+                         (see filter_names) to keep / drop from each list
         lora_dir:        directory for LoRAs
         lora_fallback:   fallback LoRA name
         unet_dirs:       optional dir or list of (dir, prefix) for UNet models
         unet_fallback:   fallback UNet name
-        unet_exclude:    tuple of prefixes to exclude from UNet list
         clip_dirs:       optional dir or list of (dir, prefix) for CLIP models
         clip_fallback:   fallback CLIP name
-        clip_exclude:    tuple of prefixes to exclude from CLIP list
         header_title:    e.g. "LTXV" or "Krea2"
         header_sub:      e.g. "grafo: LTXV_DMD_OK"
         model_count_label: "modelos" or "" (for the success message)
@@ -121,12 +136,7 @@ def generate_html(config):
     # --- Build model, LoRA and VAE lists ---
     model_ext = config.get('model_ext', '.safetensors')
     raw_models = get_file_list(config['model_dirs'], ext=model_ext, fallback=config['model_fallback'])
-    exclude = config.get('model_exclude', ())
-    include = config.get('model_include', None)
-    if include:
-        model_files = [m for m in raw_models if any(x.lower() in m.lower() for x in include) and not any(m.startswith(x) for x in exclude)]
-    else:
-        model_files = [m for m in raw_models if not any(m.startswith(x) for x in exclude)]
+    model_files = filter_names(raw_models, config.get('model_include'), config.get('model_exclude'))
     model_js_array = json.dumps(model_files)
 
     if config.get('lora_dirs'):
@@ -139,41 +149,20 @@ def generate_html(config):
         raw_vaes = get_file_list(config['vae_dirs'], fallback=config.get('vae_fallback'))
     else:
         raw_vaes = get_vae_list(config.get('vae_dir'), fallback=config.get('vae_fallback'))
-    vae_exclude = config.get('vae_exclude', ())
-    vae_include = config.get('vae_include', None)
-    if vae_include:
-        vae_files = [
-            v for v in raw_vaes
-            if any(inc.lower() in v.lower() for inc in vae_include)
-            and not any(x in v for x in vae_exclude)
-        ]
-    else:
-        vae_files = [v for v in raw_vaes if not any(x in v for x in vae_exclude)]
+    vae_files = filter_names(raw_vaes, config.get('vae_include'), config.get('vae_exclude'))
     vae_js_array = json.dumps(vae_files)
 
     # --- UNet / CLIP lists (optional, used by MiniMaxH3) ---
     if config.get('unet_dirs'):
         raw_unets = get_file_list(config['unet_dirs'], fallback=config.get('unet_fallback'))
-        unet_exclude = config.get('unet_exclude', ())
-        unet_include = config.get('unet_include')
-        unet_files = [
-            m for m in raw_unets
-            if (not unet_include or any(inc.lower() in m.lower() for inc in unet_include))
-            and not any(x.lower() in m.lower() for x in unet_exclude)
-        ]
+        unet_files = filter_names(raw_unets, config.get('unet_include'), config.get('unet_exclude'))
     else:
         unet_files = []
     unet_js_array = json.dumps(unet_files)
 
     if config.get('clip_dirs'):
         raw_clips = get_file_list(config['clip_dirs'], fallback=config.get('clip_fallback'))
-        clip_exclude = config.get('clip_exclude', ())
-        clip_include = config.get('clip_include')
-        clip_files = [
-            m for m in raw_clips
-            if (not clip_include or any(inc.lower() in m.lower() for inc in clip_include))
-            and not any(x in m for x in clip_exclude)
-        ]
+        clip_files = filter_names(raw_clips, config.get('clip_include'), config.get('clip_exclude'))
     else:
         clip_files = []
     clip_js_array = json.dumps(clip_files)
