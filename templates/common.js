@@ -528,6 +528,10 @@ function connectSocket() {
               socket.send(JSON.stringify({ type: "feature_flags", data: { supports_preview_metadata: true } }));
           } catch(e){ console.warn("WS feature_flags no enviados:", e); }
           console.debug("WebSocket conectado"); setConn("ok", "Conectado (WS)");
+          // Tras una reconexión (p.ej. el móvil vuelve del segundo plano) los
+          // execution_success emitidos mientras el WS estaba caído se perdieron:
+          // comprobar ya los prompts pendientes en vez de esperar al polling.
+          for(const pid of Object.keys(pendingSeeds)) handlePromptDone(pid);
       };
       socket.onmessage = (event) => {
           if(event.data instanceof Blob || event.data instanceof ArrayBuffer){
@@ -665,13 +669,7 @@ async function handlePromptDone(promptId) {
         const errMsg = entry.status.exception_message || (entry.status.messages || []).filter(m => m[0] === "execution_error").map(m => m[1] && m[1].exception_message).filter(Boolean)[0] || "error desconocido del backend";
         log(`❌ Error en backend: ${errMsg}`, "l-err");
         if(entry.status.exception_type) log(`   Tipo: ${entry.status.exception_type}`, "l-err");
-        handledPrompts.add(promptId);
-        processingPrompts.delete(promptId);
-        delete pendingSeeds[promptId];
-        discardTimer(promptId);
-        if(CONFIG.onPromptError) CONFIG.onPromptError(promptId);
-        currentBatchIndex++;
-        processNextBatch();
+        _failPrompt(promptId);
         return;
     }
 
@@ -749,14 +747,82 @@ async function handlePromptDone(promptId) {
     processNextBatch();
 }
 
+// Da un prompt por fallido y avanza el batch (mismo efecto que un error del backend).
+function _failPrompt(promptId){
+    handledPrompts.add(promptId);
+    processingPrompts.delete(promptId);
+    delete pendingSeeds[promptId];
+    discardTimer(promptId);
+    if(CONFIG.onPromptError) CONFIG.onPromptError(promptId);
+    currentBatchIndex++;
+    processNextBatch();
+}
+
+// true/false según ComfyUI tenga el prompt en cola o ejecutándose; null si no se sabe.
+async function _promptInServerQueue(promptId){
+    try {
+        const r = await fetch(server() + "/queue");
+        if(!r.ok) return null;
+        const q = await r.json();
+        const has = list => Array.isArray(list) && list.some(it => Array.isArray(it) && it[1] === promptId);
+        return has(q.queue_running) || has(q.queue_pending);
+    } catch(_){ return null; }
+}
+
+// true/false según exista entrada en /history; null si no se sabe.
+async function _promptInHistory(promptId){
+    try {
+        const r = await fetch(server() + "/history/" + promptId);
+        if(!r.ok) return null;
+        const h = await r.json();
+        return !!(h && h[promptId]);
+    } catch(_){ return null; }
+}
+
+// Respaldo por polling por si el WS pierde execution_success/execution_error
+// (típico en el móvil con la pestaña en segundo plano). Antes se rendía a los
+// 12 min (180 × 4 s): una generación más larga quedaba sin finalizar y la cola
+// local se atascaba. Ahora no hay tope de tiempo mientras ComfyUI tenga el
+// prompt en cola o ejecutándose; solo se da por perdido si desaparece de la
+// cola sin dejar historial (p.ej. ComfyUI reiniciado), o si terminó pero no
+// aparece media utilizable en ~2 min.
+const POLL_INTERVAL_MS = 4000;
+const POLL_QUEUE_CHECK_EVERY = 15;      // comprobar /queue cada ~1 min
+const POLL_LOST_CONFIRMATIONS = 2;      // fuera de cola y sin historial, 2 veces seguidas
+const POLL_NO_OUTPUT_LIMIT = 30;        // fuera de cola con historial pero sin media: ~2 min
+
 function pollFallback(promptId) {
-    let tries = 0;
+    let tries = 0, outOfQueue = 0, busy = false;
+    const stop = () => clearInterval(iv);
     const iv = setInterval(async () => {
-        tries++;
-        if(handledPrompts.has(promptId) || tries > 180) { clearInterval(iv); return; }
-        await handlePromptDone(promptId);
-        if(handledPrompts.has(promptId)) clearInterval(iv);
-    }, 4000);
+        if(busy) return;   // no solapar ticks si el backend tarda en responder
+        // Terminado, o cancelado por Stop/Stop All (ambos lo sacan de pendingSeeds).
+        if(handledPrompts.has(promptId) || !(promptId in pendingSeeds)) { stop(); return; }
+        busy = true;
+        try {
+            tries++;
+            await handlePromptDone(promptId);
+            if(handledPrompts.has(promptId)) { stop(); return; }
+
+            // Una vez fuera de cola se comprueba en cada tick; si no, cada ~1 min.
+            if(outOfQueue === 0 && tries % POLL_QUEUE_CHECK_EVERY !== 0) return;
+            const inQueue = await _promptInServerQueue(promptId);
+            if(inQueue !== false){ outOfQueue = 0; return; }   // en cola, o backend sin responder
+            outOfQueue++;
+            const inHistory = await _promptInHistory(promptId);
+            if(inHistory === null) return;
+            if(handledPrompts.has(promptId) || !(promptId in pendingSeeds)) { stop(); return; }
+            if(!inHistory && outOfQueue >= POLL_LOST_CONFIRMATIONS){
+                log(`❌ El prompt ${promptId.slice(0, 8)}… ya no está en la cola de ComfyUI ni en su historial (¿ComfyUI reiniciado?). Se da por perdido.`, "l-err");
+                stop(); _failPrompt(promptId);
+            } else if(inHistory && outOfQueue >= POLL_NO_OUTPUT_LIMIT){
+                log(`❌ El prompt ${promptId.slice(0, 8)}… terminó en ComfyUI pero no se encontró ningún resultado utilizable.`, "l-err");
+                stop(); _failPrompt(promptId);
+            }
+        } finally {
+            busy = false;
+        }
+    }, POLL_INTERVAL_MS);
 }
 
 function processNextBatch() {
