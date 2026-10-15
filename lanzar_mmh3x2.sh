@@ -29,7 +29,15 @@ if command -v ss >/dev/null 2>&1; then
 fi
 
 echo "Abriendo navegador en http://localhost:$PORT/$HTML_FILE ..."
-"$BROWSER" "http://localhost:$PORT/$HTML_FILE" &
+# Esperar a que serve.py acepte conexiones antes de abrir la pestaña;
+# si no, Chrome muestra "No se puede acceder a este sitio web".
+(
+  for _ in $(seq 1 100); do
+    (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && break
+    sleep 0.1
+  done
+  "$BROWSER" "http://localhost:$PORT/$HTML_FILE"
+) >/dev/null 2>&1 &
 
 echo "Sirviendo en el puerto $PORT (Ctrl+C para detener)..."
 HOST=0.0.0.0 python3 serve.py "$PORT" "$@"
