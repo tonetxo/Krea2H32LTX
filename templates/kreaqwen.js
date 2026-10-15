@@ -213,11 +213,15 @@ function updateDimensionHints(){
 //   - Krea2   ("krea")  -> CLIP type 'krea2',      CLIP qwen3vl_4b, VAE 16ch (Wan21)
 //   - Qwen2.1 ("qwen")  -> CLIP type 'qwen_image', CLIP qwen3vl_8b, VAE 64ch (QwenImage21)
 //   - Flux2/Klein ("klein"/"flux2") -> CLIP type 'flux2', CLIP qwen3vl_8b, VAE 128ch (Flux2)
-// Un CLIP con el type equivocado produce "mat1 and mat2 shapes cannot be multiplied".
+//   - Flux3/Klein ("flux3")         -> CLIP type 'flux3', CLIP qwen3vl_4b, VAE 128ch (Flux2)
+// Un CLIP con el type o el tamano equivocado produce "mat1 and mat2 shapes cannot be multiplied"
+// (7680 = 4B con tap de 3 capas; Klein 9B espera 12288 = 8B; Flux3 espera 20480 = 4B con 8 capas).
+// OJO: Flux3 vive en flux2/, asi que "flux3" debe comprobarse antes que "flux2".
 function unetArchFamily(unetName){
   const u = (unetName || "").toLowerCase();
   if(u.includes("krea")) return "krea2";
   if(u.includes("qwen")) return "qwen21";
+  if(u.includes("flux3")) return "flux3";
   if(u.includes("klein") || u.includes("flux2")) return "flux2";
   return "krea2";
 }
@@ -239,13 +243,49 @@ const ARCH_CLIP = {
   krea2:  { keyword: "qwen3vl_4b", type: "krea2" },
   qwen21: { keyword: "qwen3vl_8b_nvfp4_heretic", type: "qwen_image" },
   flux2:  { keyword: "qwen3vl_8b", type: "flux2" },
+  flux3:  { keyword: "qwen3vl_4b", type: "flux3" },
 };
 
 function archClipType(family){
   return (ARCH_CLIP[family] || ARCH_CLIP.krea2).type;
 }
-function archClipKeyword(family){
+function archClipKeyword(family, unetName){
+  if(family === "flux2" && klein4b(unetName)) return "qwen_3_4b";
   return (ARCH_CLIP[family] || ARCH_CLIP.krea2).keyword;
+}
+
+// Klein 4B usa Qwen3 4B; Klein 9B (y variantes sin tamano en el nombre) usa Qwen3 8B.
+function klein4b(unetName){
+  return /(^|[^0-9.])4b/.test((unetName || "").toLowerCase());
+}
+
+// ¿Sirve este text encoder para la arquitectura del UNET? Se mira el tamano del LLM
+// (4B/8B) y si es Qwen3-VL: Krea2/Flux3 necesitan el camino QWEN3VL_4B de ComfyUI,
+// Qwen 2.1 el QWEN3VL_8B; Flux2/Klein acepta Qwen3 o Qwen3-VL del tamano correcto.
+function clipFitsFamily(clipName, family, unetName){
+  const c = (clipName || "").toLowerCase();
+  const size = /(^|[^0-9.])4b/.test(c) ? "4b" : /(^|[^0-9.])8b/.test(c) ? "8b" : null;
+  const isVl = c.includes("qwen3vl");
+  const isQwen3 = isVl || c.includes("qwen_3_");
+  if(family === "krea2" || family === "flux3") return isVl && size === "4b";
+  if(family === "qwen21") return isVl && size === "8b";
+  if(family === "flux2") return isQwen3 && size === (klein4b(unetName) ? "4b" : "8b");
+  return true;
+}
+
+// Solo cambia el text encoder si el actual NO es compatible: respeta la variante que haya
+// elegido el usuario (fp8/int8/nvfp4...) mientras encaje con la arquitectura.
+function ensureCompatibleClip(clipSel, family, unetName){
+  if(!clipSel || clipFitsFamily(clipSel.value, family, unetName)) return false;
+  const opts = [...clipSel.options].filter(o => clipFitsFamily(o.value, family, unetName));
+  if(!opts.length) return false;
+  const kw = archClipKeyword(family, unetName).toLowerCase();
+  const pick = opts.find(o => o.value.toLowerCase().startsWith(kw + ".")) ||
+               opts.find(o => o.value.toLowerCase().includes(kw)) || opts[0];
+  const prev = clipSel.value;
+  clipSel.value = pick.value;
+  log(`Text encoder "${prev}" no vale para ${family}: cambiado a "${pick.value}".`, "l-warn");
+  return true;
 }
 
 // --- Compatibilidad VAE por ARQUITECTURA (canales latentes) ---
@@ -266,15 +306,22 @@ function vaeLatentFamily(vaeName){
   return "krea2";                                             // 16ch (Wan21)
 }
 
-// Alias historico: la familia de arquitectura del UNET es la misma que la del VAE.
-const unetVaeFamily = unetArchFamily;
+// Familia de latentes (VAE) del UNET: Flux3 comparte el latent_format Flux2 (128ch).
+function latentFamily(family){
+  return family === "flux3" ? "flux2" : family;
+}
+function unetVaeFamily(unetName){
+  return latentFamily(unetArchFamily(unetName));
+}
 
 function compatibleVaes(family){
+  family = latentFamily(family);
   const all = (typeof AVAILABLE_VAES !== "undefined" && Array.isArray(AVAILABLE_VAES)) ? AVAILABLE_VAES : [];
   return all.filter(v => vaeLatentFamily(v) === family);
 }
 
 function fallbackVae(family){
+  family = latentFamily(family);
   const list = compatibleVaes(family);
   if(family === "qwen21"){
     return list.find(v => v.toLowerCase().includes("texture_fix_vae_for_qwen_image_2.1")) ||
@@ -393,6 +440,18 @@ const ARCH_PROFILES = {
     refinerScheduler: "simple",
     refinerDenoise: 0.35,
     clip: "qwen3vl_8b"
+  },
+  flux3: {
+    steps: 8,
+    cfg: 1.0,
+    sampler: "euler",
+    scheduler: "simple",
+    refinerSteps: 6,
+    refinerCfg: 1.0,
+    refinerSampler: "euler",
+    refinerScheduler: "simple",
+    refinerDenoise: 0.35,
+    clip: "qwen3vl_4b"
   }
 };
 
@@ -400,6 +459,7 @@ const ARCH_PROFILES = {
 function profileForFamily(family){
   if(family === "qwen21") return "qwen";
   if(family === "flux2") return "flux2";
+  if(family === "flux3") return "flux3";
   return "krea";
 }
 
@@ -479,7 +539,8 @@ function applyComboMode(mode){
   // Aplica perfil y ademas fija el CLIP (fichero+type) coherente con el UNET.
   function setStage(unetSel, clipSel, family, stage, preferKw){
     selectByFamily(unetSel, family, preferKw);
-    // selectByKw(clipSel, archClipKeyword(family)); // No cambiar text encoder al cambiar modelo
+    // No se fuerza el text encoder preferido: solo se corrige si es incompatible.
+    ensureCompatibleClip(clipSel, family, unetSel?.value);
     applyProfile(profileForFamily(family), stage);
   }
 
@@ -510,7 +571,7 @@ function applyComboMode(mode){
   } else if(mode === "base_only"){
     // En base_only heredamos el perfil (pero no tocamos el text encoder) del modelo base actual
     const baseFam = unetArchFamily(selBaseU?.value);
-    // selectByKw(selBaseC, archClipKeyword(baseFam));
+    ensureCompatibleClip(selBaseC, baseFam, selBaseU?.value);
     applyProfile(profileForFamily(baseFam), "base_only");
     if($("refinerEnabled")) $("refinerEnabled").checked = false;
     if($("upscaleEnabled")) $("upscaleEnabled").checked = false;
@@ -553,9 +614,10 @@ function invertOrder(){
   log("⇄ Orden de modelos invertido.", "l-ok");
 }
 
-// Recalcula CLIP (fichero+type) y perfil de una etapa a partir de su UNET actual.
+// Recalcula CLIP (solo si es incompatible) y perfil de una etapa a partir de su UNET actual.
 function syncStageToUnet(unetSelId, clipSelId, prefix){
   const family = unetArchFamily($(unetSelId)?.value);
+  ensureCompatibleClip($(clipSelId), family, $(unetSelId)?.value);
   applyProfile(profileForFamily(family), prefix);
   return family;
 }
@@ -1767,6 +1829,7 @@ function buildGraph(job){
   //   - Krea2   -> 'krea2'      (CLIP qwen3vl_4b, 30720 features)
   //   - Qwen2.1 -> 'qwen_image' (CLIP qwen3vl_8b)
   //   - Flux2/Klein -> 'flux2'  (CLIP qwen3vl_8b, 12288 features)
+  //   - Flux3/Klein -> 'flux3'  (CLIP qwen3vl_4b, 20480 features)
   // Krea2 y Klein comparten el directorio flux2/, asi que se distinguen por el NOMBRE.
   const famBase = unetArchFamily(j.baseUnet);
   const famRefiner = unetArchFamily(j.refinerUnet);
@@ -1794,10 +1857,11 @@ function buildGraph(job){
   function famLabel(f){
     if(f === "qwen21") return "Qwen 2.1 (64 canales · qwen_image_2.1_vae)";
     if(f === "flux2") return "Flux2/Klein (128 canales · flux2-vae)";
+    if(f === "flux3") return "Flux3/Klein (128 canales · flux2-vae)";
     return "Krea2 (16 canales · qwen_image_vae / wan_2.1_vae)";
   }
   function vaeMatches(vaeName, family){
-    return vaeLatentFamily(vaeName) === family;
+    return vaeLatentFamily(vaeName) === latentFamily(family);
   }
   // Selectores vacíos: vaeLatentFamily("") / unetArchFamily("") devuelven "krea2",
   // así que un VAE vacío pasaba la validación de compatibilidad y llegaba a
@@ -1820,6 +1884,12 @@ function buildGraph(job){
   }
   if(j.refinerEnabled && j.comboMode !== "base_only" && vaeLatentFamily(j.refinerVae) === "vaeutils"){
     throw new Error(`VAE Refiner no soportado: "${j.refinerVae}" es un VAE de upscaling 2x para nodos VAEUtils, no para VAEDecode/SaveImage. Usa ${fallbackVae(famRefiner)}.`);
+  }
+  if(!clipFitsFamily(j.baseClip, famBase, j.baseUnet)){
+    throw new Error(`Text encoder Base incompatible: "${j.baseClip}" no vale para "${j.baseUnet}" (${famBase}). Usa un ${archClipKeyword(famBase, j.baseUnet)}.`);
+  }
+  if(usesRefiner && !clipFitsFamily(j.refinerClip, famRefiner, j.refinerUnet)){
+    throw new Error(`Text encoder Refiner incompatible: "${j.refinerClip}" no vale para "${j.refinerUnet}" (${famRefiner}). Usa un ${archClipKeyword(famRefiner, j.refinerUnet)}.`);
   }
   if(!vaeMatches(j.baseVae, famBase)){
     throw new Error(`VAE Base incompatible: "${j.baseVae}" no decodifica los latentes de ${famLabel(famBase)}. Selecciona ${fallbackVae(famBase)}.`);
