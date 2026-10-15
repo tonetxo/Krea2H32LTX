@@ -933,7 +933,7 @@ function setRifeUI(r){
     const fps = 24 * parseInt(r.multiplier, 10);
     if($("rifeFpsHint")) $("rifeFpsHint").textContent = `(24fps → ${fps}fps)`;
   }
-  if($("rifeModel") && r.model) $("rifeModel").value = r.model;
+  setSelectIfPresent("rifeModel", r.model);
 }
 function getRifeState(){
   const mult = parseInt($("rifeMultiplier")?.value || "2", 10);

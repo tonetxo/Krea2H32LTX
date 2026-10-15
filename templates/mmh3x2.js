@@ -1980,15 +1980,15 @@ function applyWorkflow(workflow){
   // 9. Modelos UNet, CLIP & VAE Vídeo
   const unetNode = workflow["14"] || workflow["10"] || workflow[N.UNET] || findByClass("UNETLoader");
   if(unetNode?.inputs?.unet_name && $("unetModel")){
-    $("unetModel").value = unetNode.inputs.unet_name;
+    setSelectIfPresent("unetModel", unetNode.inputs.unet_name);
   }
   const clipNode = workflow["11"] || workflow[N.CLIP] || findByClass("CLIPLoader");
   if(clipNode?.inputs?.clip_name && $("clipModel")){
-    $("clipModel").value = clipNode.inputs.clip_name;
+    setSelectIfPresent("clipModel", clipNode.inputs.clip_name);
   }
   const vaeNode = workflow[N.VAE_VID] || workflow["8"] || findByClass("VAELoader");
   if(vaeNode?.inputs?.vae_name && $("vaeModel")){
-    $("vaeModel").value = vaeNode.inputs.vae_name;
+    setSelectIfPresent("vaeModel", vaeNode.inputs.vae_name);
   }
 
   // 10. Optimizaciones de atención MMH3X2
@@ -2614,9 +2614,9 @@ function restoreSettings(){
     if(s.sampler !== undefined && $("samplerName")) $("samplerName").value = s.sampler;
     if(s.scheduler !== undefined && $("schedulerName")) $("schedulerName").value = s.scheduler;
 
-    if(s.unetModel && $("unetModel")) $("unetModel").value = s.unetModel;
-    if(s.clipModel && $("clipModel")) $("clipModel").value = s.clipModel;
-    if(s.vaeModel && $("vaeModel")) $("vaeModel").value = s.vaeModel;
+    setSelectIfPresent("unetModel", s.unetModel);
+    setSelectIfPresent("clipModel", s.clipModel);
+    setSelectIfPresent("vaeModel", s.vaeModel);
 
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
     if(IS_BLOCKATT){
@@ -2674,7 +2674,7 @@ function restoreSettings(){
       if(col) col.style.display = (s.rifeEngine === "rtx") ? "none" : "";
     }
     if(s.rifeMultiplier !== undefined && $("rifeMultiplier")) $("rifeMultiplier").value = s.rifeMultiplier;
-    if(s.rifeModel && $("rifeModel")) $("rifeModel").value = s.rifeModel;
+    setSelectIfPresent("rifeModel", s.rifeModel);
     if(s.audioMode !== undefined && $("audioMode")) $("audioMode").value = s.audioMode;
 
     if(s.audioCrossfadeToggle !== undefined && $("audioCrossfadeToggle")) $("audioCrossfadeToggle").checked = s.audioCrossfadeToggle;

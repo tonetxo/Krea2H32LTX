@@ -3087,6 +3087,18 @@ function formatVariantMeta(obj){
   return parts.join("");
 }
 
+// Asigna `value` a un <select> solo si existe esa opción. `sel.value = x` con un
+// valor inexistente deja el selector VACÍO sin avisar (y el grafo sale con
+// nombres de modelo ''). Devuelve true si se aplicó.
+function setSelectIfPresent(id, value){
+  const sel = $(id);
+  if(!sel || value == null || value === "") return false;
+  const v = String(value);
+  if(![...sel.options].some(o => o.value === v)) return false;
+  sel.value = v;
+  return true;
+}
+
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 }

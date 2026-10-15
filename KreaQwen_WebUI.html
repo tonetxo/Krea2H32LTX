@@ -4048,6 +4048,18 @@ function formatVariantMeta(obj){
   return parts.join("");
 }
 
+// Asigna `value` a un <select> solo si existe esa opción. `sel.value = x` con un
+// valor inexistente deja el selector VACÍO sin avisar (y el grafo sale con
+// nombres de modelo ''). Devuelve true si se aplicó.
+function setSelectIfPresent(id, value){
+  const sel = $(id);
+  if(!sel || value == null || value === "") return false;
+  const v = String(value);
+  if(![...sel.options].some(o => o.value === v)) return false;
+  sel.value = v;
+  return true;
+}
+
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 }
@@ -4894,7 +4906,7 @@ function populateModelSelects(){
   const upscales = typeof AVAILABLE_UPSCALE_MODELS !== "undefined" ? AVAILABLE_UPSCALE_MODELS : [];
 
   fill("baseUnetSelect", unets, "habanero");
-  fill("refinerUnetSelect", unets, "qwen-image-2.1-UC-NVFP4");
+  fill("refinerUnetSelect", unets, "qwen-image-2.1-UC");
   fill("baseClipSelect", clips, "qwen3vl_4b");
   fill("refinerClipSelect", clips, "qwen3vl_8b_nvfp4_heretic");
   fill("upscaleModelSelect", upscales, "4xPurePhoto-Span.pth");
@@ -5030,12 +5042,12 @@ function applyComboMode(mode){
 
   if(mode === "krea_qwen"){
     setStage(selBaseU, selBaseC, "krea2", "base", "habanero");
-    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC-NVFP4");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC");
     if(hint) hint.textContent = "Krea2 compone la escena con estética fotográfica cinematográfica; Qwen 2.1 refina microtexturas y nitidez tras el reescalado.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "qwen_krea"){
-    setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC-NVFP4");
+    setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC");
     setStage(selRefU, selRefC, "krea2", "refiner", "habanero");
     if(hint) hint.textContent = "Qwen 2.1 genera la composición con adherencia profunda al prompt; Krea2 aporta riqueza tonal y grano en la pasada de refinamiento.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
@@ -5047,8 +5059,8 @@ function applyComboMode(mode){
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "qwen_qwen"){
-    setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC-NVFP4");
-    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC-NVFP4");
+    setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC");
     if(hint) hint.textContent = "Pipeline homogéneo Qwen 2.1: renderizado y refinado con máxima nitidez textual y detalle anatómico.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
@@ -5691,13 +5703,33 @@ function restoreKreaQwenSettings(){
     const s = JSON.parse(raw);
     if(!s || typeof s !== "object") return false;
 
+    // Asigna un modelo guardado solo si sigue entre las opciones. Un
+    // <select>.value con un valor inexistente deja el selector VACÍO sin avisar
+    // (y el VAE del refiner se recalculaba para la familia equivocada).
+    // Si el UNET guardado ya no existe, se elige otro de su MISMA familia
+    // (un Qwen 2.1 por otro Qwen 2.1), no la primera opción de la lista: así el
+    // VAE/CLIP guardados siguen siendo compatibles y el combo no cambia.
+    const missingModels = [];
+    const restoreModel = (id, val, label) => {
+      const sel = $(id);
+      if(!sel || !val) return;
+      if([...sel.options].some(o => o.value === val)){ sel.value = val; return; }
+      let note = "";
+      if(/UnetSelect$/.test(id)){
+        const fam = unetArchFamily(val);
+        const alt = [...sel.options].find(o => unetArchFamily(o.value) === fam);
+        if(alt){ sel.value = alt.value; note = ` → "${alt.value}"`; }
+      }
+      missingModels.push(`${label} "${val}"${note}`);
+    };
+
     if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
     if(s.negPrompt !== undefined && $("negPrompt")) $("negPrompt").value = s.negPrompt;
     if(s.comboMode && $("comboMode")) $("comboMode").value = s.comboMode;
 
-    if(s.baseUnet && $("baseUnetSelect")) $("baseUnetSelect").value = s.baseUnet;
+    restoreModel("baseUnetSelect", s.baseUnet, "modelo Base");
     if(s.baseWeightDtype && $("baseWeightDtype")) $("baseWeightDtype").value = s.baseWeightDtype;
-    if(s.baseClip && $("baseClipSelect")) $("baseClipSelect").value = s.baseClip;
+    restoreModel("baseClipSelect", s.baseClip, "text encoder Base");
     if(s.baseAttn && $("baseAttentionBackend")) $("baseAttentionBackend").value = s.baseAttn;
     if(s.baseSteps !== undefined && $("baseSteps")) $("baseSteps").value = s.baseSteps;
     if(s.baseCfg !== undefined && $("baseCfg")) $("baseCfg").value = s.baseCfg;
@@ -5710,9 +5742,9 @@ function restoreKreaQwenSettings(){
     }
 
     if(s.refinerEnabled !== undefined && $("refinerEnabled")) $("refinerEnabled").checked = !!s.refinerEnabled;
-    if(s.refinerUnet && $("refinerUnetSelect")) $("refinerUnetSelect").value = s.refinerUnet;
+    restoreModel("refinerUnetSelect", s.refinerUnet, "modelo Refiner");
     if(s.refinerWeightDtype && $("refinerWeightDtype")) $("refinerWeightDtype").value = s.refinerWeightDtype;
-    if(s.refinerClip && $("refinerClipSelect")) $("refinerClipSelect").value = s.refinerClip;
+    restoreModel("refinerClipSelect", s.refinerClip, "text encoder Refiner");
     if(s.refinerAttn && $("refinerAttentionBackend")) $("refinerAttentionBackend").value = s.refinerAttn;
     if(s.refinerDenoise !== undefined && $("refinerDenoise")){
       $("refinerDenoise").value = s.refinerDenoise;
@@ -5725,8 +5757,11 @@ function restoreKreaQwenSettings(){
 
     // Actualizar selectores VAE según UNet restaurado y asignar VAEs
     updateVaeSelectors();
-    if(s.baseVae && $("baseVaeSelect")) $("baseVaeSelect").value = s.baseVae;
-    if(s.refinerVae && $("refinerVaeSelect")) $("refinerVaeSelect").value = s.refinerVae;
+    restoreModel("baseVaeSelect", s.baseVae, "VAE Base");
+    restoreModel("refinerVaeSelect", s.refinerVae, "VAE Refiner");
+    if(missingModels.length){
+      log(`⚠️ Ajustes guardados con modelos que ya no están disponibles: ${missingModels.join(", ")}. Se ha elegido uno equivalente; revísalo antes de generar.`, "l-warn");
+    }
 
     if(Array.isArray(s.refinerLoras) && s.refinerLoras.length){
       s.refinerLoras.forEach((l, i) => { if(i < refinerLoras.length && l) refinerLoras[i] = l; });
@@ -5743,7 +5778,7 @@ function restoreKreaQwenSettings(){
       $("upscaleFactor").value = s.upscaleFactor;
       if($("upscaleFactorVal")) $("upscaleFactorVal").textContent = `${parseFloat(s.upscaleFactor).toFixed(2)}x`;
     }
-    if(s.upscaleModel && $("upscaleModelSelect")) $("upscaleModelSelect").value = s.upscaleModel;
+    setSelectIfPresent("upscaleModelSelect", s.upscaleModel);
 
     // Semillas
     if(s.seedMode){
@@ -6320,6 +6355,22 @@ function buildGraph(job){
   }
   function vaeMatches(vaeName, family){
     return vaeLatentFamily(vaeName) === family;
+  }
+  // Selectores vacíos: vaeLatentFamily("") / unetArchFamily("") devuelven "krea2",
+  // así que un VAE vacío pasaba la validación de compatibilidad y llegaba a
+  // ComfyUI como vae_name '' ("Model in folder 'vae' with filename '' not found").
+  const usesRefiner = j.refinerEnabled && j.comboMode !== "base_only";
+  const emptySel = [];
+  if(!j.baseUnet) emptySel.push("modelo Base");
+  if(!j.baseClip) emptySel.push("text encoder Base");
+  if(!j.baseVae) emptySel.push("VAE Base");
+  if(usesRefiner){
+    if(!j.refinerUnet) emptySel.push("modelo Refiner");
+    if(!j.refinerClip) emptySel.push("text encoder Refiner");
+    if(!j.refinerVae) emptySel.push("VAE Refiner");
+  }
+  if(emptySel.length){
+    throw new Error(`Falta seleccionar: ${emptySel.join(", ")}. Puede que el modelo guardado en los ajustes ya no exista; elige uno en el selector.`);
   }
   if(vaeLatentFamily(j.baseVae) === "vaeutils"){
     throw new Error(`VAE Base no soportado: "${j.baseVae}" es un VAE de upscaling 2x para nodos VAEUtils, no para VAEDecode/SaveImage. Usa ${fallbackVae(famBase)}.`);
