@@ -120,6 +120,34 @@ def _parse_time_arg(value):
     return "", "formato no reconocido (usa segundos o HH:MM:SS.mmm)"
 
 
+def _parse_byte_range(header, total):
+    """Interpreta un Range de un solo tramo: 'bytes=a-b', 'bytes=a-' o 'bytes=-n'
+    (los últimos n bytes). Devuelve (start, end) inclusivos, "unsatisfiable"
+    (-> 416), o None si no hay cabecera, no se entiende o pide varios tramos:
+    entonces se sirve el fichero entero, como permite la RFC 9110."""
+    if not header or not header.startswith("bytes="):
+        return None
+    spec = header[6:].strip()
+    if "," in spec:
+        return None
+    m = re.fullmatch(r"(\d*)-(\d*)", spec)
+    if not m or not (m.group(1) or m.group(2)):
+        return None
+    first, last = m.groups()
+    if not first:  # sufijo: últimos N bytes
+        n = int(last)
+        if n == 0 or total == 0:
+            return "unsatisfiable"
+        return (max(0, total - n), total - 1)
+    start = int(first)
+    if start >= total:
+        return "unsatisfiable"
+    end = int(last) if last else total - 1
+    if end < start:
+        return None
+    return (start, min(end, total - 1))
+
+
 # Routes that should be proxied to the backend instead of served as files.
 PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt", "/free")
 OLLAMA_PREFIXES = ("/api",)
@@ -626,7 +654,6 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             return f["data"].decode("utf-8", "replace").strip()
 
         scale = field("scale", "1") or "1"
-        ar_lock = field("ar_lock", "true").lower() in ("true", "1", "on")
         trim_start_raw = field("trim_start", "")
         trim_end_raw = field("trim_end", "")
         skip_frames = field("skip_frames", "1")
@@ -724,10 +751,9 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             if vw and vh and scale > 0 and scale != 1.0:
                 nw = max(2, int(vw * scale) // 2 * 2)
                 nh = max(2, int(vh * scale) // 2 * 2)
-                if ar_lock:
-                    vf.append(f"scale={nw}:{nh}")
-                else:
-                    vf.append(f"scale={nw}:{nh}")
+                # Escala uniforme: el aspecto se conserva siempre, así que el
+                # campo ar_lock del cliente no cambia nada aquí.
+                vf.append(f"scale={nw}:{nh}")
             if skip > 1:
                 vf.append(f"select='not(mod(n,{skip}))'")
                 vf.append("setpts=N/FRAME_RATE/TB")
@@ -1194,19 +1220,17 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         content_type = content_types.get(ext, "application/octet-stream")
 
         client_origin = self._allowed_origin()
-        range_header = self.headers.get("Range")
+        byte_range = _parse_byte_range(self.headers.get("Range"), total_size)
+        if byte_range == "unsatisfiable":
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{total_size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
 
-        if range_header and range_header.startswith("bytes="):
+        if byte_range:
             try:
-                ranges = range_header[6:].split("-")
-                start = int(ranges[0]) if ranges[0] else 0
-                end = int(ranges[1]) if len(ranges) > 1 and ranges[1] else total_size - 1
-                if start >= total_size:
-                    self.send_response(416)
-                    self.send_header("Content-Range", f"bytes */{total_size}")
-                    self.end_headers()
-                    return
-                end = min(end, total_size - 1)
+                start, end = byte_range
                 length = end - start + 1
 
                 self.send_response(206)
@@ -1274,7 +1298,10 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         if not self._allowed_origin():
             self._send_json(403, {"error": "forbidden: solo same-origin puede llamar a file_delete"})
             return
-        length = int(self.headers.get("Content-Length", 0))
+        length = self._content_length()
+        if length is None:
+            self._send_json(400, {"error": "Content-Length inválido"})
+            return
         if length > 1024 * 1024:  # Limit payload to 1MB
             self._send_json(400, {"error": "Content-Length demasiado grande"})
             return
@@ -1341,8 +1368,8 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         self._send_json(200, {}, {"X-Prompts-Exists": "0"})
 
     def _do_prompts_post(self):
-        length = int(self.headers.get("Content-Length", 0))
-        if length <= 0 or length > 10 * 1024 * 1024:
+        length = self._content_length()
+        if length is None or length <= 0 or length > 10 * 1024 * 1024:
             self._send_json(400, {"error": "payload inválido"})
             return
         try:
@@ -1365,6 +1392,18 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             sys.stderr.write(f"[serve] Error guardando prompts: {e}\n")
             self._send_json(500, {"error": str(e)})
 
+    def _content_length(self):
+        """Content-Length como int (0 si falta); None si es inválido o negativo.
+        Un int() sin proteger tumbaba el hilo sin responder al cliente."""
+        raw = self.headers.get("Content-Length")
+        if raw is None:
+            return 0
+        try:
+            n = int(raw)
+        except ValueError:
+            return None
+        return n if n >= 0 else None
+
     def _send_json(self, status, obj, extra_headers=None):
         body = json.dumps(obj).encode("utf-8")
         self.send_response(status)
@@ -1383,10 +1422,19 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             path_to_forward = path_to_forward[len("/llamacpp"):]
             if not path_to_forward.startswith("/"):
                 path_to_forward = "/" + path_to_forward
+        # http.server decodifica la línea de petición como latin-1: un cliente que
+        # envíe bytes no ASCII sin codificar (p.ej. "sofá" en crudo) hacía que
+        # urllib reventase con UnicodeEncodeError y el cliente se quedaba sin
+        # respuesta. Se recuperan los bytes originales y se codifican con %XX.
+        path_to_forward = urllib.parse.quote(
+            path_to_forward.encode("latin-1", "replace"), safe="/?&=%:+,;@!$'()*~#[]")
         target = base + path_to_forward
         body = None
         if method in ("POST", "PUT", "PATCH"):
-            length = int(self.headers.get("Content-Length", 0))
+            length = self._content_length()
+            if length is None:
+                self._send_json(400, {"error": "Content-Length inválido"})
+                return
             # Tope para evitar que un cliente (o un atacante desde una web maliciosa)
             # OOMee el proceso enviando cuerpos enormes al proxy. 100 MB es amplio
             # para los payloads de /prompt (workflow JSON) y de /upload/image (imágenes
