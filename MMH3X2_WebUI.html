@@ -8511,6 +8511,7 @@ async function restoreSavedMedia(){
   for(const rec of records){
     if(rec.key && rec.key.startsWith("slot_") && rec.key !== "slot_vid" && !rec.key.startsWith("slot_audio_")){
       const slotIdx = parseInt(rec.key.replace("slot_", ""), 10);
+      if(slotIdx === 1 && refQueryImagePending) continue;
       if(slotIdx >= 1 && slotIdx <= 4 && rec.dataUrl){
         setMediaSlotData(slotIdx, null, rec.dataUrl, rec.name || `slot_${slotIdx}.png`, false);
         if(rec.uploaded) mediaSlots[slotIdx].uploaded = rec.uploaded;
@@ -11672,10 +11673,15 @@ function enableKrea2RecentSlotDrop(){
 }
 
 // Cargar imagen pasada por query ?ref= (botón "→ MMH3X2" de Krea2) en el slot 1.
+// true si la página se abrió con ?ref=: la imagen recibida tiene prioridad sobre
+// el slot 1 guardado en IndexedDB, que se restaura en paralelo y podía terminar
+// después, pisándola con la imagen de la sesión anterior.
+let refQueryImagePending = false;
 (async function maybeLoadFromQuery(){
   const qs = new URLSearchParams(window.location.search);
   const ref = qs.get("ref");
   if(!ref) return;
+  refQueryImagePending = true;
   const rawName = decodeURIComponent(ref);
   const filename = rawName.replace(/^.*\//, "");
   const subfolder = (rawName.includes("/") && rawName.split("/").slice(0,-1).join("/")) || "krea2";

@@ -7484,10 +7484,15 @@ async function loadKrea2ImageAsInput(url, filename){
   }
 }
 
+// true si la página se abrió con ?ref=: la imagen recibida tiene prioridad sobre
+// la "firstImage" guardada en IndexedDB, que se restaura en paralelo y podía
+// terminar después, pisándola con la imagen de la sesión anterior.
+let refQueryImagePending = false;
 (function maybeLoadFromQuery(){
   const qs = new URLSearchParams(window.location.search);
   const ref = qs.get("ref");
   if(!ref) return;
+  refQueryImagePending = true;
   const rawName = decodeURIComponent(ref);
   const filename = rawName.replace(/^.*\//, "");
   const subfolder = (rawName.includes("/") && rawName.split("/").slice(0,-1).join("/")) || "krea2";
@@ -11775,6 +11780,7 @@ async function restoreMiniMaxH3MediaFromDB(){
   for(const e of sortedEntries){
     if(!e || !e.key) continue;
     try {
+      if(e.key === "firstImage" && refQueryImagePending) continue;
       if(e.key === "firstImage" && e.data){
         const b = dataUrlToBlob(e.data);
         localFirstFile = new File([b], e.name || "restored_first.png", { type: e.type || b.type || "image/png" });
