@@ -1,6 +1,12 @@
 # Estado de sesión (para continuar después)
 
-Última actuación: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
+Última actuación (2026-10-15): ronda de revisión con `REVISION.md` (seguridad de
+`serve.py`, polling, prompts, restauración de modelos, refactors), toda
+commitada; ver "Ronda de revisión" más abajo. Después: plan de optimización
+de velocidad/memoria (puntos 0 y 1 hechos, ver "Optimización"); quedan 2–5;
+luego KreaQwen + RTX SR.
+
+Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
 ComfyUI con LUT+grano en vídeos grandes queda corregido y verificado.
 
 ## Problema (causa raíz)
@@ -129,14 +135,81 @@ LTXV lo aprovechable:
   4xPurePhoto). No hay modos que portar; pendiente decidir si se AÑADE un
   nodo RTX SR como etapa nueva (consulta al usuario).
 
+## Ronda de revisión (REVISION.md) — 2026-10-15, todo commitado
+Fixes:
+- `c97014b` serve: `_request_allowed()` bloquea cross-site/Origin ajeno en todo
+  lo que no es página; CORS sin `*`; solo se sirven `*_WebUI*.html`; `/view`
+  confinado a output/temp/input (sin `..` ni rutas absolutas).
+- `b8ce80d` videofx: LUTs 1D (antes crasheaban), `DOMAIN_MIN/MAX` correcto,
+  la carpeta `luts` se fusiona con la existente en vez de reemplazarla.
+- `a432d07` prompts: toda mutación se aplica sobre la copia actual del servidor
+  (`_mutatePrompts()`), cabecera `X-Prompts-Exists`; trims `HH:MM:SS` en
+  `video_preprocess`.
+- `4533755` restauración de modelos: `setSelectIfPresent()` en common.js;
+  KreaQwen no envía nombres vacíos y rechaza el grafo con "Falta seleccionar".
+- `a9fb76b` polling: sin límite de 12 min mientras el prompt siga en `/queue`;
+  solo se da por fallido si desaparece sin historial; re-check al reconectar WS.
+- `3119d93` serve: `Range` RFC (sufijos, 416), `Content-Length` validado (400),
+  rutas no ASCII en el proxy (`sofá`).
+Refactors (salida byte-idéntica salvo lo indicado en cada commit):
+- `1bd6eff` serve: `EXACT_ROUTES`/`PROXY_ROUTES` + `_dispatch()`;
+  `MEDIA_LISTS` + `_build_media_list()`.
+- `297c5ec` evolver de prompts único en common.js; no se sondea `/queue` con la
+  pestaña oculta.
+- `ff91b92` generadores: `filter_names()` (substring, sin mayúsculas) para
+  modelos/VAE/UNET/CLIP.
+
+## Optimización velocidad/memoria (plan aprobado: 0 y 1 hechos)
+**0. `bench_comfyui.py`**: reenvía el grafo API embebido en una salida (mp4/png)
+o un .json, con variantes como JSON Merge Patch (`--variant N='{...}'`, `--set`
+común). Mide el tiempo total y por nodo (vía WebSocket), el pico de VRAM
+(nvidia-smi) y el de RSS de ComfyUI. Misma semilla por ronda en todas las
+variantes. Salidas en `output/bench/<tag>/`; resultados en
+`bench_results.jsonl` (gitignored).
+
+**1. Backend de atención** (rondas medidas, Gen5, 2026-10-15):
+
+| UI (grafo) | kitchen | sage3 | sage2 | pytorch |
+|---|---|---|---|---|
+| LTXV 1280×736×321 (`modeux_00008`) | 102.4 s | 102.0 s | 124.9 s | – |
+| Krea2 (`imagen_01436`) | 6.0 s | 6.1 s | 5.9 s | 6.3 s |
+| KreaQwen (`imagen_00525`) | 16.6 s | 16.2 s | 17.2 s | 19.8 s |
+| MiniMax H3 15 s (`MiniMax_H3_00445`) | 236.0 s | 233.6 s | 254.7 s | – |
+
+- kitchen ≈ sage3 (diferencia < ruido). sage2 (= "auto" de KJ) es un 8–22 % más
+  lento en vídeo. Pytorch, +19 % en KreaQwen. **Los defaults (kitchen) ya son
+  óptimos**: no hay ganancia por esta vía.
+- LTXV: `LTX2MemoryEfficientSageAttentionPatch` (924) no cambia el tiempo.
+- **Bug corregido**: el selector de LTXV ofrecía `sageattn` (seleccionado por
+  defecto), `sageattn2` y `sageattn_qk`, que no existen en `PathchSageAttentionKJ`
+  (`get_sage_func` no define `sage_func` → error al ejecutar, aunque `/prompt`
+  los acepte). Ahora: kitchen (default), sageattn3, auto (avisa de que es más
+  lento); los valores antiguos se mapean a kitchen.
+
+Hallazgos para los siguientes puntos:
+- H3: decode del pase 1 (preview) 15.4 s + decode final 24.8 s, de 236 s. El
+  preview opcional (punto 3) ahorraría más aquí que en LTXV (~7 s de 102 s).
+- H3: `H3AIMDOResidencyLimiter residency="0 blocks"` → revisar en memoria (punto 2).
+
 ## Pendiente / siguientes pasos
-- **F5 en LTXV / MiniMaxH3 / MMH3X2** (HTMLs regenerados).
-- Probar con el vídeo real del usuario; ajustar calibración del **grano**
-  (amplitud base `0.18` en `add_grain`) si el look difiere del que vio antes.
-- Decidir **commit** (cambios sin comprometer: `templates/ltxv.js`,
-  `LTXV_WebUI.html`, `diagnostico_comfyui.py`, `comfy_nodes/`, `ESTADO_SESION.md`).
-- Borrar salidas de prueba si se desea: `~/SwarmUI/dlbackend/ComfyUI/output/
-  ltxweb_fxtest*`, `fxtestA_*`, `fxtestB_*`.
+- **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
+  (hoy solo upscale 4xPurePhoto). En curso.
+- Probar el Post-FX con un vídeo real del usuario; ajustar la calibración del
+  **grano** (`amp = power * 0.18` en `add_grain`, `video_fx.py:233`) si el look
+  difiere del de ProPost.
+- Secciones de `REVISION.md` aún sin repasar a fondo: tests (no hay suite),
+  rendimiento, logging/métricas.
+- Borrar salidas de prueba si se desea (`~/SwarmUI/dlbackend/ComfyUI/output/`):
+  `ltxweb_fxtest*`, `fxtestA_*`, `fxtestB_*`, `bench/`.
+
+## Nota de rendimiento (hardware)
+La 5070 Ti a veces arranca en PCIe **Gen3** en vez de Gen5 (fallo de
+ecualización). Con modelos que no caben en 16 GB (MiniMax H3, Krea2 FP16) eso
+ralentiza mucho, porque los pesos se transmiten en cada paso. Un servicio de
+usuario (`pcie-check.service` → `~/.local/bin/pcie-check.py`) mide el enlace al
+iniciar sesión y avisa si baja de 30 GB/s; el log está en
+`~/.local/state/pcie-check.log`. Referencia en Gen5: LTXV 1280×736×321 →
+1'51" en caliente, 2'28" en frío.
 
 ## Referencias
 - ComfyUI backend :7821 (venv en `~/SwarmUI/dlbackend/ComfyUI/venv`).

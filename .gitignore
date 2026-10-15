@@ -3,3 +3,4 @@ __pycache__/
 prompts_*.json
 *.tmp
 config.json
+bench_results.jsonl
