@@ -551,6 +551,13 @@
             </select>
           </div>
 
+          <div class="row" style="margin-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
+              <input type="checkbox" id="purgeVram"> <span>Liberar VRAM al final de cada trabajo</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo si hay OOM: el siguiente trabajo tendrá que recargar el modelo.</div>
+          </div>
+
           <!-- Optimizador sparse (solo visible en BlockATT) -->
           <div class="row" id="rowOptimizer" style="margin-top:8px;display:none;">
             <label>Optimizador sparse</label>

@@ -157,7 +157,7 @@
         </div>
         <div class="hint" style="margin-top:4px;font-size:10px;">Escalado o limpieza por Tensor Cores NVIDIA RTX. Los modos DENOISE/DEBLUR conservan la resolución (no escalan). El factor solo aplica a modos de escalado.</div>
       </div>
-      <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="comfy kitchen attention" selected>comfy kitchen attention</option><option value="sageattn3">sageattn3</option><option value="auto">auto (sage2, ~20% más lento)</option></select></div></div>
+      <div class="panel"><h2>Tipo de atención</h2><div class="row"><select id="sageAttentionType"><option value="comfy kitchen attention" selected>comfy kitchen attention</option><option value="sageattn3">sageattn3</option><option value="auto">auto (sage2, ~20% más lento)</option></select></div><div class="row" style="margin-top:8px;"><label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;"><input type="checkbox" id="purgeVram"> <span>Liberar VRAM entre pases y al final</span></label><div class="hint" style="font-size:10px;margin-top:2px;">Solo si hay OOM en renders extremos: cuesta ~8 s por trabajo (recarga del modelo).</div></div></div>
       <div class="panel"><h2>Color Grading & Look Cinemático</h2>
         <div class="seed-toggle">
           <div class="seg" id="segPostFxOn" data-value="true">Activo</div>

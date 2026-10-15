@@ -1081,6 +1081,13 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             </select>
           </div>
 
+          <div class="row" style="margin-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
+              <input type="checkbox" id="purgeVram"> <span>Liberar VRAM al final de cada trabajo</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo si hay OOM: el siguiente trabajo tendrá que recargar el modelo.</div>
+          </div>
+
           <!-- Optimizador sparse (solo visible en BlockATT) -->
           <div class="row" id="rowOptimizer" style="margin-top:8px;display:none;">
             <label>Optimizador sparse</label>
@@ -8049,6 +8056,7 @@ function saveSettings(){
     attentionOptimizer: IS_BLOCKATT ? getAttentionOptimizerState() : null,
     h3opt: getH3OptState(),
     aimdo: IS_BLOCKATT ? getAimdoState() : null,
+    purgeVram: !!$("purgeVram")?.checked,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     spectrum: getSpectrumState(),
@@ -8155,6 +8163,7 @@ function restoreSettings(){
     setSelectIfPresent("vaeModel", s.vaeModel);
 
     if(s.attentionBackend){ setAttentionBackendUI(s.attentionBackend); saveAttentionBackend(s.attentionBackend); }
+    if(s.purgeVram !== undefined && $("purgeVram")) $("purgeVram").checked = !!s.purgeVram;
     if(IS_BLOCKATT){
       if(s.attentionOptimizer){ setAttentionOptimizerUI(s.attentionOptimizer.mode); saveAttentionOptimizer(s.attentionOptimizer); }
       if(s.h3opt){ setH3OptUI(s.h3opt); saveH3Opt(s.h3opt); }
@@ -8294,7 +8303,7 @@ function attachAutoSaveListeners(){
     "postFxMasterToggle", "postFxLutToggle", "postFxLutSelect", "postFxLutStrength", "postFxVigToggle", "postFxVigIntensity", "postFxGrainToggle", "postFxGrainPower",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
     "audioGuideVolume", "audioUserVolume", "audioNormalizeToggle", "shareRefsToggle", "refImageSize",
-    "enhancerModel", "enhancerMode", "enhancerStyle", "enhancerChainMode"
+    "enhancerModel", "enhancerMode", "enhancerStyle", "enhancerChainMode", "purgeVram"
   ];
     const blockattIds = IS_BLOCKATT ? [
       "h3SparseBackend", "aimdoResidency"
@@ -8905,6 +8914,11 @@ function sanitizeGraph(g){
 // ==========================================
 function buildGraph(j){
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
+
+  // PurgeVRAM final (87): con DynamicVRAM solo obliga a recargar el modelo en
+  // el siguiente trabajo (~5 s medido en LTXV con bench_comfyui.py). Solo si se pide.
+  const purgeVram = j && j.purgeVram !== undefined ? !!j.purgeVram : !!$("purgeVram")?.checked;
+  if(!purgeVram) delete g["87"];
 
   // Instantánea de medios (inmunidad a cambios en UI durante el render)
   const mSlots = j?.mediaSlotsSnapshot || {
@@ -10910,6 +10924,7 @@ async function queueJob(runMode){
     h3opt: getH3OptState(),
     attentionOptimizer: IS_BLOCKATT ? getAttentionOptimizerState() : null,
     aimdo: IS_BLOCKATT ? getAimdoState() : null,
+    purgeVram: !!$("purgeVram")?.checked,
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     spectrum: getSpectrumState(),

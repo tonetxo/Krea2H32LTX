@@ -10,7 +10,7 @@ const CONFIG = {
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
   DEFAULT_VAE: "ltx-2.5-video-vae-conv-bf16",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",CLEAN_GPU:"918",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740"},
   loras: [
     {on:true, lora:"", strength:1},
     {on:false, lora:"", strength:0.15},
@@ -866,6 +866,7 @@ function snapshotJob(firstPassOnly){
     audioVae: $("audioVaeSelect")?.value,
     filenamePrefix: $("filenamePrefix")?.value,
     sageType: $("sageAttentionType")?.value,
+    purgeVram: !!$("purgeVram")?.checked,
     rife: getRifeState(),
     rtx: getRtxState(),
     bitDepth: getBitDepth(),
@@ -1651,6 +1652,7 @@ function saveLtxvSettings(){
     rtx: getRtxState(),
     bitDepth: getBitDepth(),
     sageType: $("sageAttentionType")?.value || SAGE_DEFAULT,
+    purgeVram: !!$("purgeVram")?.checked,
     ltx2Temperature: $("ltx2Temperature")?.value || "0.7",
     ltx2Seed: $("ltx2Seed")?.value || "-1",
     ltx2PreviewText: $("ltx2PreviewText")?.checked ?? true,
@@ -1751,6 +1753,7 @@ function restoreLtxvSettings(){
     if(s.bitDepth !== undefined){ setBitDepthUI(s.bitDepth); saveBitDepth(s.bitDepth); }
 
     setSelectIfPresent("sageAttentionType", s.sageType);
+    if(s.purgeVram !== undefined && $("purgeVram")) $("purgeVram").checked = !!s.purgeVram;
 
     if(s.ltx2Temperature !== undefined && $("ltx2Temperature")){
       $("ltx2Temperature").value = s.ltx2Temperature;
@@ -1818,6 +1821,7 @@ $("fidelitySlider")?.addEventListener("input", (e) => { if($("fidelityVal")) $("
 $("firstPassSteps")?.addEventListener("input", (e) => { if($("firstPassStepsVal")) $("firstPassStepsVal").textContent = e.target.value; scheduleSaveLtxvSettings(); });
 $("motionSlider")?.addEventListener("input", (e) => { if($("motionVal")) $("motionVal").textContent = parseFloat(e.target.value).toFixed(1); scheduleSaveLtxvSettings(); });
 $("sageAttentionType")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("purgeVram")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("ltx2Temperature")?.addEventListener("input", (e) => { if($("ltx2TemperatureVal")) $("ltx2TemperatureVal").textContent = parseFloat(e.target.value).toFixed(2); scheduleSaveLtxvSettings(); });
 $("ltx2Seed")?.addEventListener("input", scheduleSaveLtxvSettings);
 $("ltx2PreviewText")?.addEventListener("change", scheduleSaveLtxvSettings);
@@ -2537,6 +2541,15 @@ function buildGraph(mode, job){
   if(postFxState && postFxState.enabled && g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs){
     const fxSeed = (j ? j.seedValue : parseInt($("seedVal")?.value || "1", 10) || 1);
     g[N.CREATE_VIDEO_2].inputs.images = appendVideoPostFx(g, g[N.CREATE_VIDEO_2].inputs.images, postFxState, fxSeed);
+  }
+
+  // Purgas de VRAM (918 entre pases, 925 al final): con DynamicVRAM solo obligan
+  // a recargar el modelo (~2.4 s antes del 2º pase y ~5.5 s en el siguiente
+  // trabajo, medido con bench_comfyui.py). Se mantienen solo si se piden.
+  const purgeVram = j ? !!j.purgeVram : !!$("purgeVram")?.checked;
+  if(!purgeVram){
+    delete g[N.CLEAN_GPU];
+    delete g[N.PURGE_VRAM];
   }
 
   if(mode === "first"){
