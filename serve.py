@@ -760,6 +760,29 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         out_video = os.path.join(input_dir, base + ".mp4")
         out_audio = os.path.join(input_dir, base + "_audio.m4a")
 
+        def ffmpeg_trimmed():
+            # -ss y -t como opciones de ENTRADA: el seek no decodifica lo anterior
+            # al corte (exacto al fotograma al recodificar) y -t limita el tramo
+            # de la fuente. Como opción de salida, -t mediría tras el select de
+            # skip_frames y leería el doble de fuente; y -ss de salida con
+            # skip>1 no producía vídeo.
+            cmd = ["ffmpeg", "-y"]
+            if trim_start:
+                cmd += ["-ss", trim_start]
+            if trim_end:
+                cmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+            cmd += ["-i", src]
+            return cmd
+
+        def run_ffmpeg(cmd, out_path, what):
+            r = subprocess.run(cmd, capture_output=True, timeout=300)
+            if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                return True
+            if what is None:
+                return False
+            tail = r.stderr.decode("utf-8", "replace").strip().splitlines()[-1:] or [""]
+            raise RuntimeError(f"ffmpeg no produjo {what} de salida: {tail[0][:300]}")
+
         try:
             with open(src, "wb") as f:
                 f.write(data)
@@ -792,11 +815,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             if not has_video:
                 if not has_audio:
                     raise RuntimeError("sin pista de vídeo ni audio")
-                acmd = ["ffmpeg", "-y", "-i", src]
-                if trim_start:
-                    acmd += ["-ss", trim_start]
-                if trim_end:
-                    acmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+                acmd = ffmpeg_trimmed()
                 af_parts = []
                 if vol != 1.0:
                     af_parts.append(f"volume={vol}")
@@ -807,9 +826,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 if af_parts:
                     acmd += ["-af", ",".join(af_parts)]
                 acmd += ["-vn", "-c:a", "aac", "-b:a", "128k", out_audio]
-                subprocess.run(acmd, capture_output=True, timeout=300)
-                if not os.path.exists(out_audio) or os.path.getsize(out_audio) == 0:
-                    raise RuntimeError("ffmpeg no produjo audio de salida")
+                run_ffmpeg(acmd, out_audio, "audio")
                 audio_result = {"name": base + "_audio.m4a", "subfolder": "reference", "type": "input"}
                 self._send_json(200, {"video": None, "audio": audio_result})
                 return
@@ -826,29 +843,17 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 vf.append(f"select='not(mod(n,{skip}))'")
                 vf.append("setpts=N/FRAME_RATE/TB")
 
-            cmd = ["ffmpeg", "-y", "-i", src]
-            if trim_start:
-                cmd += ["-ss", trim_start]
-            if trim_end:
-                cmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+            cmd = ffmpeg_trimmed()
             if vf:
                 cmd += ["-vf", ",".join(vf)]
             cmd += ["-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
                     "-pix_fmt", "yuv420p", out_video]
-
-            subprocess.run(cmd, capture_output=True, timeout=300)
-
-            if not os.path.exists(out_video) or os.path.getsize(out_video) == 0:
-                raise RuntimeError("ffmpeg no produjo vídeo de salida")
+            run_ffmpeg(cmd, out_video, "vídeo")
 
             # --- audio (mismo trim) ---
             audio_result = None
             if use_audio:
-                acmd = ["ffmpeg", "-y", "-i", src]
-                if trim_start:
-                    acmd += ["-ss", trim_start]
-                if trim_end:
-                    acmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+                acmd = ffmpeg_trimmed()
                 af_parts = []
                 if vol != 1.0:
                     af_parts.append(f"volume={vol}")
@@ -858,8 +863,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
                 if af_parts:
                     acmd += ["-af", ",".join(af_parts)]
                 acmd += ["-vn", "-c:a", "aac", "-b:a", "128k", out_audio]
-                subprocess.run(acmd, capture_output=True, timeout=300)
-                if os.path.exists(out_audio) and os.path.getsize(out_audio) > 0:
+                if run_ffmpeg(acmd, out_audio, None):
                     audio_result = {"name": base + "_audio.m4a", "subfolder": "reference", "type": "input"}
 
             video_result = {"name": base + ".mp4", "subfolder": "reference", "type": "input"}

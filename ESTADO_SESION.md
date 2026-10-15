@@ -3,7 +3,7 @@
 Última actuación (2026-10-15): ronda de revisión con `REVISION.md` (seguridad de
 `serve.py`, polling, prompts, restauración de modelos, refactors), toda
 commitada; ver "Ronda de revisión" más abajo. Después: plan de optimización
-de velocidad/memoria (puntos 0–3 hechos, ver "Optimización"); quedan 4–5;
+de velocidad/memoria (puntos 0–3 y 5 hechos, ver "Optimización"); queda el 4 (KreaQwen base cuantizado, el usuario busca int8/nvfp4);
 luego KreaQwen + RTX SR.
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
@@ -159,7 +159,7 @@ Refactors (salida byte-idéntica salvo lo indicado en cada commit):
 - `ff91b92` generadores: `filter_names()` (substring, sin mayúsculas) para
   modelos/VAE/UNET/CLIP.
 
-## Optimización velocidad/memoria (plan aprobado: 0–3 hechos)
+## Optimización velocidad/memoria (plan aprobado: 0–3 y 5 hechos)
 **0. `bench_comfyui.py`**: reenvía el grafo API embebido en una salida (mp4/png)
 o un .json, con variantes como JSON Merge Patch (`--variant N='{...}'`, `--set`
 común). Mide el tiempo total y por nodo (vía WebSocket), el pico de VRAM
@@ -207,6 +207,16 @@ variantes que solo quitan nodos de salida salen de caché y miden ~6 s, falso):
   274). 1280×736×321: 99.5 → 93.9 s (−5.6 s).
 - MiniMaxH3 "Guardar vídeo del 1er pase" (`latentUpscale.savePass1`): no
   inyecta 420–423. Clip de 15 s: 242.2 → 223.9 s (−18.3 s, −7.6 %).
+
+**5. `serve.py` `/api/video_preprocess`**: `-ss` y `-t` pasan a opciones de
+entrada (helper `ffmpeg_trimmed()`, antes copiado 3 veces). Recorte a partir del
+1:30 de un 1080p de 2 min: 1.25 → 0.40 s, con una salida idéntica (PSNR inf).
+Corrige además un bug: con un recorte y `skip_frames>1` no salía vídeo. Ojo:
+`-t` debe ir antes de `-i`, porque como opción de salida mide tras el `select` y
+lee el doble de fuente. Los errores de ffmpeg incluyen ahora la última línea de
+stderr. **NVENC descartado**: 2.7 vs 3.0 s en un clip entero de 2 min, y más
+lento en clips cortos. Sin cambiar: con skip>1 el vídeo dura 1/skip del tramo
+(se acelera) y el audio dura el tramo entero.
 
 ## Pendiente / siguientes pasos
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
