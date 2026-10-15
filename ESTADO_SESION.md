@@ -4,7 +4,8 @@
 `serve.py`, polling, prompts, restauración de modelos, refactors), toda
 commitada; ver "Ronda de revisión" más abajo. Después: plan de optimización
 de velocidad/memoria (puntos 0–5 hechos, ver "Optimización"); base de KreaQwen = int8mixed;
-luego KreaQwen + RTX SR.
+luego fix de text encoder para Flux2/Flux3 Klein en KreaQwen
+(ver "Otros fixes"); pendiente KreaQwen + RTX SR.
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
 ComfyUI con LUT+grano en vídeos grandes queda corregido y verificado.
@@ -243,6 +244,20 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
   con store `thumbs` (índice ts) aparte de `images` (full), evicción con
   count() + key cursor, full bajo demanda. Migración v1→v2 verificada con la base
   real del usuario (segundos; 4 variantes seguidas sin bloqueos).
+- **KreaQwen con Flux2 Klein 9B / Flux3 Klein fallaba** con `mat1 and mat2
+  shapes cannot be multiplied` (`7c32e3d`). Causas: (1) desde `e700ece` el text
+  encoder no se cambia al cambiar de UNET, así que Klein 9B heredaba
+  `qwen3vl_4b` de Krea2 (7680 = 4B, tap 3 capas; Klein 9B espera 12288 = 8B);
+  (2) `flux2/flux3_image_klein_*` contiene "flux2" y se clasificaba como flux2
+  → CLIPLoader type `flux2` (7680) en vez de `flux3` (20480 = Qwen3-VL-4B, tap 8
+  capas; ver `comfy/sd.py`, CLIPType.FLUX3). Arreglo: familia `flux3` (type
+  `flux3`, `qwen3vl_4b`, latentes Flux2 128ch → `flux2-vae`) comprobada antes que
+  flux2; `clipFitsFamily()` (4B-VL para Krea2/Flux3, 8B-VL para Qwen 2.1, Qwen3/
+  Qwen3-VL 8B para Klein 9B, 4B para Klein 4B); `ensureCompatibleClip()` solo
+  cambia el encoder si es incompatible (respeta la variante elegida) y
+  `buildGraph` rechaza combinaciones incompatibles con mensaje claro.
+  Verificado en :7821: Klein 9B int8 + `qwen3vl_8b`/flux2 y Flux3 Klein int8 +
+  `qwen3vl_4b`/flux3, 512² 4 pasos → success.
 
 ## Pendiente / siguientes pasos
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
