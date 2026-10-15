@@ -1648,7 +1648,20 @@ function applyReActorSwap(g, imageRef, job, stage){
 function appendPostFx(g, imageRef, job){
   const fx = job.postfx || getPostFxState();
   if(!fx || !fx.enabled) return imageRef;
-  let cur = imageRef;
+  const anyFx = (fx.radial?.enabled && Number(fx.radial.strength) > 0)
+    || (fx.lut?.enabled && fx.lut?.name)
+    || (fx.vignette?.enabled && Number(fx.vignette.intensity) > 0)
+    || (fx.grain?.enabled && Number(fx.grain.power) > 0);
+  if(!anyFx) return imageRef;
+
+  // El VAE de Qwen Image 2.1 decodifica en RGBA; LUT Apply (colour) solo acepta
+  // RGB. SplitImageWithAlpha (core) recorta a 3 canales y no altera imágenes RGB.
+  g["post_rgb"] = {
+    class_type: "SplitImageWithAlpha",
+    inputs: { image: imageRef },
+    _meta: { title: "Post-FX: quitar alfa" }
+  };
+  let cur = ["post_rgb", 0];
 
   // 0. Desenfoque radial opcional (óptica de lente, ProPost Torched)
   if(fx.radial?.enabled && Number(fx.radial.strength) > 0){
