@@ -7,7 +7,8 @@ de velocidad/memoria (puntos 0–5 hechos, ver "Optimización"); base de KreaQwe
 luego fix de text encoder para Flux2/Flux3 Klein en KreaQwen
 (ver "Otros fixes"); 2026-10-16: lanzadores esperan a serve.py, alfa del VAE
 Qwen 2.1 antes del post-FX y panel de color en la columna derecha (ver
-"Fixes 2026-10-16"); pendiente KreaQwen + RTX SR.
+"Fixes 2026-10-16"), fix de ?ref en H3/X2 y prueba de humo con Playwright
+(`ltxweb_smoke.py`); pendiente KreaQwen + RTX SR.
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
 ComfyUI con LUT+grano en vídeos grandes queda corregido y verificado.
@@ -278,6 +279,27 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
 - Panel "Color Grading & Look Cinemático" de KreaQwen movido a la columna de
   resultados, entre Galería de Variantes e Historial (`margin-bottom:0` porque
   `.results-col` ya tiene `gap`).
+
+- **Envío KreaQwen → MiniMaxH3 / MMH3X2 cargaba la imagen anterior**
+  (`8a9aa7e`): la imagen llega por `?ref=` mientras la sesión previa se
+  restaura de IndexedDB en paralelo; si la restauración terminaba después,
+  pisaba la nueva. Con `?ref=` ya no se restaura `firstImage` (H3) ni el slot 1
+  (X2). LTXV no persiste la entrada, por eso no fallaba. Reproducido y
+  verificado con Chromium headless (versión anterior: la 2ª carga mostraba la
+  imagen previa; nueva: la enviada).
+
+## Prueba de humo de las UIs (Playwright, fuera del repo)
+- Playwright 1.64 en venv propio `~/.venvs/playwright` (navegadores en
+  `~/.cache/ms-playwright/`, build 1248; no usa el Chrome del usuario).
+- Script `~/Documentos/worflows/ltxweb_smoke.py` (fuera del repo): levanta su
+  propio `serve.py` por UI en puertos 18000–18004 (no toca las UIs abiertas),
+  abre cada página (ltxv, krea2, minimaxh3, mmh3x2, blockatt, kreaqwen) en
+  Chromium headless con perfil vacío, recoge errores JS/consola y peticiones
+  fallidas, y guarda capturas en `/tmp/ltxweb_smoke/<fecha>/`. `--ref
+  <subcarpeta/fichero>` comprueba además la carga por `?ref=` (ltxv: `localFile`;
+  H3: `localFirstFile`; X2/BlockATT: `mediaSlots[1]`). Sale con 1 si algo falla.
+  No lanza generaciones (no ocupa la GPU).
+- Estado 2026-10-16: las 6 páginas OK; `--ref` OK en ltxv/minimaxh3/mmh3x2/blockatt.
 
 ## Pendiente / siguientes pasos
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
