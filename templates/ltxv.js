@@ -36,7 +36,10 @@ let uploadedImage=null, localFile=null, seedMode="random";
 let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
-const SAGE_TYPES = ["auto","sageattn","sageattn2","sageattn3","sageattn_qk","comfy kitchen attention"];
+// Opciones válidas del selector: PathchSageAttentionKJ no acepta "sageattn"/"sageattn2"/"sageattn_qk"
+// (fallan al ejecutar). Kitchen y sageattn3 empatan en velocidad; "auto" (sage2) es ~20% más lento.
+const SAGE_DEFAULT = "comfy kitchen attention";
+const SAGE_TYPES = [SAGE_DEFAULT, "sageattn3", "auto"];
 let finalVariantIndex = null;
 // Mapa prompt_id -> índice de variante, para que tanto WS como fallback
 // sepan a qué variante pertenece cada resultado.
@@ -197,7 +200,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
     ["Text Encoder", $("textEncoderSelect")?.value ? $("textEncoderSelect").value.split('/').pop() : ""],
     ["VAE Vídeo", $("vaeSelect")?.value || "Checkpoint"],
     ["VAE Audio", $("audioVaeSelect")?.value || "Checkpoint"],
-    ["Atención", $("sageAttentionType")?.value || "sageattn3"],
+    ["Atención", $("sageAttentionType")?.value || SAGE_DEFAULT],
     ["Interpolación", r.enabled ? ((r.engine === "rtx") ? `RTX Frame Gen · ${r.multiplier}x (${24*r.multiplier} fps)` : `RIFE · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}`) : "off"],
     ["RTX Super Resolution", (typeof getRtxState === "function" && getRtxState().enabled) ? `on (2x ${getRtxState().quality})` : "off"],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
@@ -1647,7 +1650,7 @@ function saveLtxvSettings(){
     rife: getRifeState(),
     rtx: getRtxState(),
     bitDepth: getBitDepth(),
-    sageType: $("sageAttentionType")?.value || "sageattn3",
+    sageType: $("sageAttentionType")?.value || SAGE_DEFAULT,
     ltx2Temperature: $("ltx2Temperature")?.value || "0.7",
     ltx2Seed: $("ltx2Seed")?.value || "-1",
     ltx2PreviewText: $("ltx2PreviewText")?.checked ?? true,
@@ -1747,7 +1750,7 @@ function restoreLtxvSettings(){
     if(s.rtx){ setRtxUI(s.rtx); saveRtx(s.rtx); }
     if(s.bitDepth !== undefined){ setBitDepthUI(s.bitDepth); saveBitDepth(s.bitDepth); }
 
-    if(s.sageType && $("sageAttentionType")) $("sageAttentionType").value = s.sageType;
+    setSelectIfPresent("sageAttentionType", s.sageType);
 
     if(s.ltx2Temperature !== undefined && $("ltx2Temperature")){
       $("ltx2Temperature").value = s.ltx2Temperature;
@@ -2348,7 +2351,8 @@ function buildGraph(mode, job){
   if(g[N.CREATE_VIDEO_2] && g[N.CREATE_VIDEO_2].inputs) g[N.CREATE_VIDEO_2].inputs.bit_depth = bitDepth;
 
   // Tipo de atención: Sage Attention o Comfy Kitchen Attention
-  const sageType = (j ? j.sageType : $("sageAttentionType")?.value) || "sageattn";
+  let sageType = (j ? j.sageType : $("sageAttentionType")?.value) || SAGE_DEFAULT;
+  if(!SAGE_TYPES.includes(sageType)) sageType = SAGE_DEFAULT;
   if(g[N.SAGE_PATCH] && g[N.SAGE_PATCH].inputs){
     const modelInput = g[N.SAGE_PATCH].inputs.model;
     if(sageType === "comfy kitchen attention"){
