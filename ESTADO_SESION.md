@@ -288,6 +288,15 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
   verificado con Chromium headless (versión anterior: la 2ª carga mostraba la
   imagen previa; nueva: la enviada).
 
+- **MMH3X2: botón 🔍 RTX Upscale en el vídeo final** (`42d4287`): job on-demand
+  `isRtxUpscaleOnly` (LoadVideo → GetVideoComponents → [post-FX] →
+  RTXVideoSuperResolution → CreateVideo con fps/audio/bit depth/color space del
+  origen). Usa calidad/escala del panel Postprocesado aunque su toggle esté
+  apagado; DENOISE/DEBLUR no escalan. Mismo commit: "Interpolar" y "Refinar
+  rostro" del final encolaban **dos veces** (onclick + addEventListener global);
+  quitado el listener. Verificado con Playwright interceptando `/prompt`
+  (1 prompt por clic); **no ejecutado aún en ComfyUI real**.
+
 ## Prueba de humo de las UIs (Playwright, fuera del repo)
 - Playwright 1.64 en venv propio `~/.venvs/playwright` (navegadores en
   `~/.cache/ms-playwright/`, build 1248; no usa el Chrome del usuario).
@@ -301,6 +310,30 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
   No lanza generaciones (no ocupa la GPU).
 - Estado 2026-10-16: las 6 páginas OK; `--ref` OK en ltxv/minimaxh3/mmh3x2/blockatt.
 
+## SpargeAttn / Sparse Sage en SM120 (investigado 2026-10-16, sin cambios)
+- `~/SpargeAttn` (upstream thu-ml, `ae5b629`, feb 2026) instalado editable en el
+  venv de ComfyUI; `.so` compilados el 2026-08-23 **solo sm_120** y funcionan
+  (en SM120 `core.py` usa la ruta genérica INT8/FP8, no los kernels sm90).
+  Bench sintético (24 heads, d=128, bf16): 32K tokens SDPA 162 ms, Sage2 densa
+  50,6 ms, Sparge topk 0,5/0,3/0,15 → 29,6/19,4/11,5 ms; sin NaN. La similitud
+  con datos aleatorios no mide calidad real.
+- Upstream sin soporte oficial SM120 (issues #76/#109 abiertas; PR #123 cerrado
+  sin merge). Fork SpargeAttn-hswq y wheels comunitarias: solo Windows.
+- **H3-Optimizations "Sparse Sage" NO puede usarlo**: en (12,0) importa
+  `spas_sage_attn._qattn_sm89` (layout split por arquitectura) y el build
+  upstream solo tiene `_qattn` monolítico → `ImportError` (en Auto cae al
+  siguiente backend sin avisar). El layout split con 12.0 es del fork
+  **github.com/woct0rdho/SpargeAttn** (solo wheels Windows; en Linux compilar).
+  Si se instala, sustituye `spas_sage_attn` en el venv; volver con
+  `pip install -e ~/SpargeAttn`; reiniciar ComfyUI.
+- Diferencias de optimizadores (MiniMaxH3): Block Sparse (core ComfyUI,
+  `BlockSparseAttention`) = Sol-Attn adaptativo por `tau` (único viable aquí:
+  ningún checkpoint de `minimaxh3/` tiene `to_gate_compress` → VSA no aplica;
+  SLA requiere pesos/LoRA destilados). H3-Optimizations = Memory Optimization +
+  sparse con presupuesto fijo (video budget) + AIMDO. Ojo: "Denser early ramp"
+  con backend explícito manda `early_steps: 8`, que con turbos de 8 pasos cubre
+  todo el muestreo (apenas acelera).
+
 ## Pendiente / siguientes pasos
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
@@ -308,6 +341,10 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
 - Probar el Post-FX con un vídeo real del usuario; ajustar la calibración del
   **grano** (`amp = power * 0.18` en `add_grain`, `video_fx.py:233`) si el look
   difiere del de ProPost.
+- **Decidir SpargeAttn**: compilar fork woct0rdho para Sparse Sage, y/o hacer la
+  comparativa en MiniMaxH3 (densa vs H3-Opt Auto/Kitchen INT8 vs Block Sparse
+  Sol-Attn vs Sol-H3: tiempo/paso, pico VRAM, captura).
+- Probar el botón RTX Upscale de MMH3X2 con un vídeo real.
 - Secciones de `REVISION.md` aún sin repasar a fondo: tests (no hay suite),
   rendimiento, logging/métricas.
 - Borrar salidas de prueba si se desea (`~/SwarmUI/dlbackend/ComfyUI/output/`):
