@@ -423,6 +423,12 @@
           <input type="range" id="stepsSlider" min="1" max="50" step="1" value="20">
           <div class="slider-val" id="stepsVal">20</div>
         </div>
+        <div class="row slider-row">
+          <label>Denoise Seg 2 <span class="hint">(Continuidad latente 2s)</span></label>
+          <input type="range" id="denoiseSlider2" min="0.50" max="1.00" step="0.01" value="1.00">
+          <div class="slider-val" id="denoiseVal2">1.00</div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:-4px;margin-bottom:8px;">1.00 = ruido total (regenera). 0.85-0.95 = conserva trayectoria e inercia física de los 2s inyectados.</div>
         <div class="row two-col">
           <div>
             <label>Sampler</label>
@@ -613,6 +619,13 @@
             <div class="seed-toggle" style="margin-top:4px;">
               <div class="seg on" id="segMemOptOn" data-value="true">Sí</div>
               <div class="seg" id="segMemOptOff" data-value="false">No</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Memoria de atención <span class="hint">(Menos VRAM evita OOM con 16 GB; algo más lento)</span></label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg" id="segAttnMemStd" data-value="Standard">Estándar</div>
+              <div class="seg on" id="segAttnMemLow" data-value="Lower VRAM (slower)">Menos VRAM</div>
             </div>
           </div>
 

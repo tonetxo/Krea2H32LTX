@@ -953,6 +953,12 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
           <input type="range" id="stepsSlider" min="1" max="50" step="1" value="20">
           <div class="slider-val" id="stepsVal">20</div>
         </div>
+        <div class="row slider-row">
+          <label>Denoise Seg 2 <span class="hint">(Continuidad latente 2s)</span></label>
+          <input type="range" id="denoiseSlider2" min="0.50" max="1.00" step="0.01" value="1.00">
+          <div class="slider-val" id="denoiseVal2">1.00</div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:-4px;margin-bottom:8px;">1.00 = ruido total (regenera). 0.85-0.95 = conserva trayectoria e inercia física de los 2s inyectados.</div>
         <div class="row two-col">
           <div>
             <label>Sampler</label>
@@ -1143,6 +1149,13 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <div class="seed-toggle" style="margin-top:4px;">
               <div class="seg on" id="segMemOptOn" data-value="true">Sí</div>
               <div class="seg" id="segMemOptOff" data-value="false">No</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Memoria de atención <span class="hint">(Menos VRAM evita OOM con 16 GB; algo más lento)</span></label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg" id="segAttnMemStd" data-value="Standard">Estándar</div>
+              <div class="seg on" id="segAttnMemLow" data-value="Lower VRAM (slower)">Menos VRAM</div>
             </div>
           </div>
 
@@ -5961,7 +5974,25 @@ RULES:
 1. Output exactly SIX sections, in order: subject_definitions, summary, retention_analysis, detailed_description, overall_soundscape, non_diegetic_music.
 2. Detailed description: 350-500 English words, shot by shot in playback order with [Shot 1] (no timestamp) then [Shot N]. Write camera motion as natural English.
 3. The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 full-reference prompt, no explanations or prefaces.` },
-      F: { name: "Continuación Seg 2 con imagen (Slot 3/4)", prompt: `You are an expert prompt writer for MiniMax H3 2-segment video continuation. You are provided with reference image(s) for the next segment (Segment 2). Describe how the character and scene transition seamlessly from Segment 1 into the new action, position, or pose shown in the image. Maintain full visual and auditory consistency. Respond in English with ONLY the enhanced prompt.` }
+      F: { name: "Continuación Seg 2 con imagen (Slot 3/4)", prompt: `You are an expert prompt writer for the MiniMax H3 2-segment continuation pipeline. You are generating the prompt for Segment 2, and you are provided with:
+1. The reference image(s) for Segment 2.
+2. The context and prompt of Segment 1.
+3. The director's direction / hint for the subsequent action.
+
+RULES:
+1. Maintain strict visual continuity (subject identity, appearance, clothing, environment, lighting, and soundscape) from Segment 1.
+2. Seamlessly transition the action from the end of Segment 1 toward the new pose, location, or state indicated in the reference image.
+3. If the director specifies a turn, maneuver, or new action, prioritize the commanded direction over visual inertia.
+4. Output the final continuation prompt strictly in English with no explanations, prefaces, or conversational filler.` },
+      G: { name: "Continuación Seg 2 desde Img 1 base (Slot 1)", prompt: `You are an expert prompt writer for the MiniMax H3 2-segment continuation pipeline. You are generating the prompt for Segment 2 using ONLY the original base image from Segment 1 (Slot 1) as visual reference for the subject and world, combined with:
+1. The prompt/action that happened in Segment 1.
+2. The director's direction or desired evolution for Segment 2.
+
+RULES:
+1. VISUAL CONTINUITY: Keep the exact identity, textures, lighting, scale, and environment established in <Picture 1> and Segment 1.
+2. DYNAMIC TRANSITION: Do NOT restart or re-describe the initial state of <Picture 1>. Instead, assume the subject/camera has already completed the action of Segment 1, and describe the continuous subsequent progression, change of direction, camera maneuver, or reaction.
+3. DIRECTION OVER INERTIA: If the director commands a turn, speed change, camera rotation, or new event, make this transition unfold smoothly and logically from the end of the previous movement.
+4. Output ONLY the final continuation prompt in English, with no preamble, quotes, or conversational commentary.` }
     }
   }
 };
@@ -6004,7 +6035,11 @@ const AIMDO_KEY = "mmh3x2_aimdo";
 
 const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
 const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "none" };
-const H3OPT_DEFAULTS = { sparseBackend: "auto", videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true };
+const H3OPT_DEFAULTS = { sparseBackend: "auto", videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true, attnMemMode: "Lower VRAM (slower)" };
+// kitchen_v_memory_mode de H3MemoryOptimization. "Standard" reserva V int8 entero
+// (~1 GB extra por bloque): con 16 GB y el modelo en streaming provoca OOM a mitad
+// de la inferencia. "Lower VRAM (slower)" lo procesa en dos pasadas.
+const H3_ATTN_MEM_MODES = ["Standard", "Lower VRAM (slower)"];
 const AIMDO_DEFAULTS = { residency: "0 blocks" };
 // Nota: BlockSparseAttention está desactivado en MMH3X2 porque produce:
 // make_forward.<locals>.forward() got an unexpected keyword argument 'attention'
@@ -6088,6 +6123,7 @@ function getH3OptState(){
     videoBudget: parseFloat($("h3VideoBudget")?.value || "0.30"),
     denserEarlyLate: $("segDenserOn")?.classList.contains("on") ?? true,
     memOptEnabled: $("segMemOptOn")?.classList.contains("on") ?? true,
+    attnMemMode: $("segAttnMemStd")?.classList.contains("on") ? "Standard" : "Lower VRAM (slower)",
   };
 }
 function setH3OptUI(state){
@@ -6103,6 +6139,9 @@ function setH3OptUI(state){
   const mOn = $("segMemOptOn"), mOff = $("segMemOptOff");
   if(state.memOptEnabled){ mOn?.classList.add("on"); mOff?.classList.remove("on"); }
   else { mOff?.classList.add("on"); mOn?.classList.remove("on"); }
+  const std = state.attnMemMode === "Standard";
+  $("segAttnMemStd")?.classList.toggle("on", std);
+  $("segAttnMemLow")?.classList.toggle("on", !std);
 }
 
 function loadAimdo(){
@@ -6494,6 +6533,8 @@ function attachAttentionOptimizerListeners(){
   $("segDenserOff")?.addEventListener("click", () => { const s = getH3OptState(); s.denserEarlyLate = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("segAttnMemStd")?.addEventListener("click", () => { const s = getH3OptState(); s.attnMemMode = "Standard"; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
+  $("segAttnMemLow")?.addEventListener("click", () => { const s = getH3OptState(); s.attnMemMode = "Lower VRAM (slower)"; setH3OptUI(s); saveH3Opt(s); scheduleSaveSettings(); });
   $("aimdoResidency")?.addEventListener("change", () => { saveAimdo(getAimdoState()); scheduleSaveSettings(); });
   $("segSpectrumOn")?.addEventListener("click", () => { const s = getSpectrumState(); s.enabled = true; setSpectrumUI(s); saveSpectrum(s); scheduleSaveSettings(); });
   $("segSpectrumOff")?.addEventListener("click", () => { const s = getSpectrumState(); s.enabled = false; setSpectrumUI(s); saveSpectrum(s); scheduleSaveSettings(); });
@@ -6836,6 +6877,7 @@ CONFIG.variantMeta = function(seedValue, timeText){
     ["Resolución", `${w}×${h} (${mp} MP)`],
     ["A/R", getFriendlyRatio(parseInt(w, 10), parseInt(h, 10))],
     ["Pasos (Steps)", steps],
+    ["Denoise Seg 2", $("denoiseSlider2")?.value || "1.00"],
     ["Sampler", sampler],
     ["Scheduler", scheduler],
     ["LoRAs", lorasActive.length ? lorasActive.join(", ") : "ninguno"],
@@ -7808,6 +7850,16 @@ function applyWorkflow(workflow){
     saveAttentionOptimizer({ mode: "none" });
   }
 
+  // Modo de memoria de atención (H3MemoryOptimization.kitchen_v_memory_mode).
+  // Metadatos antiguos sin el campo: se asume "Standard", que era el valor fijo.
+  if(memOptNode?.inputs){
+    const h3State = loadH3Opt();
+    const mode = memOptNode.inputs.kitchen_v_memory_mode;
+    h3State.attnMemMode = H3_ATTN_MEM_MODES.includes(mode) ? mode : "Standard";
+    setH3OptUI(h3State);
+    saveH3Opt(h3State);
+  }
+
   // 11. Spectrum
   const spectrumNode = findByClass("SpectrumApplyMiniMaxH3");
   if(spectrumNode && spectrumNode.inputs){
@@ -8328,6 +8380,7 @@ function saveSettings(){
     batchSize: $("batchSize")?.value || "1",
     filenamePrefix: $("filenamePrefix")?.value || "video/MiniMax_H3",
     steps: $("stepsSlider")?.value || "20",
+    denoise2: $("denoiseSlider2")?.value || "1.00",
     sampler: $("samplerName")?.value || "res_multistep",
     scheduler: $("schedulerName")?.value || "simple",
     unetModel: $("unetModel")?.value || "",
@@ -8435,6 +8488,10 @@ function restoreSettings(){
     if(s.steps !== undefined && $("stepsSlider")){
       $("stepsSlider").value = s.steps;
       if($("stepsVal")) $("stepsVal").textContent = s.steps;
+    }
+    if(s.denoise2 !== undefined && $("denoiseSlider2")){
+      $("denoiseSlider2").value = s.denoise2;
+      if($("denoiseVal2")) $("denoiseVal2").textContent = parseFloat(s.denoise2).toFixed(2);
     }
     if(s.sampler !== undefined && $("samplerName")) $("samplerName").value = s.sampler;
     if(s.scheduler !== undefined && $("schedulerName")) $("schedulerName").value = s.scheduler;
@@ -8576,7 +8633,7 @@ async function restoreSavedMedia(){
 
 function attachAutoSaveListeners(){
   const baseIds = [
-    "prompt", "prompt2", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "aspectRatioSelect", "mpSlider", "stepsSlider",
+    "prompt", "prompt2", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "aspectRatioSelect", "mpSlider", "stepsSlider", "denoiseSlider2",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
     "unetModel", "clipModel", "vaeModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
     "lora1Toggle", "lora1Select",
@@ -9322,7 +9379,11 @@ function buildGraph(j){
   if(g[N.SAMPLER_1]?.inputs) g[N.SAMPLER_1].inputs.sampler_name = sampler;
   if(g[N.SAMPLER_2]?.inputs) g[N.SAMPLER_2].inputs.sampler_name = sampler;
   if(g[N.SCHEDULER_1]?.inputs) g[N.SCHEDULER_1].inputs.scheduler = scheduler;
-  if(g[N.SCHEDULER_2]?.inputs) g[N.SCHEDULER_2].inputs.scheduler = scheduler;
+  if(g[N.SCHEDULER_2]?.inputs){
+    g[N.SCHEDULER_2].inputs.scheduler = scheduler;
+    const denoise2 = parseFloat((j ? j.denoise2 : $("denoiseSlider2")?.value) ?? "1.00");
+    g[N.SCHEDULER_2].inputs.denoise = denoise2;
+  }
 
   // 6. Modelos: UNet, CLIP y VAE Vídeo
   const unet = $("unetModel")?.value;
@@ -9335,6 +9396,8 @@ function buildGraph(j){
   // 7. Pipeline de Modelo Base & Optimizaciones H3
   const backendState = j?.attentionBackend || getAttentionBackendState();
   const h3opt = j?.h3opt || getH3OptState();
+  // Jobs encolados antes de existir el selector: mantener el comportamiento previo.
+  const attnMemMode = H3_ATTN_MEM_MODES.includes(h3opt.attnMemMode) ? h3opt.attnMemMode : "Standard";
 
   // Backend denso (ModelAttentionBackend) - primero en la cadena
   if(g[N.ATTN]?.inputs){
@@ -9439,13 +9502,14 @@ function buildGraph(j){
             fused_qkv: "auto", mlp_memory: "auto", chunk_rows: 4096,
             preserve_precision: true, precision_mode: "Auto",
             qkv_streaming_mode: "Auto", embedding_memory_mode: "Auto",
-            kitchen_v_memory_mode: "Standard",
+            kitchen_v_memory_mode: attnMemMode,
             model: [currentModelNode, 0]
           },
           _meta: { title: "H3 Memory Optimization" }
         };
       } else if(g[N.MEM_OPT].inputs){
         g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+        g[N.MEM_OPT].inputs.kitchen_v_memory_mode = attnMemMode;
       }
       currentModelNode = N.MEM_OPT;
     } else if(g[N.MEM_OPT]){
@@ -9479,13 +9543,14 @@ function buildGraph(j){
             fused_qkv: "auto", mlp_memory: "auto", chunk_rows: 4096,
             preserve_precision: true, precision_mode: "Auto",
             qkv_streaming_mode: "Auto", embedding_memory_mode: "Auto",
-            kitchen_v_memory_mode: "Standard",
+            kitchen_v_memory_mode: attnMemMode,
             model: [currentModelNode, 0]
           },
           _meta: { title: "H3 Memory Optimization" }
         };
       } else if(g[N.MEM_OPT].inputs){
         g[N.MEM_OPT].inputs.model = [currentModelNode, 0];
+        g[N.MEM_OPT].inputs.kitchen_v_memory_mode = attnMemMode;
       }
       currentModelNode = N.MEM_OPT;
     } else if(g[N.MEM_OPT]){
@@ -11254,6 +11319,7 @@ async function queueJob(runMode){
     height: parseInt($("height")?.value || "640", 10),
     aspectRatio: $("aspectRatioSelect")?.value || "auto",
     steps: parseInt($("stepsSlider")?.value || "20", 10),
+    denoise2: parseFloat($("denoiseSlider2")?.value || "1.00"),
     sampler: $("samplerName")?.value || "res_multistep",
     scheduler: $("schedulerName")?.value || "simple",
     audioMode: $("audioMode")?.value || "none",
@@ -11906,6 +11972,12 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if($("denoiseSlider2")){
+    $("denoiseSlider2").addEventListener("input", (e) => {
+      if($("denoiseVal2")) $("denoiseVal2").textContent = parseFloat(e.target.value).toFixed(2);
+    });
+  }
+
   if($("h3VideoBudget")){
     $("h3VideoBudget").addEventListener("input", (e) => {
       const val = parseFloat(e.target.value);
@@ -12105,19 +12177,24 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if(mode === "vision"){
       const sharedRefs = !!$("shareRefsToggle")?.checked;
-      const isSeg2Style = (styleKey === "F");
-      const allowedSlots = isSeg2Style
-        ? (sharedRefs ? [2, 3, 4] : [3, 4])
-        : (sharedRefs ? [1, 2, 3, 4] : [1, 2]);
+      const isSeg2StyleF = (styleKey === "F");
+      const isSeg2StyleG = (styleKey === "G");
+      const allowedSlots = isSeg2StyleG
+        ? [1, 2]
+        : (isSeg2StyleF
+          ? (sharedRefs ? [2, 3, 4] : [3, 4])
+          : (sharedRefs ? [1, 2, 3, 4] : [1, 2]));
 
       const availableSlots = [];
       for(const i of allowedSlots){
         if(mediaSlots[i]?.file || mediaSlots[i]?.dataUrl) availableSlots.push(i);
       }
       if(availableSlots.length === 0){
-        const targetDesc = isSeg2Style
-          ? (sharedRefs ? "Slot 2, 3 o 4" : "Slot 3 o 4 (Segmento 2)")
-          : (sharedRefs ? "los slots de entrada (1 a 4)" : "Slot 1 o 2 (Segmento 1)");
+        const targetDesc = isSeg2StyleG
+          ? "Slot 1 (Imagen base Seg 1)"
+          : (isSeg2StyleF
+            ? (sharedRefs ? "Slot 2, 3 o 4" : "Slot 3 o 4 (Segmento 2)")
+            : (sharedRefs ? "los slots de entrada (1 a 4)" : "Slot 1 o 2 (Segmento 1)"));
         log(`⚠️ Carga al menos una imagen en ${targetDesc} para usar este estilo en modo Visión.`, "l-err");
         return;
       }
@@ -12170,6 +12247,16 @@ window.addEventListener("DOMContentLoaded", () => {
               : (seg1Prompt
                 ? `REFERENCE IMAGE FOR SEGMENT 2: see above. Existing context / Segment 1 action: ${seg1Prompt}. Describe the continued action evolving into this scene.`
                 : "REFERENCE IMAGE FOR SEGMENT 2: see above. Describe the continued action evolving into this scene.");
+          }
+        } else if(styleKey === "G"){
+          // Continuación Seg 2 desde Img 1 base (Slot 1)
+          const baseSlot = (mediaSlots[1]?.file || mediaSlots[1]?.dataUrl) ? 1 : availableSlots[0];
+          const b64 = await readSlotBase64(baseSlot);
+          if(b64){
+            payload.images = [b64];
+            const seg1Prompt = $("prompt")?.value?.trim() || "";
+            const seg2Hint = $("prompt2")?.value?.trim() || "";
+            payload.prompt = `ORIGINAL BASE IMAGE (Subject & World reference): see above.\n\nACTION THAT ALREADY OCCURRED IN SEGMENT 1:\n${seg1Prompt || "(Subject is introduced as seen in image)"}\n\nDIRECTOR'S COMMANDED CONTINUATION FOR SEGMENT 2:\n${seg2Hint || "The subject smoothly continues forward, transitioning into the next logical movement or maneuver without restarting."}\n\nTask: Generate the continuation prompt for Segment 2 ensuring perfect visual identity with the base image while seamlessly developing the new commanded action.`;
           }
         } else if(styleKey === "E" && availableSlots.length > 1){
           // R2VA: multi-imagen (hasta 3 imágenes estrictamente de los slots permitidos)
