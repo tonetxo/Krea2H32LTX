@@ -477,6 +477,11 @@ PSU off, pero venía de Gen5 sano).
 | Paso | Fecha/hora | Evento | Resultado |
 |---|---|---|---|
 | 5 | 17-oct 14:35 | arranque tras guardar BIOS (reset reason 0x01000800) | Gen4 28.9 GB/s, nvidia-smi Max=4 (Host 4, Device 5) |
+| 5 | 17-oct 14:37 | resume S3 (48 s) | **FALLO** Gen3 14.4 GB/s, Max=3 |
+
+Resultado paso 5: **Gen4 forzado también cae a Gen3 en el 1er resume** → la EQ
+de 16 GT/s tampoco sobrevive al resume S3; no es (solo) la fragilidad de 32 GT/s.
+Gen4 no aporta nada → volver a PCI_E1=Gen5.
 
 ## Pendiente / siguientes pasos
 - **PCIe**: seguir el plan de pruebas de la sección anterior (paso 5 en curso: PCI_E1=Gen4).
