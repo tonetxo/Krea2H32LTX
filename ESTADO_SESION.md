@@ -503,6 +503,19 @@ paso 7 físico (recolocar GPU, revisar 12V-2x6); también posible VBIOS de la
 tarjeta. Mientras tanto: **no suspender** (apagar/hibernar); si cae, reinicio con
 PSU off.
 
+**Hibernación activada (workaround, 2026-10-17):** swapfile ext4 de 48 GB;
+GRUB `resume=UUID=ae62eeb6-… resume_offset=404719616` (backup
+`/etc/default/grub.bak-hibernate`), `/etc/initramfs-tools/conf.d/resume`
+(`RESUME=UUID=…`; el aviso "no matching swap device" de update-initramfs es
+normal con swapfile) y regla polkit `/etc/polkit-1/rules.d/10-enable-hibernate.rules`
+(menú Hibernar para el grupo sudo). Cerrar ComfyUI antes de hibernar (la imagen
+debe caber en 48 GB de swap).
+
+| Paso | Fecha/hora | Evento | Resultado |
+|---|---|---|---|
+| H | 17-oct 15:04 | reinicio en caliente desde estado degradado (sin PSU off) | Gen3 14.5 GB/s (confirma: el reset en caliente arrastra la EQ fallida) |
+| H | 17-oct 15:05→15:20 | hibernación + resume | **Gen5 56.1 GB/s**, sesión restaurada |
+
 ## Pendiente / siguientes pasos
 - **PCIe**: seguir el plan de pruebas de la sección anterior (descartado todo el software salvo paso 4; siguiente: paso 4 y físico).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
