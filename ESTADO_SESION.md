@@ -8,7 +8,10 @@ luego fix de text encoder para Flux2/Flux3 Klein en KreaQwen
 (ver "Otros fixes"); 2026-10-16: lanzadores esperan a serve.py, alfa del VAE
 Qwen 2.1 antes del post-FX y panel de color en la columna derecha (ver
 "Fixes 2026-10-16"), fix de ?ref en H3/X2 y prueba de humo con Playwright
-(`ltxweb_smoke.py`); pendiente KreaQwen + RTX SR.
+(`ltxweb_smoke.py`); pendiente KreaQwen + RTX SR. 2026-10-17: defaults de
+KreaQwen Krea2→Qwen Turbo, scheduler Align Your Steps, «Invertir orden» que
+intercambia ajustes y pulido iterativo de prompt en todas las UIs (ver
+"Cambios 2026-10-17").
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
 ComfyUI con LUT+grano en vídeos grandes queda corregido y verificado.
@@ -334,6 +337,51 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
   con backend explícito manda `early_steps: 8`, que con turbos de 8 pasos cubre
   todo el muestreo (apenas acelera).
 
+## Cambios 2026-10-17 (commitado y pusheado: `2104dda`, `16879fa`, `4676410`)
+- **Defaults de KreaQwen modo `krea_qwen`** (`KREA_QWEN_DEFAULTS` +
+  `applyModeOverrides()` en `kreaqwen.js`; solo ese modo, respeta campos tocados):
+  - Base jibMix (`habanero_int8mixed`): `er_sde`/`bong_tangent`, 10 pasos, CFG 1,
+    CLIP `qwen3vl_4b_int8_convrot`, dtype auto, Comfy Kitchen.
+  - Refiner `qwen_image_2.1_turbo`: `lcm`/`align_your_steps`, 8 pasos, CFG 1,
+    denoise 0.20, CLIP `qwen3vl_8b_nvfp4_heretic`, VAE `texture_fix_vae…2.1`,
+    dtype auto, Comfy Kitchen.
+  - En selects de ficheros el default es palabra clave de la ruta (si no existe,
+    se deja lo que haya). Antes el CLIP base cogía `qwen3vl_4b.safetensors`
+    (primera coincidencia).
+  - Ojo: si hay sesión en `localStorage` se restaura y no se aplican los defaults
+    (re-seleccionar el modo).
+- **«Invertir orden»** intercambia con su modelo pasos/CFG/sampler/scheduler/
+  dtype/atención en vez de reaplicar perfiles (antes salía Qwen 20 pasos
+  euler/simple y Krea 6). El denoise se queda en el Refiner. Al salir de «Solo
+  etapa base» se vuelve a marcar el upscale neuronal.
+- **Scheduler `align_your_steps (Qwen 2.1)`**: ComfyUI no lo tiene como
+  scheduler de KSampler (`AlignYourStepsScheduler` solo SD1/SDXL/SVD); SwarmUI lo
+  calcula en `SwarmKSampler.py` con `AYS_NOISE_LEVELS["QwenImage21"]` (de
+  `model_index.json` de Qwen-Image-2.1-Turbo). `applyAlignYourSteps()` convierte
+  antes del POST cada KSampler con ese scheduler en `SamplerCustom` +
+  `KSamplerSelect` + `ManualSigmas` (nodos core; mismo id de nodo; se dejan los
+  campos de KSampler, que ComfyUI ignora, para restaurar desde metadatos). Misma
+  interpolación log-lineal que Swarm; 8 pasos = curva oficial exacta. Denoise
+  recortado como KSampler (`steps/denoise` y cola), por eso con AYS el refiner a
+  denoise 0.30 arranca en sigma ≈0.77 (repinta más de lo que sugiere). En etapas
+  no-Qwen avisa y usa `simple`.
+- **Pulido iterativo de prompt** (todas las UIs, `common.js` +
+  `common_html.html`): campo «Cambios a aplicar» + «Aplicar cambios»
+  (Ctrl+Enter). El LLM reescribe el último resultado del enhancer (o `#prompt`
+  si no hay) aplicando solo los cambios (`ENHANCER_REFINE_SYSTEM`, temp 0.4,
+  texto plano, mismo idioma); el resultado vuelve a `#enhancerOutput` para
+  encadenar. Si falla o viene vacío se restaura el prompt anterior. Hook
+  opcional `CONFIG.parseEnhancerOutput` (KreaQwen usa `parseEnhancerResult`,
+  JSON `rewritten_prompt`/`wh_ratio`); por defecto quita el pie
+  `--- Ollama · … ---`. Probado por el usuario en KreaQwen; las 6 páginas cargan
+  sin errores JS (headless).
+- Incidencia sin aclarar: tras los primeros cambios el usuario vio imágenes
+  "raras" y reinició ComfyUI (parecía estado corrupto del backend; los cambios
+  solo tocaban valores de UI). No volvió a reportarse.
+- Aclarado (sin cambios): en LTXV «Generar completo» **rehace el 1er pase**; el
+  vídeo cargado en la ventana 1er pase no se usa (solo la caché de ComfyUI lo
+  evita si el grafo es idéntico a la última ejecución).
+
 ## Pendiente / siguientes pasos
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
@@ -345,6 +393,9 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
   comparativa en MiniMaxH3 (densa vs H3-Opt Auto/Kitchen INT8 vs Block Sparse
   Sol-Attn vs Sol-H3: tiempo/paso, pico VRAM, captura).
 - Probar el botón RTX Upscale de MMH3X2 con un vídeo real.
+- Idea aparcada (LTXV): botón «Refinar este 1er pase» (cargar vídeo guardado →
+  VAE encode → upscale + 2º pase), o guardar el latente del 1er pase (exacto pero
+  ocupa disco). El usuario prefiere dejarlo así por ahora.
 - Secciones de `REVISION.md` aún sin repasar a fondo: tests (no hay suite),
   rendimiento, logging/métricas.
 - Borrar salidas de prueba si se desea (`~/SwarmUI/dlbackend/ComfyUI/output/`):
