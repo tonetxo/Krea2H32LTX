@@ -482,9 +482,16 @@ PSU off, pero venía de Gen5 sano).
 Resultado paso 5: **Gen4 forzado también cae a Gen3 en el 1er resume** → la EQ
 de 16 GT/s tampoco sobrevive al resume S3; no es (solo) la fragilidad de 32 GT/s.
 Gen4 no aporta nada → volver a PCI_E1=Gen5.
+Vuelta a PCI_E1=Gen5 + PSU off: arranque 14:45 (reset reason 0x00200800) Gen5 55.8 GB/s.
+
+Paso B (nuevo): **driver 595.99-open** en vez de 615.71 (hipótesis: el driver
+fija "Max=3" tras la EQ fallida; el primer Gen3 apareció tras subir 595→610→615).
+CUDA 13.2 de torch 2.13+cu132 funciona con drivers ≥580 (compatibilidad de
+versión menor). `apt install nvidia-driver-595-open` retira limpiamente los
+paquetes 615 y 610; volver: `apt install nvidia-driver-615-open`.
 
 ## Pendiente / siguientes pasos
-- **PCIe**: seguir el plan de pruebas de la sección anterior (paso 5 en curso: PCI_E1=Gen4).
+- **PCIe**: seguir el plan de pruebas de la sección anterior (paso B en curso: driver 595.99).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
   (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
