@@ -404,8 +404,7 @@ seguidas + 2 arranques en frío sin fallo**. `pcie-check` mide tras cada resume
 (`~/.local/state/pcie-check.log`); revisar además journal (Xid, AER, kgsp).
 Suspender con Firefox abierto (caso que falló).
 
-0. **Base actual sin tocar** (BIOS de serie). Llevamos 2/5 resumes y 1 arranque.
-   Si pasa → paso 1; si falla → paso 2.
+0. **Base actual sin tocar** (BIOS de serie). ❌ Falló en el 3er resume → paso 2.
 1. Reactivar rendimiento de uno en uno: **A-XMP** primero, luego PBO (Game Boost
    probablemente no compensa). Si A-XMP rompe: probar DDR5-5200 o bajar VSOC.
 2. **Spread Spectrum off** (incl. FCH).
@@ -424,9 +423,18 @@ Registro de pruebas:
 | 0 | 17-oct 04:54 | arranque (tras PSU off) | Gen5 55.9 GB/s |
 | 0 | 17-oct 09:34 | resume S3 | Gen5 55.9 GB/s |
 | 0 | 17-oct 13:35 | resume S3 | Gen5 56.4 GB/s |
+| 0 | 17-oct 13:49 | resume S3 (27 s suspendido) | **FALLO** Gen3 14.4 GB/s, sin Xid; nvidia-smi Max=3 |
+| 6 | 17-oct 13:52 | retrain manual con `nvidia-smi -lgc 1500,2500` (en el estado degradado) | idle 8→16 GT/s, pero bajo carga vuelve a 8 GT/s / 14.4 GB/s; Max sigue 3 → **no recupera** |
+
+Resultado paso 0: **falla con BIOS de serie** → A-XMP/PBO no son la causa (paso 1
+descartado). Fallos en resume: 3 de 7 desde el 16-oct, sin relación con la
+duración de la suspensión (27 s, 50 min, 1 h 38 min fallan; 1 h 33 min va bien).
+Registros EQ en el fallo: GPU 0x164/0x194 y RP 0x41c/0x50c = 00000000 (ni la EQ
+de 16 GT/s ni la de 32 GT/s se completan). Paso 6 descartado como solución: solo
+el reinicio recupera. Siguiente: paso 2 (Spread Spectrum off).
 
 ## Pendiente / siguientes pasos
-- **PCIe**: seguir el plan de pruebas de la sección anterior (paso 0 en curso).
+- **PCIe**: seguir el plan de pruebas de la sección anterior (paso 2 en curso).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
   (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
