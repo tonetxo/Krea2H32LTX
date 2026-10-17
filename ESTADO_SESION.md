@@ -515,6 +515,11 @@ debe caber en 48 GB de swap).
 |---|---|---|---|
 | H | 17-oct 15:04 | reinicio en caliente desde estado degradado (sin PSU off) | Gen3 14.5 GB/s (confirma: el reset en caliente arrastra la EQ fallida) |
 | H | 17-oct 15:05→15:20 | hibernación + resume | **Gen5 56.1 GB/s**, sesión restaurada |
+| 4 | 17-oct 15:25 | arranque en frío (PSU off, 0x00200800) con `pcie_aspm=off pcie_port_pm=off` | **FALLO ya en el arranque** (sin suspender): Gen3 14.4 GB/s, Max=3 |
+
+Resultado paso 4: **falla ya en el arranque en frío** y, con `pcie_aspm=off`, el
+kernel deja de pedir control _OSC (pierde AER/PCIe capability) → peor. Revertir
+(`/etc/default/grub.bak-paso4`). Queda solo lo físico / VBIOS; workaround = hibernar.
 
 ## Pendiente / siguientes pasos
 - **PCIe**: seguir el plan de pruebas de la sección anterior (descartado todo el software salvo paso 4; siguiente: paso 4 y físico).
