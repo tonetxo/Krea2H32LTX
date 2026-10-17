@@ -454,9 +454,32 @@ Paso 3: instalado `linux-image-generic-6.17` + headers (6.17.0-42, DKMS nvidia
 
 Resultado paso 3: **el kernel 6.17 falla igual** (3er resume, como en el paso 0)
 → la regresión del kernel 7.0 que cita el informe no es la causa aquí.
+Vuelta al kernel 7.0 (GRUB restaurado desde el backup; 6.17 queda instalado sin usar).
+
+Paso A (nuevo, antes del 4): **`mem_sleep` = s2idle** (en caliente,
+`echo s2idle | sudo tee /sys/power/mem_sleep`; no persiste). Evita el corte de
+alimentación y el reentrenamiento del resume S3 de AGESA. Si aguanta → fijar
+`mem_sleep_default=s2idle` en GRUB; si falla → pasos 4 y 5.
+
+| Paso | Fecha/hora | Evento | Resultado |
+|---|---|---|---|
+| A | 17-oct 14:23 | arranque en frío tras PSU off (reset reason 0x00200800), kernel 7.0, s2idle activado | Gen5 57.0 GB/s |
+
+Paso A **no concluyente / abandonado**: la placa no soporta s2idle real (no hay
+dispositivo LPS0 `PNP0D80`, no carga `amd_pmc`); se despierta en 1-6 s por GPE
+ACPI (0x10; con 0x10 deshabilitado, 0x1A). Sin LPS0, s2idle no baja consumo.
+Tras esos "resumes" de segundos el enlace seguía Gen5 (no cuentan).
+
+Paso 5: **PCI_E1 = Gen4** forzado (resto igual: A-XMP/PBO/Game Boost off;
+se reactivarán juntos si Gen4 pasa). Arranque directo tras guardar BIOS (sin
+PSU off, pero venía de Gen5 sano).
+
+| Paso | Fecha/hora | Evento | Resultado |
+|---|---|---|---|
+| 5 | 17-oct 14:35 | arranque tras guardar BIOS (reset reason 0x01000800) | Gen4 28.9 GB/s, nvidia-smi Max=4 (Host 4, Device 5) |
 
 ## Pendiente / siguientes pasos
-- **PCIe**: seguir el plan de pruebas de la sección anterior (paso 3 en curso: kernel 6.17).
+- **PCIe**: seguir el plan de pruebas de la sección anterior (paso 5 en curso: PCI_E1=Gen4).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
   (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
