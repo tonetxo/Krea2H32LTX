@@ -448,6 +448,12 @@ Paso 3: instalado `linux-image-generic-6.17` + headers (6.17.0-42, DKMS nvidia
 | Paso | Fecha/hora | Evento | Resultado |
 |---|---|---|---|
 | 3 | 17-oct 14:08 | arranque en frío, kernel 6.17.0-42 | Gen5 56.6 GB/s, nvidia-smi Max=5 |
+| 3 | 17-oct 14:11 | resume S3 (43 s) | Gen5 55.6 GB/s |
+| 3 | 17-oct 14:13 | resume S3 (44 s) | Gen5 56.2 GB/s |
+| 3 | 17-oct 14:15 | resume S3 (45 s) | **FALLO** Gen3 14.4 GB/s, Max=3, sin Xid/AER |
+
+Resultado paso 3: **el kernel 6.17 falla igual** (3er resume, como en el paso 0)
+→ la regresión del kernel 7.0 que cita el informe no es la causa aquí.
 
 ## Pendiente / siguientes pasos
 - **PCIe**: seguir el plan de pruebas de la sección anterior (paso 3 en curso: kernel 6.17).
