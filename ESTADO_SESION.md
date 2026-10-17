@@ -382,7 +382,51 @@ nombre y sin "int8" aplicaría `fp8_e4m3fn_fast`.
   vídeo cargado en la ventana 1er pase no se usa (solo la caché de ComfyUI lo
   evita si el grafo es idéntico a la última ejecución).
 
+## PCIe Gen5 → Gen3 tras suspensión: plan de pruebas (2026-10-17)
+Contexto completo en la memoria `pcie-gen5-equalization` y en
+`Degradación PCIe Tras Suspensión.md` (informe generado por IA: explicación
+coherente, pero citas concretas sin verificar → tratarlas como hipótesis).
+
+**Pista principal:** desde la vuelta a BIOS de serie (04:46: A-XMP off, PBO off,
+Game Boost off, PCI_E1=Gen5, PSU apagada) todo Gen5: arranque 04:54 (55.9 GB/s),
+resumes S3 09:34 (55.9) y 13:35 (56.4). Las caídas tras S3 previas (16-oct 14:05,
+17-oct 03:50) fueron con A-XMP + PBO activos → posible margen PHY reducido por
+OC de memoria/SoC.
+
+**Ya hecho / descartado:** BIOS 1.AA3 (AGESA 1.3.0.1d, no lo arregló sola);
+servicios nvidia-suspend/resume/hibernate activos; PreserveVideoMemoryAllocations=1;
+driver 615.71; retrain en caliente sin éxito (driver fija "Generation Max: 3" tras
+EQ fallida). Estado SW: kernel 7.0.0-38, `mem_sleep` = deep,
+`DynamicPowerManagement=3`.
+
+**Protocolo:** un solo cambio por paso; un paso es bueno con **5 suspensiones
+seguidas + 2 arranques en frío sin fallo**. `pcie-check` mide tras cada resume
+(`~/.local/state/pcie-check.log`); revisar además journal (Xid, AER, kgsp).
+Suspender con Firefox abierto (caso que falló).
+
+0. **Base actual sin tocar** (BIOS de serie). Llevamos 2/5 resumes y 1 arranque.
+   Si pasa → paso 1; si falla → paso 2.
+1. Reactivar rendimiento de uno en uno: **A-XMP** primero, luego PBO (Game Boost
+   probablemente no compensa). Si A-XMP rompe: probar DDR5-5200 o bajar VSOC.
+2. **Spread Spectrum off** (incl. FCH).
+3. **Kernel 6.17** (`linux-image-generic-6.17` en apt; dejar 7.0 en GRUB;
+   comprobar build del módulo nvidia).
+4. GRUB `pcie_aspm=off pcie_port_pm=off`.
+5. Re-probar **PCI_E1=Gen4** forzado partiendo de apagado completo (la prueba
+   anterior venía de estado degradado).
+6. Red de seguridad: retrain con `nvidia-smi --lock-gpu-clocks` (primero manual
+   cuando falle; automatizar solo si recupera).
+7. Físico: recolocar la tarjeta y revisar el conector 12V-2x6.
+
+Registro de pruebas:
+| Paso | Fecha/hora | Evento | Resultado |
+|---|---|---|---|
+| 0 | 17-oct 04:54 | arranque (tras PSU off) | Gen5 55.9 GB/s |
+| 0 | 17-oct 09:34 | resume S3 | Gen5 55.9 GB/s |
+| 0 | 17-oct 13:35 | resume S3 | Gen5 56.4 GB/s |
+
 ## Pendiente / siguientes pasos
+- **PCIe**: seguir el plan de pruebas de la sección anterior (paso 0 en curso).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
   (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
