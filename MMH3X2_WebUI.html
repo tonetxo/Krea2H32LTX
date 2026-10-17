@@ -537,6 +537,11 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             </div>
             <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado del LLM aparecerá aquí..."></textarea>
           </div>
+          <div class="enhancer-row">
+            <label>Cambios a aplicar <span class="hint">(pulido sobre el resultado; Ctrl+Enter)</span></label>
+            <textarea class="enhancer-output" id="enhancerRefineInput" placeholder="p. ej.: que sea de noche, quita el sombrero, plano más cerrado..."></textarea>
+            <button id="btnRefinePrompt" class="primary" style="width:100%; margin-top:6px;">Aplicar cambios</button>
+          </div>
           <div class="enhancer-actions">
             <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
             <button id="btnSaveEnhanced">Guardar en biblioteca</button>
@@ -2777,7 +2782,7 @@ const BASE_GRAPH = {
   }
 };
 const AVAILABLE_MODELS = [];
-const AVAILABLE_LORAS = ["h3/Eros_beta6mix_Lora.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-3step-ComfyUI.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors", "h3/taomate_h3_3step_comfy.safetensors"];
+const AVAILABLE_LORAS = ["h3/Eros_beta6mix_Lora.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-FL2VA-3Step-ComfyUI-BF16.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors", "h3/taomate_h3_3step_comfy.safetensors"];
 const AVAILABLE_VAES = ["MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors"];
 const AVAILABLE_UNETS = ["minimaxh3/10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_w6a8.safetensors"];
 const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "t5_base.safetensors"];
@@ -5066,6 +5071,62 @@ function generateEvolved(prompt, mode, strength, count){
 
 // --- INIT: all top-level code that uses $ or CONFIG ---
 // Called by the UI-specific JS after CONFIG is defined.
+// --- PULIDO ITERATIVO DEL PROMPT ---
+// Reescribe el último resultado del enhancer (o el prompt actual si no hay) aplicando solo
+// los cambios pedidos. El resultado vuelve a #enhancerOutput, así se puede encadenar.
+// Cada UI puede definir CONFIG.parseEnhancerOutput(raw) para extraer el texto (p.ej. JSON).
+const ENHANCER_REFINE_SYSTEM = `You are an expert editor of prompts for image and video generation models.
+You receive an existing prompt and a list of requested changes (the changes may be written in another language).
+Rewrite the prompt applying ONLY the requested changes. Keep everything else exactly as it is: subject, composition, action, camera, style, lighting, wording and level of detail. Add, remove or replace details only where the changes require it, and keep the result coherent (no contradictions with the changes).
+Write the result in the same language as the existing prompt.
+Output ONLY the final prompt as plain text: no explanations, no headings, no quotes, no JSON.`;
+
+function enhancerOutputText(raw){
+  if(typeof CONFIG.parseEnhancerOutput === "function") return CONFIG.parseEnhancerOutput(raw);
+  return raw.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
+}
+
+async function refineEnhancedPrompt(){
+  const model = $("enhancerModel").value;
+  if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
+  const changes = $("enhancerRefineInput").value.trim();
+  if(!changes){ log("⚠️ Escribe los cambios que quieres aplicar al prompt", "l-err"); return; }
+  const out = $("enhancerOutput").value.trim();
+  const base = (out && !out.startsWith("Error:")) ? enhancerOutputText(out) : $("prompt").value.trim();
+  if(!base){ log("⚠️ No hay prompt que pulir: escribe uno o pulsa 'Mejorar prompt' primero", "l-err"); return; }
+
+  const payload = {
+    model,
+    system: ENHANCER_REFINE_SYSTEM,
+    prompt: `EXISTING PROMPT:\n${base}\n\nREQUESTED CHANGES:\n${changes}`,
+    options: { num_ctx: 4096, temperature: 0.4 }
+  };
+  const btn = $("btnRefinePrompt");
+  btn.disabled = true;
+  btn.textContent = "Aplicando cambios...";
+  $("enhancerOutput").value = "";
+  if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
+  try {
+    const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const timeStr = fmtMs(elapsedMs);
+    if(!text){
+      $("enhancerOutput").value = base; // no perder el prompt anterior
+      log("Respuesta vacía del LLM: se mantiene el prompt anterior. Prueba a liberar VRAM y reintenta.", "l-err");
+      return;
+    }
+    $("enhancerOutput").value = text;
+    if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · pulido · ${timeStr}`;
+    log(`✏️ Cambios aplicados en ${timeStr}. Sigue puliendo o pulsa 'Usar como prompt'.`, "l-ok");
+    $("enhancerRefineInput").select(); // escribir encima para el siguiente cambio
+  } catch(e){
+    $("enhancerOutput").value = base;
+    log("Error al aplicar cambios: " + e.message, "l-err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Aplicar cambios";
+  }
+}
+
 function initCommon(){
   loras = CONFIG.loras;
   DEFAULT_BACKEND_PORT = CONFIG.DEFAULT_BACKEND_PORT;
@@ -5141,6 +5202,11 @@ function initCommon(){
   $("enhancerMode").addEventListener("change", () => {
     const data = loadSysPrompts();
     populateStyleSelect(data, $("enhancerMode").value);
+  });
+
+  $("btnRefinePrompt").addEventListener("click", refineEnhancedPrompt);
+  $("enhancerRefineInput").addEventListener("keydown", (e) => {
+    if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); refineEnhancedPrompt(); }
   });
 
   $("btnUseAsPrompt").addEventListener("click", () => {

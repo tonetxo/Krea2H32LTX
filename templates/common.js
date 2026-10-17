@@ -2276,6 +2276,62 @@ function generateEvolved(prompt, mode, strength, count){
 
 // --- INIT: all top-level code that uses $ or CONFIG ---
 // Called by the UI-specific JS after CONFIG is defined.
+// --- PULIDO ITERATIVO DEL PROMPT ---
+// Reescribe el último resultado del enhancer (o el prompt actual si no hay) aplicando solo
+// los cambios pedidos. El resultado vuelve a #enhancerOutput, así se puede encadenar.
+// Cada UI puede definir CONFIG.parseEnhancerOutput(raw) para extraer el texto (p.ej. JSON).
+const ENHANCER_REFINE_SYSTEM = `You are an expert editor of prompts for image and video generation models.
+You receive an existing prompt and a list of requested changes (the changes may be written in another language).
+Rewrite the prompt applying ONLY the requested changes. Keep everything else exactly as it is: subject, composition, action, camera, style, lighting, wording and level of detail. Add, remove or replace details only where the changes require it, and keep the result coherent (no contradictions with the changes).
+Write the result in the same language as the existing prompt.
+Output ONLY the final prompt as plain text: no explanations, no headings, no quotes, no JSON.`;
+
+function enhancerOutputText(raw){
+  if(typeof CONFIG.parseEnhancerOutput === "function") return CONFIG.parseEnhancerOutput(raw);
+  return raw.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
+}
+
+async function refineEnhancedPrompt(){
+  const model = $("enhancerModel").value;
+  if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
+  const changes = $("enhancerRefineInput").value.trim();
+  if(!changes){ log("⚠️ Escribe los cambios que quieres aplicar al prompt", "l-err"); return; }
+  const out = $("enhancerOutput").value.trim();
+  const base = (out && !out.startsWith("Error:")) ? enhancerOutputText(out) : $("prompt").value.trim();
+  if(!base){ log("⚠️ No hay prompt que pulir: escribe uno o pulsa 'Mejorar prompt' primero", "l-err"); return; }
+
+  const payload = {
+    model,
+    system: ENHANCER_REFINE_SYSTEM,
+    prompt: `EXISTING PROMPT:\n${base}\n\nREQUESTED CHANGES:\n${changes}`,
+    options: { num_ctx: 4096, temperature: 0.4 }
+  };
+  const btn = $("btnRefinePrompt");
+  btn.disabled = true;
+  btn.textContent = "Aplicando cambios...";
+  $("enhancerOutput").value = "";
+  if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
+  try {
+    const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const timeStr = fmtMs(elapsedMs);
+    if(!text){
+      $("enhancerOutput").value = base; // no perder el prompt anterior
+      log("Respuesta vacía del LLM: se mantiene el prompt anterior. Prueba a liberar VRAM y reintenta.", "l-err");
+      return;
+    }
+    $("enhancerOutput").value = text;
+    if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · pulido · ${timeStr}`;
+    log(`✏️ Cambios aplicados en ${timeStr}. Sigue puliendo o pulsa 'Usar como prompt'.`, "l-ok");
+    $("enhancerRefineInput").select(); // escribir encima para el siguiente cambio
+  } catch(e){
+    $("enhancerOutput").value = base;
+    log("Error al aplicar cambios: " + e.message, "l-err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Aplicar cambios";
+  }
+}
+
 function initCommon(){
   loras = CONFIG.loras;
   DEFAULT_BACKEND_PORT = CONFIG.DEFAULT_BACKEND_PORT;
@@ -2351,6 +2407,11 @@ function initCommon(){
   $("enhancerMode").addEventListener("change", () => {
     const data = loadSysPrompts();
     populateStyleSelect(data, $("enhancerMode").value);
+  });
+
+  $("btnRefinePrompt").addEventListener("click", refineEnhancedPrompt);
+  $("enhancerRefineInput").addEventListener("keydown", (e) => {
+    if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); refineEnhancedPrompt(); }
   });
 
   $("btnUseAsPrompt").addEventListener("click", () => {
