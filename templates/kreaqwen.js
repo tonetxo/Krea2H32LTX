@@ -396,8 +396,8 @@ function populateModelSelects(){
   const upscales = typeof AVAILABLE_UPSCALE_MODELS !== "undefined" ? AVAILABLE_UPSCALE_MODELS : [];
 
   fill("baseUnetSelect", unets, "habanero_int8mixed");
-  fill("refinerUnetSelect", unets, "qwen-image-2.1-UC");
-  fill("baseClipSelect", clips, "qwen3vl_4b");
+  fill("refinerUnetSelect", unets, "qwen_image_2.1_turbo");
+  fill("baseClipSelect", clips, "qwen3vl_4b_int8_convrot");
   fill("refinerClipSelect", clips, "qwen3vl_8b_nvfp4_heretic");
   fill("upscaleModelSelect", upscales, "4xPurePhoto-Span.pth");
   updateVaeSelectors();
@@ -504,6 +504,43 @@ function applyProfile(profile, stage){
   }
 }
 
+// Valores por defecto propios del modo Krea2 (jibMix) → Qwen 2.1 Turbo; prevalecen sobre
+// los perfiles de arquitectura, salvo en los campos que el usuario ya haya tocado.
+const KREA_QWEN_DEFAULTS = {
+  baseWeightDtype: "auto",
+  baseClipSelect: "qwen3vl_4b_int8_convrot",
+  baseAttentionBackend: "comfy kitchen attention",
+  baseSteps: 10,
+  baseCfg: 1.0,
+  baseSamplerName: "er_sde",
+  baseSchedulerName: "bong_tangent",
+  refinerWeightDtype: "auto",
+  refinerClipSelect: "qwen3vl_8b_nvfp4_heretic",
+  refinerAttentionBackend: "comfy kitchen attention",
+  refinerDenoise: 0.2,
+  refinerSteps: 8,
+  refinerCfg: 1.0,
+  refinerSamplerName: "lcm",
+  refinerSchedulerName: "align_your_steps"
+};
+
+function applyModeOverrides(defaults){
+  for(const [id, value] of Object.entries(defaults)){
+    if(isTouched(id)) continue;
+    // En selects de ficheros (CLIP) el valor es una palabra clave de la ruta.
+    const el = $(id);
+    if(el?.tagName === "SELECT" && ![...el.options].some(o => o.value === String(value))){
+      const opt = [...el.options].find(o => o.value.toLowerCase().includes(String(value).toLowerCase()));
+      if(opt) el.value = opt.value;
+      continue;
+    }
+    setInputValue(id, value, { silent: true, mark: false });
+  }
+  if(defaults.refinerDenoise != null && !isTouched("refinerDenoise") && $("refinerDenoiseVal")){
+    $("refinerDenoiseVal").textContent = Number($("refinerDenoise")?.value || defaults.refinerDenoise).toFixed(2);
+  }
+}
+
 // Gestión del modo de combinación
 function applyComboMode(mode){
   const selBaseU = $("baseUnetSelect");
@@ -546,27 +583,32 @@ function applyComboMode(mode){
 
   if(mode === "krea_qwen"){
     setStage(selBaseU, selBaseC, "krea2", "base", "habanero_int8mixed");
-    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen_image_2.1_turbo");
+    applyModeOverrides(KREA_QWEN_DEFAULTS);
     if(hint) hint.textContent = "Krea2 compone la escena con estética fotográfica cinematográfica; Qwen 2.1 refina microtexturas y nitidez tras el reescalado.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "qwen_krea"){
     setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC");
     setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
     if(hint) hint.textContent = "Qwen 2.1 genera la composición con adherencia profunda al prompt; Krea2 aporta riqueza tonal y grano en la pasada de refinamiento.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "krea_krea"){
     setStage(selBaseU, selBaseC, "krea2", "base", "habanero_int8mixed");
     setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
     if(hint) hint.textContent = "Pipeline homogéneo Krea2: generación inicial y refinado en superresolución dentro del modelo Flux2.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "qwen_qwen"){
     setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC");
     setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC");
     if(hint) hint.textContent = "Pipeline homogéneo Qwen 2.1: renderizado y refinado con máxima nitidez textual y detalle anatómico.";
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
   } else if(mode === "base_only"){
     // En base_only heredamos el perfil (pero no tocamos el text encoder) del modelo base actual
@@ -593,14 +635,21 @@ function invertOrder(){
 
   swap("baseUnetSelect", "refinerUnetSelect");
   swap("baseClipSelect", "refinerClipSelect");
+  // Los ajustes de muestreo viajan con su modelo: se intercambian en vez de reaplicar perfiles.
+  swap("baseWeightDtype", "refinerWeightDtype");
+  swap("baseAttentionBackend", "refinerAttentionBackend");
+  swap("baseSteps", "refinerSteps");
+  swap("baseCfg", "refinerCfg");
+  swap("baseSamplerName", "refinerSamplerName");
+  swap("baseSchedulerName", "refinerSchedulerName");
   
   updateVaeSelectors();
   
   if($("baseVaeSelect")) $("baseVaeSelect").value = v2;
   if($("refinerVaeSelect")) $("refinerVaeSelect").value = v1;
   
-  syncStageToUnet("baseUnetSelect", "baseClipSelect", "base");
-  syncStageToUnet("refinerUnetSelect", "refinerClipSelect", "refiner");
+  ensureCompatibleClip($("baseClipSelect"), unetArchFamily($("baseUnetSelect")?.value), $("baseUnetSelect")?.value);
+  ensureCompatibleClip($("refinerClipSelect"), unetArchFamily($("refinerUnetSelect")?.value), $("refinerUnetSelect")?.value);
 
   const modeSel = $("comboMode");
   const bFam = unetArchFamily($("baseUnetSelect")?.value);
@@ -1833,6 +1882,82 @@ function appendFaceRefine(g, imageRef, job, opts){
 }
 
 // Construcción del grafo dinámico nativo ComfyUI
+// --- Align Your Steps (como el scheduler homónimo de SwarmUI) ---
+// ComfyUI no lo ofrece como scheduler de KSampler: su nodo AlignYourStepsScheduler solo
+// trae curvas SD1/SDXL/SVD. Replicamos el SwarmKSampler: curva de sigmas específica del
+// modelo, interpolada log-lineal al nº de pasos, y la inyectamos con nodos core
+// (ManualSigmas + KSamplerSelect + SamplerCustom), así funciona también en ComfyUI puro.
+const AYS_NOISE_LEVELS = {
+  // https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo/blob/main/model_index.json (+ valor de cola)
+  qwen21: [1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.001]
+};
+
+function aysLoglinearInterp(levels, num){
+  const ys = levels.slice().reverse().map(Math.log);
+  const out = [];
+  for(let i = 0; i < num; i++){
+    const x = num === 1 ? 0 : i * (ys.length - 1) / (num - 1);
+    const lo = Math.floor(x), hi = Math.min(lo + 1, ys.length - 1);
+    out.push(Math.exp(ys[lo] + (ys[hi] - ys[lo]) * (x - lo)));
+  }
+  return out.reverse();
+}
+
+function aysSigmas(family, steps, denoise){
+  const levels = AYS_NOISE_LEVELS[family];
+  // Mismo recorte que KSampler con denoise < 1: horario de steps/denoise pasos, cola final.
+  const total = (denoise == null || denoise > 0.9999) ? steps : Math.floor(steps / denoise);
+  let sig = (total + 1 === levels.length) ? levels.slice() : aysLoglinearInterp(levels, total + 1);
+  sig[sig.length - 1] = 0;
+  return sig.slice(-(steps + 1));
+}
+
+// Sigue la cadena `model` hasta el loader para saber qué UNET usa un sampler.
+function traceUnetName(g, ref){
+  for(let i = 0; i < 64 && Array.isArray(ref); i++){
+    const n = g[ref[0]];
+    if(!n) return "";
+    if(n.inputs?.unet_name) return n.inputs.unet_name;
+    ref = n.inputs?.model;
+  }
+  return "";
+}
+
+// Convierte en SamplerCustom cada KSampler con scheduler "align_your_steps". Se conserva el
+// id del nodo (las referencias [id, 0] siguen valiendo) y los campos de KSampler, que ComfyUI
+// ignora pero permiten restaurar los parámetros desde los metadatos.
+function applyAlignYourSteps(g){
+  for(const [id, n] of Object.entries(g)){
+    if(n.class_type !== "KSampler" || n.inputs?.scheduler !== "align_your_steps") continue;
+    const inp = n.inputs;
+    const family = unetArchFamily(traceUnetName(g, inp.model));
+    if(!AYS_NOISE_LEVELS[family]){
+      log(`⚠️ Align Your Steps solo tiene curva para Qwen 2.1; el sampler ${id} (${family}) usa 'simple'.`, "l-warn");
+      inp.scheduler = "simple";
+      continue;
+    }
+    const sig = aysSigmas(family, inp.steps, inp.denoise);
+    g[`ays_sigmas_${id}`] = {
+      class_type: "ManualSigmas",
+      inputs: { sigmas: sig.map(v => v.toFixed(6)).join(", ") },
+      _meta: { title: `AYS Sigmas (${id})` }
+    };
+    g[`ays_sampler_${id}`] = {
+      class_type: "KSamplerSelect",
+      inputs: { sampler_name: inp.sampler_name },
+      _meta: { title: `AYS Sampler (${id})` }
+    };
+    n.class_type = "SamplerCustom";
+    Object.assign(inp, {
+      add_noise: true,
+      noise_seed: inp.seed,
+      sampler: [`ays_sampler_${id}`, 0],
+      sigmas: [`ays_sigmas_${id}`, 0]
+    });
+  }
+  return g;
+}
+
 function buildGraph(job){
   const j = job || activeJob || snapshotJob();
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
@@ -3280,7 +3405,7 @@ async function runSingleGeneration(index){
     if(job.varianceSeedMode === "random") job.varianceSeedValue = randomSeed();
     log(`⏳ Preparando grafo para variante ${index + 1}/${totalBatchSize}...`, "l-info");
     await resolveQwenEditRefs(job);
-    const graph = buildGraph(job);
+    const graph = applyAlignYourSteps(buildGraph(job));
 
     log(`🚀 Enviando variante ${index + 1}/${totalBatchSize} a ComfyUI...`, "l-info");
     const srv = getServerUrl();
