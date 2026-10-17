@@ -433,8 +433,24 @@ Registros EQ en el fallo: GPU 0x164/0x194 y RP 0x41c/0x50c = 00000000 (ni la EQ
 de 16 GT/s ni la de 32 GT/s se completan). Paso 6 descartado como solución: solo
 el reinicio recupera. Siguiente: paso 2 (Spread Spectrum off).
 
+| Paso | Fecha/hora | Evento | Resultado |
+|---|---|---|---|
+| 2 | 17-oct 13:58 | arranque tras guardar BIOS (solo existe FCH Spread Spectrum → Disabled; PCI_E1=Gen5; reset reason 0x01000800, esperable tras cambio de BIOS) | Gen5 55.9 GB/s |
+
+Paso 2 **descartado sin probar**: FCH Spread Spectrum (el único que hay) ya estaba
+Disabled en todas las pruebas anteriores, incluidos los fallos.
+
+Paso 3: instalado `linux-image-generic-6.17` + headers (6.17.0-42, DKMS nvidia
+615.71.09 compilado OK). GRUB: `GRUB_DEFAULT=saved` → entrada 6.17, menú visible
+5 s (backup `/etc/default/grub.bak-pcie`; volver: restaurar backup + `update-grub`
++ `grub-set-default 0`).
+
+| Paso | Fecha/hora | Evento | Resultado |
+|---|---|---|---|
+| 3 | 17-oct 14:08 | arranque en frío, kernel 6.17.0-42 | Gen5 56.6 GB/s, nvidia-smi Max=5 |
+
 ## Pendiente / siguientes pasos
-- **PCIe**: seguir el plan de pruebas de la sección anterior (paso 2 en curso).
+- **PCIe**: seguir el plan de pruebas de la sección anterior (paso 3 en curso: kernel 6.17).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
   (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
