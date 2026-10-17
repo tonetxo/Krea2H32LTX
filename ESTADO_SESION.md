@@ -521,8 +521,31 @@ Resultado paso 4: **falla ya en el arranque en frío** y, con `pcie_aspm=off`, e
 kernel deja de pedir control _OSC (pierde AER/PCIe capability) → peor. Revertir
 (`/etc/default/grub.bak-paso4`). Queda solo lo físico / VBIOS; workaround = hibernar.
 
+| Paso | Fecha/hora | Evento | Resultado |
+|---|---|---|---|
+| — | 17-oct 15:33 | arranque en frío (0x00200800), driver **615.71 de vuelta** (via Administrador do controlador), sin params PCIe, **con `resume=`** | **FALLO** Gen3 14.4 GB/s, Max=3 |
+| R | 17-oct 15:38 | **reinicio en caliente** (0x01000800, "failed boot timer") **sin `resume=`** | Gen5 55.8 GB/s |
+
+**Sospecha abierta: `resume=` (hibernación).** Arranques en frío de hoy antes de
+añadir `resume=`: 7/7 Gen5 (04:54, 13:58, 14:08, 14:23, 14:35, 14:45, 14:52).
+Después: 0/2 (15:25, 15:33). Mecanismo poco plausible (resume= solo hace que el
+initramfs busque imagen en la swap), pero la correlación es clara. El arranque
+bueno de 15:38 cambió dos cosas a la vez (sin resume= **y** reinicio en caliente
+con 0x01000800, que ya se asoció antes a Gen5), así que no concluye.
+
+Estado actual: driver 615.71, kernel 7.0, GRUB **sin** `resume=`/`resume_offset=`
+(backup con resume en `/etc/default/grub.bak-conresume`; la regla polkit e
+`/etc/initramfs-tools/conf.d/resume` siguen) → **hibernación desactivada** de
+momento: apagar en vez de suspender/hibernar.
+
+**Siguiente prueba:** arranque en frío (PSU off ~30 s) **sin** `resume=`.
+- Gen5 → apunta a resume=: restaurar `grub.bak-conresume` + `update-grub` y
+  otro arranque en frío; si cae → confirmado.
+- Gen3 → resume= descartado; los fríos fallan y el caliente arregla → físico
+  (paso 7: recolocar GPU, revisar 12V-2x6) / VBIOS.
+
 ## Pendiente / siguientes pasos
-- **PCIe**: seguir el plan de pruebas de la sección anterior (descartado todo el software salvo paso 4; siguiente: paso 4 y físico).
+- **PCIe**: seguir el plan de pruebas de la sección anterior (siguiente: arranque en frío sin `resume=`; ver tabla).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
   (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
