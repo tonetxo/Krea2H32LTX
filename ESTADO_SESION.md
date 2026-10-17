@@ -490,8 +490,21 @@ CUDA 13.2 de torch 2.13+cu132 funciona con drivers ≥580 (compatibilidad de
 versión menor). `apt install nvidia-driver-595-open` retira limpiamente los
 paquetes 615 y 610; volver: `apt install nvidia-driver-615-open`.
 
+| Paso | Fecha/hora | Evento | Resultado |
+|---|---|---|---|
+| B | 17-oct 14:52 | arranque en frío (PSU off, reset reason 0x00200800), driver 595.99.02, kernel 7.0 | Gen5 55.6 GB/s; torch 2.13+cu132 OK en CUDA |
+| B | 17-oct 14:54 | resume S3 (40 s) | **FALLO** Gen3 14.4 GB/s, Max=3 |
+
+Resultado paso B: **el driver 595.99 falla igual (1er resume)** → la versión del
+driver no es la causa. Descartados ya: OC (A-XMP/PBO), kernel (7.0/6.17), Spread
+Spectrum, velocidad forzada (Gen5/Gen4), driver (615/595), s2idle (no soportado).
+Quedan: paso 4 (GRUB `pcie_aspm=off pcie_port_pm=off`, pocas esperanzas) y el
+paso 7 físico (recolocar GPU, revisar 12V-2x6); también posible VBIOS de la
+tarjeta. Mientras tanto: **no suspender** (apagar/hibernar); si cae, reinicio con
+PSU off.
+
 ## Pendiente / siguientes pasos
-- **PCIe**: seguir el plan de pruebas de la sección anterior (paso B en curso: driver 595.99).
+- **PCIe**: seguir el plan de pruebas de la sección anterior (descartado todo el software salvo paso 4; siguiente: paso 4 y físico).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
 - **KreaQwen + RTX Video Super Resolution**: decidir si se añade una etapa RTX SR
   (hoy solo upscale 4xPurePhoto); propuesta: probar primero RTX VSR vs 4xPurePhoto.
