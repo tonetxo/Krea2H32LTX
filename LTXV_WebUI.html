@@ -596,6 +596,93 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
           <div id="loraList"></div>
         </div>
       </div>
+      <!-- REFINADO DE ELEMENTOS (H3 FaceTrackCrop/Stitch + resampleado LTXV) -->
+      <div class="panel">
+        <h2>Refinado de elementos (Face / Hand / Body Refine)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segFaceRefineOn" data-value="true">Activo</div>
+          <div class="seg on" id="segFaceRefineOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="faceRefineControls" style="display:none; margin-top:8px;">
+          <div class="row">
+            <label>Elemento a refinar</label>
+            <select id="faceRefineTarget">
+              <option value="face" selected>Rostro (Face · face_yolov8m)</option>
+              <option value="hands">Manos (Hands · hand_yolov8s)</option>
+              <option value="face_hands">Combo: Rostro + Manos (2 pasadas)</option>
+              <option value="hair">Cabello (Hair · yolov8-seg)</option>
+              <option value="skin">Piel (Skin · yolov8-seg)</option>
+              <option value="body">Cuerpo / Persona (Person · yolov8m-seg)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Resolución de recorte</label>
+            <select id="faceRefineCanvasMode">
+              <option value="512" selected>512x512 (Bajo consumo · evita OOM · 2x rápido)</option>
+              <option value="768">768x768 (Alta resolución · más VRAM)</option>
+            </select>
+          </div>
+          <div class="row slider-row">
+            <label>Pasos DiT (Steps) <span class="hint" id="faceRefineStepsHint">(4)</span></label>
+            <input type="range" id="faceRefineStepsSlider" min="2" max="16" step="1" value="4">
+            <div class="slider-val" id="faceRefineStepsVal">4</div>
+          </div>
+          <div class="row slider-row">
+            <label>Denoise base <span class="hint" id="faceRefineDenoiseHint">(0.35)</span></label>
+            <input type="range" id="faceRefineDenoiseSlider" min="0.15" max="0.55" step="0.05" value="0.35">
+            <div class="slider-val" id="faceRefineDenoiseVal">0.35</div>
+          </div>
+          <div class="row slider-row">
+            <label>Suavizado de borde (Feather) <span class="hint" id="faceRefineFeatherHint">(16 px)</span></label>
+            <input type="range" id="faceRefineFeatherSlider" min="4" max="32" step="2" value="16">
+            <div class="slider-val" id="faceRefineFeatherVal">16 px</div>
+          </div>
+          <div class="row">
+            <label>Modo de selección</label>
+            <select id="faceRefineSelectMode">
+              <option value="largest_face" selected>1 objetivo (Principal · más grande)</option>
+              <option value="dual_faces">2 objetivos (Dual · refina ambos)</option>
+              <option value="centre_most">1 objetivo (Más centrado)</option>
+              <option value="left_most">1 objetivo (A la izquierda)</option>
+              <option value="right_most">1 objetivo (A la derecha)</option>
+              <option value="second_face">1 objetivo (Solo segundo · index 1)</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+            <label>Caras de referencia (selección de persona, opcional)</label>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <!-- Slot Cara 1 -->
+              <div class="ref-face-slot" style="flex:1;background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px;text-align:center;position:relative;">
+                <input type="file" id="faceRefineImgFile1" accept="image/*" style="display:none;">
+                <div id="faceRefineSlotPlaceholder1" style="cursor:pointer;padding:8px 4px;">
+                  <div style="font-size:16px;">👤</div>
+                  <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">Ref. Cara 1</div>
+                  <div style="font-size:9.5px;color:var(--muted-2);">(clic o arrastrar)</div>
+                </div>
+                <div id="faceRefineSlotPreview1" style="display:none;position:relative;">
+                  <img id="faceRefineSlotImg1" style="max-height:80px;max-width:100%;border-radius:4px;object-fit:cover;display:block;margin:0 auto;">
+                  <button type="button" id="faceRefineSlotClear1" class="ghost btn-mini" title="Quitar referencia 1" style="position:absolute;top:2px;right:2px;padding:2px 5px;font-size:10px;background:rgba(0,0,0,0.6);">✕</button>
+                </div>
+              </div>
+              <!-- Slot Cara 2 -->
+              <div class="ref-face-slot" id="faceRefineSlotWrap2" style="flex:1;background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px;text-align:center;position:relative;">
+                <input type="file" id="faceRefineImgFile2" accept="image/*" style="display:none;">
+                <div id="faceRefineSlotPlaceholder2" style="cursor:pointer;padding:8px 4px;">
+                  <div style="font-size:16px;">👥</div>
+                  <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">Ref. Cara 2 (Dual)</div>
+                  <div style="font-size:9.5px;color:var(--muted-2);">(clic o arrastrar)</div>
+                </div>
+                <div id="faceRefineSlotPreview2" style="display:none;position:relative;">
+                  <img id="faceRefineSlotImg2" style="max-height:80px;max-width:100%;border-radius:4px;object-fit:cover;display:block;margin:0 auto;">
+                  <button type="button" id="faceRefineSlotClear2" class="ghost btn-mini" title="Quitar referencia 2" style="position:absolute;top:2px;right:2px;padding:2px 5px;font-size:10px;background:rgba(0,0,0,0.6);">✕</button>
+                </div>
+              </div>
+            </div>
+            <div class="hint" style="font-size:9.5px;margin-top:4px;">Solo eligen a quién sigue el recorte (InsightFace), útil con varias personas en plano. No transfieren la identidad: en LTXV no hay condicionamiento por referencia que funcione; para eso usa una LoRA de personaje.</div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera rostros, manos, pelo o cuerpo sobre el vídeo final (antes de interpolar/escalar). El modo Combo o Dual refina dos elementos en cadena. 512x512 evita OOM en vídeos largos y acelera el render.</div>
+      </div>
       <div class="panel">
         <h2>Interpolación de Frames</h2>
         <div class="seed-toggle">
@@ -5236,6 +5323,272 @@ $("segRtxOff")?.addEventListener("click", () => { const r = getRtxState(); r.ena
 $("rtxQuality")?.addEventListener("change", () => { const r = getRtxState(); saveRtx(r); });
 $("rtxScale")?.addEventListener("change", () => { const r = getRtxState(); saveRtx(r); });
 
+// --- REFINADO DE ELEMENTOS (ComfyUI-H3-FaceRefine) ---
+// Reutiliza el seguimiento/recorte (H3FaceTrackCrop) y el pegado (H3FaceStitch), que no
+// dependen del modelo; el resampleado de los recortes se hace con LTXV (ver appendElementRefine).
+let uploadedRefFace1=null, localRefFace1=null;
+let uploadedRefFace2=null, localRefFace2=null;
+const FACEREFINE_KEY = "ltxv_facerefine_state";
+const ELEMENT_REFINE_CONFIG = {
+  face: {
+    detector: "face_yolov8m.pt",
+    cropFactor: 3.0,
+    prompt: "cinematic face, natural expression, ultra high detail, sharp focus, 8k"
+  },
+  hands: {
+    detector: "hand_yolov8s.pt",
+    cropFactor: 2.8,
+    prompt: "detailed realistic hands, 5 distinct fingers, natural fingernails, high quality skin texture, sharp focus"
+  },
+  hair: {
+    detector: "hair_yolov8n-seg_60.pt",
+    cropFactor: 2.2,
+    prompt: "detailed strands of hair, natural hair flow, clean scalp, high definition, sharp focus"
+  },
+  skin: {
+    detector: "skin_yolov8m-seg_400.pt",
+    cropFactor: 2.5,
+    prompt: "smooth natural skin texture, realistic pores, fine details, sharp focus, 8k"
+  },
+  body: {
+    detector: "person_yolov8m-seg.pt",
+    cropFactor: 1.3,
+    prompt: "detailed clothing fabric, realistic anatomy, natural posture, ultra high definition"
+  }
+};
+
+const FACEREFINE_DEFAULTS = {
+  enabled: false,
+  target: "face",
+  canvas: 512,
+  steps: 4,
+  denoise: 0.35,
+  feather: 16,
+  select: "largest_face",
+  postproc: false
+};
+function loadFaceRefine(){
+  try { return Object.assign({}, FACEREFINE_DEFAULTS, JSON.parse(localStorage.getItem(FACEREFINE_KEY) || "{}")); }
+  catch(_) { return {...FACEREFINE_DEFAULTS}; }
+}
+function saveFaceRefine(s){
+  try {
+    const { refFace1, refFace2, ...rest } = s || {};
+    localStorage.setItem(FACEREFINE_KEY, JSON.stringify(rest));
+  } catch(_){}
+}
+function getFaceRefineState(){
+  return {
+    enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
+    target: $("faceRefineTarget")?.value || "face",
+    canvas: parseInt($("faceRefineCanvasMode")?.value || "512", 10),
+    steps: parseInt($("faceRefineStepsSlider")?.value || "4", 10),
+    denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.35"),
+    feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
+    select: $("faceRefineSelectMode")?.value || "largest_face",
+    postproc: $("faceRefinePostprocToggle")?.checked ?? false,
+    refFace1: uploadedRefFace1 || localRefFace1 || null,
+    refFace2: uploadedRefFace2 || localRefFace2 || null
+  };
+}
+function setFaceRefineUI(s){
+  if(!s) return;
+  const on = $("segFaceRefineOn"), off = $("segFaceRefineOff");
+  const panel = $("faceRefineControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("faceRefineTarget") && s.target){
+    $("faceRefineTarget").value = s.target;
+  }
+  if($("faceRefineCanvasMode")){
+    $("faceRefineCanvasMode").value = String(s.canvas || 512);
+  }
+  if($("faceRefineStepsSlider")){
+    const st = parseInt(s.steps != null ? s.steps : 4, 10);
+    $("faceRefineStepsSlider").value = st;
+    if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+    if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+  }
+  if($("faceRefineDenoiseSlider")){
+    const d = parseFloat(s.denoise != null ? s.denoise : 0.35);
+    $("faceRefineDenoiseSlider").value = d;
+    if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+    if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+  }
+  if($("faceRefineFeatherSlider")){
+    const f = parseInt(s.feather != null ? s.feather : 16, 10);
+    $("faceRefineFeatherSlider").value = f;
+    if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+    if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  }
+  if($("faceRefineSelectMode") && s.select){
+    $("faceRefineSelectMode").value = s.select;
+  }
+  if($("faceRefinePostprocToggle")){
+    $("faceRefinePostprocToggle").checked = !!s.postproc;
+  }
+}
+const _faceRefineState = loadFaceRefine();
+setFaceRefineUI(_faceRefineState);
+$("segFaceRefineOn")?.addEventListener("click", () => {
+  const s = getFaceRefineState();
+  s.enabled = true;
+  setFaceRefineUI(s);
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+$("segFaceRefineOff")?.addEventListener("click", () => {
+  const s = getFaceRefineState();
+  s.enabled = false;
+  setFaceRefineUI(s);
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+$("faceRefineTarget")?.addEventListener("change", (e) => {
+  const s = getFaceRefineState();
+  s.target = e.target.value;
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+$("faceRefineCanvasMode")?.addEventListener("change", (e) => {
+  const s = getFaceRefineState();
+  s.canvas = parseInt(e.target.value, 10) || 512;
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+$("faceRefineStepsSlider")?.addEventListener("input", (e) => {
+  const st = parseInt(e.target.value, 10) || 4;
+  if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+  if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+  const s = getFaceRefineState();
+  s.steps = st;
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+$("faceRefineDenoiseSlider")?.addEventListener("input", (e) => {
+  const d = parseFloat(e.target.value) || 0.35;
+  if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+  if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+  const s = getFaceRefineState();
+  s.denoise = d;
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+$("faceRefineFeatherSlider")?.addEventListener("input", (e) => {
+  const f = parseInt(e.target.value, 10) || 16;
+  if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+  if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  const s = getFaceRefineState();
+  s.feather = f;
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+$("faceRefineSelectMode")?.addEventListener("change", (e) => {
+  const s = getFaceRefineState();
+  s.select = e.target.value;
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+$("faceRefinePostprocToggle")?.addEventListener("change", (e) => {
+  const s = getFaceRefineState();
+  s.postproc = e.target.checked;
+  saveFaceRefine(s);
+  scheduleSaveLtxvSettings();
+});
+
+// --- CARAS DE REFERENCIA PARA FACE REFINE ---
+function handleRefFaceFile(f, slotIndex){
+  if(!f) return;
+  const isSlot1 = (slotIndex === 1);
+  const uniqueName = `temp_face_${slotIndex}_${Date.now()}_${f.name}`;
+  const fileObj = new File([f], uniqueName, {type: f.type || "image/png"});
+  if(isSlot1){
+    localRefFace1 = fileObj;
+    uploadedRefFace1 = null;
+  } else {
+    localRefFace2 = fileObj;
+    uploadedRefFace2 = null;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    const imgEl = $(`faceRefineSlotImg${slotIndex}`);
+    const prevEl = $(`faceRefineSlotPreview${slotIndex}`);
+    const phEl = $(`faceRefineSlotPlaceholder${slotIndex}`);
+    if(imgEl) imgEl.src = dataUrl;
+    if(prevEl) prevEl.style.display = "block";
+    if(phEl) phEl.style.display = "none";
+    log(`Foto referencia facial ${slotIndex} cargada: ${f.name}`, "l-ok");
+  };
+  reader.readAsDataURL(f);
+}
+
+function clearRefFace(slotIndex){
+  const isSlot1 = (slotIndex === 1);
+  if(isSlot1){
+    localRefFace1 = null;
+    uploadedRefFace1 = null;
+  } else {
+    localRefFace2 = null;
+    uploadedRefFace2 = null;
+  }
+  const imgEl = $(`faceRefineSlotImg${slotIndex}`);
+  const prevEl = $(`faceRefineSlotPreview${slotIndex}`);
+  const phEl = $(`faceRefineSlotPlaceholder${slotIndex}`);
+  const fileInp = $(`faceRefineImgFile${slotIndex}`);
+  if(imgEl) imgEl.src = "";
+  if(prevEl) prevEl.style.display = "none";
+  if(phEl) phEl.style.display = "block";
+  if(fileInp) fileInp.value = "";
+  log(`Referencia facial ${slotIndex} eliminada.`, "l-info");
+}
+
+[1, 2].forEach(slot => {
+  const fileInp = $(`faceRefineImgFile${slot}`);
+  const ph = $(`faceRefineSlotPlaceholder${slot}`);
+  const clearBtn = $(`faceRefineSlotClear${slot}`);
+  const slotWrap = ph?.closest(".ref-face-slot");
+
+  ph?.addEventListener("click", () => fileInp?.click());
+  fileInp?.addEventListener("change", (e) => {
+    if(e.target.files && e.target.files[0]) handleRefFaceFile(e.target.files[0], slot);
+  });
+  clearBtn?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    clearRefFace(slot);
+  });
+
+  if(slotWrap){
+    ["dragenter", "dragover"].forEach(ev => {
+      slotWrap.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        slotWrap.style.borderColor = "var(--accent)";
+      });
+    });
+    ["dragleave", "drop"].forEach(ev => {
+      slotWrap.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        slotWrap.style.borderColor = "var(--border)";
+      });
+    });
+    slotWrap.addEventListener("drop", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      slotWrap.style.borderColor = "var(--border)";
+      if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]){
+        handleRefFaceFile(e.dataTransfer.files[0], slot);
+      }
+    });
+  }
+});
+
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
   for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
@@ -5260,6 +5613,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
     ["Atención", $("sageAttentionType")?.value || SAGE_DEFAULT],
     ["Interpolación", r.enabled ? ((r.engine === "rtx") ? `RTX Frame Gen · ${r.multiplier}x (${24*r.multiplier} fps)` : `RIFE · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}`) : "off"],
     ["RTX Super Resolution", (typeof getRtxState === "function" && getRtxState().enabled) ? `on (2x ${getRtxState().quality})` : "off"],
+    ["Refinado", (() => { const fr = getFaceRefineState(); return fr.enabled ? `${fr.target} · ${fr.canvas}px · ${fr.steps} pasos · denoise ${Number(fr.denoise).toFixed(2)}` : "off"; })()],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", (w && h) ? `${w}×${h}` : `${$("width")?.value || ""}×${$("height")?.value || ""}`],
     ["A/R", getFriendlyRatio(w, h)],
@@ -5902,6 +6256,214 @@ function appendVideoPostFx(g, imageRef, postFxState, seedHint){
   return imageRef;
 }
 
+// Sigmas del refinado: rampa lineal desde el denoise hasta 0 (img2img de flujo).
+function buildRefineSigmas(denoise, steps){
+  const d = Math.max(0.05, Math.min(1, parseFloat(denoise) || 0.35));
+  const n = Math.max(1, parseInt(steps, 10) || 4);
+  const out = [];
+  for(let i = 0; i <= n; i++) out.push((d * (1 - i / n)).toFixed(6));
+  return out.join(", ");
+}
+
+// Refinado de elementos sobre el vídeo final decodificado (antes de RIFE / RTX SR / Post-FX).
+// H3FaceTrackCrop y H3FaceStitch son independientes del modelo; el resampleado de los
+// recortes se hace con LTXV: VAEEncode → AV latent (con el audio del 2º pase) →
+// SamplerCustom a bajo denoise → VAEDecode. No se usan H3PerFrameDenoise ni
+// H3InjectVideoLatent: el parche de modelo del primero llama a audio_scale() (solo H3).
+function appendElementRefine(g, imagesRef, j){
+  const fr = j ? j.faceRefine : getFaceRefineState();
+  ["fr_ref_img_1", "fr_ref_img_2", "fr_sampler_select"].forEach(id => { delete g[id]; });
+  const passIds = ["crop", "trim", "enc", "av", "ref", "pos", "cond", "sigmas", "sampler", "sep", "dec", "stitch"];
+  const clearPass = (p) => passIds.forEach(id => { delete g[`fr${p}_${id}`]; });
+  clearPass(1); clearPass(2);
+  if(!fr || !fr.enabled) return imagesRef;
+
+  const vaeRef = g[N.DECODE_VIDEO_2]?.inputs?.vae || [N.CHECKPOINT, 2];
+  const clipRef = g[N.PROMPT]?.inputs?.clip || [N.LTXAV_TEXT_ENCODER, 0];
+  const negRef = g["523"]?.inputs?.negative || ["537", 0];
+  const frameRateRef = g["523"]?.inputs?.frame_rate || ["542", 0];
+  // Longitud real del vídeo (frames+1 = 8k+1). H3FaceTrackCrop rellena los recortes
+  // hasta la rejilla 17k+5 de H3; se recortan de vuelta para que el VAE de LTXV
+  // reciba 8k+1 frames y el audio del 2º pase encaje en duración.
+  const lengthRef = g["534"]?.inputs?.length || ["798", 1];
+  const audioLatentRef = ["596", 1];
+
+  const canvas = parseInt(fr.canvas || 512, 10) || 512;
+  const steps = (typeof fr.steps === "number") ? fr.steps : 4;
+  const denoise = fr.denoise || 0.35;
+  const feather = fr.feather || 16;
+  const target = fr.target || "face";
+  const isCombo = (target === "face_hands");
+  const rawSelect = fr.select || "largest_face";
+  const isDual = (rawSelect === "dual_faces") || isCombo;
+  const elemCfg1 = ELEMENT_REFINE_CONFIG[isCombo ? "face" : target] || ELEMENT_REFINE_CONFIG.face;
+  const elemCfg2 = isCombo ? ELEMENT_REFINE_CONFIG.hands : elemCfg1;
+
+  let pass1Select = "largest_face", pass1Index = 0;
+  if(rawSelect === "second_face"){
+    pass1Index = 1;
+  } else if(rawSelect === "centre_most" || rawSelect === "left_most" || rawSelect === "right_most"){
+    pass1Select = rawSelect;
+  }
+
+  const sMode = j ? j.seedMode : seedMode;
+  const sVal = j ? j.seedValue : parseInt($("seedVal")?.value || "12345", 10);
+  const seedFor = (k) => (sMode === "random") ? Math.floor(Math.random() * 100000000) : (sVal + k);
+
+  const refFace1 = j ? j.uploadedRefFace1 : uploadedRefFace1;
+  const refFace2 = j ? j.uploadedRefFace2 : uploadedRefFace2;
+  const loadRef = (id, obj, title) => {
+    g[id] = {
+      class_type: "LoadImage",
+      inputs: { image: (obj.subfolder ? obj.subfolder + "/" : "") + obj.name },
+      _meta: { title }
+    };
+    return [id, 0];
+  };
+  const ref1 = refFace1 ? loadRef("fr_ref_img_1", refFace1, "Element Refine · Ref. Cara 1") : null;
+  const ref2 = refFace2 ? loadRef("fr_ref_img_2", refFace2, "Element Refine · Ref. Cara 2") : null;
+
+  g["fr_sampler_select"] = {
+    class_type: "KSamplerSelect",
+    inputs: { sampler_name: "euler" },
+    _meta: { title: "Element Refine · Sampler" }
+  };
+
+  const basePrompt = ((j ? j.prompt : $("prompt")?.value) || "").trim();
+
+  const addPass = (p, srcImages, elemCfg, select, selectIndex, refImg, seed) => {
+    const id = (s) => `fr${p}_${s}`;
+    const cropInputs = {
+      images: srcImages,
+      detector: elemCfg.detector,
+      confidence: 0.35,
+      crop_factor: elemCfg.cropFactor,
+      canvas_width: canvas,
+      canvas_height: canvas,
+      canvas_mode: "manual",
+      smooth_window: 21,
+      size_smooth_window: 51,
+      smooth_method: "gaussian",
+      size_mode: "per_frame",
+      identity_track: !!refImg,
+      identity_threshold: 0.28,
+      select,
+      fallback_detector: "none",
+      fallback_head_frac: 0.5,
+      select_index: selectIndex,
+      identity_model: "insightface",
+      cut_detection: "none",
+      cut_threshold: 3.0,
+      absent_shots: "off",
+      X: 0,
+      Y: 0,
+      frame_index: 0
+    };
+    if(refImg) cropInputs.identity_reference = refImg;
+    g[id("crop")] = { class_type: "H3FaceTrackCrop", inputs: cropInputs, _meta: { title: `Element Track Crop ${p}` } };
+    g[id("trim")] = {
+      class_type: "ImageFromBatch",
+      inputs: { image: [id("crop"), 0], batch_index: 0, length: lengthRef },
+      _meta: { title: `Element Crops 8k+1 ${p}` }
+    };
+    g[id("enc")] = {
+      class_type: "VAEEncode",
+      inputs: { pixels: [id("trim"), 0], vae: vaeRef },
+      _meta: { title: `Element Crops Encode ${p}` }
+    };
+    g[id("av")] = {
+      class_type: "LTXVConcatAVLatent",
+      inputs: { video_latent: [id("enc"), 0], audio_latent: audioLatentRef },
+      _meta: { title: `Element AV Latent ${p}` }
+    };
+    // LTXReferenceConditioning con strength 0 solo limpia la referencia de la imagen de
+    // entrada que 860/870 dejan en el diffusion_model (si no, se colaría en el recorte);
+    // target_latent fuerza además a que se ejecute tras el 2º pase. Las caras de referencia
+    // NO se usan para condicionar: medido con InsightFace, ni este nodo (reference /
+    // prefix_continuous, strength 1–1.5) ni subir el denoise a 0.9 acercan la identidad
+    // (similitud ~0.03). En LTXV solo sirven para elegir a quién sigue el recorte.
+    g[id("ref")] = {
+      class_type: "LTXReferenceConditioning",
+      inputs: {
+        model: [N.LORA, 0],
+        vae: vaeRef,
+        image: [id("trim"), 0],
+        target_latent: [id("enc"), 0],
+        strength: 0.0,
+        position_mode: "reference",
+        verbose: false
+      },
+      _meta: { title: `Element Reference Clear ${p}` }
+    };
+    const prompt = basePrompt ? `${basePrompt}, ${elemCfg.prompt}` : elemCfg.prompt;
+    g[id("pos")] = {
+      class_type: "CLIPTextEncode",
+      inputs: { text: prompt, clip: clipRef },
+      _meta: { title: `Element Prompt ${p}` }
+    };
+    g[id("cond")] = {
+      class_type: "LTXVConditioning",
+      inputs: { positive: [id("pos"), 0], negative: negRef, frame_rate: frameRateRef },
+      _meta: { title: `Element Conditioning ${p}` }
+    };
+    g[id("sigmas")] = {
+      class_type: "ManualSigmas",
+      inputs: { sigmas: buildRefineSigmas(denoise, steps) },
+      _meta: { title: `Element Refine Sigmas ${p}` }
+    };
+    g[id("sampler")] = {
+      class_type: "SamplerCustom",
+      inputs: {
+        add_noise: true,
+        noise_seed: seed,
+        cfg: 1,
+        model: [id("ref"), 0],
+        positive: [id("cond"), 0],
+        negative: [id("cond"), 1],
+        sampler: ["fr_sampler_select", 0],
+        sigmas: [id("sigmas"), 0],
+        latent_image: [id("av"), 0]
+      },
+      _meta: { title: `Element Refine Sampler ${p}` }
+    };
+    g[id("sep")] = {
+      class_type: "LTXVSeparateAVLatent",
+      inputs: { av_latent: [id("sampler"), 0] },
+      _meta: { title: `Element Separate AV ${p}` }
+    };
+    g[id("dec")] = {
+      class_type: "VAEDecode",
+      inputs: { samples: [id("sep"), 0], vae: vaeRef },
+      _meta: { title: `Element Crops Decode ${p}` }
+    };
+    g[id("stitch")] = {
+      class_type: "H3FaceStitch",
+      inputs: {
+        base_images: srcImages,
+        refined_crops: [id("dec"), 0],
+        transform: [id("crop"), 1],
+        paste_region: "face_ellipse",
+        mask_dilation: 6,
+        feather,
+        colour_match: 0.5,
+        blend: 1.0,
+        undetected_frames: "fade_out",
+        feather_scales_with_crop: false
+      },
+      _meta: { title: `Element Stitch ${p}` }
+    };
+    return [id("stitch"), 0];
+  };
+
+  let out = addPass(1, imagesRef, elemCfg1, pass1Select, pass1Index, ref1, seedFor(0));
+  if(isDual){
+    // Pasada 2: segundo rostro (Dual) o manos (Combo). Solo usa la Ref. 2: reutilizar la
+    // Ref. 1 haría que el seguimiento volviese a la misma persona de la pasada 1.
+    out = addPass(2, out, elemCfg2, "largest_face", isCombo ? 0 : 1, isCombo ? null : ref2, seedFor(1));
+  }
+  return out;
+}
+
 function snapshotJob(firstPassOnly){
   // Captura inmutable de todos los parámetros necesarios para reproducir el job
   return {
@@ -5929,6 +6491,11 @@ function snapshotJob(firstPassOnly){
     savePreview: $("savePreview")?.checked ?? true,
     rife: getRifeState(),
     rtx: getRtxState(),
+    faceRefine: getFaceRefineState(),
+    uploadedRefFace1: uploadedRefFace1 ? {...uploadedRefFace1} : null,
+    uploadedRefFace2: uploadedRefFace2 ? {...uploadedRefFace2} : null,
+    localRefFace1: localRefFace1,
+    localRefFace2: localRefFace2,
     bitDepth: getBitDepth(),
     loras: JSON.parse(JSON.stringify(loras)),
     chainMode: $("enhancerChainMode")?.value,
@@ -6522,6 +7089,38 @@ async function applyWorkflow(workflow, opts={}){
     saveRife(r);
   }
 
+  // Restaurar Refinado de elementos (fr1_* / fr2_*). Vídeos sin estos nodos → desactivado.
+  const frCrop1 = workflow["fr1_crop"];
+  if(frCrop1 && frCrop1.inputs){
+    const ci = frCrop1.inputs;
+    const frCrop2 = workflow["fr2_crop"];
+    const detTarget = (det) => Object.keys(ELEMENT_REFINE_CONFIG).find(k => ELEMENT_REFINE_CONFIG[k].detector === det) || "face";
+    const t1 = detTarget(ci.detector);
+    const t2 = frCrop2?.inputs ? detTarget(frCrop2.inputs.detector) : null;
+    const target = (t1 === "face" && t2 === "hands") ? "face_hands" : t1;
+    let select = ci.select || "largest_face";
+    if(frCrop2 && target !== "face_hands") select = "dual_faces";
+    else if(select === "largest_face" && ci.select_index === 1) select = "second_face";
+    const fr = { ...FACEREFINE_DEFAULTS, enabled: true, target, select, canvas: parseInt(ci.canvas_width, 10) || 512 };
+    const sig = workflow["fr1_sigmas"]?.inputs?.sigmas;
+    if(typeof sig === "string"){
+      const vals = sig.split(",").map(v => parseFloat(v)).filter(v => !isNaN(v));
+      if(vals.length >= 2){ fr.denoise = vals[0]; fr.steps = vals.length - 1; }
+    }
+    const fe = workflow["fr1_stitch"]?.inputs?.feather;
+    if(typeof fe === "number") fr.feather = fe;
+    setFaceRefineUI(fr);
+    saveFaceRefine(fr);
+    setApplied(`refinado de elementos (${target}, denoise ${Number(fr.denoise).toFixed(2)}, ${fr.steps} pasos)`);
+  } else {
+    const fr = getFaceRefineState();
+    if(fr.enabled){
+      fr.enabled = false;
+      setFaceRefineUI(fr);
+      saveFaceRefine(fr);
+    }
+  }
+
   // Restaurar RTX Video Super Resolution
   const rtxNode = findByClass("RTXVideoSuperResolution");
   if(rtxNode && rtxNode.inputs){
@@ -6710,6 +7309,7 @@ function saveLtxvSettings(){
     postfx: getPostFxState(),
     rife: getRifeState(),
     rtx: getRtxState(),
+    faceRefine: (({ refFace1, refFace2, ...rest }) => rest)(getFaceRefineState()),
     bitDepth: getBitDepth(),
     sageType: $("sageAttentionType")?.value || SAGE_DEFAULT,
     purgeVram: !!$("purgeVram")?.checked,
@@ -6811,6 +7411,7 @@ function restoreLtxvSettings(){
 
     if(s.rife){ setRifeUI(s.rife); saveRife(s.rife); }
     if(s.rtx){ setRtxUI(s.rtx); saveRtx(s.rtx); }
+    if(s.faceRefine){ setFaceRefineUI(s.faceRefine); saveFaceRefine(s.faceRefine); }
     if(s.bitDepth !== undefined){ setBitDepthUI(s.bitDepth); saveBitDepth(s.bitDepth); }
 
     setSelectIfPresent("sageAttentionType", s.sageType);
@@ -7137,6 +7738,26 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   }, { once: true });
 
   vid.src = videoUrl;
+}
+
+// Sube las caras de referencia del refinado (si el refinado está activo y hay fotos locales).
+async function ensureJobRefFacesUploaded(job){
+  if(!(job.faceRefine && job.faceRefine.enabled)) return;
+  for(const slot of [1, 2]){
+    const local = job[`localRefFace${slot}`];
+    if(!local || job[`uploadedRefFace${slot}`]) continue;
+    const fd = new FormData();
+    fd.append("image", local, local.name);
+    fd.append("overwrite", "true");
+    const r = await fetch(server()+"/upload/image", {method:"POST", body:fd});
+    if(!r.ok) throw new Error(`Fallo al subir la cara de referencia ${slot}`);
+    const d = await r.json();
+    const up = {name:d.name, subfolder:d.subfolder||"", type:d.type||"input"};
+    job[`uploadedRefFace${slot}`] = up;
+    if(slot === 1){ if(localRefFace1 === local){ uploadedRefFace1 = {...up}; localRefFace1 = null; } }
+    else { if(localRefFace2 === local){ uploadedRefFace2 = {...up}; localRefFace2 = null; } }
+    log(`Foto Ref. Cara ${slot} subida: ${up.name}`, "l-ok");
+  }
 }
 
 async function ensureJobImageUploaded(job){
@@ -7511,6 +8132,10 @@ function buildGraph(mode, job){
   const rifeEngine = rifeState ? (rifeState.engine || "rife") : "rife";
 
   let currentVideoSource = [N.DECODE_VIDEO_2, 0];
+  // Refinado de elementos (rostro/manos/...) sobre los frames finales, antes de interpolar/escalar.
+  if(mode !== "first" && g[N.DECODE_VIDEO_2]){
+    currentVideoSource = appendElementRefine(g, currentVideoSource, j);
+  }
 
   if(rifeEnabled){
     if(rifeEngine === "rtx"){
@@ -8153,7 +8778,10 @@ async function startJob(job){
   updateQueueUI();
   try {
     await ensureSocketConnected();
-    if(!(job.isInterpolateOnly || job.isRtxUpscaleOnly)) await ensureJobImageUploaded(job);
+    if(!(job.isInterpolateOnly || job.isRtxUpscaleOnly)){
+      await ensureJobImageUploaded(job);
+      await ensureJobRefFacesUploaded(job);
+    }
     totalBatchSize = job.batchSize || 1;
     currentBatchIndex = 0;
     generationStep = 1;

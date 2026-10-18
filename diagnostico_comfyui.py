@@ -78,7 +78,7 @@ REQUIRED_PACKAGES = [
         "repo": "https://github.com/Carasibana/ComfyUI-H3-FaceRefine.git",
         "nodes": ["H3FaceTrackCrop", "H3FaceStitch", "H3PerFrameDenoise"],
         "critical": False,
-        "workflows": ["MiniMaxH3 (Refinado Facial)"],
+        "workflows": ["MiniMaxH3 (Refinado Facial)", "LTXV (Refinado de elementos)"],
     },
     {
         "name": "ComfyUI-Sol-H3",
