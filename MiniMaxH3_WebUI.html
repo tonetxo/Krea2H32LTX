@@ -1224,6 +1224,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
             <button class="vid-action-btn" id="btnSaveFrame1" title="Extraer frame actual como imagen de entrada" style="display:none;" type="button">📸 Extraer frame</button>
             <button class="vid-action-btn" id="btnUpscale1" title="Realizar Latent Upscale (2º pase) de este clip" style="display:none;" type="button">🔍 Upscale Latente</button>
             <button class="vid-action-btn" id="btnInterpolate1" title="Interpolar fotogramas del clip actual (RIFE / RTX Frame Gen)" style="display:none;" type="button">⚡ Interpolar</button>
+            <button class="vid-action-btn" id="btnRtxUpscale1" title="Escalar o limpiar el clip actual con RTX Video Super Resolution (usa calidad y escala del panel RTX). Si también interpolas, interpola primero." style="display:none;" type="button">🔍 RTX Upscale</button>
             <button class="vid-action-btn" id="btnFaceRefine1" title="Refinar los rostros del clip actual con H3 FaceRefine" style="display:none;" type="button">😊 Refinar rostro</button>
             <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled>📋 Workflow</button>
           </div>
@@ -7221,7 +7222,9 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
       : (frTgt === "hair" ? "Pelo"
       : (frTgt === "skin" ? "Piel"
       : (frTgt === "body" ? "Cuerpo" : "Rostro"))));
-    const badgeText = activeJob?.isInterpolateOnly
+    const badgeText = activeJob?.isRtxUpscaleOnly
+      ? (/^(DENOISE|DEBLUR)_/.test(activeJob.rtx?.quality || "") ? "RTX limpieza" : `RTX ${activeJob.rtx?.scale || 2}x`)
+      : activeJob?.isInterpolateOnly
       ? `Var ${varIndex} · Interp ${activeJob.rife?.multiplier || 2}x`
       : (activeJob?.isFaceRefineOnly
         ? frLabel
@@ -9335,6 +9338,67 @@ function buildGraph(job){
     delete g[N.SOL_H3];
   }
 
+  // MODO ON-DEMAND: RTX Video Super Resolution del clip actual (sin re-muestrear).
+  // Sin Post-FX: el clip ya lo lleva si estaba activo al generarlo.
+  if(j && j.isRtxUpscaleOnly){
+    const sourceMedia = j.sourceMedia || currentMedia[1];
+    const videoFilePath = (sourceMedia && sourceMedia.subfolder ? sourceMedia.subfolder + "/" : "") + (sourceMedia ? sourceMedia.filename : "") + " [output]";
+    Object.keys(g).forEach(id => delete g[id]);
+
+    const quality = j.rtx?.quality || "HIGHBITRATE_ULTRA";
+    const sameRes = /^(DENOISE|DEBLUR)_/.test(quality);
+    const scale = parseFloat(j.rtx?.scale || 2) || 2;
+
+    g["100_load_video"] = {
+      class_type: "LoadVideo",
+      inputs: { file: videoFilePath },
+      _meta: { title: "Load Video (Native)" }
+    };
+    g["101_get_components"] = {
+      class_type: "GetVideoComponents",
+      inputs: { video: ["100_load_video", 0] },
+      _meta: { title: "Get Video Components (Native)" }
+    };
+    g["102_rtx_sr"] = {
+      class_type: "RTXVideoSuperResolution",
+      inputs: {
+        images: ["101_get_components", 0],
+        resize_type: "scale by multiplier",
+        "resize_type.scale": sameRes ? 1.0 : scale,
+        quality,
+        strength: 1.0,
+        image_encoding: "8-bit RGB"
+      },
+      _meta: { title: sameRes ? "RTX Limpieza (misma resolución)" : `RTX Super Resolution (${scale}x)` }
+    };
+
+    const prefix = ($("filenamePrefix")?.value || "video/MiniMax_H3").trim();
+    const suffix = sameRes ? `_${quality.toLowerCase()}` : `_rtx${scale}x`;
+    g[N.CREATE_VIDEO] = {
+      class_type: "CreateVideo",
+      inputs: {
+        fps: ["101_get_components", 2],
+        bit_depth: ["101_get_components", 3],
+        color_space: ["101_get_components", 4],
+        images: ["102_rtx_sr", 0],
+        audio: ["101_get_components", 1]
+      },
+      _meta: { title: "Create Video (RTX SR)" }
+    };
+    g[N.SAVE] = {
+      class_type: "SaveVideo",
+      inputs: {
+        filename_prefix: prefix + suffix,
+        format: "auto",
+        "format.codec": "auto",
+        codec: "auto",
+        video: [N.CREATE_VIDEO, 0]
+      },
+      _meta: { title: "Save Video (RTX SR)" }
+    };
+    return g;
+  }
+
   // MODO ON-DEMAND: Interpolar frames del clip actual
   if(j && j.isInterpolateOnly){
     const sourceMedia = j.sourceMedia || currentMedia[1];
@@ -10932,6 +10996,7 @@ function showVideo(slot, media, options={}){
   const frBtn = $("btnFaceRefine"+slot);
   const upBtn = $("btnUpscale"+slot);
   const interpBtn = $("btnInterpolate"+slot);
+  const rtxBtn = $("btnRtxUpscale"+slot);
   const prev=$("previewImg"+slot), wrap=$("previewWrap"+slot), step=$("previewStep"+slot);
   if(prev) prev.style.display="none";
   if(wrap) wrap.style.display="none";
@@ -10947,6 +11012,7 @@ function showVideo(slot, media, options={}){
   if(frBtn) frBtn.style.display="inline-flex";
   if(upBtn) upBtn.style.display="inline-flex";
   if(interpBtn) interpBtn.style.display="inline-flex";
+  if(rtxBtn) rtxBtn.style.display="inline-flex";
   currentMedia[slot] = { filename: media.filename, subfolder: media.subfolder||"", type: media.type||"output" };
   if(options.seed != null){
     currentMediaSeed[slot] = options.seed;
@@ -11184,6 +11250,37 @@ async function enqueueInterpolateCurrent(){
 const btnInterpolate1 = $("btnInterpolate1");
 if(btnInterpolate1){
   btnInterpolate1.addEventListener("click", enqueueInterpolateCurrent);
+}
+
+// --- RTX Video Super Resolution del clip actual (On-Demand) ---
+// Usa calidad/escala del panel RTX aunque su toggle esté apagado (pulsar el botón
+// ya expresa la intención). DENOISE_*/DEBLUR_* no escalan.
+async function enqueueRtxUpscaleCurrent(){
+  const media = currentMedia[1];
+  if(!media || !media.filename){
+    log("No hay ningún vídeo en el reproductor para escalar.", "l-warn");
+    return;
+  }
+  const rtx = getRtxState();
+  const job = snapshotJob();
+  job.id = ++jobCounter;
+  job.isRtxUpscaleOnly = true;
+  job.sourceMedia = { ...media };
+  job.rtx = { quality: rtx.quality, scale: rtx.scale };
+  job.batchSize = 1;
+  const desc = /^(DENOISE|DEBLUR)_/.test(rtx.quality) ? `limpieza ${rtx.quality}` : `escalado ${rtx.scale}x`;
+  log(`🔍 Añadido RTX VSR (${desc}) para ${media.filename} a la cola.`, "l-info");
+  if(activeJob){
+    jobQueue.push(job);
+    updateQueueUI();
+  } else {
+    await startJob(job);
+  }
+}
+
+const btnRtxUpscale1 = $("btnRtxUpscale1");
+if(btnRtxUpscale1){
+  btnRtxUpscale1.addEventListener("click", enqueueRtxUpscaleCurrent);
 }
 
 // --- Upscale Latente (2º Pase) On-Demand ---
@@ -11629,7 +11726,7 @@ async function startJob(job){
     job.currentVariantIndex = null;
     $("time1").textContent = "";
     $("time1").classList.remove("live");
-    setRun("busy", job.isInterpolateOnly ? `Interpolando frames de ${job.sourceMedia?.filename || "clip"}...` : (job.isFaceRefineOnly ? `Refinando de ${job.sourceMedia?.filename || "clip"}...` : `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`));
+    setRun("busy", job.isRtxUpscaleOnly ? `RTX VSR de ${job.sourceMedia?.filename || "clip"}...` : job.isInterpolateOnly ? `Interpolando frames de ${job.sourceMedia?.filename || "clip"}...` : (job.isFaceRefineOnly ? `Refinando de ${job.sourceMedia?.filename || "clip"}...` : `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`));
     enableStopButtons(true);
     await runSingleGeneration(0);
   } catch(err) {
