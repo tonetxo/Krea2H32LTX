@@ -83,6 +83,69 @@ Single concluding sentence: "The overall composition [is / uses / feels] ..."
 Return strictly valid JSON on a single line, with no Markdown wrapper, no thoughts, and no text before or after:
 {"rewritten_prompt": "<the single-paragraph description>", "wh_ratio": "<e.g. 3:2>"}`;
 
+// --- MOSS-Image: system prompts del enhancer ---
+// Caption: system prompt del upsampler del template oficial de ComfyUI (image_moss_image_t2i),
+// escrito a partir del skill "moss-image-prompt-enhancer" de OpenMOSS/MOSS-Image.
+const MOSS_CAPTION_SYS = `You turn a user's image idea into one detailed caption for a text-to-image model. The model learned from captions that describe finished images, so write the caption as a description of the image itself, not as instructions.
+
+Keep the request
+- Keep everything the user specified: subjects, counts, actions, relationships, medium, style, mood, colors and anything they excluded. Never contradict or drop it.
+- Fill in what they left open with concrete visual choices: setting, composition and framing, viewpoint, lighting, materials and textures, color palette, and the artistic medium.
+- Describe only what can be seen. Leave out sounds, smells, backstory and intentions.
+- Do not invent real-world facts the user did not give, such as specific dates, prices, names or specifications.
+
+Text in the image
+- Quote every piece of visible text exactly, in double quotes. Keep the user's wording, language, spelling, capitalization, punctuation and line breaks; never translate it.
+- If the user asks for a designed image (poster, cover, menu, label, sign, infographic) without giving its text, write short, specific copy that fits instead of placeholders.
+- Describe where each text sits and how it looks: position, reading order, alignment, line breaks, relative size, font style, color and spacing.
+- Do not mention watermarks or artist signatures.
+
+Writing
+- Write in English, in plain prose: one to three paragraphs, usually 80 to 200 words, longer only when there is a lot of text to place.
+- Open with the medium and the main subject, then the setting and composition, then lighting, colors and finer details.
+- Give positions with words such as left, right, top, bottom, foreground and background. No coordinates, lists, headings, JSON or Markdown.
+- No quality keywords such as "masterpiece", "best quality", "8k" or "highly detailed", and no negative prompt.
+
+Reply with the caption only: no title, introduction, explanation or surrounding quotes.`;
+
+// Layout: el LLM redacta un borrador en píxeles absolutos (xyxy, origen arriba-izquierda) y
+// compileMossLayout() lo convierte al formato del modelo (abs_centralized / yxyx), como hace
+// scripts/compile_prompt.py del skill. {{WIDTH}}/{{HEIGHT}} se sustituyen por la resolución Base.
+const MOSS_LAYOUT_SYS = `You turn a user's image idea into a MOSS-Image Layout draft: a global caption plus bounding boxes that place text, objects and characters on the canvas. Use it for posters, covers, menus, infographics, multi-panel images or any request where text placement or object positions matter.
+
+Canvas
+- The canvas is exactly {{WIDTH}}x{{HEIGHT}} pixels. Use "width": {{WIDTH}} and "height": {{HEIGHT}}.
+- Boxes are [x_min, y_min, x_max, y_max] in actual pixels from the top-left corner, with 0 <= x_min < x_max <= {{WIDTH}} and 0 <= y_min < y_max <= {{HEIGHT}}. No normalized or centered coordinates.
+
+Schema (no other fields are allowed)
+{"width": W, "height": H, "bbox_coord_space": "abs", "bbox_format": "xyxy",
+ "summary": {"meta": ["medium/genre tags"], "canvas": "single", "caption": "global description of the whole image, its style, palette and lighting"},
+ "items": [{"label": "object" | "character" | "text", "caption": "visible appearance; for text: typography, size, color, surface", "text": "exact visible characters (text items only)", "bbox": [x1, y1, x2, y2]}]}
+- summary.canvas is "single", "multi_panel" or "collage"; summary.meta and summary.palette are optional string arrays. Items may also carry optional "tags" and "palette" string arrays.
+- items is a flat, nonempty array. Never add children, parent, id or elements.
+
+Content
+- Keep everything the user specified: subjects, counts, relationships, medium, style, mood, exclusions and intended wording. Fill open gaps with concrete visual choices.
+- Quote visible text exactly in the "text" field, in its original language, spelling, capitalization and punctuation; never translate it. Use \\n inside the JSON string for intended line breaks. If the user asks for a designed image without giving its copy, write short, specific copy instead of placeholders.
+- Use boxes for coherent visible units; split text only when independent placement matters. Boxes may overlap when the image calls for it. A box is a placement annotation, not a border or panel to draw.
+- Size text boxes so the copy is readable at this resolution: a short title needs a wide, tall box; a paragraph needs room for its lines.
+- Establish reading order and hierarchy. Captions describe only what is visible, in English, with no quality keywords and no negative prompt.
+
+Reply with the JSON object only: no Markdown fences, no explanations.`;
+
+// Visión: describe la imagen de referencia como un caption de entrenamiento de MOSS-Image
+// (inspirado en el prompt de recaptioning del USERGUIDE de MOSS-Image).
+const MOSS_VISION_SYS = `You are an image recaptioner for the MOSS-Image text-to-image model. Look at the image and write one detailed caption that describes the finished image itself, so the model can recreate it.
+
+- Describe the composition, key subjects, actions, setting, colors, lighting, materials and artistic style. Include only what is visible.
+- Preserve every piece of visible text exactly, in double quotes, excluding watermarks. Do not translate, paraphrase, romanize or normalize it. Describe its layout: line breaks, reading order, relative position, alignment, size hierarchy, font style, color and spacing.
+- Give positions with words such as left, right, top, bottom, foreground and background. No coordinates, lists, headings, JSON or Markdown.
+- Do not mention watermarks, artist signatures or borders. No quality keywords and no negative prompt.
+- If the user adds guidance, follow it while keeping the caption faithful to the image.
+- Write in English, in plain prose: one to three paragraphs, usually 80 to 200 words.
+
+Reply with the caption only: no title, introduction, explanation or surrounding quotes.`;
+
 const CONFIG = {
   PROMPTS_KEY: 'kreaqwen_prompts',
   // Clave en desuso: kreaqwen gestiona 2x4 LoRAs con sus claves propias
@@ -128,11 +191,16 @@ const CONFIG = {
       A: { name: "Qwen 2.1 Oficial (Rewriter JSON)", prompt: QWEN_TEXT_SYS },
       B: { name: "Krea2 Fotorrealista", prompt: "You are an expert in prompts for Krea2/Flux2 image generation. Transform the user's idea into a detailed photorealistic prompt. Include: subject, lighting, colors, texture, composition, and atmosphere. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
       C: { name: "Krea2 Artístico / Cinematográfico", prompt: "You are a creative assistant specialized in artistic image prompts. Take the user's idea and turn it into an evocative, artistic prompt. Use descriptive, poetic language. Focus on style, mood, and visual impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+
+      MOSS: { name: "MOSS-Image Caption (skill oficial)", prompt: MOSS_CAPTION_SYS },
+      MOSS_LAYOUT: { name: "MOSS-Image Layout (JSON con cajas)", prompt: MOSS_LAYOUT_SYS },
     },
     vision: {
       A: { name: "Qwen 2.1 VLM Oficial (Reverse Eng JSON)", prompt: QWEN_VISION_SYS },
       B: { name: "Krea2 Visión Descriptiva", prompt: "You are an expert at describing images for image generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, and style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
       C: { name: "Krea2 Visión Estilizada", prompt: "You are a digital artist. Look at the image and turn it into a stylized artistic description. Focus on the artistic style, color palette, and emotional impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+
+      MOSS: { name: "MOSS-Image Visión (recaption)", prompt: MOSS_VISION_SYS },
     },
   },
 };
@@ -214,11 +282,13 @@ function updateDimensionHints(){
 //   - Qwen2.1 ("qwen")  -> CLIP type 'qwen_image', CLIP qwen3vl_8b, VAE 64ch (QwenImage21)
 //   - Flux2/Klein ("klein"/"flux2") -> CLIP type 'flux2', CLIP qwen3vl_8b, VAE 128ch (Flux2)
 //   - Flux3/Klein ("flux3")         -> CLIP type 'flux3', CLIP qwen3vl_4b, VAE 128ch (Flux2)
+//   - MOSS-Image ("moss")           -> CLIP type 'moss_image', CLIP qwen3.5_9b, VAE 128ch (Flux2 small)
 // Un CLIP con el type o el tamano equivocado produce "mat1 and mat2 shapes cannot be multiplied"
 // (7680 = 4B con tap de 3 capas; Klein 9B espera 12288 = 8B; Flux3 espera 20480 = 4B con 8 capas).
 // OJO: Flux3 vive en flux2/, asi que "flux3" debe comprobarse antes que "flux2".
 function unetArchFamily(unetName){
   const u = (unetName || "").toLowerCase();
+  if(u.includes("moss")) return "moss";
   if(u.includes("krea")) return "krea2";
   if(u.includes("qwen")) return "qwen21";
   if(u.includes("flux3")) return "flux3";
@@ -244,6 +314,7 @@ const ARCH_CLIP = {
   qwen21: { keyword: "qwen3vl_8b_nvfp4_heretic", type: "qwen_image" },
   flux2:  { keyword: "qwen3vl_8b", type: "flux2" },
   flux3:  { keyword: "qwen3vl_4b", type: "flux3" },
+  moss:   { keyword: "qwen3.5_9b_w4a8_gptq", type: "moss_image" },
 };
 
 function archClipType(family){
@@ -261,9 +332,11 @@ function klein4b(unetName){
 
 // ¿Sirve este text encoder para la arquitectura del UNET? Se mira el tamano del LLM
 // (4B/8B) y si es Qwen3-VL: Krea2/Flux3 necesitan el camino QWEN3VL_4B de ComfyUI,
-// Qwen 2.1 el QWEN3VL_8B; Flux2/Klein acepta Qwen3 o Qwen3-VL del tamano correcto.
+// Qwen 2.1 el QWEN3VL_8B; Flux2/Klein acepta Qwen3 o Qwen3-VL del tamano correcto;
+// MOSS-Image solo acepta Qwen3.5 9B (ComfyUI exige TEModel.QWEN35_9B para 'moss_image').
 function clipFitsFamily(clipName, family, unetName){
   const c = (clipName || "").toLowerCase();
+  if(family === "moss") return c.includes("qwen3.5_9b");
   const size = /(^|[^0-9.])4b/.test(c) ? "4b" : /(^|[^0-9.])8b/.test(c) ? "8b" : null;
   const isVl = c.includes("qwen3vl");
   const isQwen3 = isVl || c.includes("qwen_3_");
@@ -294,6 +367,7 @@ function ensureCompatibleClip(clipSel, family, unetName){
 //   - Krea2  -> latent_format Wan21   -> 16 canales. VAE: wan_2.1_vae o qwen_image_vae.
 //   - Qwen2.1 -> latent_format QwenImage21 -> 64 canales. VAE: qwen_image_2.1_vae.
 //   - Flux2  -> latent_format Flux2   -> 128 canales. VAE: flux2-vae.
+//   - MOSS   -> latent_format Flux2   -> 128 canales. VAE: flux2-vae_small (decoder reducido).
 // OJO: el nombre del fichero engana. "QwenImage/qwen_image_vae" es 16ch (vale para Krea2),
 // mientras que "QwenImage/qwen_image_2.1_vae" es 64ch (solo Qwen 2.1). No vale fiarse del
 // directorio ni de la palabra "qwen"/"flux" en la ruta.
@@ -306,9 +380,9 @@ function vaeLatentFamily(vaeName){
   return "krea2";                                             // 16ch (Wan21)
 }
 
-// Familia de latentes (VAE) del UNET: Flux3 comparte el latent_format Flux2 (128ch).
+// Familia de latentes (VAE) del UNET: Flux3 y MOSS comparten el latent_format Flux2 (128ch).
 function latentFamily(family){
-  return family === "flux3" ? "flux2" : family;
+  return (family === "flux3" || family === "moss") ? "flux2" : family;
 }
 function unetVaeFamily(unetName){
   return latentFamily(unetArchFamily(unetName));
@@ -321,15 +395,21 @@ function compatibleVaes(family){
 }
 
 function fallbackVae(family){
-  family = latentFamily(family);
   const list = compatibleVaes(family);
+  // MOSS-Image se entrena con el VAE pequeno de Flux2; Flux2/Klein prefiere el completo.
+  if(family === "moss"){
+    return list.find(v => v.toLowerCase().includes("flux2-vae_small")) ||
+           list[0] || "moss/flux2-vae_small.safetensors";
+  }
+  family = latentFamily(family);
   if(family === "qwen21"){
     return list.find(v => v.toLowerCase().includes("texture_fix_vae_for_qwen_image_2.1")) ||
            list.find(v => v.toLowerCase().includes("qwen_image_2.1_vae")) ||
            list[0] || "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors";
   }
   if(family === "flux2"){
-    return list.find(v => v.toLowerCase().includes("flux2-vae")) ||
+    return list.find(v => /flux2-vae\.safetensors$/i.test(v)) ||
+           list.find(v => v.toLowerCase().includes("flux2-vae")) ||
            list[0] || "Flux/flux2-vae.safetensors";
   }
   // Krea2 (16ch): el workflow nativo KreaQwen_Native.json usa qwen_image_vae para la base Krea2.
@@ -376,16 +456,26 @@ function selectOrFallback(selId, list, fallbackKeyword){
   }
 }
 
+// Familia del ultimo UNET con el que se rellenó cada selector de VAE: MOSS y Flux2
+// comparten latentes (128ch), asi que selectOrFallback conservaria el VAE anterior;
+// al cruzar de una a otra se pasa al VAE propio de la nueva familia.
+const lastVaeArch = {};
+
 function updateVaeSelectors(){
-  const baseFam = unetVaeFamily($("baseUnetSelect")?.value);
-  const refFam = unetVaeFamily($("refinerUnetSelect")?.value);
-  selectOrFallback("baseVaeSelect", compatibleVaes(baseFam), vaeShortKw(baseFam));
-  selectOrFallback("refinerVaeSelect", compatibleVaes(refFam), vaeShortKw(refFam));
+  for(const [vaeId, unetId] of [["baseVaeSelect", "baseUnetSelect"], ["refinerVaeSelect", "refinerUnetSelect"]]){
+    const arch = unetArchFamily($(unetId)?.value);
+    const crossed = lastVaeArch[vaeId] && lastVaeArch[vaeId] !== arch &&
+                    (lastVaeArch[vaeId] === "moss" || arch === "moss");
+    lastVaeArch[vaeId] = arch;
+    selectOrFallback(vaeId, compatibleVaes(arch), vaeShortKw(arch));
+    if(crossed && $(vaeId)) $(vaeId).value = fallbackVae(arch);
+  }
 }
 
 function vaeShortKw(family){
   if(family === "qwen21") return "texture_fix_vae_for_qwen_image_2.1";
-  if(family === "flux2") return "flux2-vae";
+  if(family === "moss") return "flux2-vae_small";
+  if(family === "flux2" || family === "flux3") return "flux2-vae";
   return "qwen_image_vae";
 }
 
@@ -452,6 +542,20 @@ const ARCH_PROFILES = {
     refinerScheduler: "simple",
     refinerDenoise: 0.35,
     clip: "qwen3vl_4b"
+  },
+  // MOSS-Image (template oficial de ComfyUI, PR #17095): 25 pasos, CFG 2.5, er_sde/simple,
+  // shift 5 (el del modelo). OpenMOSS recomienda 50 pasos / CFG 3 / euler para máxima calidad.
+  moss: {
+    steps: 25,
+    cfg: 2.5,
+    sampler: "er_sde",
+    scheduler: "simple",
+    refinerSteps: 12,
+    refinerCfg: 2.5,
+    refinerSampler: "er_sde",
+    refinerScheduler: "simple",
+    refinerDenoise: 0.35,
+    clip: "qwen3.5_9b_w4a8_gptq"
   }
 };
 
@@ -460,6 +564,7 @@ function profileForFamily(family){
   if(family === "qwen21") return "qwen";
   if(family === "flux2") return "flux2";
   if(family === "flux3") return "flux3";
+  if(family === "moss") return "moss";
   return "krea";
 }
 
@@ -610,6 +715,26 @@ function applyComboMode(mode){
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_qwen"){
+    setStage(selBaseU, selBaseC, "moss", "base", "moss_image_sft");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen_image_2.1_turbo");
+    if(hint) hint.textContent = "MOSS-Image compone la escena con texto y layout precisos (bilingüe EN/ZH); Qwen 2.1 refina microtexturas tras el reescalado. Usa un denoise bajo para no alterar el texto.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_krea"){
+    setStage(selBaseU, selBaseC, "moss", "base", "moss_image_sft");
+    setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
+    if(hint) hint.textContent = "MOSS-Image compone la escena con texto y layout precisos; Krea2 aporta estética fotográfica, riqueza tonal y grano en el refinado. Usa un denoise bajo para no alterar el texto.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_only"){
+    setStage(selBaseU, selBaseC, "moss", "base_only", "moss_image_sft");
+    if($("refinerEnabled")) $("refinerEnabled").checked = false;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = false;
+    if(hint) hint.textContent = "MOSS-Image en una sola pasada: renderizado de texto y layouts JSON (usa el enhancer 'MOSS Layout'). SFT = texto/layout más limpios; Base = mejor con LoRAs.";
+    if(refWrap) refWrap.style.opacity = "0.6";
   } else if(mode === "base_only"){
     // En base_only heredamos el perfil (pero no tocamos el text encoder) del modelo base actual
     const baseFam = unetArchFamily(selBaseU?.value);
@@ -657,7 +782,9 @@ function invertOrder(){
   const newMode = (bFam === "krea2" && rFam === "qwen21") ? "krea_qwen" :
                   (bFam === "qwen21" && rFam === "krea2") ? "qwen_krea" :
                   (bFam === "krea2" && rFam === "krea2") ? "krea_krea" :
-                  (bFam === "qwen21" && rFam === "qwen21") ? "qwen_qwen" : "";
+                  (bFam === "qwen21" && rFam === "qwen21") ? "qwen_qwen" :
+                  (bFam === "moss" && rFam === "qwen21") ? "moss_qwen" :
+                  (bFam === "moss" && rFam === "krea2") ? "moss_krea" : "";
   if(newMode && modeSel) modeSel.value = newMode;
   
   log("⇄ Orden de modelos invertido.", "l-ok");
@@ -763,10 +890,95 @@ function showImageView(mode){
 // en el selector de relación de aspecto. No escribe en #prompt (lo decide quien
 // lo invoca): así puede usarse tanto desde "Usar como prompt" como desde el
 // interceptor de captura registrado en initKreaQwenUI().
+// Port de scripts/compile_prompt.py (skill moss-image-prompt-enhancer): valida un borrador
+// de Layout en píxeles absolutos (xyxy) y lo convierte al formato que espera MOSS-Image
+// (abs_centralized / yxyx, una sola línea, sin width/height). Lanza Error si no es válido.
+function compileMossLayout(draft){
+  const req = (cond, msg) => { if(!cond) throw new Error(msg); };
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+  const fields = (v, allowed, required, loc) => {
+    req(isObj(v), `${loc} debe ser un objeto`);
+    const unknown = Object.keys(v).filter(k => !allowed.includes(k));
+    const missing = required.filter(k => !(k in v));
+    req(!unknown.length, `${loc}: campos desconocidos ${unknown.join(", ")}`);
+    req(!missing.length, `${loc}: faltan campos ${missing.join(", ")}`);
+  };
+  const text = (v, loc) => req(typeof v === "string" && v.trim() !== "", `${loc} debe ser texto no vacío`);
+  const strings = (v, loc) => { req(Array.isArray(v), `${loc} debe ser un array`); v.forEach((x, i) => text(x, `${loc}[${i}]`)); };
+  const r9 = x => Math.round(x * 1e9) / 1e9;
+
+  const rootFields = ["width", "height", "bbox_coord_space", "bbox_format", "summary", "items"];
+  fields(draft, rootFields, rootFields, "Layout");
+  const { width, height } = draft;
+  for(const [name, v] of [["width", width], ["height", height]]){
+    req(Number.isInteger(v) && v > 0 && v % 16 === 0, `${name} debe ser un entero positivo múltiplo de 16`);
+  }
+  req(draft.bbox_coord_space === "abs", "bbox_coord_space debe ser abs");
+  req(draft.bbox_format === "xyxy", "bbox_format debe ser xyxy");
+
+  const summary = draft.summary;
+  fields(summary, ["caption", "meta", "canvas", "palette"], ["caption"], "summary");
+  text(summary.caption, "summary.caption");
+  if("canvas" in summary) req(["single", "multi_panel", "collage"].includes(summary.canvas), "summary.canvas debe ser single, multi_panel o collage");
+  for(const k of ["meta", "palette"]) if(k in summary) strings(summary[k], `summary.${k}`);
+
+  req(Array.isArray(draft.items) && draft.items.length, "items debe ser un array plano no vacío");
+  const items = draft.items.map((item, i) => {
+    const loc = `items[${i}]`;
+    fields(item, ["label", "caption", "bbox", "text", "tags", "palette"], ["label", "caption", "bbox"], loc);
+    req(["object", "character", "text"].includes(item.label), `${loc}.label debe ser object, character o text`);
+    text(item.caption, `${loc}.caption`);
+    if(item.label === "text") req("text" in item, `${loc}: un item de texto necesita "text"`);
+    if("text" in item) text(item.text, `${loc}.text`);
+    for(const k of ["tags", "palette"]) if(k in item) strings(item[k], `${loc}.${k}`);
+    const b = item.bbox;
+    req(Array.isArray(b) && b.length === 4 && b.every(v => typeof v === "number" && Number.isFinite(v)), `${loc}.bbox debe ser [x1,y1,x2,y2]`);
+    const [x1, y1, x2, y2] = b;
+    req(x1 < x2 && y1 < y2, `${loc}.bbox debe tener ancho y alto positivos`);
+    req(x1 >= 0 && x2 <= width && y1 >= 0 && y2 <= height, `${loc}.bbox se sale del lienzo ${width}x${height}`);
+    // Bordes enteros (floor arriba/izquierda, ceil abajo/derecha) antes de centrar.
+    const hw = Math.floor(width / 2), hh = Math.floor(height / 2);
+    const box = [Math.floor(r9(y1)) - hh, Math.floor(r9(x1)) - hw, Math.ceil(r9(y2)) - hh, Math.ceil(r9(x2)) - hw];
+    req(box[0] < box[2] && box[1] < box[3], `${loc}.bbox es demasiado pequeña`);
+    const out = {};
+    for(const [k, v] of Object.entries(item)) out[k] = (k === "bbox") ? box : v;
+    return out;
+  });
+  return { prompt: JSON.stringify({ summary, items, bbox_coord_space: "abs_centralized", bbox_format: "yxyx" }), width, height };
+}
+
+// Salida de los presets MOSS: {"caption": "..."} o un borrador de Layout. Devuelve el
+// prompt listo, o null si el texto no es JSON de MOSS (se trata como texto normal).
+function parseMossEnhancerOutput(rawText){
+  const a = rawText.indexOf("{"), b = rawText.lastIndexOf("}");
+  if(a < 0 || b <= a) return null;
+  let parsed;
+  try { parsed = JSON.parse(rawText.slice(a, b + 1)); } catch(e){ return null; }
+  if(!parsed || typeof parsed !== "object") return null;
+  if(Object.keys(parsed).length === 1 && typeof parsed.caption === "string") return parsed.caption.trim();
+  if(!Array.isArray(parsed.items) || parsed.bbox_coord_space !== "abs") return null;
+  try {
+    const { prompt, width, height } = compileMossLayout(parsed);
+    const cur = calculateDimensions(parseFloat($("mpSlider")?.value || "1.0"), $("aspectRatio")?.value || "16:9 (Widescreen)");
+    if(cur.w !== width || cur.h !== height){
+      log(`⚠️ Layout MOSS pensado para ${width}x${height}, pero la resolución Base es ${cur.w}x${cur.h}: las cajas no coincidirán. Ajusta MP/relación de aspecto o regenera el layout.`, "l-warn");
+    } else {
+      log(`🧩 Layout MOSS compilado (${parsed.items.length} elementos, ${width}x${height}).`, "l-ok");
+    }
+    return prompt;
+  } catch(e){
+    log(`❌ Layout MOSS no válido: ${e.message}. Se usa el texto tal cual; pide al LLM que lo corrija.`, "l-err");
+    return null;
+  }
+}
+
 function parseEnhancerResult(rawText){
   if(!rawText) return "";
   let textToApply = rawText.trim();
   let ratioToApply = null;
+
+  const moss = parseMossEnhancerOutput(textToApply);
+  if(moss) return moss;
 
   // Intentar parsear JSON estricto o regex de bloque JSON
   try {
@@ -1084,6 +1296,8 @@ function snapshotJob(isBaseOnly = false){
     prompt: $("prompt")?.value || "",
     negPrompt: $("negPrompt")?.value || "",
     comboMode: isBaseOnly ? "base_only" : ($("comboMode")?.value || "krea_qwen"),
+    mossSlgLayers: $("mossSlgLayers")?.value ?? "22",
+    mossSlgEnd: parseFloat($("mossSlgEnd")?.value || "0.5"),
     baseUnet: $("baseUnetSelect")?.value,
     baseWeightDtype: $("baseWeightDtype")?.value || "default",
     baseClip: $("baseClipSelect")?.value,
@@ -1176,6 +1390,8 @@ function saveKreaQwenSettings(){
     prompt: $("prompt")?.value ?? "",
     negPrompt: $("negPrompt")?.value ?? "",
     comboMode: $("comboMode")?.value || "krea_qwen",
+    mossSlgLayers: $("mossSlgLayers")?.value ?? "22",
+    mossSlgEnd: $("mossSlgEnd")?.value || "0.5",
     baseUnet: $("baseUnetSelect")?.value,
     baseWeightDtype: $("baseWeightDtype")?.value || "default",
     baseClip: $("baseClipSelect")?.value,
@@ -1283,6 +1499,8 @@ function restoreKreaQwenSettings(){
     if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
     if(s.negPrompt !== undefined && $("negPrompt")) $("negPrompt").value = s.negPrompt;
     if(s.comboMode && $("comboMode")) $("comboMode").value = s.comboMode;
+    if(s.mossSlgLayers !== undefined && $("mossSlgLayers")) $("mossSlgLayers").value = s.mossSlgLayers;
+    if(s.mossSlgEnd !== undefined && $("mossSlgEnd")) $("mossSlgEnd").value = s.mossSlgEnd;
 
     restoreModel("baseUnetSelect", s.baseUnet, "modelo Base");
     if(s.baseWeightDtype && $("baseWeightDtype")) $("baseWeightDtype").value = s.baseWeightDtype;
@@ -1961,6 +2179,35 @@ function applyAlignYourSteps(g){
   return g;
 }
 
+// --- MOSS-Image ---
+// Negativo recomendado por OpenMOSS (USERGUIDE); el template de ComfyUI lo usa cuando
+// el campo negativo está vacío.
+const MOSS_DEFAULT_NEG = "nsfw, worst quality, bad anatomy, watermark, jpeg artifact";
+function mossNegative(isMoss, neg){
+  const t = (neg || "").trim();
+  return (isMoss && !t) ? MOSS_DEFAULT_NEG : t;
+}
+
+// Skip Layer Guidance "uncond skip" (SkipLayerGuidanceDiTSimple, nodo nativo): la rama
+// negativa salta las capas single indicadas. Oficial: capa 22, de 0 a 0.5 del muestreo.
+function appendMossSlg(g, stage, modelRef, j){
+  const layers = String(j.mossSlgLayers ?? "22").trim();
+  if(!layers) return modelRef;
+  const id = `moss_slg_${stage}`;
+  g[id] = {
+    class_type: "SkipLayerGuidanceDiTSimple",
+    inputs: {
+      double_layers: "",
+      single_layers: layers,
+      start_percent: 0,
+      end_percent: Math.min(1, Math.max(0.05, Number(j.mossSlgEnd) || 0.5)),
+      model: modelRef
+    },
+    _meta: { title: `MOSS SLG (${stage})` }
+  };
+  return [id, 0];
+}
+
 function buildGraph(job){
   const j = job || activeJob || snapshotJob();
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
@@ -1978,6 +2225,8 @@ function buildGraph(job){
   const isKreaBase = (famBase === "krea2");
   const isQwenRefiner = (famRefiner === "qwen21");
   const isKreaRefiner = (famRefiner === "krea2");
+  const isMossBase = (famBase === "moss");
+  const isMossRefiner = (famRefiner === "moss");
 
   // --- EDICIÓN QWEN 2.1: etapas afectadas ---
   // Vía oficial (template image_qwen_image_2_1_image_edit de ComfyUI): conditioning
@@ -1999,6 +2248,7 @@ function buildGraph(job){
     if(f === "qwen21") return "Qwen 2.1 (64 canales · qwen_image_2.1_vae)";
     if(f === "flux2") return "Flux2/Klein (128 canales · flux2-vae)";
     if(f === "flux3") return "Flux3/Klein (128 canales · flux2-vae)";
+    if(f === "moss") return "MOSS-Image (128 canales · flux2-vae_small)";
     return "Krea2 (16 canales · qwen_image_vae / wan_2.1_vae)";
   }
   function vaeMatches(vaeName, family){
@@ -2097,6 +2347,9 @@ function buildGraph(job){
   if(isQwenBase && Number(j.baseCfg) > 1){
     curBaseModel = appendQwenCacheOff(g, "base", curBaseModel);
   }
+  if(isMossBase && Number(j.baseCfg) > 1){
+    curBaseModel = appendMossSlg(g, "base", curBaseModel, j);
+  }
 
   g[N.SAMPLER_BASE].inputs.model = curBaseModel;
 
@@ -2106,7 +2359,7 @@ function buildGraph(job){
 
   g[N.POS_BASE].inputs.text = (j.prompt || "").trim();
   // Krea 2 (Flux) no soporta prompt negativo (CFG=1), lo vaciamos. Qwen UC sí lo soporta.
-  g[N.NEG_BASE].inputs.text = isKreaBase ? "" : (j.negPrompt || "").trim();
+  g[N.NEG_BASE].inputs.text = isKreaBase ? "" : mossNegative(isMossBase, j.negPrompt);
 
   // Edición con Qwen 2.1 en la etapa Base (solo si el Base es Qwen).
   const qwenEditBase = (isQwenBase && qwenEditWantsBase)
@@ -2289,6 +2542,9 @@ function buildGraph(job){
   if(isQwenRefiner && Number(j.refinerCfg) > 1){
     curRefinerModel = appendQwenCacheOff(g, "refiner", curRefinerModel);
   }
+  if(isMossRefiner && Number(j.refinerCfg) > 1){
+    curRefinerModel = appendMossSlg(g, "refiner", curRefinerModel, j);
+  }
 
   g[N.SAMPLER_REFINER].inputs.model = curRefinerModel;
 
@@ -2297,7 +2553,7 @@ function buildGraph(job){
 
   g[N.POS_REFINER].inputs.text = (j.prompt || "").trim();
   // Krea 2 (Flux) no soporta prompt negativo, lo vaciamos. Qwen UC sí lo soporta.
-  g[N.NEG_REFINER].inputs.text = isKreaRefiner ? "" : (j.negPrompt || "").trim();
+  g[N.NEG_REFINER].inputs.text = isKreaRefiner ? "" : mossNegative(isMossRefiner, j.negPrompt);
 
   // Edición con Qwen 2.1 en la etapa Refiner vía oficial: el borrador intermedio
   // (IMAGE del nodo 26) entra como <image1> (objetivo del edit, la salida sigue su
@@ -3173,7 +3429,9 @@ function applyKreaQwenWorkflow(workflow){
   const unetRefFam = unetArchFamily(g[N.UNET_REFINER]?.inputs?.unet_name);
   const hasRefiner = !!g[N.UNET_REFINER];
   let combo = "krea_qwen";
-  if(!hasRefiner) combo = "base_only";
+  if(!hasRefiner) combo = (unetBaseFam === "moss") ? "moss_only" : "base_only";
+  else if(unetBaseFam === "moss" && unetRefFam === "qwen21") combo = "moss_qwen";
+  else if(unetBaseFam === "moss" && unetRefFam === "krea2") combo = "moss_krea";
   else if(unetBaseFam === "qwen21" && unetRefFam === "qwen21") combo = "qwen_qwen";
   else if(unetBaseFam === "krea2" && unetRefFam === "krea2") combo = "krea_krea";
   else if(unetBaseFam === "qwen21" && unetRefFam === "krea2") combo = "qwen_krea";
@@ -3186,6 +3444,9 @@ function applyKreaQwenWorkflow(workflow){
   if(hasRefiner && setModel("refinerUnetSelect", g[N.UNET_REFINER]?.inputs?.unet_name)) applied.push("modelo refiner");
   setModel("baseClipSelect", g[N.CLIP_BASE]?.inputs?.clip_name);
   if(hasRefiner) setModel("refinerClipSelect", g[N.CLIP_REFINER]?.inputs?.clip_name);
+  // Las listas de VAE se filtran por la familia del UNET: hay que regenerarlas para el
+  // UNET restaurado antes de seleccionar su VAE (si no, el VAE no está entre las opciones).
+  updateVaeSelectors();
   setModel("baseVaeSelect", g[N.VAE_BASE]?.inputs?.vae_name);
   if(hasRefiner) setModel("refinerVaeSelect", g[N.VAE_REFINER]?.inputs?.vae_name);
   if(g[N.UNET_BASE]?.inputs?.weight_dtype && $("baseWeightDtype")) $("baseWeightDtype").value = g[N.UNET_BASE].inputs.weight_dtype;
@@ -3196,6 +3457,15 @@ function applyKreaQwenWorkflow(workflow){
   if($("baseAttentionBackend")) $("baseAttentionBackend").value = attnBase?.inputs?.attention || "none";
   const attnRef = Object.values(g).find(n => n.class_type === "ModelAttentionBackend" && JSON.stringify(n.inputs.model||[]).includes(N.UNET_REFINER));
   if($("refinerAttentionBackend")) $("refinerAttentionBackend").value = attnRef?.inputs?.attention || "none";
+
+  // --- MOSS SLG (SkipLayerGuidanceDiTSimple) ---
+  // Imágenes MOSS sin nodo SLG se generaron con el SLG desactivado (o con CFG 1).
+  if(unetBaseFam === "moss" || unetRefFam === "moss"){
+    const slg = Object.values(g).find(n => n.class_type === "SkipLayerGuidanceDiTSimple");
+    if($("mossSlgLayers")) $("mossSlgLayers").value = slg?.inputs?.single_layers ?? "";
+    if(slg?.inputs?.end_percent != null && $("mossSlgEnd")) $("mossSlgEnd").value = slg.inputs.end_percent;
+    applied.push("SLG MOSS");
+  }
 
   // --- Samplers Base / Refiner ---
   const sb = g[N.SAMPLER_BASE]?.inputs || {};
@@ -3566,6 +3836,13 @@ function getRefImageSrc(){
   return el.src;
 }
 
+// Los presets de Layout MOSS necesitan el tamaño exacto del lienzo (resolución Base).
+function withCanvasDims(system){
+  if(!system || !system.includes("{{")) return system;
+  const d = calculateDimensions(parseFloat($("mpSlider")?.value || "1.0"), $("aspectRatio")?.value || "16:9 (Widescreen)");
+  return system.replace(/\{\{WIDTH\}\}/g, d.w).replace(/\{\{HEIGHT\}\}/g, d.h);
+}
+
 // --- ENHANCER (texto + visión) vía streamOllamaGenerate (common.js) ---
 $("btnEnhance")?.addEventListener("click", async () => {
   const chainMode = $("enhancerChainMode")?.value || "ollama";
@@ -3578,7 +3855,7 @@ $("btnEnhance")?.addEventListener("click", async () => {
   const mode = $("enhancerMode").value;
   const styleKey = $("enhancerStyle").value;
   const data = loadSysPrompts();
-  const system = getCurrentSysPrompt(data, mode, styleKey);
+  const system = withCanvasDims(getCurrentSysPrompt(data, mode, styleKey));
   const userPrompt = $("prompt").value.trim();
   if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 

@@ -10,6 +10,7 @@ _diff_base = config_loader.get_model_subdirs("diffusion_models")
 _diff_flux2 = os.path.join(_diff_base, "flux2")
 _diff_qwen = os.path.join(_diff_base, "qwen")
 _diff_k2 = os.path.join(_diff_base, "K2")
+_diff_moss = os.path.join(_diff_base, "moss")
 
 UNET_DIRS = [
     (_diff_flux2, "flux2") if os.path.isdir(_diff_flux2) else (_diff_base, ""),
@@ -17,6 +18,8 @@ UNET_DIRS = [
 ]
 if os.path.isdir(_diff_k2):
     UNET_DIRS.append((_diff_k2, "K2"))
+if os.path.isdir(_diff_moss):
+    UNET_DIRS.append((_diff_moss, "moss"))
 
 _loras_base = config_loader.get_model_subdirs("loras")
 LORAS_DIR = os.environ.get("KREAQWEN_LORAS_DIR", _loras_base)
@@ -36,7 +39,7 @@ def main():
         'json_file': JSON_FILE,
         'output_html': OUTPUT_HTML,
         'title': 'KreaQwen · Studio Pro',
-        'enhancer_title': 'Mejorar prompt con IA (Qwen 2.1 / Krea2 · Ollama)',
+        'enhancer_title': 'Mejorar prompt con IA (Qwen 2.1 / Krea2 / MOSS · Ollama)',
         'ui_html': 'kreaqwen_html.html',
         'ui_css': 'kreaqwen.css',
         'ui_js': 'kreaqwen.js',

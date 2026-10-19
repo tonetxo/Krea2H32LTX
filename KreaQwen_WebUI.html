@@ -461,9 +461,23 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
             <option value="qwen_krea">Qwen 2.1 (Base) → Krea2 (Refiner)</option>
             <option value="krea_krea">Krea2 (Base) → Krea2 (Refiner)</option>
             <option value="qwen_qwen">Qwen 2.1 (Base) → Qwen 2.1 (Refiner)</option>
+            <option value="moss_qwen">MOSS-Image (Base) → Qwen 2.1 (Refiner)</option>
+            <option value="moss_krea">MOSS-Image (Base) → Krea2 (Refiner)</option>
+            <option value="moss_only">MOSS-Image (Solo Base, texto y layout)</option>
             <option value="base_only">Solo Etapa Base (Sin Refiner)</option>
           </select>
         </div>
+        <div class="row two-col" style="margin-top:8px;">
+          <div>
+            <label title="SkipLayerGuidanceDiTSimple: salta estas capas single en la rama negativa. Oficial: 22 (24/26 también ayudan). Vacío = desactivado.">MOSS · SLG capas (vacío = off)</label>
+            <input type="text" id="mossSlgLayers" value="22" placeholder="22">
+          </div>
+          <div>
+            <label title="Fracción final del muestreo en la que actúa el SLG (template oficial: 0.5).">MOSS · SLG fin</label>
+            <input type="number" id="mossSlgEnd" value="0.5" min="0.05" max="1" step="0.05">
+          </div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:4px;">Solo se aplica a etapas con un UNET MOSS y CFG &gt; 1. Puede sobresaturar estilos anime.</div>
         <div class="btn-row" style="margin-top:8px;">
           <button id="btnInvertOrder" type="button" class="ghost btn-mini" style="flex:1;" title="Intercambiar el modelo Base por el Refiner y viceversa">⇄ Invertir orden Base / Refiner</button>
         </div>
@@ -490,7 +504,7 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
       <!-- ENHANCER PANEL -->
       <div class="panel">
         <div class="collapsible-header" id="enhancerToggle">
-          <span class="arrow">▶</span> Mejorar prompt con IA (Qwen 2.1 / Krea2 · Ollama)
+          <span class="arrow">▶</span> Mejorar prompt con IA (Qwen 2.1 / Krea2 / MOSS · Ollama)
         </div>
         <div class="collapsible-body" id="enhancerBody">
           <div class="enhancer-row">
@@ -1784,11 +1798,11 @@ const BASE_GRAPH = {
   }
 }
 ;
-const AVAILABLE_MODELS = ["K2/jibMixKrea2_v40Habanero_int8mixed_convrot.safetensors", "flux2/DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "flux2/Krea2_Turbo_convrot_int8mixed.safetensors", "flux2/flux-2-klein-9b.safetensors", "flux2/flux-2-klein-9b_int8_convrot.safetensors", "flux2/flux3_image_klein_int8_convrot.safetensors", "flux2/flux3_image_klein_sd_int8_convrot.safetensors", "qwen/qwen-image-2.1-UC-int8_convrot.safetensors", "qwen/qwen_image_2.1_int8_convrot.safetensors", "qwen/qwen_image_2.1_turbo_int8_convrot.safetensors", "qwen/qwen_image_edit_2511_int8_convrot.safetensors"];
-const AVAILABLE_LORAS = ["AceStep/MiMusicAce.safetensors", "AceStep/mimusica.safetensors", "AceStep/mimusica_XL.safetensors", "AceStep/mimusica_XL_2.safetensors", "AceStep/mimusica_XL_3.safetensors", "AceStep/mymusic.safetensors", "AceStep/mymusic_000001000.safetensors", "AceStep/mymusic_000002000.safetensors", "Flux/Anal_Gape_-_Flux.safetensors", "Flux/anus.safetensors", "Flux/anus2.safetensors", "K2/(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "K2/(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "K2/(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "K2/Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "K2/Detailer-KREA2.safetensors", "K2/Economic_Capital_v1.safetensors", "K2/GalKrea.safetensors", "K2/GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "K2/IvoryKrea.safetensors", "K2/KNPV4.1_pre.safetensors", "K2/Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "K2/Krea2_HMNSFW_AIO.safetensors", "K2/Krea2_TextFusion_Refusal_Reduction.safetensors", "K2/MysticXXX_KREA2_v1.safetensors", "K2/MysticXXX_KREA2_v2.safetensors", "K2/PussyHM_krea2_epoch10.safetensors", "K2/SummerVibesHM_krea2_epoch8.safetensors", "K2/VBVR_H3_attn_only.safetensors", "K2/Wayne_Barlowe_Krea2.safetensors", "K2/YFG-Asak-Krea2_1.8k-v1.safetensors", "K2/YFG-FutureIsDark-Krea2_1k-v1.safetensors", "K2/bfs_head_swap_v1.1_krea2.safetensors", "K2/fedor_bypass.safetensors", "K2/glock_pistol_v1_krea_2.safetensors", "K2/kali/AliKrea.safetensors", "K2/kali/AliKrea100.safetensors", "K2/kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "K2/kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "K2/kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "K2/kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "K2/kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "K2/kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "K2/kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "K2/kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "K2/kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "K2/keva/evaK2_copy.safetensors", "K2/keva/evaK2_copy_000000500.safetensors", "K2/keva/evaK2_copy_000001750.safetensors", "K2/keva/evaK2_copy_merged.safetensors", "K2/keva/kreaEva.safetensors", "K2/keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "K2/keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "K2/kliz/lizK2_copy_copy_000001000.safetensors", "K2/kliz/lizK2_copy_copy_000001250.safetensors", "K2/kliz/lizK2_copy_copy_000001500.safetensors", "K2/kliz/lizK2_copy_copy_merged.safetensors", "K2/kliz/lizK2_copy_copy_merged_merged.safetensors", "K2/krea2_Enhancer.safetensors", "K2/krea2_identity_edit_v1_2.safetensors", "K2/krea2_nud3.safetensors", "K2/krea2_turbo_lora_rank_64_bf16.safetensors", "K2/krea2_turbo_sda_v1.0_comfy.safetensors", "K2/krea2_warmpastel.safetensors", "K2/krea2filterbypass3.safetensors", "K2/ksab/sabK2.safetensors", "K2/ksab/sabK2_000000500.safetensors", "K2/ksab/sabK2_000001000.safetensors", "K2/ksab/sabK2_000001250.safetensors", "K2/ksab/sabK2_merged.safetensors", "K2/kuxi/K2uxi2.safetensors", "K2/kuxi/K2uxi2_000000750.safetensors", "K2/kuxi/K2uxi2_000001500.safetensors", "K2/kuxi/K2uxi2_merged.safetensors", "K2/kuxi/K2uxi_000001000.safetensors", "K2/kuxi/K2uxi_merged.safetensors", "K2/kuxi/UxiKrea.safetensors", "K2/kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "K2/kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "K2/kuxi/uxiK2_000000750.safetensors", "K2/kuxi/uxiK2_merged.safetensors", "K2/kyo/YoKrea.safetensors", "K2/kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "K2/kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "K2/kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "K2/kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "K2/kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "K2/kyol/yolK2_000000500.safetensors", "K2/kyol/yolK2_000001250.safetensors", "K2/kyol/yolK2_merged3.safetensors", "K2/kyol/yolK2_merged4.safetensors", "K2/realism_engine_krea2_v2.safetensors", "K2/shes_merged.safetensors", "K2/skc3vo.safetensors", "K2/sliders/Decay_slider_v1_krea2.safetensors", "K2/sliders/RealismSlider-v1.safetensors", "K2/sliders/WarmLightSlider-KREA2_v1.safetensors", "K2/sliders/WeightSlider-KREA2_v2.safetensors", "K2/sliders/anal_helper_krea2_loraholic.safetensors", "K2/sliders/brightness_krea2_loraholic.safetensors", "K2/sliders/color_temp_krea2_loraholic.safetensors", "K2/sliders/crowd_slider_v1_krea2.safetensors", "K2/sliders/detail_slider_krea2_loraholic.safetensors", "K2/sliders/ethnicity_krea2_loraholic.safetensors", "K2/sliders/hair_length_krea2_loraholic.safetensors", "K2/sliders/head_size_krea2_loraholic.safetensors", "K2/sliders/height_krea2_loraholic.safetensors", "K2/sliders/light_krea2_loraholic.safetensors", "K2/sliders/skindetails_krea2_loraholic.safetensors", "K2/sliders/wetness_krea2_loraholic.safetensors", "K2/z0jglf.safetensors", "YuE/YuE_proba_000000250.safetensors", "YuE/YuE_proba_000000500.safetensors", "YuE/YuE_proba_000000750.safetensors", "YuE/YuE_proba_000001000.safetensors", "YuE/YuE_proba_000001250.safetensors", "anima/anima-turbo-lora-v0.2.safetensors", "ernie/2026-06-11_16-41-40-save-4500-10-0.safetensors", "ernie/2026-06-11_20-51-52-save-9000-20-0.safetensors", "ernie/2026-06-12_16-04-50-save-13500-30-0.safetensors", "ernie/ERNIE-Image_Futanari_Penis_Erect_(Degenerator123).safetensors", "ernie/uxiernie.safetensors", "flux/Anal_Gape_-_Flux.safetensors", "flux/FLUX_FD-AnusHelper-R4.safetensors", "flux/Flux_Turbo_Alpha.safetensors", "flux/Skintastic_Flux_v1.safetensors", "flux/Surprise_Anal_FLUX.safetensors", "flux/aidmaHyperrealism-FLUX-v0.3.safetensors", "flux/flux_realism.safetensors", "flux/roundassv16_FLUX.safetensors", "flux/shes/2uxiextract.safetensors", "flux/shes/UxI_warmup_rank64_bf16-step00600.safetensors", "flux/shes/uXi_rank64_bf16-step00600.safetensors", "flux/shes/uxi.safetensors", "flux/shes/uxi64_2000.safetensors", "flux/shes/uxi_2_rank64_bf16-step00600.safetensors", "flux/shes/uxiextract.safetensors", "flux/shes/uxiflux_rank32_bf16-step01000.safetensors", "flux/xentes/AliYo_rank16_bf16-step00750.safetensors", "flux/xentes/AliYo_rank16_bf16-step03000.safetensors", "flux/xentes/ali_polynomial_rank64_bf16-step00300.safetensors", "flux/xentes/ali_polynomial_rank64_bf16-step00400.safetensors", "flux/xentes/catedral_rank32_bf16-step00150.safetensors", "flux/xentes/horreo2_rank64_bf16-step00300.safetensors", "flux/xentes/pedras_cosine_rank64_bf16.safetensors", "flux/xentes/yo_ali_rank64_bf16-step00400.safetensors", "flux2/liz.safetensors", "flux2/shushi2026-03-28_07-28-26-save-3500-250-0.safetensors", "flux2/shushi2026-03-28_08-24-02-save-7000-500-0.safetensors", "flux2/shushi2026-03-28_10-33-58-save-11088-750-0.safetensors", "flux2/shushi2026-03-28_11-41-20-save-15338-1000-0.safetensors", "flux2/shushi2026-03-28_14-08-47-save-21764-1250-0.safetensors", "fluxklein/Amateur_Nudes_2.5_Z-Image-Turbo.safetensors", "fluxklein/BubbleButt.safetensors", "fluxklein/Buttocks_Slider_V4-KLEIN_000000550.safetensors", "fluxklein/FK_analdoggystylebbc.safetensors", "fluxklein/FK_analonside.safetensors", "fluxklein/FK_piledriver.safetensors", "fluxklein/FLUX2K_Vintage_Beauties_v2.safetensors", "fluxklein/Flux Klein - NSFW v2.safetensors", "fluxklein/Flux2_Klein_9B_Futanari_Penis_(Degenerator123).safetensors", "fluxklein/HugeGape_Klein_V1.safetensors", "fluxklein/Kisa9B.safetensors", "fluxklein/Kisa9B_000000500.safetensors", "fluxklein/Mia_Pussy_epoch_10.safetensors", "fluxklein/RealSkin.safetensors", "fluxklein/Realistic Nipples.safetensors", "fluxklein/SEXGOD_ImprovedNudity_Klein9b_v4.safetensors", "fluxklein/bfs_head_v1_flux-klein_9b_step3500_rank128.safetensors", "fluxklein/bfs_head_v1_flux-klein_9b_step3750_rank64.safetensors", "fluxklein/eva/Keva9B_000000750.safetensors", "fluxklein/eva/Keva9B_000001500.safetensors", "fluxklein/eva/evaklein2.safetensors", "fluxklein/eva/evaklein22026-04-25_23-22-08-save-1400-100-0.safetensors", "fluxklein/eva/evaklein3.safetensors", "fluxklein/eva/evuxi_FluxK_9B_000001250.safetensors", "fluxklein/eva/evuxi_FluxK_9B_000002500.safetensors", "fluxklein/eva/fluxeva9B.safetensors", "fluxklein/eva/fluxeva9b2026-02-22_00-05-43-save-1500-100-0.safetensors", "fluxklein/femboy_lora_v5_LoKr16_000030000.safetensors", "fluxklein/klein-pov-anal-11epoc-k3nk.safetensors", "fluxklein/klein_slider_bodyweight_50.safetensors", "fluxklein/klein_snofs_v1_4.safetensors", "fluxklein/liz/Kliz9B_copy_000001750.safetensors", "fluxklein/liz/fluxliz9b2026-02-22_00-29-25-save-450-150-0.safetensors", "fluxklein/liz/fluxlz9B.safetensors", "fluxklein/liz/kleinliz.safetensors", "fluxklein/liz/kleinliz_000001000.safetensors", "fluxklein/liz/lizklein.safetensors", "fluxklein/liz/lizklein2026-04-25_10-03-57-save-225-75-0.safetensors", "fluxklein/model_9B.safetensors", "fluxklein/party_time_v1.0_klein4b.safetensors", "fluxklein/party_time_v1.0_klein9b.safetensors", "fluxklein/pedras.safetensors", "fluxklein/pedrasKlein2026-02-25_11-58-15-save-1825-25-0.safetensors", "fluxklein/pedrasKlein2026-02-25_12-33-47-save-3650-50-0.safetensors", "fluxklein/pedrasKlein2026-02-25_13-01-21-save-5475-75-0.safetensors", "fluxklein/perfect eyes v2.1.safetensors", "fluxklein/sweaty_glistening_skin.safetensors", "fluxklein/traxegalKlein.safetensors", "fluxklein/traxegalKlein_000000600.safetensors", "fluxklein/traxegalKlein_000001200.safetensors", "fluxklein/traxegalKlein_000001800.safetensors", "fluxklein/traxegalKlein_000002400.safetensors", "fluxklein/traxegalKlein_000002700.safetensors", "fluxklein/uxi/Fluxi9Ba.safetensors", "fluxklein/uxi/Fluxi9Bc.safetensors", "fluxklein/uxi/Kuxi9B_000001750.safetensors", "fluxklein/uxi/fluxi9b2026-02-21_22-45-02-save-1050-150-0.safetensors", "fluxklein/uxi/kleinShe2026-02-22_21-15-32-save-1200-150-0.safetensors", "fluxklein/uxi/kleinuxi2.safetensors", "fluxklein/uxi/kleinuxi22026-02-22_10-03-16-save-750-150-0.safetensors", "fluxklein/uxi/shee.safetensors", "fluxklein/uxi/sheklein.safetensors", "fluxklein/uxi/sheklein2026-02-25_00-01-37-save-1200-150-0.safetensors", "fluxklein/uxi/shezit.safetensors", "fluxklein/uxi/shezit2026-04-23_15-47-56-save-6600-200-0.safetensors", "fluxklein/uxi/shezit2026-04-23_16-28-16-save-9075-275-0.safetensors", "fluxklein/uxi/uxi_Klein_4B.safetensors", "fluxklein/uxi/uxi_Klein_4B_2_000000500.safetensors", "fluxklein/uxi/uxiklein.safetensors", "fluxklein/uxi/uxiklein2026-02-25_00-32-56-save-1200-100-0.safetensors", "h3/Eros_beta6mix_Lora.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-FL2VA-3Step-ComfyUI-BF16.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors", "h3/taomate_h3_3step_comfy.safetensors", "hidream/hidream_o1_dev_lora_rank_64_bf16_pruned_v1.safetensors", "ideogram/ID_Vintage_Beauties_v1.safetensors", "ideogram/Realism_Engine_Ideogram_V5.safetensors", "ideogram/ideogramSnofsV1.safetensors", "ideogram/ideogram_4_turbotime_v1.safetensors", "ideogram/ideogram_4_unconditional_lora_r16.safetensors", "ideogram/lenovo_ideogram4.safetensors", "ideogram/uxideogram.safetensors", "ideogram/uxideogram_000000750.safetensors", "ideogram/uxideogram_000002500.safetensors", "ideogram/uxideogram_merged_1.safetensors", "ideogram/uxideogram_merged_2.safetensors", "ideogram/yolideogram_000001750.safetensors", "ideogram/yolideogram_merged.safetensors", "ideogram/yolideogram_merged_2.safetensors", "ltxv/Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "ltxv/DR34ML4Y_LTXXX_V2.safetensors", "ltxv/HeroCam_LTX2_bucket113_step_02000.safetensors", "ltxv/IvoriLTX_000000250.safetensors", "ltxv/IvoriLTX_000000750.safetensors", "ltxv/IvoriLTX_000001000.safetensors", "ltxv/IvoriLTX_000001250.safetensors", "ltxv/IvoriLTX_000001500.safetensors", "ltxv/LTX-2 - She Struts.safetensors", "ltxv/LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "ltxv/LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "ltxv/LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "ltxv/LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "ltxv/LTX-2.3-RL-Lora.safetensors", "ltxv/LTX2-i2v-SexThrust.safetensors", "ltxv/LTX2.3-MysticXXX.safetensors", "ltxv/LTX2.3Animated.safetensors", "ltxv/LTX2.3_666asslick.safetensors", "ltxv/LTX2.3_Crisp_Enhance.safetensors", "ltxv/LTX2.3_DMD_reshaped_r256.safetensors", "ltxv/LTX2.3_Soft_Enhance.safetensors", "ltxv/LTX23_Multipurpose_NSFW_v2.safetensors", "ltxv/LTX23_SexFromBehind_v0_1.safetensors", "ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "ltxv/Post_Apocalyptic.safetensors", "ltxv/anal-insertion-i2v.safetensors", "ltxv/beauty_of_rain_ltx23.safetensors", "ltxv/cowgirl-ride-withfuta.safetensors", "ltxv/cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "ltxv/doggystyle_ltx_000004200.safetensors", "ltxv/full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "ltxv/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "ltxv/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltxv/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltxv/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltxv/ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltxv/ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltxv/ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltxv/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltxv/ltx2.3-transition.safetensors", "ltxv/ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltxv/ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltxv/ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltxv/ltx23_srx_scififilm_lora.safetensors", "ltxv/ltx2_fnelson-5000steps.k3nk.safetensors", "ltxv/nsfw_anal_insertion_ltx23_v1.0.safetensors", "ltxv/phool-realism-ltx-2.3-v1.0.safetensors", "ltxv/plora_sulfer_v1.2-step00008500.safetensors", "ltxv/realisdance_ltx2.3_ic-lora_step_02000.safetensors", "ltxv/sulphur_experimental_lora_v1.safetensors", "ltxv/traxegal/traxegalltxv.safetensors", "ltxv/traxegal/traxegalltxv_000002100.safetensors", "ltxv/traxegal/traxegalltxv_000003300.safetensors", "ltxv/uxiltxv2.3_UP_merged.safetensors", "ltxv/vbvr-ltx2.3.safetensors", "ltxv/xaliyo/aliyo.safetensors", "ltxv/xaliyo/aliyo_000001800.safetensors", "ltxv/xaliyo/aliyo_000003900.safetensors", "ltxv/xaliyo/aliyo_000005700.safetensors", "ltxv/xgeva/evaltxv.safetensors", "ltxv/xgeva/evaltxv2.safetensors", "ltxv/xgeva/evaltxv3.safetensors", "ltxv/xgisa/isaltxv_000001500.safetensors", "ltxv/xgliz/lizltxv.safetensors", "ltxv/xgliz/lizltxv2.safetensors", "ltxv/xgliz/lizltxv3.safetensors", "ltxv/xguxi/sheltxv2.safetensors", "ltxv/xguxi/uxi3ltxv.safetensors", "ltxv/xguxi/uxiltxv.safetensors", "ltxv/xguxi/uxiltxv2.3.safetensors", "ltxv/xgvir/virltxv_000001000.safetensors", "ltxv/xsab/latxSab.safetensors", "ltxv/xsab/latxSab_000001000.safetensors", "ltxv/xsab/latxSab_000001500.safetensors", "ltxv/xsab/latxSab_merged.safetensors", "ltxv/xyol/yoltx.safetensors", "ltxv/xyol/yoltx_merged.safetensors", "qwen/QWen2512-Portrait.safetensors", "qwen/Qwen-Image-2.1 NSFW Image Edit.safetensors", "qwen/Qwen-Image-2512-Lightning-8steps-V1.0-bf16.safetensors", "qwen/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors", "qwen/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors", "qwen/bfs_head_v1.1_alternative_qwen_2.1.safetensors", "qwen/elusarcas-qwen2-1-detailer-v1.safetensors", "qwen/lora.safetensors", "qwen/nsfw_qwen_21.safetensors", "qwen/p_qwen_image_2.1_5step_v0.1_comfyui.safetensors", "qwen/p_qwen_image_2.1_8step_v0.1_comfyui.safetensors", "qwen/qwen-image-2.1-uncensored-lora.safetensors", "qwen/qwen-image-edit-2511-multiple-angles-lora.safetensors", "qwen/qwen-image_nsfw_adv_v1.0.safetensors", "qwen/qwen_image_nsfw.safetensors", "qwen/shes/diegoqwen.safetensors", "qwen/shes/eva_qwen_000001000.safetensors", "qwen/shes/evaqwen.safetensors", "qwen/shes/isaqwen.safetensors", "qwen/shes/laraqwen.safetensors", "qwen/shes/liz_qwen_000001000.safetensors", "qwen/shes/lizqwen.safetensors", "qwen/shes/qwenliz.safetensors", "qwen/shes/qwenliz2026-02-22_01-41-42-save-150-50-0.safetensors", "qwen/shes/sheqwen.safetensors", "qwen/shes/uxiqwen.safetensors", "qwen/shes/uxiqwen2026-02-24_22-33-58-save-900-75-0.safetensors", "qwen/shes/uxiqwen2026-02-24_23-12-18-save-1200-100-0.safetensors", "qwen/shes/uxiqwen_fin.safetensors", "qwen/shes/virqwen.safetensors", "qwen/shes/xui_qwen_000001000.safetensors", "qwen/turbo8_lora_step2500.safetensors", "qwen/xente/aliyoqwen.safetensors", "qwen/xente/aliyoqwen_000001200.safetensors", "qwen/xente/pedrasqwen.safetensors", "qwen/xente/pedrasqwen2026-02-25_15-34-58-save-1825-25-0.safetensors", "qwen/xente/traxegalqwen.safetensors", "qwen/xente/traxegalqwen_000001500.safetensors", "qwen/xente/traxegalqwen_000005100.safetensors", "sd3.5/uxisd3.safetensors", "sdxl/69_ass_focus_v1_Illustrious.safetensors", "sdxl/All_Anal_Art-000011.safetensors", "sdxl/FC-000013.TA_trained.safetensors", "sdxl/Happy anal - Illustrious.safetensors", "sdxl/Huge erect.safetensors", "sdxl/LoRASexAndAnalFingering.safetensors", "sdxl/NaturalBodyV2.0.safetensors", "sdxl/PainCraft_XL_Anal_Lora_v1.safetensors", "sdxl/Skin color slider - Illustrious_alpha1.0_rank4_noxattn_last.safetensors", "sdxl/TransexQuiron_v1_ilus.safetensors", "sdxl/add-detail-xl.safetensors", "sdxl/aidmaRealisticSkin-IL-v0.1.safetensors", "sdxl/anal_beads_full_insertion_v1_Illustrious.safetensors", "sdxl/anal_cross-section_v1_Illustrious.safetensors", "sdxl/anal_large_insertion_v1_Illustrious.safetensors", "sdxl/anal_slime_v1_Illustrious.safetensors", "sdxl/anal_stomach_bulge_v1_Illustrious.safetensors", "sdxl/analhugger_v1_Illustrious.safetensors", "sdxl/bulldog-000007.safetensors", "sdxl/female_orgasm_outstretched_legs_v1_Illustrious.safetensors", "sdxl/gaping_anus_v5_Illustrious.safetensors", "sdxl/hugeAnusGapeQuiron_ilus.safetensors", "sdxl/il_mountedanal.safetensors", "sdxl/multiple_anal_v1_Illustrious.safetensors", "sdxl/spread_anus_by_self_v1_Illustrious.safetensors", "sdxl/subtle-analsex-xl3.safetensors", "sdxl/tateware_anus_v2_Illustrious.safetensors", "sdxl/ux/sdxlux.safetensors", "sdxl/ux/sdxlux_000000750.safetensors", "sdxl/ux/sdxlux_000001250.safetensors", "sdxl/ux/sdxlux_000002500.safetensors", "sdxl/ux/sdxlux_merged.safetensors", "sdxl/ux/uxillus.safetensors", "sdxl/ux/uxillus2.safetensors", "sdxl/ux/uxillus2026-06-09_18-25-31-save-1120-5-0.safetensors", "sdxl/ux/uxillus2026-06-09_19-02-07-save-2240-10-0.safetensors", "sdxl/ux/uxillus2026-06-09_23-27-31-save-3360-15-0.safetensors", "sdxl/ux/uxillus2026-06-10_00-00-28-save-4480-20-0.safetensors", "sdxl/ux/uxillus2026-06-10_04-09-25-save-5600-25-0.safetensors", "sdxl/ux/uxillus22026-06-10_14-20-21-save-1120-5-0.safetensors", "sdxl/ux/uxillus22026-06-10_14-52-36-save-2240-10-0.safetensors", "sdxl/ux/uxillus22026-06-10_16-00-56-save-3360-15-0.safetensors", "sdxl/ux/uxillus22026-06-10_16-33-11-save-4480-20-0.safetensors", "sdxl/ux/uxillus22026-06-10_17-05-46-save-5600-25-0.safetensors", "sdxl/ux/uxisd.safetensors", "sdxl/ux/uxisd2026-05-31_06-38-42-save-700-100-0.safetensors", "sdxl/ux/uxisd2026-05-31_06-49-10-save-1050-150-0.safetensors", "sdxl/ux/uxisd2026-05-31_07-10-18-save-1750-250-0.safetensors", "sdxl/ux/uxisd2026-05-31_10-46-29-save-2100-300-0.safetensors", "sdxl/ux/uxisd2026-05-31_10-57-31-save-2450-350-0.safetensors", "sdxl/ux/uxisd2026-06-01_01-46-55-save-2800-400-0.safetensors", "sdxl/ux/uxisd2026-06-01_01-57-29-save-3150-450-0.safetensors", "sdxl/ux/uxisd2026-06-01_04-36-04-save-8400-1200-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-07-46-save-9450-1350-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-18-19-save-9800-1400-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-50-08-save-10850-1550-0.safetensors", "sdxl/ux/uxisd2026-06-01_06-00-42-save-11200-1600-0.safetensors", "sdxl/ux/uxisdfin.safetensors", "sdxl/ux/uxisdxllora1000.safetensors", "sdxl/ux/uxisdxllora300.safetensors", "sdxl/ux/uxisdxllora525.safetensors", "sdxl/zy_Skin_Enhancer_v1.safetensors", "wan/uxi/uxi5b.safetensors", "wan/uxi/uxi5b_000001250.safetensors", "wan/uxi/uxi5b_000003250.safetensors", "wan/uxi/uxi5b_000004000.safetensors", "wan/uxi/uxi5b_000004500.safetensors", "wan/uxi/uxi_wan5B.safetensors", "wan/uxi/uxi_wan5B_000000300.safetensors", "wan/uxi/uxi_wan5B_000000500.safetensors", "wan/uxi/uxi_wan_5B.safetensors", "zit/Detailed_Nipples_Z.safetensors", "zit/Mystic-XXX-ZIT-V5.safetensors", "zit/NSFW_master_ZIT_000008766.safetensors", "zit/NSFW_master_ZIT_000017532.safetensors", "zit/NakedErectFutaZit.safetensors", "zit/Nsfw Anal Doggystyle.safetensors", "zit/Nsfw Doggystyle.safetensors", "zit/Nsfw Reverse Cowgirl Anal.safetensors", "zit/Nsfw_Standing_Anal.safetensors", "zit/OiledSkin_Zit_Turbo_V1.safetensors", "zit/Oily shiny glossy skin style v2.1.safetensors", "zit/Pedras/pedras_zit.safetensors", "zit/Pedras/pedras_zit_000000500.safetensors", "zit/Pedras/pedras_zit_000001250.safetensors", "zit/Pedras/pedras_zit_000002250.safetensors", "zit/Pedras/pedras_zit_000002750.safetensors", "zit/RealisticSnapshot-Zimage-Turbov5.safetensors", "zit/Z-Image Turbo Radiant v2.0.safetensors", "zit/Z-TURBO_Photography_35mmPhoto_1536.safetensors", "zit/ZIT_Vintage_Beauties_1.0.safetensors", "zit/ZPenisv2.safetensors", "zit/adazwsr_v1_110.safetensors", "zit/b3tternud3s_v3.safetensors", "zit/diego/diegozit.safetensors", "zit/eva/evaZimage_000000250.safetensors", "zit/eva/evaZimage_000000750.safetensors", "zit/eva/eva_zit_32_000000250.safetensors", "zit/eva/eva_zit_32_000000750.safetensors", "zit/eva/eva_zit_32_000001000.safetensors", "zit/faceforwardLookbackZ_2_6000.safetensors", "zit/isa/isa_zit_32_000000500.safetensors", "zit/isa/isa_zit_32_000001000.safetensors", "zit/lara_ZIT_000000750.safetensors", "zit/lara_ZIT_000001001.safetensors", "zit/liz/liZimage_000001250.safetensors", "zit/liz/liZimage_000002750.safetensors", "zit/liz/liz_000000350.safetensors", "zit/liz/liz_000000550.safetensors", "zit/liz/lizimgt.safetensors", "zit/liz/lizimgt2026-02-22_02-40-45-save-450-150-0.safetensors", "zit/liz/lizimgtfin.safetensors", "zit/liz/lizit2026-04-24_00-05-30-save-750-250-0.safetensors", "zit/liz/lizit2026-04-24_00-27-00-save-1350-450-0.safetensors", "zit/liz/lizitDD_copy.safetensors", "zit/liz/lizitDD_copy_000002000.safetensors", "zit/liz/lizitTA_copy.safetensors", "zit/liz/lizitTA_copy_000000500.safetensors", "zit/liz/lizitTA_copy_000001000.safetensors", "zit/liz/lizitTA_copy_000001750.safetensors", "zit/liz/zitliz.safetensors", "zit/liz/zitliz2026-04-24_01-46-34-save-100-50-0.safetensors", "zit/liz/zitliz2026-04-24_01-50-13-save-200-100-0.safetensors", "zit/liz/zitliz2026-04-24_01-53-49-save-300-150-0.safetensors", "zit/liz/zitliz2026-04-24_01-57-28-save-400-200-0.safetensors", "zit/liz/zitliz2026-04-24_02-01-08-save-500-250-0.safetensors", "zit/nsfwv2-zit.safetensors", "zit/skin texture Photorealistic style v4.5.safetensors", "zit/traxegal/traxegal2026-05-02_19-09-46-save-2000-50-0.safetensors", "zit/traxegal/traxegal2026-05-02_19-35-38-save-4000-100-0.safetensors", "zit/traxegal/traxegal2026-05-02_20-05-34-save-6000-150-0.safetensors", "zit/traxegal/traxegalzit.safetensors", "zit/traxegal/traxegalzitTA.safetensors", "zit/traxegal/traxegalzitTA_000000300.safetensors", "zit/traxegal/traxegalzitTA_000000900.safetensors", "zit/traxegal/traxegalzitTA_000001500.safetensors", "zit/traxegal/traxegalzitTA_000002100.safetensors", "zit/traxegal/traxegalzitTA_000002700.safetensors", "zit/traxegal/traxegalzit_000001200.safetensors", "zit/traxegal/traxegalzit_000002400.safetensors", "zit/traxegalzitTA_000000900.safetensors", "zit/uxi/2uxizitTA_000001000.safetensors", "zit/uxi/2uxizitTA_000001500.safetensors", "zit/uxi/she_zit_000000750.safetensors", "zit/uxi/she_zit_000000750_16.safetensors", "zit/uxi/she_zit_000001000.safetensors", "zit/uxi/shezit.safetensors", "zit/uxi/shezit2026-04-23_12-34-22-save-4125-125-0.safetensors", "zit/uxi/shezit2026-04-23_14-40-27-save-2475-75-0.safetensors", "zit/uxi/shezit2026-04-23_16-01-27-save-7425-225-0.safetensors", "zit/uxi/uxi2_zit_32_ok_000001250.safetensors", "zit/uxi/uxi3zitwt.safetensors", "zit/uxi/uxi3zitwt_000000600.safetensors", "zit/uxi/uxi3zitwt_000001200.safetensors", "zit/uxi/uxi3zitwt_000001800.safetensors", "zit/uxi/uxi3zitwt_000002700.safetensors", "zit/uxi/uxiZimage_000002750.safetensors", "zit/uxi/uxi_zit_000001000.safetensors", "zit/uxi/uxi_zit_32_ok_000001750.safetensors", "zit/uxi/uxizit.safetensors", "zit/vir_zit_000000750.safetensors", "zit/yol_zit_000000250.safetensors", "zit/zitCyberrealisticpC9.bj9E.safetensors", "zit/zit_stage1_masked_dpo_11100.safetensors"];
-const AVAILABLE_VAES = ["Flux/ae.safetensors", "Flux/flux2-vae.safetensors", "Flux/ultra_flux1.safetensors", "QwenImage/REPA-E_qwen.safetensors", "QwenImage/qwen_image_2.1_vae_bf16.safetensors", "QwenImage/qwen_image_vae.safetensors", "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors", "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Wan/wan_2.1_vae.safetensors", "flux2-vae.safetensors", "qwenImageVAESharpKrea2_sharpFp32.safetensors", "qwen_image_vae.safetensors", "wan/wan_2.1_vae.safetensors"];
-const AVAILABLE_UNETS = ["K2/jibMixKrea2_v40Habanero_int8mixed_convrot.safetensors", "flux2/DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "flux2/Krea2_Turbo_convrot_int8mixed.safetensors", "flux2/flux-2-klein-9b.safetensors", "flux2/flux-2-klein-9b_int8_convrot.safetensors", "flux2/flux3_image_klein_int8_convrot.safetensors", "flux2/flux3_image_klein_sd_int8_convrot.safetensors", "qwen/qwen-image-2.1-UC-int8_convrot.safetensors", "qwen/qwen_image_2.1_int8_convrot.safetensors", "qwen/qwen_image_2.1_turbo_int8_convrot.safetensors", "qwen/qwen_image_edit_2511_int8_convrot.safetensors"];
-const AVAILABLE_CLIPS = ["mistral_3_small_flux2.safetensors", "qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "qwen3vl_4b.safetensors", "qwen3vl_4b_int8_convrot.safetensors", "qwen3vl_8b_int8_convrot.safetensors", "qwen3vl_8b_nvfp4_heretic.safetensors", "qwen_0.6b_ace15.safetensors", "qwen_1.7b_ace15.safetensors", "qwen_2.5_vl_7b_fp8_scaled.safetensors", "qwen_3_06b_base.safetensors", "qwen_3_4b.safetensors", "qwen_3_600m.safetensors", "qwen_3_8b.safetensors", "sulphur_prompt_enhancer_qwen3.5_9b_int8tensormixed_learned.safetensors"];
+const AVAILABLE_MODELS = ["K2/jibMixKrea2_v40Habanero_int8mixed_convrot.safetensors", "flux2/DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "flux2/Krea2_Turbo_convrot_int8mixed.safetensors", "flux2/flux-2-klein-9b.safetensors", "flux2/flux-2-klein-9b_int8_convrot.safetensors", "flux2/flux3_image_klein_int8_convrot.safetensors", "flux2/flux3_image_klein_sd_int8_convrot.safetensors", "moss/moss_image_base_int8_convrot.safetensors", "moss/moss_image_sft_int8_convrot.safetensors", "qwen/qwen-image-2.1-UC-int8_convrot.safetensors", "qwen/qwen_image_2.1_int8_convrot.safetensors", "qwen/qwen_image_2.1_turbo_int8_convrot.safetensors", "qwen/qwen_image_edit_2511_int8_convrot.safetensors"];
+const AVAILABLE_LORAS = ["AceStep/MiMusicAce.safetensors", "AceStep/mimusica.safetensors", "AceStep/mimusica_XL.safetensors", "AceStep/mimusica_XL_2.safetensors", "AceStep/mimusica_XL_3.safetensors", "AceStep/mymusic.safetensors", "AceStep/mymusic_000001000.safetensors", "AceStep/mymusic_000002000.safetensors", "Flux/Anal_Gape_-_Flux.safetensors", "Flux/anus.safetensors", "Flux/anus2.safetensors", "K2/(Krea 2) Vision Vanguard 21 V2026.1.safetensors", "K2/(Krea 2) Vision Vanguard 22 V2026.1.safetensors", "K2/(Krea 2) Vision Vanguard 25 V2026.1.safetensors", "K2/Biomech Giger - Organic Sci-Fi & Biopunk Style.safetensors", "K2/Detailer-KREA2.safetensors", "K2/Economic_Capital_v1.safetensors", "K2/GalKrea.safetensors", "K2/GalKrea2026-07-26_01-36-43-save-470-10-0.safetensors", "K2/IvoryKrea.safetensors", "K2/KNPV4.1_pre.safetensors", "K2/Krea-2-Turbo-Projector-Scale-LoRA-Diffusers.safetensors", "K2/Krea2_HMNSFW_AIO.safetensors", "K2/Krea2_TextFusion_Refusal_Reduction.safetensors", "K2/MysticXXX_KREA2_v1.safetensors", "K2/MysticXXX_KREA2_v2.safetensors", "K2/PussyHM_krea2_epoch10.safetensors", "K2/SummerVibesHM_krea2_epoch8.safetensors", "K2/VBVR_H3_attn_only.safetensors", "K2/Wayne_Barlowe_Krea2.safetensors", "K2/YFG-Asak-Krea2_1.8k-v1.safetensors", "K2/YFG-FutureIsDark-Krea2_1k-v1.safetensors", "K2/bfs_head_swap_v1.1_krea2.safetensors", "K2/fedor_bypass.safetensors", "K2/glock_pistol_v1_krea_2.safetensors", "K2/kali/AliKrea.safetensors", "K2/kali/AliKrea100.safetensors", "K2/kali/AliKrea2026-07-14_23-53-42-save-320-20-0.safetensors", "K2/kali/AliKrea2026-07-15_00-00-15-save-640-40-0.safetensors", "K2/kali/AliKrea2026-07-15_00-07-02-save-960-60-0.safetensors", "K2/kali/AliKrea2026-07-15_00-13-35-save-1280-80-0.safetensors", "K2/kali/AliKrea2026-07-16_13-02-24-save-1600-100-0.safetensors", "K2/kali/AliKrea2026-07-16_13-12-20-save-1920-120-0.safetensors", "K2/kali/AliKrea2026-07-16_13-20-22-save-2240-140-0.safetensors", "K2/kali/AliKrea2026-07-16_13-28-24-save-2560-160-0.safetensors", "K2/kali/AliKrea2026-07-16_13-36-45-save-2880-180-0.safetensors", "K2/keva/evaK2_copy.safetensors", "K2/keva/evaK2_copy_000000500.safetensors", "K2/keva/evaK2_copy_000001750.safetensors", "K2/keva/evaK2_copy_merged.safetensors", "K2/keva/kreaEva.safetensors", "K2/keva/kreaEva2026-07-07_03-30-55-save-750-50-0.safetensors", "K2/keva/kreaEva2026-07-07_03-37-59-save-1125-75-0.safetensors", "K2/kliz/lizK2_copy_copy_000001000.safetensors", "K2/kliz/lizK2_copy_copy_000001250.safetensors", "K2/kliz/lizK2_copy_copy_000001500.safetensors", "K2/kliz/lizK2_copy_copy_merged.safetensors", "K2/kliz/lizK2_copy_copy_merged_merged.safetensors", "K2/krea2_Enhancer.safetensors", "K2/krea2_identity_edit_v1_2.safetensors", "K2/krea2_nud3.safetensors", "K2/krea2_turbo_lora_rank_64_bf16.safetensors", "K2/krea2_turbo_sda_v1.0_comfy.safetensors", "K2/krea2_warmpastel.safetensors", "K2/krea2filterbypass3.safetensors", "K2/ksab/sabK2.safetensors", "K2/ksab/sabK2_000000500.safetensors", "K2/ksab/sabK2_000001000.safetensors", "K2/ksab/sabK2_000001250.safetensors", "K2/ksab/sabK2_merged.safetensors", "K2/kuxi/K2uxi2.safetensors", "K2/kuxi/K2uxi2_000000750.safetensors", "K2/kuxi/K2uxi2_000001500.safetensors", "K2/kuxi/K2uxi2_merged.safetensors", "K2/kuxi/K2uxi_000001000.safetensors", "K2/kuxi/K2uxi_merged.safetensors", "K2/kuxi/UxiKrea.safetensors", "K2/kuxi/UxiKrea2026-07-08_13-03-32-save-1664-8-136.safetensors", "K2/kuxi/UxiKrea2026-07-08_16-00-16-save-9550-50-0.safetensors", "K2/kuxi/uxiK2_000000750.safetensors", "K2/kuxi/uxiK2_merged.safetensors", "K2/kyo/YoKrea.safetensors", "K2/kyo/YoKrea2026-07-14_18-51-44-save-180-20-0.safetensors", "K2/kyo/YoKrea2026-07-14_18-55-59-save-360-40-0.safetensors", "K2/kyo/YoKrea2026-07-14_19-00-09-save-540-60-0.safetensors", "K2/kyo/YoKrea2026-07-14_19-04-16-save-720-80-0.safetensors", "K2/kyol/YolKrea2026-07-09_11-23-25-save-400-400-0.safetensors", "K2/kyol/yolK2_000000500.safetensors", "K2/kyol/yolK2_000001250.safetensors", "K2/kyol/yolK2_merged3.safetensors", "K2/kyol/yolK2_merged4.safetensors", "K2/realism_engine_krea2_v2.safetensors", "K2/shes_merged.safetensors", "K2/skc3vo.safetensors", "K2/sliders/Decay_slider_v1_krea2.safetensors", "K2/sliders/RealismSlider-v1.safetensors", "K2/sliders/WarmLightSlider-KREA2_v1.safetensors", "K2/sliders/WeightSlider-KREA2_v2.safetensors", "K2/sliders/anal_helper_krea2_loraholic.safetensors", "K2/sliders/brightness_krea2_loraholic.safetensors", "K2/sliders/color_temp_krea2_loraholic.safetensors", "K2/sliders/crowd_slider_v1_krea2.safetensors", "K2/sliders/detail_slider_krea2_loraholic.safetensors", "K2/sliders/ethnicity_krea2_loraholic.safetensors", "K2/sliders/hair_length_krea2_loraholic.safetensors", "K2/sliders/head_size_krea2_loraholic.safetensors", "K2/sliders/height_krea2_loraholic.safetensors", "K2/sliders/light_krea2_loraholic.safetensors", "K2/sliders/skindetails_krea2_loraholic.safetensors", "K2/sliders/wetness_krea2_loraholic.safetensors", "K2/z0jglf.safetensors", "YuE/YuE_proba_000000250.safetensors", "YuE/YuE_proba_000000500.safetensors", "YuE/YuE_proba_000000750.safetensors", "YuE/YuE_proba_000001000.safetensors", "YuE/YuE_proba_000001250.safetensors", "anima/anima-turbo-lora-v0.2.safetensors", "ernie/2026-06-11_16-41-40-save-4500-10-0.safetensors", "ernie/2026-06-11_20-51-52-save-9000-20-0.safetensors", "ernie/2026-06-12_16-04-50-save-13500-30-0.safetensors", "ernie/ERNIE-Image_Futanari_Penis_Erect_(Degenerator123).safetensors", "ernie/uxiernie.safetensors", "flux/Anal_Gape_-_Flux.safetensors", "flux/FLUX_FD-AnusHelper-R4.safetensors", "flux/Flux_Turbo_Alpha.safetensors", "flux/Skintastic_Flux_v1.safetensors", "flux/Surprise_Anal_FLUX.safetensors", "flux/aidmaHyperrealism-FLUX-v0.3.safetensors", "flux/flux_realism.safetensors", "flux/roundassv16_FLUX.safetensors", "flux/shes/2uxiextract.safetensors", "flux/shes/UxI_warmup_rank64_bf16-step00600.safetensors", "flux/shes/uXi_rank64_bf16-step00600.safetensors", "flux/shes/uxi.safetensors", "flux/shes/uxi64_2000.safetensors", "flux/shes/uxi_2_rank64_bf16-step00600.safetensors", "flux/shes/uxiextract.safetensors", "flux/shes/uxiflux_rank32_bf16-step01000.safetensors", "flux/xentes/AliYo_rank16_bf16-step00750.safetensors", "flux/xentes/AliYo_rank16_bf16-step03000.safetensors", "flux/xentes/ali_polynomial_rank64_bf16-step00300.safetensors", "flux/xentes/ali_polynomial_rank64_bf16-step00400.safetensors", "flux/xentes/catedral_rank32_bf16-step00150.safetensors", "flux/xentes/horreo2_rank64_bf16-step00300.safetensors", "flux/xentes/pedras_cosine_rank64_bf16.safetensors", "flux/xentes/yo_ali_rank64_bf16-step00400.safetensors", "flux2/liz.safetensors", "flux2/shushi2026-03-28_07-28-26-save-3500-250-0.safetensors", "flux2/shushi2026-03-28_08-24-02-save-7000-500-0.safetensors", "flux2/shushi2026-03-28_10-33-58-save-11088-750-0.safetensors", "flux2/shushi2026-03-28_11-41-20-save-15338-1000-0.safetensors", "flux2/shushi2026-03-28_14-08-47-save-21764-1250-0.safetensors", "fluxklein/Amateur_Nudes_2.5_Z-Image-Turbo.safetensors", "fluxklein/BubbleButt.safetensors", "fluxklein/Buttocks_Slider_V4-KLEIN_000000550.safetensors", "fluxklein/FK_analdoggystylebbc.safetensors", "fluxklein/FK_analonside.safetensors", "fluxklein/FK_piledriver.safetensors", "fluxklein/FLUX2K_Vintage_Beauties_v2.safetensors", "fluxklein/Flux Klein - NSFW v2.safetensors", "fluxklein/Flux2_Klein_9B_Futanari_Penis_(Degenerator123).safetensors", "fluxklein/HugeGape_Klein_V1.safetensors", "fluxklein/Kisa9B.safetensors", "fluxklein/Kisa9B_000000500.safetensors", "fluxklein/Mia_Pussy_epoch_10.safetensors", "fluxklein/RealSkin.safetensors", "fluxklein/Realistic Nipples.safetensors", "fluxklein/SEXGOD_ImprovedNudity_Klein9b_v4.safetensors", "fluxklein/bfs_head_v1_flux-klein_9b_step3500_rank128.safetensors", "fluxklein/bfs_head_v1_flux-klein_9b_step3750_rank64.safetensors", "fluxklein/eva/Keva9B_000000750.safetensors", "fluxklein/eva/Keva9B_000001500.safetensors", "fluxklein/eva/evaklein2.safetensors", "fluxklein/eva/evaklein22026-04-25_23-22-08-save-1400-100-0.safetensors", "fluxklein/eva/evaklein3.safetensors", "fluxklein/eva/evuxi_FluxK_9B_000001250.safetensors", "fluxklein/eva/evuxi_FluxK_9B_000002500.safetensors", "fluxklein/eva/fluxeva9B.safetensors", "fluxklein/eva/fluxeva9b2026-02-22_00-05-43-save-1500-100-0.safetensors", "fluxklein/femboy_lora_v5_LoKr16_000030000.safetensors", "fluxklein/klein-pov-anal-11epoc-k3nk.safetensors", "fluxklein/klein_slider_bodyweight_50.safetensors", "fluxklein/klein_snofs_v1_4.safetensors", "fluxklein/liz/Kliz9B_copy_000001750.safetensors", "fluxklein/liz/fluxliz9b2026-02-22_00-29-25-save-450-150-0.safetensors", "fluxklein/liz/fluxlz9B.safetensors", "fluxklein/liz/kleinliz.safetensors", "fluxklein/liz/kleinliz_000001000.safetensors", "fluxklein/liz/lizklein.safetensors", "fluxklein/liz/lizklein2026-04-25_10-03-57-save-225-75-0.safetensors", "fluxklein/model_9B.safetensors", "fluxklein/party_time_v1.0_klein4b.safetensors", "fluxklein/party_time_v1.0_klein9b.safetensors", "fluxklein/pedras.safetensors", "fluxklein/pedrasKlein2026-02-25_11-58-15-save-1825-25-0.safetensors", "fluxklein/pedrasKlein2026-02-25_12-33-47-save-3650-50-0.safetensors", "fluxklein/pedrasKlein2026-02-25_13-01-21-save-5475-75-0.safetensors", "fluxklein/perfect eyes v2.1.safetensors", "fluxklein/sweaty_glistening_skin.safetensors", "fluxklein/traxegalKlein.safetensors", "fluxklein/traxegalKlein_000000600.safetensors", "fluxklein/traxegalKlein_000001200.safetensors", "fluxklein/traxegalKlein_000001800.safetensors", "fluxklein/traxegalKlein_000002400.safetensors", "fluxklein/traxegalKlein_000002700.safetensors", "fluxklein/uxi/Fluxi9Ba.safetensors", "fluxklein/uxi/Fluxi9Bc.safetensors", "fluxklein/uxi/Kuxi9B_000001750.safetensors", "fluxklein/uxi/fluxi9b2026-02-21_22-45-02-save-1050-150-0.safetensors", "fluxklein/uxi/kleinShe2026-02-22_21-15-32-save-1200-150-0.safetensors", "fluxklein/uxi/kleinuxi2.safetensors", "fluxklein/uxi/kleinuxi22026-02-22_10-03-16-save-750-150-0.safetensors", "fluxklein/uxi/shee.safetensors", "fluxklein/uxi/sheklein.safetensors", "fluxklein/uxi/sheklein2026-02-25_00-01-37-save-1200-150-0.safetensors", "fluxklein/uxi/shezit.safetensors", "fluxklein/uxi/shezit2026-04-23_15-47-56-save-6600-200-0.safetensors", "fluxklein/uxi/shezit2026-04-23_16-28-16-save-9075-275-0.safetensors", "fluxklein/uxi/uxi_Klein_4B.safetensors", "fluxklein/uxi/uxi_Klein_4B_2_000000500.safetensors", "fluxklein/uxi/uxiklein.safetensors", "fluxklein/uxi/uxiklein2026-02-25_00-32-56-save-1200-100-0.safetensors", "h3/Eros_beta6mix_Lora.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-FL2VA-3Step-ComfyUI-BF16.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors", "h3/taomate_h3_3step_comfy.safetensors", "hidream/hidream_o1_dev_lora_rank_64_bf16_pruned_v1.safetensors", "ideogram/ID_Vintage_Beauties_v1.safetensors", "ideogram/Realism_Engine_Ideogram_V5.safetensors", "ideogram/ideogramSnofsV1.safetensors", "ideogram/ideogram_4_turbotime_v1.safetensors", "ideogram/ideogram_4_unconditional_lora_r16.safetensors", "ideogram/lenovo_ideogram4.safetensors", "ideogram/uxideogram.safetensors", "ideogram/uxideogram_000000750.safetensors", "ideogram/uxideogram_000002500.safetensors", "ideogram/uxideogram_merged_1.safetensors", "ideogram/uxideogram_merged_2.safetensors", "ideogram/yolideogram_000001750.safetensors", "ideogram/yolideogram_merged.safetensors", "ideogram/yolideogram_merged_2.safetensors", "ltxv/Cr3ampi3_animation_sulphur-2_i2v_v1.0.safetensors", "ltxv/DR34ML4Y_LTXXX_V2.safetensors", "ltxv/HeroCam_LTX2_bucket113_step_02000.safetensors", "ltxv/IvoriLTX_000000250.safetensors", "ltxv/IvoriLTX_000000750.safetensors", "ltxv/IvoriLTX_000001000.safetensors", "ltxv/IvoriLTX_000001250.safetensors", "ltxv/IvoriLTX_000001500.safetensors", "ltxv/LTX-2 - She Struts.safetensors", "ltxv/LTX-2.3 - Better Female Nudity v2_rank64.safetensors", "ltxv/LTX-2.3-ID-LoRA-CelebVHQ-3K.safetensors", "ltxv/LTX-2.3-ID-LoRA-TalkVid-3K.safetensors", "ltxv/LTX-2.3-OmniNFT-RL-Lora_bf16.safetensors", "ltxv/LTX-2.3-RL-Lora.safetensors", "ltxv/LTX2-i2v-SexThrust.safetensors", "ltxv/LTX2.3-MysticXXX.safetensors", "ltxv/LTX2.3Animated.safetensors", "ltxv/LTX2.3_666asslick.safetensors", "ltxv/LTX2.3_Crisp_Enhance.safetensors", "ltxv/LTX2.3_DMD_reshaped_r256.safetensors", "ltxv/LTX2.3_Soft_Enhance.safetensors", "ltxv/LTX23_Multipurpose_NSFW_v2.safetensors", "ltxv/LTX23_SexFromBehind_v0_1.safetensors", "ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors", "ltxv/Post_Apocalyptic.safetensors", "ltxv/anal-insertion-i2v.safetensors", "ltxv/beauty_of_rain_ltx23.safetensors", "ltxv/cowgirl-ride-withfuta.safetensors", "ltxv/cr3ampi3_animation_i2v_ltx2_v1.0.safetensors", "ltxv/doggystyle_ltx_000004200.safetensors", "ltxv/full-nelson-sex-i2v-ltx2.3-i2v-lora-k3nk.safetensors", "ltxv/gemma-3-12b-it-abliterated_lora_rank64_bf16.safetensors", "ltxv/lightx2v_T2V_14B_cfg_step_distill_v2_lora_rank64_bf16.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-in.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-left.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-out.safetensors", "ltxv/ltx-2-19b-lora-camera-control-dolly-right.safetensors", "ltxv/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil36.safetensors", "ltxv/ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors", "ltxv/ltx-2.3-22b-ic-lora-hdr-0.9.safetensors", "ltxv/ltx-2.3-22b-ic-lora-outpaint.safetensors", "ltxv/ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors", "ltxv/ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors", "ltxv/ltx2.3-transition.safetensors", "ltxv/ltx23_edit_anything_global_rank128_v1_9000steps_adamw.safetensors", "ltxv/ltx23_inpaint_masked_r2v_rank32_v1_3000steps.safetensors", "ltxv/ltx23_nsfw_helper_multi_concept_lora_v2.safetensors", "ltxv/ltx23_srx_scififilm_lora.safetensors", "ltxv/ltx2_fnelson-5000steps.k3nk.safetensors", "ltxv/nsfw_anal_insertion_ltx23_v1.0.safetensors", "ltxv/phool-realism-ltx-2.3-v1.0.safetensors", "ltxv/plora_sulfer_v1.2-step00008500.safetensors", "ltxv/realisdance_ltx2.3_ic-lora_step_02000.safetensors", "ltxv/sulphur_experimental_lora_v1.safetensors", "ltxv/traxegal/traxegalltxv.safetensors", "ltxv/traxegal/traxegalltxv_000002100.safetensors", "ltxv/traxegal/traxegalltxv_000003300.safetensors", "ltxv/uxiltxv2.3_UP_merged.safetensors", "ltxv/vbvr-ltx2.3.safetensors", "ltxv/xaliyo/aliyo.safetensors", "ltxv/xaliyo/aliyo_000001800.safetensors", "ltxv/xaliyo/aliyo_000003900.safetensors", "ltxv/xaliyo/aliyo_000005700.safetensors", "ltxv/xgeva/evaltxv.safetensors", "ltxv/xgeva/evaltxv2.safetensors", "ltxv/xgeva/evaltxv3.safetensors", "ltxv/xgisa/isaltxv_000001500.safetensors", "ltxv/xgliz/lizltxv.safetensors", "ltxv/xgliz/lizltxv2.safetensors", "ltxv/xgliz/lizltxv3.safetensors", "ltxv/xguxi/sheltxv2.safetensors", "ltxv/xguxi/uxi3ltxv.safetensors", "ltxv/xguxi/uxiltxv.safetensors", "ltxv/xguxi/uxiltxv2.3.safetensors", "ltxv/xgvir/virltxv_000001000.safetensors", "ltxv/xsab/latxSab.safetensors", "ltxv/xsab/latxSab_000001000.safetensors", "ltxv/xsab/latxSab_000001500.safetensors", "ltxv/xsab/latxSab_merged.safetensors", "ltxv/xyol/yoltx.safetensors", "ltxv/xyol/yoltx_merged.safetensors", "moss/lora_DMD_base.safetensors", "moss/lora_DMD_sft.safetensors", "moss/mossisa_000001250.safetensors", "moss/mossisa_000001500.safetensors", "moss/mossisa_000001750.safetensors", "moss/mossisa_000002000.safetensors", "moss/mossisa_000002250.safetensors", "moss/mossisa_merged.safetensors", "qwen/QWen2512-Portrait.safetensors", "qwen/Qwen-Image-2.1 NSFW Image Edit.safetensors", "qwen/Qwen-Image-2512-Lightning-8steps-V1.0-bf16.safetensors", "qwen/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors", "qwen/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors", "qwen/bfs_head_v1.1_alternative_qwen_2.1.safetensors", "qwen/elusarcas-qwen2-1-detailer-v1.safetensors", "qwen/lora.safetensors", "qwen/nsfw_qwen_21.safetensors", "qwen/p_qwen_image_2.1_5step_v0.1_comfyui.safetensors", "qwen/p_qwen_image_2.1_8step_v0.1_comfyui.safetensors", "qwen/qwen-image-2.1-uncensored-lora.safetensors", "qwen/qwen-image-edit-2511-multiple-angles-lora.safetensors", "qwen/qwen-image_nsfw_adv_v1.0.safetensors", "qwen/qwen_image_nsfw.safetensors", "qwen/shes/diegoqwen.safetensors", "qwen/shes/eva_qwen_000001000.safetensors", "qwen/shes/evaqwen.safetensors", "qwen/shes/isaqwen.safetensors", "qwen/shes/laraqwen.safetensors", "qwen/shes/liz_qwen_000001000.safetensors", "qwen/shes/lizqwen.safetensors", "qwen/shes/qwenliz.safetensors", "qwen/shes/qwenliz2026-02-22_01-41-42-save-150-50-0.safetensors", "qwen/shes/sheqwen.safetensors", "qwen/shes/uxiqwen.safetensors", "qwen/shes/uxiqwen2026-02-24_22-33-58-save-900-75-0.safetensors", "qwen/shes/uxiqwen2026-02-24_23-12-18-save-1200-100-0.safetensors", "qwen/shes/uxiqwen_fin.safetensors", "qwen/shes/virqwen.safetensors", "qwen/shes/xui_qwen_000001000.safetensors", "qwen/turbo8_lora_step2500.safetensors", "qwen/xente/aliyoqwen.safetensors", "qwen/xente/aliyoqwen_000001200.safetensors", "qwen/xente/pedrasqwen.safetensors", "qwen/xente/pedrasqwen2026-02-25_15-34-58-save-1825-25-0.safetensors", "qwen/xente/traxegalqwen.safetensors", "qwen/xente/traxegalqwen_000001500.safetensors", "qwen/xente/traxegalqwen_000005100.safetensors", "sd3.5/uxisd3.safetensors", "sdxl/69_ass_focus_v1_Illustrious.safetensors", "sdxl/All_Anal_Art-000011.safetensors", "sdxl/FC-000013.TA_trained.safetensors", "sdxl/Happy anal - Illustrious.safetensors", "sdxl/Huge erect.safetensors", "sdxl/LoRASexAndAnalFingering.safetensors", "sdxl/NaturalBodyV2.0.safetensors", "sdxl/PainCraft_XL_Anal_Lora_v1.safetensors", "sdxl/Skin color slider - Illustrious_alpha1.0_rank4_noxattn_last.safetensors", "sdxl/TransexQuiron_v1_ilus.safetensors", "sdxl/add-detail-xl.safetensors", "sdxl/aidmaRealisticSkin-IL-v0.1.safetensors", "sdxl/anal_beads_full_insertion_v1_Illustrious.safetensors", "sdxl/anal_cross-section_v1_Illustrious.safetensors", "sdxl/anal_large_insertion_v1_Illustrious.safetensors", "sdxl/anal_slime_v1_Illustrious.safetensors", "sdxl/anal_stomach_bulge_v1_Illustrious.safetensors", "sdxl/analhugger_v1_Illustrious.safetensors", "sdxl/bulldog-000007.safetensors", "sdxl/female_orgasm_outstretched_legs_v1_Illustrious.safetensors", "sdxl/gaping_anus_v5_Illustrious.safetensors", "sdxl/hugeAnusGapeQuiron_ilus.safetensors", "sdxl/il_mountedanal.safetensors", "sdxl/multiple_anal_v1_Illustrious.safetensors", "sdxl/spread_anus_by_self_v1_Illustrious.safetensors", "sdxl/subtle-analsex-xl3.safetensors", "sdxl/tateware_anus_v2_Illustrious.safetensors", "sdxl/ux/sdxlux.safetensors", "sdxl/ux/sdxlux_000000750.safetensors", "sdxl/ux/sdxlux_000001250.safetensors", "sdxl/ux/sdxlux_000002500.safetensors", "sdxl/ux/sdxlux_merged.safetensors", "sdxl/ux/uxillus.safetensors", "sdxl/ux/uxillus2.safetensors", "sdxl/ux/uxillus2026-06-09_18-25-31-save-1120-5-0.safetensors", "sdxl/ux/uxillus2026-06-09_19-02-07-save-2240-10-0.safetensors", "sdxl/ux/uxillus2026-06-09_23-27-31-save-3360-15-0.safetensors", "sdxl/ux/uxillus2026-06-10_00-00-28-save-4480-20-0.safetensors", "sdxl/ux/uxillus2026-06-10_04-09-25-save-5600-25-0.safetensors", "sdxl/ux/uxillus22026-06-10_14-20-21-save-1120-5-0.safetensors", "sdxl/ux/uxillus22026-06-10_14-52-36-save-2240-10-0.safetensors", "sdxl/ux/uxillus22026-06-10_16-00-56-save-3360-15-0.safetensors", "sdxl/ux/uxillus22026-06-10_16-33-11-save-4480-20-0.safetensors", "sdxl/ux/uxillus22026-06-10_17-05-46-save-5600-25-0.safetensors", "sdxl/ux/uxisd.safetensors", "sdxl/ux/uxisd2026-05-31_06-38-42-save-700-100-0.safetensors", "sdxl/ux/uxisd2026-05-31_06-49-10-save-1050-150-0.safetensors", "sdxl/ux/uxisd2026-05-31_07-10-18-save-1750-250-0.safetensors", "sdxl/ux/uxisd2026-05-31_10-46-29-save-2100-300-0.safetensors", "sdxl/ux/uxisd2026-05-31_10-57-31-save-2450-350-0.safetensors", "sdxl/ux/uxisd2026-06-01_01-46-55-save-2800-400-0.safetensors", "sdxl/ux/uxisd2026-06-01_01-57-29-save-3150-450-0.safetensors", "sdxl/ux/uxisd2026-06-01_04-36-04-save-8400-1200-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-07-46-save-9450-1350-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-18-19-save-9800-1400-0.safetensors", "sdxl/ux/uxisd2026-06-01_05-50-08-save-10850-1550-0.safetensors", "sdxl/ux/uxisd2026-06-01_06-00-42-save-11200-1600-0.safetensors", "sdxl/ux/uxisdfin.safetensors", "sdxl/ux/uxisdxllora1000.safetensors", "sdxl/ux/uxisdxllora300.safetensors", "sdxl/ux/uxisdxllora525.safetensors", "sdxl/zy_Skin_Enhancer_v1.safetensors", "wan/uxi/uxi5b.safetensors", "wan/uxi/uxi5b_000001250.safetensors", "wan/uxi/uxi5b_000003250.safetensors", "wan/uxi/uxi5b_000004000.safetensors", "wan/uxi/uxi5b_000004500.safetensors", "wan/uxi/uxi_wan5B.safetensors", "wan/uxi/uxi_wan5B_000000300.safetensors", "wan/uxi/uxi_wan5B_000000500.safetensors", "wan/uxi/uxi_wan_5B.safetensors", "zit/Detailed_Nipples_Z.safetensors", "zit/Mystic-XXX-ZIT-V5.safetensors", "zit/NSFW_master_ZIT_000008766.safetensors", "zit/NSFW_master_ZIT_000017532.safetensors", "zit/NakedErectFutaZit.safetensors", "zit/Nsfw Anal Doggystyle.safetensors", "zit/Nsfw Doggystyle.safetensors", "zit/Nsfw Reverse Cowgirl Anal.safetensors", "zit/Nsfw_Standing_Anal.safetensors", "zit/OiledSkin_Zit_Turbo_V1.safetensors", "zit/Oily shiny glossy skin style v2.1.safetensors", "zit/Pedras/pedras_zit.safetensors", "zit/Pedras/pedras_zit_000000500.safetensors", "zit/Pedras/pedras_zit_000001250.safetensors", "zit/Pedras/pedras_zit_000002250.safetensors", "zit/Pedras/pedras_zit_000002750.safetensors", "zit/RealisticSnapshot-Zimage-Turbov5.safetensors", "zit/Z-Image Turbo Radiant v2.0.safetensors", "zit/Z-TURBO_Photography_35mmPhoto_1536.safetensors", "zit/ZIT_Vintage_Beauties_1.0.safetensors", "zit/ZPenisv2.safetensors", "zit/adazwsr_v1_110.safetensors", "zit/b3tternud3s_v3.safetensors", "zit/diego/diegozit.safetensors", "zit/eva/evaZimage_000000250.safetensors", "zit/eva/evaZimage_000000750.safetensors", "zit/eva/eva_zit_32_000000250.safetensors", "zit/eva/eva_zit_32_000000750.safetensors", "zit/eva/eva_zit_32_000001000.safetensors", "zit/faceforwardLookbackZ_2_6000.safetensors", "zit/isa/isa_zit_32_000000500.safetensors", "zit/isa/isa_zit_32_000001000.safetensors", "zit/lara_ZIT_000000750.safetensors", "zit/lara_ZIT_000001001.safetensors", "zit/liz/liZimage_000001250.safetensors", "zit/liz/liZimage_000002750.safetensors", "zit/liz/liz_000000350.safetensors", "zit/liz/liz_000000550.safetensors", "zit/liz/lizimgt.safetensors", "zit/liz/lizimgt2026-02-22_02-40-45-save-450-150-0.safetensors", "zit/liz/lizimgtfin.safetensors", "zit/liz/lizit2026-04-24_00-05-30-save-750-250-0.safetensors", "zit/liz/lizit2026-04-24_00-27-00-save-1350-450-0.safetensors", "zit/liz/lizitDD_copy.safetensors", "zit/liz/lizitDD_copy_000002000.safetensors", "zit/liz/lizitTA_copy.safetensors", "zit/liz/lizitTA_copy_000000500.safetensors", "zit/liz/lizitTA_copy_000001000.safetensors", "zit/liz/lizitTA_copy_000001750.safetensors", "zit/liz/zitliz.safetensors", "zit/liz/zitliz2026-04-24_01-46-34-save-100-50-0.safetensors", "zit/liz/zitliz2026-04-24_01-50-13-save-200-100-0.safetensors", "zit/liz/zitliz2026-04-24_01-53-49-save-300-150-0.safetensors", "zit/liz/zitliz2026-04-24_01-57-28-save-400-200-0.safetensors", "zit/liz/zitliz2026-04-24_02-01-08-save-500-250-0.safetensors", "zit/nsfwv2-zit.safetensors", "zit/skin texture Photorealistic style v4.5.safetensors", "zit/traxegal/traxegal2026-05-02_19-09-46-save-2000-50-0.safetensors", "zit/traxegal/traxegal2026-05-02_19-35-38-save-4000-100-0.safetensors", "zit/traxegal/traxegal2026-05-02_20-05-34-save-6000-150-0.safetensors", "zit/traxegal/traxegalzit.safetensors", "zit/traxegal/traxegalzitTA.safetensors", "zit/traxegal/traxegalzitTA_000000300.safetensors", "zit/traxegal/traxegalzitTA_000000900.safetensors", "zit/traxegal/traxegalzitTA_000001500.safetensors", "zit/traxegal/traxegalzitTA_000002100.safetensors", "zit/traxegal/traxegalzitTA_000002700.safetensors", "zit/traxegal/traxegalzit_000001200.safetensors", "zit/traxegal/traxegalzit_000002400.safetensors", "zit/traxegalzitTA_000000900.safetensors", "zit/uxi/2uxizitTA_000001000.safetensors", "zit/uxi/2uxizitTA_000001500.safetensors", "zit/uxi/she_zit_000000750.safetensors", "zit/uxi/she_zit_000000750_16.safetensors", "zit/uxi/she_zit_000001000.safetensors", "zit/uxi/shezit.safetensors", "zit/uxi/shezit2026-04-23_12-34-22-save-4125-125-0.safetensors", "zit/uxi/shezit2026-04-23_14-40-27-save-2475-75-0.safetensors", "zit/uxi/shezit2026-04-23_16-01-27-save-7425-225-0.safetensors", "zit/uxi/uxi2_zit_32_ok_000001250.safetensors", "zit/uxi/uxi3zitwt.safetensors", "zit/uxi/uxi3zitwt_000000600.safetensors", "zit/uxi/uxi3zitwt_000001200.safetensors", "zit/uxi/uxi3zitwt_000001800.safetensors", "zit/uxi/uxi3zitwt_000002700.safetensors", "zit/uxi/uxiZimage_000002750.safetensors", "zit/uxi/uxi_zit_000001000.safetensors", "zit/uxi/uxi_zit_32_ok_000001750.safetensors", "zit/uxi/uxizit.safetensors", "zit/vir_zit_000000750.safetensors", "zit/yol_zit_000000250.safetensors", "zit/zitCyberrealisticpC9.bj9E.safetensors", "zit/zit_stage1_masked_dpo_11100.safetensors"];
+const AVAILABLE_VAES = ["Flux/ae.safetensors", "Flux/flux2-vae.safetensors", "Flux/ultra_flux1.safetensors", "QwenImage/REPA-E_qwen.safetensors", "QwenImage/qwen_image_2.1_vae_bf16.safetensors", "QwenImage/qwen_image_vae.safetensors", "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors", "Wan/Wan2.1_VAE_upscale2x_imageonly_real_v1.safetensors", "Wan/wan_2.1_vae.safetensors", "flux2-vae.safetensors", "moss/flux2-vae_small.safetensors", "qwenImageVAESharpKrea2_sharpFp32.safetensors", "qwen_image_vae.safetensors", "wan/wan_2.1_vae.safetensors"];
+const AVAILABLE_UNETS = ["K2/jibMixKrea2_v40Habanero_int8mixed_convrot.safetensors", "flux2/DarkBeast-Klein9b-V2-BFS-NVFP4-ComfyUI.safetensors", "flux2/Krea2_Turbo_convrot_int8mixed.safetensors", "flux2/flux-2-klein-9b.safetensors", "flux2/flux-2-klein-9b_int8_convrot.safetensors", "flux2/flux3_image_klein_int8_convrot.safetensors", "flux2/flux3_image_klein_sd_int8_convrot.safetensors", "moss/moss_image_base_int8_convrot.safetensors", "moss/moss_image_sft_int8_convrot.safetensors", "qwen/qwen-image-2.1-UC-int8_convrot.safetensors", "qwen/qwen_image_2.1_int8_convrot.safetensors", "qwen/qwen_image_2.1_turbo_int8_convrot.safetensors", "qwen/qwen_image_edit_2511_int8_convrot.safetensors"];
+const AVAILABLE_CLIPS = ["mistral_3_small_flux2.safetensors", "qwen3.5_9b_int8_convrot.safetensors", "qwen3.5_9b_qwen_image_2.1_pe_i2i.int8_convrot.safetensors", "qwen3.5_9b_w4a8_gptq.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "qwen3vl_4b.safetensors", "qwen3vl_4b_int8_convrot.safetensors", "qwen3vl_8b.safetensors", "qwen3vl_8b_int8_convrot.safetensors", "qwen3vl_8b_nvfp4_heretic.safetensors", "qwen_0.6b_ace15.safetensors", "qwen_1.7b_ace15.safetensors", "qwen_2.5_vl_7b_fp8_scaled.safetensors", "qwen_3_06b_base.safetensors", "qwen_3_4b.safetensors", "qwen_3_600m.safetensors", "qwen_3_8b.safetensors", "sulphur_prompt_enhancer_qwen3.5_9b_int8tensormixed_learned.safetensors"];
 const AVAILABLE_INTERP_MODELS = [];
 const AVAILABLE_UPSCALE_MODELS = ["1x-AnimeUndeint-Compact.pth", "1x-DeJpeg-Fatality-PlusULTRA.pth", "1x-ITF-SkinDiffDetail-Lite-v1.pth", "1xDeNoise_realplksr_otf.pth", "1xSkinContrast-HighAlternative-SuperUltraCompact.pth", "1x_DeBLR.pth", "1x_Manhwa_Null.pth", "1x_NMKDDetoon_97500_G.pth", "1x_SSAntiAlias9x.pth", "4x-AnimeSharp.pth", "4x-NMKD-YandereNeo.pth", "4x-UltraSharp.pth", "4xFaceUpDAT.pth", "4xNomos2_realplksr_dysample.pth", "4xNomosUniDAT_bokeh_jpg.pth", "4xPurePhoto-RealPLSKR.pth", "4xPurePhoto-Span.pth", "4x_NMKD-Siax_200k.pth", "4x_NMKD-Superscale-SP_178000_G.pth", "4x_RealisticRescaler_100000_G.pth", "OmniSR_X2_DIV2K.safetensors", "OmniSR_X3_DIV2K.safetensors", "OmniSR_X4_DIV2K.safetensors", "RealESRGAN_x4.pth", "RealESRGAN_x4plus.pth", "VHS-Sharpen-1x_46000_G.pth"];
 const AVAILABLE_LUTS = ["3Strip.cube", "70s.cube", "Agfa Portrait XPS 160.cube", "Amelie.cube", "Aviator.cube", "Blade Runner.cube", "Bleach.cube", "BlueArchitecture.cube", "Brooklyn.cube", "CELLULOID_01_FU_LOW.cube", "Casablanca-Noir.cube", "Celadon.cube", "Chamoisee.cube", "CineStill-800-T-V1.0--N125.cube", "Citizen-Depth.cube", "Colorist_Factory_Severn_LUT.cube", "Cubanismo.cube", "Drive.cube", "Duotone.cube", "Emulsion.cube", "Enemy.cube", "Enhance.cube", "Fashion.cube", "Fuji Astia 100F.cube", "Fuji Eterna 3513.cube", "Fuji Eterna 8563.cube", "Fuji Provia 100F.cube", "Fuji Sensia 100.cube", "Fuji Superia Xtra 400.cube", "Fuji Vivid 8543.cube", "Glacier.cube", "Godfather.cube", "Grand Budapest.cube", "Grime.cube", "Grit.cube", "Hannibal.cube", "Her.cube", "Kodak Ektachrome 64.cube", "Kodak Professional Portra 400.cube", "Kodak Vision 2383.cube", "LPP Tetrachrome 400.cube", "MONOCHROME_2_.cube", "Mad Max.cube", "Matrix V1.cube", "Matrix V2.cube", "Metropolis-Mist.cube", "Mint.cube", "Moonrise Kingdom.cube", "Ochre.cube", "Polaroid 600.cube", "Punch.cube", "Raging-Shadow.cube", "Revenant.cube", "Rhythm.cube", "Seven.cube", "Spy.cube", "Stranger Things.cube", "Summer.cube", "Sunset-Boulevard-Glow.cube", "Teal and Orange.cube", "Thriller.cube", "Vinteo.cube", "Wonder Woman.cube", "justyndigitalphotography.cube", "ta\u015fdemirrr_1.A006_04280540_S.cube"];
@@ -4956,6 +4970,69 @@ Single concluding sentence: "The overall composition [is / uses / feels] ..."
 Return strictly valid JSON on a single line, with no Markdown wrapper, no thoughts, and no text before or after:
 {"rewritten_prompt": "<the single-paragraph description>", "wh_ratio": "<e.g. 3:2>"}`;
 
+// --- MOSS-Image: system prompts del enhancer ---
+// Caption: system prompt del upsampler del template oficial de ComfyUI (image_moss_image_t2i),
+// escrito a partir del skill "moss-image-prompt-enhancer" de OpenMOSS/MOSS-Image.
+const MOSS_CAPTION_SYS = `You turn a user's image idea into one detailed caption for a text-to-image model. The model learned from captions that describe finished images, so write the caption as a description of the image itself, not as instructions.
+
+Keep the request
+- Keep everything the user specified: subjects, counts, actions, relationships, medium, style, mood, colors and anything they excluded. Never contradict or drop it.
+- Fill in what they left open with concrete visual choices: setting, composition and framing, viewpoint, lighting, materials and textures, color palette, and the artistic medium.
+- Describe only what can be seen. Leave out sounds, smells, backstory and intentions.
+- Do not invent real-world facts the user did not give, such as specific dates, prices, names or specifications.
+
+Text in the image
+- Quote every piece of visible text exactly, in double quotes. Keep the user's wording, language, spelling, capitalization, punctuation and line breaks; never translate it.
+- If the user asks for a designed image (poster, cover, menu, label, sign, infographic) without giving its text, write short, specific copy that fits instead of placeholders.
+- Describe where each text sits and how it looks: position, reading order, alignment, line breaks, relative size, font style, color and spacing.
+- Do not mention watermarks or artist signatures.
+
+Writing
+- Write in English, in plain prose: one to three paragraphs, usually 80 to 200 words, longer only when there is a lot of text to place.
+- Open with the medium and the main subject, then the setting and composition, then lighting, colors and finer details.
+- Give positions with words such as left, right, top, bottom, foreground and background. No coordinates, lists, headings, JSON or Markdown.
+- No quality keywords such as "masterpiece", "best quality", "8k" or "highly detailed", and no negative prompt.
+
+Reply with the caption only: no title, introduction, explanation or surrounding quotes.`;
+
+// Layout: el LLM redacta un borrador en píxeles absolutos (xyxy, origen arriba-izquierda) y
+// compileMossLayout() lo convierte al formato del modelo (abs_centralized / yxyx), como hace
+// scripts/compile_prompt.py del skill. {{WIDTH}}/{{HEIGHT}} se sustituyen por la resolución Base.
+const MOSS_LAYOUT_SYS = `You turn a user's image idea into a MOSS-Image Layout draft: a global caption plus bounding boxes that place text, objects and characters on the canvas. Use it for posters, covers, menus, infographics, multi-panel images or any request where text placement or object positions matter.
+
+Canvas
+- The canvas is exactly {{WIDTH}}x{{HEIGHT}} pixels. Use "width": {{WIDTH}} and "height": {{HEIGHT}}.
+- Boxes are [x_min, y_min, x_max, y_max] in actual pixels from the top-left corner, with 0 <= x_min < x_max <= {{WIDTH}} and 0 <= y_min < y_max <= {{HEIGHT}}. No normalized or centered coordinates.
+
+Schema (no other fields are allowed)
+{"width": W, "height": H, "bbox_coord_space": "abs", "bbox_format": "xyxy",
+ "summary": {"meta": ["medium/genre tags"], "canvas": "single", "caption": "global description of the whole image, its style, palette and lighting"},
+ "items": [{"label": "object" | "character" | "text", "caption": "visible appearance; for text: typography, size, color, surface", "text": "exact visible characters (text items only)", "bbox": [x1, y1, x2, y2]}]}
+- summary.canvas is "single", "multi_panel" or "collage"; summary.meta and summary.palette are optional string arrays. Items may also carry optional "tags" and "palette" string arrays.
+- items is a flat, nonempty array. Never add children, parent, id or elements.
+
+Content
+- Keep everything the user specified: subjects, counts, relationships, medium, style, mood, exclusions and intended wording. Fill open gaps with concrete visual choices.
+- Quote visible text exactly in the "text" field, in its original language, spelling, capitalization and punctuation; never translate it. Use \\n inside the JSON string for intended line breaks. If the user asks for a designed image without giving its copy, write short, specific copy instead of placeholders.
+- Use boxes for coherent visible units; split text only when independent placement matters. Boxes may overlap when the image calls for it. A box is a placement annotation, not a border or panel to draw.
+- Size text boxes so the copy is readable at this resolution: a short title needs a wide, tall box; a paragraph needs room for its lines.
+- Establish reading order and hierarchy. Captions describe only what is visible, in English, with no quality keywords and no negative prompt.
+
+Reply with the JSON object only: no Markdown fences, no explanations.`;
+
+// Visión: describe la imagen de referencia como un caption de entrenamiento de MOSS-Image
+// (inspirado en el prompt de recaptioning del USERGUIDE de MOSS-Image).
+const MOSS_VISION_SYS = `You are an image recaptioner for the MOSS-Image text-to-image model. Look at the image and write one detailed caption that describes the finished image itself, so the model can recreate it.
+
+- Describe the composition, key subjects, actions, setting, colors, lighting, materials and artistic style. Include only what is visible.
+- Preserve every piece of visible text exactly, in double quotes, excluding watermarks. Do not translate, paraphrase, romanize or normalize it. Describe its layout: line breaks, reading order, relative position, alignment, size hierarchy, font style, color and spacing.
+- Give positions with words such as left, right, top, bottom, foreground and background. No coordinates, lists, headings, JSON or Markdown.
+- Do not mention watermarks, artist signatures or borders. No quality keywords and no negative prompt.
+- If the user adds guidance, follow it while keeping the caption faithful to the image.
+- Write in English, in plain prose: one to three paragraphs, usually 80 to 200 words.
+
+Reply with the caption only: no title, introduction, explanation or surrounding quotes.`;
+
 const CONFIG = {
   PROMPTS_KEY: 'kreaqwen_prompts',
   // Clave en desuso: kreaqwen gestiona 2x4 LoRAs con sus claves propias
@@ -5001,11 +5078,16 @@ const CONFIG = {
       A: { name: "Qwen 2.1 Oficial (Rewriter JSON)", prompt: QWEN_TEXT_SYS },
       B: { name: "Krea2 Fotorrealista", prompt: "You are an expert in prompts for Krea2/Flux2 image generation. Transform the user's idea into a detailed photorealistic prompt. Include: subject, lighting, colors, texture, composition, and atmosphere. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
       C: { name: "Krea2 Artístico / Cinematográfico", prompt: "You are a creative assistant specialized in artistic image prompts. Take the user's idea and turn it into an evocative, artistic prompt. Use descriptive, poetic language. Focus on style, mood, and visual impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+
+      MOSS: { name: "MOSS-Image Caption (skill oficial)", prompt: MOSS_CAPTION_SYS },
+      MOSS_LAYOUT: { name: "MOSS-Image Layout (JSON con cajas)", prompt: MOSS_LAYOUT_SYS },
     },
     vision: {
       A: { name: "Qwen 2.1 VLM Oficial (Reverse Eng JSON)", prompt: QWEN_VISION_SYS },
       B: { name: "Krea2 Visión Descriptiva", prompt: "You are an expert at describing images for image generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, and style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
       C: { name: "Krea2 Visión Estilizada", prompt: "You are a digital artist. Look at the image and turn it into a stylized artistic description. Focus on the artistic style, color palette, and emotional impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+
+      MOSS: { name: "MOSS-Image Visión (recaption)", prompt: MOSS_VISION_SYS },
     },
   },
 };
@@ -5087,11 +5169,13 @@ function updateDimensionHints(){
 //   - Qwen2.1 ("qwen")  -> CLIP type 'qwen_image', CLIP qwen3vl_8b, VAE 64ch (QwenImage21)
 //   - Flux2/Klein ("klein"/"flux2") -> CLIP type 'flux2', CLIP qwen3vl_8b, VAE 128ch (Flux2)
 //   - Flux3/Klein ("flux3")         -> CLIP type 'flux3', CLIP qwen3vl_4b, VAE 128ch (Flux2)
+//   - MOSS-Image ("moss")           -> CLIP type 'moss_image', CLIP qwen3.5_9b, VAE 128ch (Flux2 small)
 // Un CLIP con el type o el tamano equivocado produce "mat1 and mat2 shapes cannot be multiplied"
 // (7680 = 4B con tap de 3 capas; Klein 9B espera 12288 = 8B; Flux3 espera 20480 = 4B con 8 capas).
 // OJO: Flux3 vive en flux2/, asi que "flux3" debe comprobarse antes que "flux2".
 function unetArchFamily(unetName){
   const u = (unetName || "").toLowerCase();
+  if(u.includes("moss")) return "moss";
   if(u.includes("krea")) return "krea2";
   if(u.includes("qwen")) return "qwen21";
   if(u.includes("flux3")) return "flux3";
@@ -5117,6 +5201,7 @@ const ARCH_CLIP = {
   qwen21: { keyword: "qwen3vl_8b_nvfp4_heretic", type: "qwen_image" },
   flux2:  { keyword: "qwen3vl_8b", type: "flux2" },
   flux3:  { keyword: "qwen3vl_4b", type: "flux3" },
+  moss:   { keyword: "qwen3.5_9b_w4a8_gptq", type: "moss_image" },
 };
 
 function archClipType(family){
@@ -5134,9 +5219,11 @@ function klein4b(unetName){
 
 // ¿Sirve este text encoder para la arquitectura del UNET? Se mira el tamano del LLM
 // (4B/8B) y si es Qwen3-VL: Krea2/Flux3 necesitan el camino QWEN3VL_4B de ComfyUI,
-// Qwen 2.1 el QWEN3VL_8B; Flux2/Klein acepta Qwen3 o Qwen3-VL del tamano correcto.
+// Qwen 2.1 el QWEN3VL_8B; Flux2/Klein acepta Qwen3 o Qwen3-VL del tamano correcto;
+// MOSS-Image solo acepta Qwen3.5 9B (ComfyUI exige TEModel.QWEN35_9B para 'moss_image').
 function clipFitsFamily(clipName, family, unetName){
   const c = (clipName || "").toLowerCase();
+  if(family === "moss") return c.includes("qwen3.5_9b");
   const size = /(^|[^0-9.])4b/.test(c) ? "4b" : /(^|[^0-9.])8b/.test(c) ? "8b" : null;
   const isVl = c.includes("qwen3vl");
   const isQwen3 = isVl || c.includes("qwen_3_");
@@ -5167,6 +5254,7 @@ function ensureCompatibleClip(clipSel, family, unetName){
 //   - Krea2  -> latent_format Wan21   -> 16 canales. VAE: wan_2.1_vae o qwen_image_vae.
 //   - Qwen2.1 -> latent_format QwenImage21 -> 64 canales. VAE: qwen_image_2.1_vae.
 //   - Flux2  -> latent_format Flux2   -> 128 canales. VAE: flux2-vae.
+//   - MOSS   -> latent_format Flux2   -> 128 canales. VAE: flux2-vae_small (decoder reducido).
 // OJO: el nombre del fichero engana. "QwenImage/qwen_image_vae" es 16ch (vale para Krea2),
 // mientras que "QwenImage/qwen_image_2.1_vae" es 64ch (solo Qwen 2.1). No vale fiarse del
 // directorio ni de la palabra "qwen"/"flux" en la ruta.
@@ -5179,9 +5267,9 @@ function vaeLatentFamily(vaeName){
   return "krea2";                                             // 16ch (Wan21)
 }
 
-// Familia de latentes (VAE) del UNET: Flux3 comparte el latent_format Flux2 (128ch).
+// Familia de latentes (VAE) del UNET: Flux3 y MOSS comparten el latent_format Flux2 (128ch).
 function latentFamily(family){
-  return family === "flux3" ? "flux2" : family;
+  return (family === "flux3" || family === "moss") ? "flux2" : family;
 }
 function unetVaeFamily(unetName){
   return latentFamily(unetArchFamily(unetName));
@@ -5194,15 +5282,21 @@ function compatibleVaes(family){
 }
 
 function fallbackVae(family){
-  family = latentFamily(family);
   const list = compatibleVaes(family);
+  // MOSS-Image se entrena con el VAE pequeno de Flux2; Flux2/Klein prefiere el completo.
+  if(family === "moss"){
+    return list.find(v => v.toLowerCase().includes("flux2-vae_small")) ||
+           list[0] || "moss/flux2-vae_small.safetensors";
+  }
+  family = latentFamily(family);
   if(family === "qwen21"){
     return list.find(v => v.toLowerCase().includes("texture_fix_vae_for_qwen_image_2.1")) ||
            list.find(v => v.toLowerCase().includes("qwen_image_2.1_vae")) ||
            list[0] || "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors";
   }
   if(family === "flux2"){
-    return list.find(v => v.toLowerCase().includes("flux2-vae")) ||
+    return list.find(v => /flux2-vae\.safetensors$/i.test(v)) ||
+           list.find(v => v.toLowerCase().includes("flux2-vae")) ||
            list[0] || "Flux/flux2-vae.safetensors";
   }
   // Krea2 (16ch): el workflow nativo KreaQwen_Native.json usa qwen_image_vae para la base Krea2.
@@ -5249,16 +5343,26 @@ function selectOrFallback(selId, list, fallbackKeyword){
   }
 }
 
+// Familia del ultimo UNET con el que se rellenó cada selector de VAE: MOSS y Flux2
+// comparten latentes (128ch), asi que selectOrFallback conservaria el VAE anterior;
+// al cruzar de una a otra se pasa al VAE propio de la nueva familia.
+const lastVaeArch = {};
+
 function updateVaeSelectors(){
-  const baseFam = unetVaeFamily($("baseUnetSelect")?.value);
-  const refFam = unetVaeFamily($("refinerUnetSelect")?.value);
-  selectOrFallback("baseVaeSelect", compatibleVaes(baseFam), vaeShortKw(baseFam));
-  selectOrFallback("refinerVaeSelect", compatibleVaes(refFam), vaeShortKw(refFam));
+  for(const [vaeId, unetId] of [["baseVaeSelect", "baseUnetSelect"], ["refinerVaeSelect", "refinerUnetSelect"]]){
+    const arch = unetArchFamily($(unetId)?.value);
+    const crossed = lastVaeArch[vaeId] && lastVaeArch[vaeId] !== arch &&
+                    (lastVaeArch[vaeId] === "moss" || arch === "moss");
+    lastVaeArch[vaeId] = arch;
+    selectOrFallback(vaeId, compatibleVaes(arch), vaeShortKw(arch));
+    if(crossed && $(vaeId)) $(vaeId).value = fallbackVae(arch);
+  }
 }
 
 function vaeShortKw(family){
   if(family === "qwen21") return "texture_fix_vae_for_qwen_image_2.1";
-  if(family === "flux2") return "flux2-vae";
+  if(family === "moss") return "flux2-vae_small";
+  if(family === "flux2" || family === "flux3") return "flux2-vae";
   return "qwen_image_vae";
 }
 
@@ -5325,6 +5429,20 @@ const ARCH_PROFILES = {
     refinerScheduler: "simple",
     refinerDenoise: 0.35,
     clip: "qwen3vl_4b"
+  },
+  // MOSS-Image (template oficial de ComfyUI, PR #17095): 25 pasos, CFG 2.5, er_sde/simple,
+  // shift 5 (el del modelo). OpenMOSS recomienda 50 pasos / CFG 3 / euler para máxima calidad.
+  moss: {
+    steps: 25,
+    cfg: 2.5,
+    sampler: "er_sde",
+    scheduler: "simple",
+    refinerSteps: 12,
+    refinerCfg: 2.5,
+    refinerSampler: "er_sde",
+    refinerScheduler: "simple",
+    refinerDenoise: 0.35,
+    clip: "qwen3.5_9b_w4a8_gptq"
   }
 };
 
@@ -5333,6 +5451,7 @@ function profileForFamily(family){
   if(family === "qwen21") return "qwen";
   if(family === "flux2") return "flux2";
   if(family === "flux3") return "flux3";
+  if(family === "moss") return "moss";
   return "krea";
 }
 
@@ -5483,6 +5602,26 @@ function applyComboMode(mode){
     if($("refinerEnabled")) $("refinerEnabled").checked = true;
     if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
     if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_qwen"){
+    setStage(selBaseU, selBaseC, "moss", "base", "moss_image_sft");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen_image_2.1_turbo");
+    if(hint) hint.textContent = "MOSS-Image compone la escena con texto y layout precisos (bilingüe EN/ZH); Qwen 2.1 refina microtexturas tras el reescalado. Usa un denoise bajo para no alterar el texto.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_krea"){
+    setStage(selBaseU, selBaseC, "moss", "base", "moss_image_sft");
+    setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
+    if(hint) hint.textContent = "MOSS-Image compone la escena con texto y layout precisos; Krea2 aporta estética fotográfica, riqueza tonal y grano en el refinado. Usa un denoise bajo para no alterar el texto.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_only"){
+    setStage(selBaseU, selBaseC, "moss", "base_only", "moss_image_sft");
+    if($("refinerEnabled")) $("refinerEnabled").checked = false;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = false;
+    if(hint) hint.textContent = "MOSS-Image en una sola pasada: renderizado de texto y layouts JSON (usa el enhancer 'MOSS Layout'). SFT = texto/layout más limpios; Base = mejor con LoRAs.";
+    if(refWrap) refWrap.style.opacity = "0.6";
   } else if(mode === "base_only"){
     // En base_only heredamos el perfil (pero no tocamos el text encoder) del modelo base actual
     const baseFam = unetArchFamily(selBaseU?.value);
@@ -5530,7 +5669,9 @@ function invertOrder(){
   const newMode = (bFam === "krea2" && rFam === "qwen21") ? "krea_qwen" :
                   (bFam === "qwen21" && rFam === "krea2") ? "qwen_krea" :
                   (bFam === "krea2" && rFam === "krea2") ? "krea_krea" :
-                  (bFam === "qwen21" && rFam === "qwen21") ? "qwen_qwen" : "";
+                  (bFam === "qwen21" && rFam === "qwen21") ? "qwen_qwen" :
+                  (bFam === "moss" && rFam === "qwen21") ? "moss_qwen" :
+                  (bFam === "moss" && rFam === "krea2") ? "moss_krea" : "";
   if(newMode && modeSel) modeSel.value = newMode;
   
   log("⇄ Orden de modelos invertido.", "l-ok");
@@ -5636,10 +5777,95 @@ function showImageView(mode){
 // en el selector de relación de aspecto. No escribe en #prompt (lo decide quien
 // lo invoca): así puede usarse tanto desde "Usar como prompt" como desde el
 // interceptor de captura registrado en initKreaQwenUI().
+// Port de scripts/compile_prompt.py (skill moss-image-prompt-enhancer): valida un borrador
+// de Layout en píxeles absolutos (xyxy) y lo convierte al formato que espera MOSS-Image
+// (abs_centralized / yxyx, una sola línea, sin width/height). Lanza Error si no es válido.
+function compileMossLayout(draft){
+  const req = (cond, msg) => { if(!cond) throw new Error(msg); };
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+  const fields = (v, allowed, required, loc) => {
+    req(isObj(v), `${loc} debe ser un objeto`);
+    const unknown = Object.keys(v).filter(k => !allowed.includes(k));
+    const missing = required.filter(k => !(k in v));
+    req(!unknown.length, `${loc}: campos desconocidos ${unknown.join(", ")}`);
+    req(!missing.length, `${loc}: faltan campos ${missing.join(", ")}`);
+  };
+  const text = (v, loc) => req(typeof v === "string" && v.trim() !== "", `${loc} debe ser texto no vacío`);
+  const strings = (v, loc) => { req(Array.isArray(v), `${loc} debe ser un array`); v.forEach((x, i) => text(x, `${loc}[${i}]`)); };
+  const r9 = x => Math.round(x * 1e9) / 1e9;
+
+  const rootFields = ["width", "height", "bbox_coord_space", "bbox_format", "summary", "items"];
+  fields(draft, rootFields, rootFields, "Layout");
+  const { width, height } = draft;
+  for(const [name, v] of [["width", width], ["height", height]]){
+    req(Number.isInteger(v) && v > 0 && v % 16 === 0, `${name} debe ser un entero positivo múltiplo de 16`);
+  }
+  req(draft.bbox_coord_space === "abs", "bbox_coord_space debe ser abs");
+  req(draft.bbox_format === "xyxy", "bbox_format debe ser xyxy");
+
+  const summary = draft.summary;
+  fields(summary, ["caption", "meta", "canvas", "palette"], ["caption"], "summary");
+  text(summary.caption, "summary.caption");
+  if("canvas" in summary) req(["single", "multi_panel", "collage"].includes(summary.canvas), "summary.canvas debe ser single, multi_panel o collage");
+  for(const k of ["meta", "palette"]) if(k in summary) strings(summary[k], `summary.${k}`);
+
+  req(Array.isArray(draft.items) && draft.items.length, "items debe ser un array plano no vacío");
+  const items = draft.items.map((item, i) => {
+    const loc = `items[${i}]`;
+    fields(item, ["label", "caption", "bbox", "text", "tags", "palette"], ["label", "caption", "bbox"], loc);
+    req(["object", "character", "text"].includes(item.label), `${loc}.label debe ser object, character o text`);
+    text(item.caption, `${loc}.caption`);
+    if(item.label === "text") req("text" in item, `${loc}: un item de texto necesita "text"`);
+    if("text" in item) text(item.text, `${loc}.text`);
+    for(const k of ["tags", "palette"]) if(k in item) strings(item[k], `${loc}.${k}`);
+    const b = item.bbox;
+    req(Array.isArray(b) && b.length === 4 && b.every(v => typeof v === "number" && Number.isFinite(v)), `${loc}.bbox debe ser [x1,y1,x2,y2]`);
+    const [x1, y1, x2, y2] = b;
+    req(x1 < x2 && y1 < y2, `${loc}.bbox debe tener ancho y alto positivos`);
+    req(x1 >= 0 && x2 <= width && y1 >= 0 && y2 <= height, `${loc}.bbox se sale del lienzo ${width}x${height}`);
+    // Bordes enteros (floor arriba/izquierda, ceil abajo/derecha) antes de centrar.
+    const hw = Math.floor(width / 2), hh = Math.floor(height / 2);
+    const box = [Math.floor(r9(y1)) - hh, Math.floor(r9(x1)) - hw, Math.ceil(r9(y2)) - hh, Math.ceil(r9(x2)) - hw];
+    req(box[0] < box[2] && box[1] < box[3], `${loc}.bbox es demasiado pequeña`);
+    const out = {};
+    for(const [k, v] of Object.entries(item)) out[k] = (k === "bbox") ? box : v;
+    return out;
+  });
+  return { prompt: JSON.stringify({ summary, items, bbox_coord_space: "abs_centralized", bbox_format: "yxyx" }), width, height };
+}
+
+// Salida de los presets MOSS: {"caption": "..."} o un borrador de Layout. Devuelve el
+// prompt listo, o null si el texto no es JSON de MOSS (se trata como texto normal).
+function parseMossEnhancerOutput(rawText){
+  const a = rawText.indexOf("{"), b = rawText.lastIndexOf("}");
+  if(a < 0 || b <= a) return null;
+  let parsed;
+  try { parsed = JSON.parse(rawText.slice(a, b + 1)); } catch(e){ return null; }
+  if(!parsed || typeof parsed !== "object") return null;
+  if(Object.keys(parsed).length === 1 && typeof parsed.caption === "string") return parsed.caption.trim();
+  if(!Array.isArray(parsed.items) || parsed.bbox_coord_space !== "abs") return null;
+  try {
+    const { prompt, width, height } = compileMossLayout(parsed);
+    const cur = calculateDimensions(parseFloat($("mpSlider")?.value || "1.0"), $("aspectRatio")?.value || "16:9 (Widescreen)");
+    if(cur.w !== width || cur.h !== height){
+      log(`⚠️ Layout MOSS pensado para ${width}x${height}, pero la resolución Base es ${cur.w}x${cur.h}: las cajas no coincidirán. Ajusta MP/relación de aspecto o regenera el layout.`, "l-warn");
+    } else {
+      log(`🧩 Layout MOSS compilado (${parsed.items.length} elementos, ${width}x${height}).`, "l-ok");
+    }
+    return prompt;
+  } catch(e){
+    log(`❌ Layout MOSS no válido: ${e.message}. Se usa el texto tal cual; pide al LLM que lo corrija.`, "l-err");
+    return null;
+  }
+}
+
 function parseEnhancerResult(rawText){
   if(!rawText) return "";
   let textToApply = rawText.trim();
   let ratioToApply = null;
+
+  const moss = parseMossEnhancerOutput(textToApply);
+  if(moss) return moss;
 
   // Intentar parsear JSON estricto o regex de bloque JSON
   try {
@@ -5957,6 +6183,8 @@ function snapshotJob(isBaseOnly = false){
     prompt: $("prompt")?.value || "",
     negPrompt: $("negPrompt")?.value || "",
     comboMode: isBaseOnly ? "base_only" : ($("comboMode")?.value || "krea_qwen"),
+    mossSlgLayers: $("mossSlgLayers")?.value ?? "22",
+    mossSlgEnd: parseFloat($("mossSlgEnd")?.value || "0.5"),
     baseUnet: $("baseUnetSelect")?.value,
     baseWeightDtype: $("baseWeightDtype")?.value || "default",
     baseClip: $("baseClipSelect")?.value,
@@ -6049,6 +6277,8 @@ function saveKreaQwenSettings(){
     prompt: $("prompt")?.value ?? "",
     negPrompt: $("negPrompt")?.value ?? "",
     comboMode: $("comboMode")?.value || "krea_qwen",
+    mossSlgLayers: $("mossSlgLayers")?.value ?? "22",
+    mossSlgEnd: $("mossSlgEnd")?.value || "0.5",
     baseUnet: $("baseUnetSelect")?.value,
     baseWeightDtype: $("baseWeightDtype")?.value || "default",
     baseClip: $("baseClipSelect")?.value,
@@ -6156,6 +6386,8 @@ function restoreKreaQwenSettings(){
     if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
     if(s.negPrompt !== undefined && $("negPrompt")) $("negPrompt").value = s.negPrompt;
     if(s.comboMode && $("comboMode")) $("comboMode").value = s.comboMode;
+    if(s.mossSlgLayers !== undefined && $("mossSlgLayers")) $("mossSlgLayers").value = s.mossSlgLayers;
+    if(s.mossSlgEnd !== undefined && $("mossSlgEnd")) $("mossSlgEnd").value = s.mossSlgEnd;
 
     restoreModel("baseUnetSelect", s.baseUnet, "modelo Base");
     if(s.baseWeightDtype && $("baseWeightDtype")) $("baseWeightDtype").value = s.baseWeightDtype;
@@ -6834,6 +7066,35 @@ function applyAlignYourSteps(g){
   return g;
 }
 
+// --- MOSS-Image ---
+// Negativo recomendado por OpenMOSS (USERGUIDE); el template de ComfyUI lo usa cuando
+// el campo negativo está vacío.
+const MOSS_DEFAULT_NEG = "nsfw, worst quality, bad anatomy, watermark, jpeg artifact";
+function mossNegative(isMoss, neg){
+  const t = (neg || "").trim();
+  return (isMoss && !t) ? MOSS_DEFAULT_NEG : t;
+}
+
+// Skip Layer Guidance "uncond skip" (SkipLayerGuidanceDiTSimple, nodo nativo): la rama
+// negativa salta las capas single indicadas. Oficial: capa 22, de 0 a 0.5 del muestreo.
+function appendMossSlg(g, stage, modelRef, j){
+  const layers = String(j.mossSlgLayers ?? "22").trim();
+  if(!layers) return modelRef;
+  const id = `moss_slg_${stage}`;
+  g[id] = {
+    class_type: "SkipLayerGuidanceDiTSimple",
+    inputs: {
+      double_layers: "",
+      single_layers: layers,
+      start_percent: 0,
+      end_percent: Math.min(1, Math.max(0.05, Number(j.mossSlgEnd) || 0.5)),
+      model: modelRef
+    },
+    _meta: { title: `MOSS SLG (${stage})` }
+  };
+  return [id, 0];
+}
+
 function buildGraph(job){
   const j = job || activeJob || snapshotJob();
   const g = JSON.parse(JSON.stringify(BASE_GRAPH));
@@ -6851,6 +7112,8 @@ function buildGraph(job){
   const isKreaBase = (famBase === "krea2");
   const isQwenRefiner = (famRefiner === "qwen21");
   const isKreaRefiner = (famRefiner === "krea2");
+  const isMossBase = (famBase === "moss");
+  const isMossRefiner = (famRefiner === "moss");
 
   // --- EDICIÓN QWEN 2.1: etapas afectadas ---
   // Vía oficial (template image_qwen_image_2_1_image_edit de ComfyUI): conditioning
@@ -6872,6 +7135,7 @@ function buildGraph(job){
     if(f === "qwen21") return "Qwen 2.1 (64 canales · qwen_image_2.1_vae)";
     if(f === "flux2") return "Flux2/Klein (128 canales · flux2-vae)";
     if(f === "flux3") return "Flux3/Klein (128 canales · flux2-vae)";
+    if(f === "moss") return "MOSS-Image (128 canales · flux2-vae_small)";
     return "Krea2 (16 canales · qwen_image_vae / wan_2.1_vae)";
   }
   function vaeMatches(vaeName, family){
@@ -6970,6 +7234,9 @@ function buildGraph(job){
   if(isQwenBase && Number(j.baseCfg) > 1){
     curBaseModel = appendQwenCacheOff(g, "base", curBaseModel);
   }
+  if(isMossBase && Number(j.baseCfg) > 1){
+    curBaseModel = appendMossSlg(g, "base", curBaseModel, j);
+  }
 
   g[N.SAMPLER_BASE].inputs.model = curBaseModel;
 
@@ -6979,7 +7246,7 @@ function buildGraph(job){
 
   g[N.POS_BASE].inputs.text = (j.prompt || "").trim();
   // Krea 2 (Flux) no soporta prompt negativo (CFG=1), lo vaciamos. Qwen UC sí lo soporta.
-  g[N.NEG_BASE].inputs.text = isKreaBase ? "" : (j.negPrompt || "").trim();
+  g[N.NEG_BASE].inputs.text = isKreaBase ? "" : mossNegative(isMossBase, j.negPrompt);
 
   // Edición con Qwen 2.1 en la etapa Base (solo si el Base es Qwen).
   const qwenEditBase = (isQwenBase && qwenEditWantsBase)
@@ -7162,6 +7429,9 @@ function buildGraph(job){
   if(isQwenRefiner && Number(j.refinerCfg) > 1){
     curRefinerModel = appendQwenCacheOff(g, "refiner", curRefinerModel);
   }
+  if(isMossRefiner && Number(j.refinerCfg) > 1){
+    curRefinerModel = appendMossSlg(g, "refiner", curRefinerModel, j);
+  }
 
   g[N.SAMPLER_REFINER].inputs.model = curRefinerModel;
 
@@ -7170,7 +7440,7 @@ function buildGraph(job){
 
   g[N.POS_REFINER].inputs.text = (j.prompt || "").trim();
   // Krea 2 (Flux) no soporta prompt negativo, lo vaciamos. Qwen UC sí lo soporta.
-  g[N.NEG_REFINER].inputs.text = isKreaRefiner ? "" : (j.negPrompt || "").trim();
+  g[N.NEG_REFINER].inputs.text = isKreaRefiner ? "" : mossNegative(isMossRefiner, j.negPrompt);
 
   // Edición con Qwen 2.1 en la etapa Refiner vía oficial: el borrador intermedio
   // (IMAGE del nodo 26) entra como <image1> (objetivo del edit, la salida sigue su
@@ -8046,7 +8316,9 @@ function applyKreaQwenWorkflow(workflow){
   const unetRefFam = unetArchFamily(g[N.UNET_REFINER]?.inputs?.unet_name);
   const hasRefiner = !!g[N.UNET_REFINER];
   let combo = "krea_qwen";
-  if(!hasRefiner) combo = "base_only";
+  if(!hasRefiner) combo = (unetBaseFam === "moss") ? "moss_only" : "base_only";
+  else if(unetBaseFam === "moss" && unetRefFam === "qwen21") combo = "moss_qwen";
+  else if(unetBaseFam === "moss" && unetRefFam === "krea2") combo = "moss_krea";
   else if(unetBaseFam === "qwen21" && unetRefFam === "qwen21") combo = "qwen_qwen";
   else if(unetBaseFam === "krea2" && unetRefFam === "krea2") combo = "krea_krea";
   else if(unetBaseFam === "qwen21" && unetRefFam === "krea2") combo = "qwen_krea";
@@ -8059,6 +8331,9 @@ function applyKreaQwenWorkflow(workflow){
   if(hasRefiner && setModel("refinerUnetSelect", g[N.UNET_REFINER]?.inputs?.unet_name)) applied.push("modelo refiner");
   setModel("baseClipSelect", g[N.CLIP_BASE]?.inputs?.clip_name);
   if(hasRefiner) setModel("refinerClipSelect", g[N.CLIP_REFINER]?.inputs?.clip_name);
+  // Las listas de VAE se filtran por la familia del UNET: hay que regenerarlas para el
+  // UNET restaurado antes de seleccionar su VAE (si no, el VAE no está entre las opciones).
+  updateVaeSelectors();
   setModel("baseVaeSelect", g[N.VAE_BASE]?.inputs?.vae_name);
   if(hasRefiner) setModel("refinerVaeSelect", g[N.VAE_REFINER]?.inputs?.vae_name);
   if(g[N.UNET_BASE]?.inputs?.weight_dtype && $("baseWeightDtype")) $("baseWeightDtype").value = g[N.UNET_BASE].inputs.weight_dtype;
@@ -8069,6 +8344,15 @@ function applyKreaQwenWorkflow(workflow){
   if($("baseAttentionBackend")) $("baseAttentionBackend").value = attnBase?.inputs?.attention || "none";
   const attnRef = Object.values(g).find(n => n.class_type === "ModelAttentionBackend" && JSON.stringify(n.inputs.model||[]).includes(N.UNET_REFINER));
   if($("refinerAttentionBackend")) $("refinerAttentionBackend").value = attnRef?.inputs?.attention || "none";
+
+  // --- MOSS SLG (SkipLayerGuidanceDiTSimple) ---
+  // Imágenes MOSS sin nodo SLG se generaron con el SLG desactivado (o con CFG 1).
+  if(unetBaseFam === "moss" || unetRefFam === "moss"){
+    const slg = Object.values(g).find(n => n.class_type === "SkipLayerGuidanceDiTSimple");
+    if($("mossSlgLayers")) $("mossSlgLayers").value = slg?.inputs?.single_layers ?? "";
+    if(slg?.inputs?.end_percent != null && $("mossSlgEnd")) $("mossSlgEnd").value = slg.inputs.end_percent;
+    applied.push("SLG MOSS");
+  }
 
   // --- Samplers Base / Refiner ---
   const sb = g[N.SAMPLER_BASE]?.inputs || {};
@@ -8439,6 +8723,13 @@ function getRefImageSrc(){
   return el.src;
 }
 
+// Los presets de Layout MOSS necesitan el tamaño exacto del lienzo (resolución Base).
+function withCanvasDims(system){
+  if(!system || !system.includes("{{")) return system;
+  const d = calculateDimensions(parseFloat($("mpSlider")?.value || "1.0"), $("aspectRatio")?.value || "16:9 (Widescreen)");
+  return system.replace(/\{\{WIDTH\}\}/g, d.w).replace(/\{\{HEIGHT\}\}/g, d.h);
+}
+
 // --- ENHANCER (texto + visión) vía streamOllamaGenerate (common.js) ---
 $("btnEnhance")?.addEventListener("click", async () => {
   const chainMode = $("enhancerChainMode")?.value || "ollama";
@@ -8451,7 +8742,7 @@ $("btnEnhance")?.addEventListener("click", async () => {
   const mode = $("enhancerMode").value;
   const styleKey = $("enhancerStyle").value;
   const data = loadSysPrompts();
-  const system = getCurrentSysPrompt(data, mode, styleKey);
+  const system = withCanvasDims(getCurrentSysPrompt(data, mode, styleKey));
   const userPrompt = $("prompt").value.trim();
   if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
