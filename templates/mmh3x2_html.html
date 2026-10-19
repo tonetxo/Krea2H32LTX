@@ -579,12 +579,13 @@
               <label>Backend sparse</label>
               <select id="h3SparseBackend" style="margin-top:4px;">
                 <option value="auto" selected>Auto (H3SparseAttention)</option>
-                <option value="Kitchen INT8">Kitchen INT8</option>
-                <option value="Kitchen INT8 64x128 (experimental)">Kitchen INT8 64x128</option>
-                <option value="Sparse Sage">Sparse Sage</option>
-                <option value="BF16 Triton">BF16 Triton</option>
-                <option value="FP8 FlexAttention">FP8 FlexAttention</option>
-                <option value="FROST BF16 (SM89)">FROST BF16 (SM89)</option>
+                <option value="Kitchen INT8 64Q x 32KV (Quality)">Kitchen INT8 64Q×32KV (calidad, recomendado)</option>
+                <option value="Kitchen INT8 64Q x 64KV (Quality)">Kitchen INT8 64Q×64KV (calidad)</option>
+                <option value="Kitchen INT8 64Q x 128KV (Faster)">Kitchen INT8 64Q×128KV (rápido)</option>
+                <option value="Sparse Sage (GPU-specific geometry)">Sparse Sage</option>
+                <option value="BF16 Triton 64Q x 64KV">BF16 Triton</option>
+                <option value="FP8 FlexAttention 64Q x 64KV">FP8 FlexAttention</option>
+                <option value="FROST BF16 64Q x 64KV (SM89)">FROST BF16 (SM89)</option>
               </select>
             </div>
             <div class="hint" style="margin-top:4px;font-size:10px;">
@@ -672,6 +673,16 @@
                 <label style="font-size:10px;">Tau (umbral)</label>
                 <input type="range" id="solTauSlider" min="0.1" max="2.0" step="0.1" value="1.0">
                 <div class="slider-val" id="solTauVal">1.0</div>
+              </div>
+              <div class="row" style="margin-top:6px;">
+                <label style="font-size:10px;">QKV por bloques (qkv_chunk_size)</label>
+                <select id="solQkvChunk" style="margin-top:4px;">
+                  <option value="0">0 (proyección QKV nativa completa)</option>
+                  <option value="2048">2048</option>
+                  <option value="4096" selected>4096 (por defecto del nodo)</option>
+                  <option value="8192">8192</option>
+                </select>
+                <div class="hint" style="margin-top:2px;font-size:10px;">Menos VRAM pico a cambio de algo más de cómputo (recalcula Q). 0 = comportamiento anterior a Sol-H3 v0.1.11.</div>
               </div>
             </div>
             <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Acelera la atención de vídeo en ambos segmentos simultáneamente.</div>

@@ -257,6 +257,20 @@ function setAttentionOptimizerUI(mode){
   if(bsPanel) bsPanel.style.display = mode === "block-sparse" ? "" : "none";
 }
 
+// Nombres de backend de H3-Optimizations < 0.2.46 → nombres canónicos actuales.
+// El nodo sigue aceptando los antiguos, pero el <select> solo tiene los nuevos.
+const H3_SPARSE_BACKEND_LEGACY = {
+  "Kitchen INT8": "Kitchen INT8 64Q x 64KV (Quality)",
+  "Kitchen INT8 (experimental)": "Kitchen INT8 64Q x 64KV (Quality)",
+  "Kitchen INT8 64x128 (experimental)": "Kitchen INT8 64Q x 128KV (Faster)",
+  "Kitchen INT8 64Q x 32KV (Experimental)": "Kitchen INT8 64Q x 32KV (Quality)",
+  "Sparse Sage": "Sparse Sage (GPU-specific geometry)",
+  "BF16 Triton": "BF16 Triton 64Q x 64KV",
+  "INT8 Triton": "BF16 Triton 64Q x 64KV",
+  "FP8 FlexAttention": "FP8 FlexAttention 64Q x 64KV",
+  "FROST BF16 (SM89)": "FROST BF16 64Q x 64KV (SM89)"
+};
+function normalizeSparseBackend(b){ return H3_SPARSE_BACKEND_LEGACY[b] || b || "auto"; }
 function loadH3Opt(){
   try { return Object.assign({}, H3OPT_DEFAULTS, JSON.parse(localStorage.getItem(H3OPT_KEY) || "{}")); }
   catch(_) { return {...H3OPT_DEFAULTS}; }
@@ -271,7 +285,7 @@ function getH3OptState(){
   };
 }
 function setH3OptUI(state){
-  if($("h3SparseBackend")) $("h3SparseBackend").value = state.sparseBackend || "auto";
+  if($("h3SparseBackend")) $("h3SparseBackend").value = normalizeSparseBackend(state.sparseBackend);
   if($("h3VideoBudget")){
     $("h3VideoBudget").value = state.videoBudget;
     const pct = Math.round(state.videoBudget * 100);
@@ -638,7 +652,7 @@ $("spectrumHistoryStorage")?.addEventListener("change", (e) => { const s = getSp
 
 // --- SOL-H3 ATTENTION (SM120 Blackwell) ---
 const SOL_H3_KEY = "minimaxh3_sol_h3_state";
-const SOL_H3_DEFAULTS = { enabled: false, exact_fusion: true, dense_evaluations: 1, dense_layers: 2, tau: 1.0 };
+const SOL_H3_DEFAULTS = { enabled: false, exact_fusion: true, dense_evaluations: 1, dense_layers: 2, tau: 1.0, qkv_chunk_size: 4096 };
 function loadSolH3(){
   try { return Object.assign({}, SOL_H3_DEFAULTS, JSON.parse(localStorage.getItem(SOL_H3_KEY) || "{}")); }
   catch(_) { return {...SOL_H3_DEFAULTS}; }
@@ -650,7 +664,8 @@ function getSolH3State(){
     exact_fusion: $("segSolExactOn")?.classList.contains("on") ?? true,
     dense_evaluations: parseInt($("solDenseEvalSlider")?.value || "1", 10),
     dense_layers: parseInt($("solDenseLayersSlider")?.value || "2", 10),
-    tau: parseFloat($("solTauSlider")?.value || "1.0")
+    tau: parseFloat($("solTauSlider")?.value || "1.0"),
+    qkv_chunk_size: parseInt($("solQkvChunk")?.value ?? "4096", 10)
   };
 }
 function setSolH3UI(s){
@@ -684,6 +699,10 @@ function setSolH3UI(s){
     const tau = (s.tau != null) ? parseFloat(s.tau) : 1.0;
     $("solTauSlider").value = tau;
     if($("solTauVal")) $("solTauVal").textContent = tau.toFixed(1);
+  }
+  if($("solQkvChunk")){
+    // Grafos anteriores a Sol-H3 v0.1.11 no llevan el campo: el nodo aplica 4096.
+    $("solQkvChunk").value = String(Number.isInteger(s.qkv_chunk_size) ? s.qkv_chunk_size : 4096);
   }
 }
 const _solH3State = loadSolH3();
@@ -744,6 +763,10 @@ $("solTauSlider")?.addEventListener("input", (e) => {
   const s = getSolH3State();
   s.tau = tau;
   saveSolH3(s);
+  scheduleSaveH3Settings();
+});
+$("solQkvChunk")?.addEventListener("change", () => {
+  saveSolH3(getSolH3State());
   scheduleSaveH3Settings();
 });
 
@@ -3078,6 +3101,7 @@ async function applyWorkflow(workflow, opts={}){
       dense_evaluations: typeof solNode.inputs.dense_evaluations === "number" ? solNode.inputs.dense_evaluations : 1,
       dense_layers: typeof solNode.inputs.dense_layers === "number" ? solNode.inputs.dense_layers : 2,
       tau: typeof solNode.inputs.tau === "number" ? solNode.inputs.tau : 1.0,
+      qkv_chunk_size: Number.isInteger(solNode.inputs.qkv_chunk_size) ? solNode.inputs.qkv_chunk_size : 4096,
     };
     setSolH3UI(s);
     saveSolH3(s);
@@ -4142,7 +4166,7 @@ function buildGraph(job){
           early_kv: 0.6833,
           late_steps: 0,
           late_kv: 0.6833,
-          backend: h3opt.sparseBackend,
+          backend: normalizeSparseBackend(h3opt.sparseBackend),
           early_schedule: "Ramp",
           video_token_order: "1x8x8"
         },
@@ -4343,7 +4367,8 @@ function buildGraph(job){
         exact_fusion: solH3State.exact_fusion !== false,
         tau: (typeof solH3State.tau === "number") ? solH3State.tau : 1.0,
         dense_evaluations: (typeof solH3State.dense_evaluations === "number") ? solH3State.dense_evaluations : 1,
-        dense_layers: (typeof solH3State.dense_layers === "number") ? solH3State.dense_layers : 2
+        dense_layers: (typeof solH3State.dense_layers === "number") ? solH3State.dense_layers : 2,
+        qkv_chunk_size: Number.isInteger(solH3State.qkv_chunk_size) ? solH3State.qkv_chunk_size : 4096
       },
       _meta: { title: "Sol-H3 SOL Attention (Experimental)" }
     };
@@ -5147,7 +5172,7 @@ function buildGraph(job){
                 early_kv: 0.6833,
                 late_steps: 0,
                 late_kv: 0.6833,
-                backend: h3opt.sparseBackend,
+                backend: normalizeSparseBackend(h3opt.sparseBackend),
                 early_schedule: "Ramp",
                 video_token_order: "1x8x8"
               },
@@ -5229,7 +5254,8 @@ function buildGraph(job){
               exact_fusion: solH3State.exact_fusion !== false,
               tau: (typeof solH3State.tau === "number") ? solH3State.tau : 1.0,
               dense_evaluations: 1,
-              dense_layers: 2
+              dense_layers: 2,
+              qkv_chunk_size: Number.isInteger(solH3State.qkv_chunk_size) ? solH3State.qkv_chunk_size : 4096
             },
             _meta: { title: "Sol-H3 SOL Attention Pase 2" }
           };

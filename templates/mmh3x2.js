@@ -308,6 +308,20 @@ function setAttentionOptimizerUI(mode){
   if(h3Panel) h3Panel.style.display = safeMode === "h3-optimizations" ? "" : "none";
 }
 
+// Nombres de backend de H3-Optimizations < 0.2.46 → nombres canónicos actuales.
+// El nodo sigue aceptando los antiguos, pero el <select> solo tiene los nuevos.
+const H3_SPARSE_BACKEND_LEGACY = {
+  "Kitchen INT8": "Kitchen INT8 64Q x 64KV (Quality)",
+  "Kitchen INT8 (experimental)": "Kitchen INT8 64Q x 64KV (Quality)",
+  "Kitchen INT8 64x128 (experimental)": "Kitchen INT8 64Q x 128KV (Faster)",
+  "Kitchen INT8 64Q x 32KV (Experimental)": "Kitchen INT8 64Q x 32KV (Quality)",
+  "Sparse Sage": "Sparse Sage (GPU-specific geometry)",
+  "BF16 Triton": "BF16 Triton 64Q x 64KV",
+  "INT8 Triton": "BF16 Triton 64Q x 64KV",
+  "FP8 FlexAttention": "FP8 FlexAttention 64Q x 64KV",
+  "FROST BF16 (SM89)": "FROST BF16 64Q x 64KV (SM89)"
+};
+function normalizeSparseBackend(b){ return H3_SPARSE_BACKEND_LEGACY[b] || b || "auto"; }
 function loadH3Opt(){
   try { return Object.assign({}, H3OPT_DEFAULTS, JSON.parse(localStorage.getItem(H3OPT_KEY) || "{}")); }
   catch(_) { return {...H3OPT_DEFAULTS}; }
@@ -323,7 +337,7 @@ function getH3OptState(){
   };
 }
 function setH3OptUI(state){
-  if($("h3SparseBackend")) $("h3SparseBackend").value = state.sparseBackend || "auto";
+  if($("h3SparseBackend")) $("h3SparseBackend").value = normalizeSparseBackend(state.sparseBackend);
   if($("h3VideoBudget")){
     $("h3VideoBudget").value = state.videoBudget;
     const pct = Math.round(state.videoBudget * 100);
@@ -370,7 +384,8 @@ const SOL_H3_DEFAULTS = {
   exact_fusion: true,
   dense_evaluations: 1,
   dense_layers: 2,
-  tau: 1.0
+  tau: 1.0,
+  qkv_chunk_size: 4096
 };
 function loadSolH3(){
   try { return Object.assign({}, SOL_H3_DEFAULTS, JSON.parse(localStorage.getItem(SOL_H3_KEY) || "{}")); }
@@ -383,7 +398,8 @@ function getSolH3State(){
     exact_fusion: $("segSolExactOn")?.classList.contains("on") ?? true,
     dense_evaluations: parseInt($("solDenseEvalSlider")?.value || "1", 10),
     dense_layers: parseInt($("solDenseLayersSlider")?.value || "2", 10),
-    tau: parseFloat($("solTauSlider")?.value || "1.0")
+    tau: parseFloat($("solTauSlider")?.value || "1.0"),
+    qkv_chunk_size: parseInt($("solQkvChunk")?.value ?? "4096", 10)
   };
 }
 function setSolH3UI(s){
@@ -418,6 +434,10 @@ function setSolH3UI(s){
     const tau = (s.tau != null) ? parseFloat(s.tau) : 1.0;
     $("solTauSlider").value = tau;
     if($("solTauVal")) $("solTauVal").textContent = tau.toFixed(1);
+  }
+  if($("solQkvChunk")){
+    // Grafos anteriores a Sol-H3 v0.1.11 no llevan el campo: el nodo aplica 4096.
+    $("solQkvChunk").value = String(Number.isInteger(s.qkv_chunk_size) ? s.qkv_chunk_size : 4096);
   }
 }
 const _solH3State = loadSolH3();
@@ -793,6 +813,10 @@ function attachAttentionOptimizerListeners(){
     const s = getSolH3State();
     s.tau = tau;
     saveSolH3(s);
+    scheduleSaveSettings();
+  });
+  $("solQkvChunk")?.addEventListener("change", () => {
+    saveSolH3(getSolH3State());
     scheduleSaveSettings();
   });
 
@@ -3652,7 +3676,7 @@ function buildGraph(j){
 
     // Nodo sparse base siempre presente en BlockATT (incluso en modo "none")
     // para no dejar hueco entre ModelAttentionBackend y SigmaShift.
-    const backend = h3opt.sparseBackend || "auto";
+    const backend = normalizeSparseBackend(h3opt.sparseBackend);
     g[N.SPARSE_ATTN] = {
       class_type: "H3SparseAttentionAdvanced",
       inputs: {
@@ -3772,7 +3796,8 @@ function buildGraph(j){
         exact_fusion: solH3State.exact_fusion !== false,
         tau: (typeof solH3State.tau === "number") ? solH3State.tau : 1.0,
         dense_evaluations: (typeof solH3State.dense_evaluations === "number") ? solH3State.dense_evaluations : 1,
-        dense_layers: (typeof solH3State.dense_layers === "number") ? solH3State.dense_layers : 2
+        dense_layers: (typeof solH3State.dense_layers === "number") ? solH3State.dense_layers : 2,
+        qkv_chunk_size: Number.isInteger(solH3State.qkv_chunk_size) ? solH3State.qkv_chunk_size : 4096
       },
       _meta: { title: "Sol-H3 SOL Attention (Experimental)" }
     };
