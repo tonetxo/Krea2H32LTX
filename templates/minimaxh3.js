@@ -204,8 +204,10 @@ const AIMDO_KEY = "minimaxh3_aimdo";
 const BLOCK_SPARSE_KEY = "minimaxh3_block_sparse";
 
 const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
-const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "none" };
-const H3OPT_DEFAULTS = { sparseBackend: "auto", videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true };
+const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "h3-optimizations" };
+const H3OPT_DEFAULTS = { sparseBackend: "auto", videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true, attnMemMode: "Lower VRAM (slower)" };
+// Valores de H3MemoryOptimization.kitchen_v_memory_mode.
+const H3_ATTN_MEM_MODES = ["Standard", "Lower VRAM (slower)"];
 const AIMDO_DEFAULTS = { residency: "0 blocks" };
   // Valores legibles en UI -> valores internos de ComfyUI BlockSparseAttention
   const BLOCK_SPARSE_MODES = {
@@ -282,6 +284,7 @@ function getH3OptState(){
     videoBudget: parseFloat($("h3VideoBudget")?.value || "0.30"),
     denserEarlyLate: $("segDenserOn")?.classList.contains("on") ?? true,
     memOptEnabled: $("segMemOptOn")?.classList.contains("on") ?? true,
+    attnMemMode: $("segAttnMemStd")?.classList.contains("on") ? "Standard" : "Lower VRAM (slower)",
   };
 }
 function setH3OptUI(state){
@@ -297,6 +300,9 @@ function setH3OptUI(state){
   const mOn = $("segMemOptOn"), mOff = $("segMemOptOff");
   if(state.memOptEnabled){ mOn?.classList.add("on"); mOff?.classList.remove("on"); }
   else { mOff?.classList.add("on"); mOn?.classList.remove("on"); }
+  const std = state.attnMemMode === "Standard";
+  $("segAttnMemStd")?.classList.toggle("on", std);
+  $("segAttnMemLow")?.classList.toggle("on", !std);
 }
 
 function loadAimdo(){
@@ -398,6 +404,8 @@ $("segDenserOn")?.addEventListener("click", () => { const s = getH3OptState(); s
 $("segDenserOff")?.addEventListener("click", () => { const s = getH3OptState(); s.denserEarlyLate = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveH3Settings(); });
 $("segMemOptOn")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = true; setH3OptUI(s); saveH3Opt(s); scheduleSaveH3Settings(); });
 $("segMemOptOff")?.addEventListener("click", () => { const s = getH3OptState(); s.memOptEnabled = false; setH3OptUI(s); saveH3Opt(s); scheduleSaveH3Settings(); });
+$("segAttnMemStd")?.addEventListener("click", () => { const s = getH3OptState(); s.attnMemMode = "Standard"; setH3OptUI(s); saveH3Opt(s); scheduleSaveH3Settings(); });
+$("segAttnMemLow")?.addEventListener("click", () => { const s = getH3OptState(); s.attnMemMode = "Lower VRAM (slower)"; setH3OptUI(s); saveH3Opt(s); scheduleSaveH3Settings(); });
 $("aimdoResidency")?.addEventListener("change", () => { saveAimdo(getAimdoState()); scheduleSaveH3Settings(); });
 $("blockSparseSelection")?.addEventListener("change", () => { saveBlockSparse(getBlockSparseState()); updateBlockSparseModeRows(); scheduleSaveH3Settings(); });
 $("vsaKeepPercent")?.addEventListener("input", (e) => { $("vsaKeepPercentVal").textContent = parseFloat(e.target.value).toFixed(1); saveBlockSparse(getBlockSparseState()); scheduleSaveH3Settings(); });
@@ -3053,6 +3061,9 @@ async function applyWorkflow(workflow, opts={}){
     }
     if(memOptNode){
       h3State.memOptEnabled = true;
+      // Metadatos antiguos sin el campo: se asume "Standard", que era el valor fijo.
+      const mode = memOptNode.inputs?.kitchen_v_memory_mode;
+      h3State.attnMemMode = H3_ATTN_MEM_MODES.includes(mode) ? mode : "Standard";
       setApplied("h3 memory opt");
     }
     setH3OptUI(h3State);
@@ -4158,7 +4169,7 @@ function buildGraph(job){
           precision_mode: "Auto",
           qkv_streaming_mode: "Auto",
           embedding_memory_mode: "Auto",
-          kitchen_v_memory_mode: "Standard"
+          kitchen_v_memory_mode: H3_ATTN_MEM_MODES.includes(h3opt.attnMemMode) ? h3opt.attnMemMode : "Standard"
         },
         _meta: { title: "H3 Memory Optimization" }
       };
@@ -5166,7 +5177,7 @@ function buildGraph(job){
                 precision_mode: "Auto",
                 qkv_streaming_mode: "Auto",
                 embedding_memory_mode: "Auto",
-                kitchen_v_memory_mode: "Standard"
+                kitchen_v_memory_mode: H3_ATTN_MEM_MODES.includes(h3opt.attnMemMode) ? h3opt.attnMemMode : "Standard"
               },
               _meta: { title: "H3 Memory Optimization Pase 2" }
             };

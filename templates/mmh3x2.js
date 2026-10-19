@@ -230,7 +230,7 @@ const H3OPT_KEY = "mmh3x2_h3opt";
 const AIMDO_KEY = "mmh3x2_aimdo";
 
 const ATTENTION_BACKEND_DEFAULTS = { backend: "comfy kitchen attention" };
-const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "none" };
+const ATTENTION_OPTIMIZER_DEFAULTS = { mode: "h3-optimizations" };
 const H3OPT_DEFAULTS = { sparseBackend: "auto", videoBudget: 0.30, denserEarlyLate: true, memOptEnabled: true, attnMemMode: "Lower VRAM (slower)" };
 // kitchen_v_memory_mode de H3MemoryOptimization. "Standard" reserva V int8 entero
 // (~1 GB extra por bloque): con 16 GB y el modelo en streaming provoca OOM a mitad
