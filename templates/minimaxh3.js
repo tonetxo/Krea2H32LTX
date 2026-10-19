@@ -4523,13 +4523,19 @@ function buildGraph(job){
       interpImages = ["103_rife_interp", 0];
     }
 
+    // fps de origen × multiplicador (un clip ya interpolado no es de 24 fps).
+    g["104_fps"] = {
+      class_type: "ComfyMathExpression",
+      inputs: { expression: `a * ${mult}`, "values.a": ["101_get_components", 2] },
+      _meta: { title: `FPS origen x${mult}` }
+    };
     const prefix = ($("filenamePrefix")?.value || "video/MiniMax_H3").trim();
     g[N.CREATE_VIDEO] = {
       class_type: "CreateVideo",
       inputs: {
-        fps: 24 * mult,
-        bit_depth: 8,
-        color_space: "sRGB",
+        fps: ["104_fps", 0],
+        bit_depth: ["101_get_components", 3],
+        color_space: ["101_get_components", 4],
         images: interpImages,
         audio: ["101_get_components", 1]
       },
