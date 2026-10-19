@@ -4487,9 +4487,8 @@ function buildGraph(job){
       _meta: { title: "Get Video Components (Native)" }
     };
 
+    // Sin Post-FX: el clip de origen ya lo lleva si estaba activo al generarlo.
     let interpImages = ["101_get_components", 0];
-    // CRÍTICO: Post-FX (LUT/Color) ANTES de interpolar frames, reduciendo carga de CPU/RAM a la mitad
-    interpImages = appendVideoPostFx(g, interpImages, j?.postFx);
 
     if(rifeEngine === "rtx"){
       g["102_rtx_fg"] = {
@@ -5018,8 +5017,7 @@ function buildGraph(job){
     const rtxSameRes = /^(DENOISE|DEBLUR)_/.test(rtxQuality);
     const rtxScale = rtxSameRes ? 1.0 : (rtxState ? parseFloat(rtxState.scale || 2) : 2);
 
-    // CRÍTICO: Post-FX (LUT/Color) ANTES de RTX Video Super Resolution para evitar procesar a 2.5K/4K en CPU
-    currentVideoImages = appendVideoPostFx(g, currentVideoImages, j?.postFx);
+    // Sin Post-FX: el clip de origen ya lo lleva si estaba activo al generarlo.
 
     if(rtxEnabled){
       g[N.RTX_SR] = {

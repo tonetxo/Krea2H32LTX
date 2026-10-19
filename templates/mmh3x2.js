@@ -3882,8 +3882,8 @@ function buildGraph(j){
       inputs: { video: ["100_load_video", 0] },
       _meta: { title: "Get Video Components (Native)" }
     };
-    // Post-FX del panel antes del escalado (mismo orden que el pipeline principal).
-    let srImages = appendVideoPostFx(g, ["101_get_components", 0], j?.postFx);
+    // Sin Post-FX: el clip de origen ya lo lleva si estaba activo al generarlo.
+    let srImages = ["101_get_components", 0];
     g["102_rtx_sr"] = {
       class_type: "RTXVideoSuperResolution",
       inputs: {
@@ -3951,9 +3951,8 @@ function buildGraph(j){
       _meta: { title: "Get Video Components (Native)" }
     };
 
+    // Sin Post-FX: el clip de origen ya lo lleva si estaba activo al generarlo.
     let interpImages = ["101_get_components", 0];
-    // CRÍTICO: Post-FX (LUT/Color) ANTES de interpolar frames, reduciendo carga de CPU/RAM a la mitad
-    interpImages = appendVideoPostFx(g, interpImages, j?.postFx);
 
     if(rifeState.engine === "rtx"){
       g["102_rtx_fg"] = {
@@ -4451,8 +4450,7 @@ function buildGraph(j){
     const rtxOn = frPostproc && ($("rtxToggle") ? $("rtxToggle").checked : false);
     const rifeOn = frPostproc && ($("rifeToggle") ? $("rifeToggle").checked : false);
 
-    // CRÍTICO: Post-FX (LUT/Color) ANTES de RTX y RIFE para procesar frames nativos
-    faceFinalImages = appendVideoPostFx(g, faceFinalImages, j?.postFx);
+    // Sin Post-FX: el clip de origen ya lo lleva si estaba activo al generarlo.
 
     if(rtxOn && g[N.RTX]?.inputs){
       const frQ = $("rtxQuality")?.value || "HIGHBITRATE_ULTRA";
