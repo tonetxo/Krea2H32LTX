@@ -544,6 +544,29 @@ momento: apagar en vez de suspender/hibernar.
 - Gen3 → resume= descartado; los fríos fallan y el caliente arregla → físico
   (paso 7: recolocar GPU, revisar 12V-2x6) / VBIOS.
 
+## H3-Optimizations 0.2.46 / Sol-H3 0.1.11 (2026-10-19)
+Tras actualizar los packs (`f70a39a`): selector de backend sparse con nombres
+canónicos (nuevo default `Kitchen INT8 64Q x 32KV (Quality)`, los nombres
+antiguos se traducen al restaurar) y control `qkv_chunk_size` de Sol-H3.
+
+**Sol-H3 no coexiste con H3-Optimizations**: con `H3MemoryOptimization` o un
+nodo sparse en la cadena cede todo (`sol_eligible_calls: 0`,
+`block_forward_owner` / `inherited_block_or_attention_owner`). La "mitad de
+VRAM" con `qkv_chunk_size=0` era solo la caché del text encoder (1ª ejecución
+en frío). Bench (`bench_comfyui.py`, grafo MiniMaxH3 608x960, 8+3 pasos,
+mismo seed, 2 rondas en caliente; VRAM = nvidia-smi):
+
+| variante | media | VRAM pico |
+|---|---|---|
+| H3-Opt (MemOpt + Sparse 64Q×32KV 30% + AIMDO 0), sin Sol | 153.8 s | 7.8 GB |
+| Sol-H3 solo (cute_sm120, 400/1650 llamadas elegibles) | 174.4 s | 15.8 GB |
+| Sol-H3 + AIMDO 0 blocks | 181.7 s | 11.9 GB |
+
+Decisión: la UI omite Sol-H3 (con aviso en el log) si hay un nodo H3
+MemOpt/Sparse/BlockSparse/VSA en la cadena; en MMH3X2 (siempre lleva sparse H3)
+Sol-H3 pasa a desactivado por defecto. Salidas para comparar calidad en
+`output/bench/h3opt_vs_solh3/`.
+
 ## Pendiente / siguientes pasos
 - **PCIe**: seguir el plan de pruebas de la sección anterior (siguiente: arranque en frío sin `resume=`; ver tabla).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.

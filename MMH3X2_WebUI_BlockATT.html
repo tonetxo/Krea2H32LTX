@@ -1220,7 +1220,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
                 <div class="hint" style="margin-top:2px;font-size:10px;">Menos VRAM pico a cambio de algo más de cómputo (recalcula Q). 0 = comportamiento anterior a Sol-H3 v0.1.11.</div>
               </div>
             </div>
-            <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Acelera la atención de vídeo en ambos segmentos simultáneamente.</div>
+            <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Solo actúa si es dueño de bloques y atención: como MMH3X2 siempre lleva H3 Sparse Attention, la UI lo omite (queda para futuros grafos sin H3-Optimizations).</div>
           </div>
 
           <!-- Spectrum (MiniMax H3) -->
@@ -6267,13 +6267,22 @@ if(IS_BLOCKATT){
 // --- SOL-H3 (SM120 Blackwell) ---
 const SOL_H3_KEY = "mmh3x2_sol_h3_state";
 const SOL_H3_DEFAULTS = {
-  enabled: true,
+  enabled: false,
   exact_fusion: true,
   dense_evaluations: 1,
   dense_layers: 2,
   tau: 1.0,
   qkv_chunk_size: 4096
 };
+// Sol-H3 solo actúa si es dueño de los bloques y de la atención. Con estos nodos en
+// la cadena cede todas las llamadas (sol_eligible_calls = 0) y solo añade un nodo.
+// Bench 2026-10-19 (MiniMaxH3, 608x960, 8+3 pasos): H3-Opt 153.8 s / 7.8 GB frente a
+// Sol-H3 solo 174.4 s / 15.8 GB.
+const SOL_H3_CONFLICTS = ["H3MemoryOptimization", "H3SparseAttention", "H3SparseAttentionAdvanced", "BlockSparseAttention", "H3VSAAttention"];
+function solH3ConflictIn(g){
+  const n = Object.values(g).find(node => node && SOL_H3_CONFLICTS.includes(node.class_type));
+  return n ? n.class_type : null;
+}
 function loadSolH3(){
   try { return Object.assign({}, SOL_H3_DEFAULTS, JSON.parse(localStorage.getItem(SOL_H3_KEY) || "{}")); }
   catch(_) { return {...SOL_H3_DEFAULTS}; }
@@ -6281,7 +6290,7 @@ function loadSolH3(){
 function saveSolH3(s){ try { localStorage.setItem(SOL_H3_KEY, JSON.stringify(s)); } catch(_){} }
 function getSolH3State(){
   return {
-    enabled: $("segSolH3On")?.classList.contains("on") ?? true,
+    enabled: $("segSolH3On")?.classList.contains("on") ?? false,
     exact_fusion: $("segSolExactOn")?.classList.contains("on") ?? true,
     dense_evaluations: parseInt($("solDenseEvalSlider")?.value || "1", 10),
     dense_layers: parseInt($("solDenseLayersSlider")?.value || "2", 10),
@@ -9675,7 +9684,11 @@ function buildGraph(j){
 
   // Sol-H3 SOL Attention (Experimental) — kernel CuTe SM120 para Blackwell
   const solH3State = j ? j.solH3 : getSolH3State();
-  if(solH3State && solH3State.enabled){
+  const solH3Conflict = solH3ConflictIn(g);
+  if(solH3State && solH3State.enabled && solH3Conflict){
+    delete g[N.SOL_H3];
+    log(`⚠️ Sol-H3 omitido: ${solH3Conflict} ya controla bloques/atención y Sol-H3 no actuaría`, "l-warn");
+  } else if(solH3State && solH3State.enabled){
     g[N.SOL_H3] = {
       class_type: "SolH3Experimental",
       inputs: {

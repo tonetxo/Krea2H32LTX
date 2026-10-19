@@ -498,7 +498,7 @@
             <div class="hint" style="margin-top:2px;font-size:10px;">Acota las filas de la proyección QKV (conserva K/V en BF16 y recalcula Q): menos VRAM pico a cambio de algo más de cómputo. 0 = comportamiento anterior a Sol-H3 v0.1.11.</div>
           </div>
         </div>
-        <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Acelera la atención de vídeo. 'Evaluaciones densas = 1' garantiza máxima estabilidad visual en el arranque.</div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Acelera la atención de vídeo. 'Evaluaciones densas = 1' garantiza máxima estabilidad visual en el arranque. Solo actúa con Optimizador sparse = Ninguno: con H3-Optimizations o Block Sparse se omite.</div>
       </div>
 
       <div class="panel"><h2>Sigma Shift (Flow Match)</h2>

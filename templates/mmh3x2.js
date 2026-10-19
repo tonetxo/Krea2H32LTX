@@ -380,13 +380,22 @@ if(IS_BLOCKATT){
 // --- SOL-H3 (SM120 Blackwell) ---
 const SOL_H3_KEY = "mmh3x2_sol_h3_state";
 const SOL_H3_DEFAULTS = {
-  enabled: true,
+  enabled: false,
   exact_fusion: true,
   dense_evaluations: 1,
   dense_layers: 2,
   tau: 1.0,
   qkv_chunk_size: 4096
 };
+// Sol-H3 solo actúa si es dueño de los bloques y de la atención. Con estos nodos en
+// la cadena cede todas las llamadas (sol_eligible_calls = 0) y solo añade un nodo.
+// Bench 2026-10-19 (MiniMaxH3, 608x960, 8+3 pasos): H3-Opt 153.8 s / 7.8 GB frente a
+// Sol-H3 solo 174.4 s / 15.8 GB.
+const SOL_H3_CONFLICTS = ["H3MemoryOptimization", "H3SparseAttention", "H3SparseAttentionAdvanced", "BlockSparseAttention", "H3VSAAttention"];
+function solH3ConflictIn(g){
+  const n = Object.values(g).find(node => node && SOL_H3_CONFLICTS.includes(node.class_type));
+  return n ? n.class_type : null;
+}
 function loadSolH3(){
   try { return Object.assign({}, SOL_H3_DEFAULTS, JSON.parse(localStorage.getItem(SOL_H3_KEY) || "{}")); }
   catch(_) { return {...SOL_H3_DEFAULTS}; }
@@ -394,7 +403,7 @@ function loadSolH3(){
 function saveSolH3(s){ try { localStorage.setItem(SOL_H3_KEY, JSON.stringify(s)); } catch(_){} }
 function getSolH3State(){
   return {
-    enabled: $("segSolH3On")?.classList.contains("on") ?? true,
+    enabled: $("segSolH3On")?.classList.contains("on") ?? false,
     exact_fusion: $("segSolExactOn")?.classList.contains("on") ?? true,
     dense_evaluations: parseInt($("solDenseEvalSlider")?.value || "1", 10),
     dense_layers: parseInt($("solDenseLayersSlider")?.value || "2", 10),
@@ -3788,7 +3797,11 @@ function buildGraph(j){
 
   // Sol-H3 SOL Attention (Experimental) — kernel CuTe SM120 para Blackwell
   const solH3State = j ? j.solH3 : getSolH3State();
-  if(solH3State && solH3State.enabled){
+  const solH3Conflict = solH3ConflictIn(g);
+  if(solH3State && solH3State.enabled && solH3Conflict){
+    delete g[N.SOL_H3];
+    log(`⚠️ Sol-H3 omitido: ${solH3Conflict} ya controla bloques/atención y Sol-H3 no actuaría`, "l-warn");
+  } else if(solH3State && solH3State.enabled){
     g[N.SOL_H3] = {
       class_type: "SolH3Experimental",
       inputs: {
