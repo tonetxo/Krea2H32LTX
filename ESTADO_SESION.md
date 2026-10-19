@@ -567,6 +567,24 @@ MemOpt/Sparse/BlockSparse/VSA en la cadena; en MMH3X2 (siempre lleva sparse H3)
 Sol-H3 pasa a desactivado por defecto. Salidas para comparar calidad en
 `output/bench/h3opt_vs_solh3/`.
 
+Después (`743f8af`): optimizador por defecto = H3-Optimizations y selector de
+memoria de atención (Estándar / Menos VRAM, def. Menos VRAM) también en
+MiniMaxH3. Escalado de resolución con H3-Opt + Menos VRAM, sin Sol-H3, mismo
+grafo/seed/duración, 1 ejecución por tamaño (salidas en
+`output/bench/h3opt_res_scaling/`):
+
+| pase 1 → final | total | sampler p1 / p2 | VAEDecode final | VRAM | RSS |
+|---|---|---|---|---|---|
+| 512×800 → 608×960 | 162 s | 80 / 51 s | 12.5 s | 7.6 GB | 32.6 GB |
+| 640×1024 → 768×1216 | 297 s | 150 / 97 s | 19.8 s | 15.8 GB | 36.1 GB |
+| 768×1216 → 928×1472 | 512 s | 248 / 191 s | 34.6 s | 15.8 GB | 38.1 GB |
+| 896×1408 → 1088×1696 | 805 s | 398 / 309 s | 44.4 s | 15.8 GB | 40.6 GB |
+
+Ningún OOM, ni en el VAEDecode normal: de momento no hace falta decode tiled.
+Los 15.8 GB son la GPU llena por la carga dinámica de pesos (no el límite de
+activaciones); el coste del tamaño se va a RAM (RSS +8 GB) y a tiempo.
+No medido: Estándar vs Menos VRAM a alta resolución, ni clips más largos.
+
 ## Pendiente / siguientes pasos
 - **PCIe**: seguir el plan de pruebas de la sección anterior (siguiente: arranque en frío sin `resume=`; ver tabla).
 - (Hecho) Base por defecto de KreaQwen: `K2/jibMixKrea2_v40Habanero_int8mixed_convrot`. El usuario borrará los otros jibMix y dejará ese y `flux2/Krea2_Turbo_convrot_int8mixed`.
