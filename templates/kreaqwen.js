@@ -184,7 +184,8 @@ const CONFIG = {
     FACE_ENCODE: "302",
     FACE_SAMPLER: "303",
     FACE_DECODE: "304",
-    FACE_STITCH: "305"
+    FACE_STITCH: "305",
+    FACE_FRAME: "306"
   },
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
@@ -2047,10 +2048,24 @@ function appendFaceRefine(g, imageRef, job, opts){
     _meta: { title: "Face Track Crop" }
   };
 
+  // H3FaceTrackCrop rellena los recortes hasta la rejilla 17k+5 de MiniMax H3 (1 imagen ->
+  // 5 frames). Con un VAE de vídeo (Wan 2.1 de Krea2) eso da 2 frames latentes y el
+  // KSampler falla en torch.cat ("Expected size 1 but got size 2"). Aquí siempre hay una
+  // sola imagen: se refina solo el primer frame (el stitch usa min(cajas, recortes)).
+  g[N.FACE_FRAME] = {
+    class_type: "ImageFromBatch",
+    inputs: {
+      image: [N.FACE_CROP, 0],
+      batch_index: 0,
+      length: 1
+    },
+    _meta: { title: "Recorte facial (1 frame)" }
+  };
+
   g[N.FACE_ENCODE] = {
     class_type: "VAEEncode",
     inputs: {
-      pixels: [N.FACE_CROP, 0],
+      pixels: [N.FACE_FRAME, 0],
       vae: opts.vaeRef
     },
     _meta: { title: "VAE Encode (Rostro)" }
