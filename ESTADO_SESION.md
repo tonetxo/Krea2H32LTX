@@ -11,7 +11,11 @@ Qwen 2.1 antes del post-FX y panel de color en la columna derecha (ver
 (`ltxweb_smoke.py`); pendiente KreaQwen + RTX SR. 2026-10-17: defaults de
 KreaQwen Krea2→Qwen Turbo, scheduler Align Your Steps, «Invertir orden» que
 intercambia ajustes y pulido iterativo de prompt en todas las UIs (ver
-"Cambios 2026-10-17").
+"Cambios 2026-10-17"). 2026-10-19/20: revisión tras actualizar H3-Optimizations,
+Sol-H3, KJNodes, LTXVideo y Continuum-Plus; benchmarks H3-Opt vs Sol-H3 y de
+resolución; botones on-demand (RTX Upscale en MiniMaxH3, sin Post-FX doble, fps
+de origen al interpolar); preset FastH3 OmniRef. **Retomar en "FastH3 OmniRef
+(2026-10-20)": benchmark pendiente.**
 
 Anterior: LTXV / Post-FX — **RESUELTO**. El bloqueo de RAM/reinicio de
 ComfyUI con LUT+grano en vídeos grandes queda corregido y verificado.
@@ -584,6 +588,52 @@ Ningún OOM, ni en el VAEDecode normal: de momento no hace falta decode tiled.
 Los 15.8 GB son la GPU llena por la carga dinámica de pesos (no el límite de
 activaciones); el coste del tamaño se va a RAM (RSS +8 GB) y a tiempo.
 No medido: Estándar vs Menos VRAM a alta resolución, ni clips más largos.
+
+## FastH3 OmniRef (2026-10-20) — EN CURSO
+Modelo nuevo `minimaxh3/fasth3_omniref_8step_pruned_int8_convrot.safetensors`
+(22.2 GB, ref2va destilado a 8 pasos; no cabe en 16 GB → pesos por PCIe).
+Hecho (`a605b77`): al elegir un UNet FastH3 la UI fija Block Sparse → VSA con
+el keep entrenado (OmniRef/Preview 10 %, V2 20 %), avisa si un FastH3 va sin
+VSA o con otro keep, y Sol-H3 ya no borra el nodo VSA. Requiere re-seleccionar
+el modelo en la UI (el 20 % guardado no cambia solo).
+
+Comparación (logs):
+- Plantilla oficial de Comfy (`output/video/FastH3_OmniRef_00001_.mp4`):
+  1376×768, 5 s (124 fr), 1 pase, **11.1 s/paso, 130 s total**.
+- UI (`MiniMaxH3_00466_`): 576×896, 15 s, VSA keep 20 (mal), 2 pases:
+  20.0 s/paso p1, 35.6 s/paso p2 (736×1152), 336 s. Por token ≈ igual que
+  mystic turbo8 + H3-Opt; "Fast" = 8 pasos frente al modelo base, no por paso.
+
+Diferencias plantilla vs UI (sin resolver):
+| | plantilla | UI |
+|---|---|---|
+| nodo VSA | core `BlockSparseAttention` `selection: vsa`, keep 10, min_tokens 12288 | `H3VSAAttention` (H3-Optimizations) |
+| sampler | `euler` | `res_multistep` |
+| orden | SigmaShift → AttentionBackend → VSA | AttentionBackend → VSA → AIMDO → SigmaShift |
+| pases | 1 | 2 (upscale latente) |
+El README de H3-Optimizations dice que FastH3 *debe* usar `H3VSAAttention`
+(rama coarse/gate aprendida); la plantilla oficial usa el nodo del core. No
+sabemos si el del core aplica la rama aprendida.
+
+**Siguiente paso (propuesto, no lanzado):** `bench_comfyui.py` con la imagen y
+prompt del usuario, 576×896, 5 s, 1 pase, variantes:
+1. `H3VSAAttention` keep 10 + `res_multistep`
+2. `H3VSAAttention` keep 10 + `euler`
+3. core `BlockSparseAttention` vsa keep 10 + `euler` (plantilla)
+4. mystic turbo8 + H3-Opt (referencia)
+Luego el usuario compara calidad y se ajusta la UI (nodo VSA y sampler por
+defecto para FastH3). Grafo de partida: metadatos de `MiniMax_H3_00466_.mp4`
+(nodos: UNET 127, ATTN 147, VSA 190, AIMDO 191, SigmaShift 159, sampler 123,
+guiders 126/408, schedulers 124/407; quitar pase 2 = 165/400/401/407/408/409 y
+decodificar desde 125). Ojo al quitar nodos: revisar TODAS las referencias
+(un BasicScheduler colgando de un nodo borrado mató el prompt_worker de
+ComfyUI el 2026-10-19; validar el parche antes de enviarlo).
+
+Otras notas de la sesión:
+- Commits locales sin push (el usuario hace el push).
+- Benchmarks guardados: `output/bench/h3opt_vs_solh3/`, `output/bench/h3opt_res_scaling/`.
+- Sparse Sage en SM120: el aviso de la UI ("fallará hasta recompilar") está
+  desfasado (la build local funciona); pendiente actualizar el texto.
 
 ## Pendiente / siguientes pasos
 - **PCIe**: seguir el plan de pruebas de la sección anterior (siguiente: arranque en frío sin `resume=`; ver tabla).
