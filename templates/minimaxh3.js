@@ -224,6 +224,15 @@ const AIMDO_DEFAULTS = { residency: "0 blocks" };
     return BLOCK_SPARSE_MODES[sel] || BLOCK_SPARSE_MODES_REVERSE[sel] || sel;
   }
   const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0, keepPercent: 20 };
+// keep_percent VSA con el que se entrenó cada checkpoint FastH3; null = no es FastH3.
+// Estos checkpoints deben correr siempre con VSA (nunca block-sparse ni H3 sparse).
+function fastH3TrainedKeep(unetName){
+  const u = (unetName || "").toLowerCase();
+  if(!u.includes("fasth3")) return null;
+  if(u.includes("omniref")) return 10;  // FastH3 OmniRef (ref2va)
+  if(u.includes("preview")) return 10;  // FastH3 Preview v1
+  return 20;                            // FastH3 8-Step V2
+}
 
 
 function loadAttentionBackend(){
@@ -361,7 +370,19 @@ setAimdoUI(_aimdoState);
 setBlockSparseUI(_blockSparseState);
 
 $("attentionBackend")?.addEventListener("change", () => { saveAttentionBackend(getAttentionBackendState()); scheduleSaveH3Settings(); });
-$("unetSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
+$("unetSelect")?.addEventListener("change", (e) => {
+  // Al elegir un checkpoint FastH3, fijar VSA con su keep_percent entrenado.
+  const keep = fastH3TrainedKeep(e.target.value);
+  if(keep != null){
+    const bs = { ...getBlockSparseState(), selection: "VSA (FastVideo)", keepPercent: keep };
+    setBlockSparseUI(bs);
+    saveBlockSparse(bs);
+    setAttentionOptimizerUI("block-sparse");
+    saveAttentionOptimizer({ mode: "block-sparse" });
+    log(`ℹ️ Checkpoint FastH3: optimizador fijado en VSA con keep_percent ${keep}% (valor entrenado)`, "l-info");
+  }
+  scheduleSaveH3Settings();
+});
 $("clipSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("vaeSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("samplerName")?.addEventListener("change", () => scheduleSaveH3Settings());
@@ -4145,6 +4166,12 @@ function buildGraph(job){
 
   // 2. Optimizador sparse (exclusivo mutuo). Se aplica ANTES de SigmaShift/Spectrum.
   const optimizerState = j ? j.attentionOptimizer : getAttentionOptimizerState();
+  if(fastH3TrainedKeep(g[N.UNET]?.inputs?.unet_name) != null){
+    const bsCheck = j ? j.blockSparse : getBlockSparseState();
+    if(optimizerState.mode !== "block-sparse" || BLOCK_SPARSE_MODES[bsCheck?.selection] !== "vsa"){
+      log("⚠️ Checkpoint FastH3 sin VSA: está entrenado con VSA; elige Block Sparse → VSA (FastVideo)", "l-warn");
+    }
+  }
   const h3opt = j ? j.h3opt : getH3OptState();
   const aimdo = j ? j.aimdo : getAimdoState();
 
@@ -4221,7 +4248,8 @@ function buildGraph(job){
 
   } else if(optimizerState.mode === "block-sparse"){
     const solH3Check = j ? j.solH3 : getSolH3State();
-    if(solH3Check && solH3Check.enabled){
+    const bsSel = (j ? j.blockSparse : getBlockSparseState())?.selection;
+    if(solH3Check && solH3Check.enabled && BLOCK_SPARSE_MODES[bsSel] !== "vsa"){
       delete g[N.BLOCK_SPARSE];
       if(typeof log === "function") log("⚠️ Sol-H3 activo: omitiendo Block Sparse para priorizar kernel nativo SM120 y evitar conflicto de atención", "l-warn");
     } else {
@@ -4248,7 +4276,10 @@ function buildGraph(job){
           _meta: { title: "H3 VSA Attention (FastH3)" }
         };
         currentModelNode = N.BLOCK_SPARSE;
-        log(`⚡ VSA (FastH3): keep_percent ${keep}% (${keep === 20 ? "valor entrenado FastH3 8-Step V2" : keep === 10 ? "valor entrenado Preview v1" : "no trained value, revisa el operando"})`);
+        const trainedKeep = fastH3TrainedKeep(g[N.UNET]?.inputs?.unet_name);
+        if(trainedKeep == null) log(`⚡ VSA (FastH3): keep_percent ${keep}%`);
+        else if(keep === trainedKeep) log(`⚡ VSA (FastH3): keep_percent ${keep}% (valor entrenado de este checkpoint)`);
+        else log(`⚠️ VSA (FastH3): keep_percent ${keep}%, pero este checkpoint se entrenó con ${trainedKeep}%`, "l-warn");
       } else {
         // Formato plano V3: la key del DynamicCombo es el modo interno; los sub-inputs se envían con punto.
         const blockSparseInputs = {

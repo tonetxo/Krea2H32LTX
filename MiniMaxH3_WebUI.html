@@ -989,7 +989,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:50vh
             </select>
           </div>
           <div class="row slider-row" id="vsaKeepRow" style="display:none;">
-            <label>Video tiles kept (%) <span class="hint">(entrenado: 20 en FastH3 8-Step V2, 10 en Preview v1)</span></label>
+            <label>Video tiles kept (%) <span class="hint">(entrenado: 20 en FastH3 8-Step V2, 10 en OmniRef y Preview v1)</span></label>
             <input type="range" id="vsaKeepPercent" min="0.5" max="95" step="0.5" value="20">
             <div class="slider-val" id="vsaKeepPercentVal">20.0</div>
           </div>
@@ -1849,7 +1849,7 @@ const BASE_GRAPH = {
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["h3/Eros_beta6mix_Lora.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-FL2VA-3Step-ComfyUI-BF16.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors", "h3/taomate_h3_3step_comfy.safetensors"];
 const AVAILABLE_VAES = ["MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors"];
-const AVAILABLE_UNETS = ["minimaxh3/10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_w6a8.safetensors"];
+const AVAILABLE_UNETS = ["minimaxh3/fasth3_omniref_8step_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_w6a8.safetensors"];
 const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "t5_base.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
 const AVAILABLE_UPSCALE_MODELS = [];
@@ -5159,6 +5159,15 @@ const AIMDO_DEFAULTS = { residency: "0 blocks" };
     return BLOCK_SPARSE_MODES[sel] || BLOCK_SPARSE_MODES_REVERSE[sel] || sel;
   }
   const BLOCK_SPARSE_DEFAULTS = { selection: "Sol-Attn (adaptive tau)", tau: 1.3, startPercent: 0.2, endPercent: 1.0, keepPercent: 20 };
+// keep_percent VSA con el que se entrenó cada checkpoint FastH3; null = no es FastH3.
+// Estos checkpoints deben correr siempre con VSA (nunca block-sparse ni H3 sparse).
+function fastH3TrainedKeep(unetName){
+  const u = (unetName || "").toLowerCase();
+  if(!u.includes("fasth3")) return null;
+  if(u.includes("omniref")) return 10;  // FastH3 OmniRef (ref2va)
+  if(u.includes("preview")) return 10;  // FastH3 Preview v1
+  return 20;                            // FastH3 8-Step V2
+}
 
 
 function loadAttentionBackend(){
@@ -5296,7 +5305,19 @@ setAimdoUI(_aimdoState);
 setBlockSparseUI(_blockSparseState);
 
 $("attentionBackend")?.addEventListener("change", () => { saveAttentionBackend(getAttentionBackendState()); scheduleSaveH3Settings(); });
-$("unetSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
+$("unetSelect")?.addEventListener("change", (e) => {
+  // Al elegir un checkpoint FastH3, fijar VSA con su keep_percent entrenado.
+  const keep = fastH3TrainedKeep(e.target.value);
+  if(keep != null){
+    const bs = { ...getBlockSparseState(), selection: "VSA (FastVideo)", keepPercent: keep };
+    setBlockSparseUI(bs);
+    saveBlockSparse(bs);
+    setAttentionOptimizerUI("block-sparse");
+    saveAttentionOptimizer({ mode: "block-sparse" });
+    log(`ℹ️ Checkpoint FastH3: optimizador fijado en VSA con keep_percent ${keep}% (valor entrenado)`, "l-info");
+  }
+  scheduleSaveH3Settings();
+});
 $("clipSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("vaeSelect")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("samplerName")?.addEventListener("change", () => scheduleSaveH3Settings());
@@ -9080,6 +9101,12 @@ function buildGraph(job){
 
   // 2. Optimizador sparse (exclusivo mutuo). Se aplica ANTES de SigmaShift/Spectrum.
   const optimizerState = j ? j.attentionOptimizer : getAttentionOptimizerState();
+  if(fastH3TrainedKeep(g[N.UNET]?.inputs?.unet_name) != null){
+    const bsCheck = j ? j.blockSparse : getBlockSparseState();
+    if(optimizerState.mode !== "block-sparse" || BLOCK_SPARSE_MODES[bsCheck?.selection] !== "vsa"){
+      log("⚠️ Checkpoint FastH3 sin VSA: está entrenado con VSA; elige Block Sparse → VSA (FastVideo)", "l-warn");
+    }
+  }
   const h3opt = j ? j.h3opt : getH3OptState();
   const aimdo = j ? j.aimdo : getAimdoState();
 
@@ -9156,7 +9183,8 @@ function buildGraph(job){
 
   } else if(optimizerState.mode === "block-sparse"){
     const solH3Check = j ? j.solH3 : getSolH3State();
-    if(solH3Check && solH3Check.enabled){
+    const bsSel = (j ? j.blockSparse : getBlockSparseState())?.selection;
+    if(solH3Check && solH3Check.enabled && BLOCK_SPARSE_MODES[bsSel] !== "vsa"){
       delete g[N.BLOCK_SPARSE];
       if(typeof log === "function") log("⚠️ Sol-H3 activo: omitiendo Block Sparse para priorizar kernel nativo SM120 y evitar conflicto de atención", "l-warn");
     } else {
@@ -9183,7 +9211,10 @@ function buildGraph(job){
           _meta: { title: "H3 VSA Attention (FastH3)" }
         };
         currentModelNode = N.BLOCK_SPARSE;
-        log(`⚡ VSA (FastH3): keep_percent ${keep}% (${keep === 20 ? "valor entrenado FastH3 8-Step V2" : keep === 10 ? "valor entrenado Preview v1" : "no trained value, revisa el operando"})`);
+        const trainedKeep = fastH3TrainedKeep(g[N.UNET]?.inputs?.unet_name);
+        if(trainedKeep == null) log(`⚡ VSA (FastH3): keep_percent ${keep}%`);
+        else if(keep === trainedKeep) log(`⚡ VSA (FastH3): keep_percent ${keep}% (valor entrenado de este checkpoint)`);
+        else log(`⚠️ VSA (FastH3): keep_percent ${keep}%, pero este checkpoint se entrenó con ${trainedKeep}%`, "l-warn");
       } else {
         // Formato plano V3: la key del DynamicCombo es el modo interno; los sub-inputs se envían con punto.
         const blockSparseInputs = {
