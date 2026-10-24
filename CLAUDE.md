@@ -48,3 +48,8 @@ There are no tests or linters. Verify changes by regenerating the HTML and exerc
 - UI text, code comments and log messages are in Spanish. Commit messages are in English Conventional Commits with a UI scope: `feat(minimaxh3,mmh3x2): ...`, `fix(ltxv): ...`.
 - `ESTADO_SESION.md` is a running session-handoff note (root causes, verification numbers). `REVISION.md` is a code-review checklist.
 - Required and optional ComfyUI custom node packs are listed in `README.md` and checked by `diagnostico_comfyui.py`. When a UI starts depending on a new node class, add it there too.
+
+## Mandatory Context Dependencies
+Before performing any tasks, writing code, or running workflows that involve the backend or node execution, read and strictly follow the ComfyUI guidelines:
+
+@~/SwarmUI/dlbackend/ComfyUI/AGENTS.md
