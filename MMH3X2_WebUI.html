@@ -794,6 +794,11 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <input type="range" id="faceRefineFeatherSlider" min="4" max="32" step="2" value="16">
             <div class="slider-val" id="faceRefineFeatherVal">16 px</div>
           </div>
+          <div class="row slider-row">
+            <label title="Contexto alrededor del elemento detectado. Más bajo = el elemento ocupa más del recorte (menos reducción en caras grandes). Doble clic: valor por defecto.">Factor de recorte (Crop factor) <span class="hint" id="faceRefineCropHint">(3.0 · por defecto)</span></label>
+            <input type="range" id="faceRefineCropSlider" min="1.2" max="3.5" step="0.1" value="3.0">
+            <div class="slider-val" id="faceRefineCropVal">3.0x</div>
+          </div>
           <div class="row">
             <label>Modo de selección</label>
             <select id="faceRefineSelectMode">
@@ -2795,8 +2800,8 @@ const BASE_GRAPH = {
 const AVAILABLE_MODELS = [];
 const AVAILABLE_LORAS = ["h3/Eros_beta6mix_Lora.safetensors", "h3/MysticXXX_MMH3-V4.safetensors", "h3/Pussy4nus_Epoch80.safetensors", "h3/TaoMate-H3-FL2VA-3Step-ComfyUI-BF16.safetensors", "h3/h3-realism-people-t2v-i2v-r2v.safetensors", "h3/h3_photoreal_ph0t0r34l_1024-step00003780.safetensors", "h3/lightx2v_hybrid-4to8step-full-fusion_Turbo_pruned.safetensors", "h3/minimax_h3_fl2v_turbo_4step_v1.2_768p_comfyui_bf16.safetensors", "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_hyperflow_8step_v1.0_comfyui_pruned_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors", "h3/minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors", "h3/minimax_h3_turbo_v4_step600_ema_pruned_comfyui.safetensors", "h3/polyhedron_minimax_h3_image_lora_v2__perfe8ct.safetensors", "h3/taomate_h3_3step_comfy.safetensors"];
 const AVAILABLE_VAES = ["MiniMaxH3/minimax_h3_video_vae_fp16.safetensors", "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors"];
-const AVAILABLE_UNETS = ["minimaxh3/10Eros_Max_h3_8stepTURBO_beta6_int8.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_w6a8.safetensors"];
-const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "t5_base.safetensors"];
+const AVAILABLE_UNETS = ["minimaxh3/Minimax-h3_Singularity_ref2va_v2_int8.safetensors", "minimaxh3/fasth3_omniref_8step_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors", "minimaxh3/minimax_h3_fused_refdelta_r1024_turbo8_mystic07_int8_convrot.safetensors", "minimaxh3/minimax_h3_hybrid_fl2va_ref2va_b25-49-int8.safetensors", "minimaxh3/minimax_h3_ref2va_pruned_w6a8.safetensors"];
+const AVAILABLE_CLIPS = ["minimax_music3_text_encoder_pruned_int8_convrot.safetensors", "qwen3vl_32b_heretic_minimax_h3_nvfp4.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"];
 const AVAILABLE_INTERP_MODELS = ["film_net_fp16.safetensors", "rife_v4.25.safetensors", "rife_v4.25_heavy.safetensors", "rife_v4.25_lite.safetensors", "rife_v4.26.safetensors", "rife_v4.26_heavy.safetensors"];
 const AVAILABLE_UPSCALE_MODELS = [];
 const AVAILABLE_LUTS = ["3Strip.cube", "70s.cube", "Agfa Portrait XPS 160.cube", "Amelie.cube", "Aviator.cube", "Blade Runner.cube", "Bleach.cube", "BlueArchitecture.cube", "Brooklyn.cube", "CELLULOID_01_FU_LOW.cube", "Casablanca-Noir.cube", "Celadon.cube", "Chamoisee.cube", "CineStill-800-T-V1.0--N125.cube", "Citizen-Depth.cube", "Colorist_Factory_Severn_LUT.cube", "Cubanismo.cube", "Drive.cube", "Duotone.cube", "Emulsion.cube", "Enemy.cube", "Enhance.cube", "Fashion.cube", "Fuji Astia 100F.cube", "Fuji Eterna 3513.cube", "Fuji Eterna 8563.cube", "Fuji Provia 100F.cube", "Fuji Sensia 100.cube", "Fuji Superia Xtra 400.cube", "Fuji Vivid 8543.cube", "Glacier.cube", "Godfather.cube", "Grand Budapest.cube", "Grime.cube", "Grit.cube", "Hannibal.cube", "Her.cube", "Kodak Ektachrome 64.cube", "Kodak Professional Portra 400.cube", "Kodak Vision 2383.cube", "LPP Tetrachrome 400.cube", "MONOCHROME_2_.cube", "Mad Max.cube", "Matrix V1.cube", "Matrix V2.cube", "Metropolis-Mist.cube", "Mint.cube", "Moonrise Kingdom.cube", "Ochre.cube", "Polaroid 600.cube", "Punch.cube", "Raging-Shadow.cube", "Revenant.cube", "Rhythm.cube", "Seven.cube", "Spy.cube", "Stranger Things.cube", "Summer.cube", "Sunset-Boulevard-Glow.cube", "Teal and Orange.cube", "Thriller.cube", "Vinteo.cube", "Wonder Woman.cube", "justyndigitalphotography.cube", "ta\u015fdemirrr_1.A006_04280540_S.cube"];
@@ -6366,6 +6371,19 @@ const ELEMENT_REFINE_CONFIG = {
 let uploadedRefFace1=null, localRefFace1=null;
 let uploadedRefFace2=null, localRefFace2=null;
 
+// crop_factor efectivo: valor explícito del slider o, si es null, el propio del elemento
+function frDefaultCropFactor(target){
+  return (ELEMENT_REFINE_CONFIG[target === "face_hands" ? "face" : target] || ELEMENT_REFINE_CONFIG.face).cropFactor;
+}
+function frCropFactor(frState, elemCfg){
+  const cf = parseFloat(frState && frState.cropFactor);
+  return (cf >= 1 && cf <= 5) ? cf : elemCfg.cropFactor;
+}
+function updateFaceRefineCropLabel(cf, explicit){
+  if($("faceRefineCropVal")) $("faceRefineCropVal").textContent = cf.toFixed(1) + "x";
+  if($("faceRefineCropHint")) $("faceRefineCropHint").textContent = `(${cf.toFixed(1)}${explicit ? "" : " · por defecto"})`;
+}
+
 const FACEREFINE_DEFAULTS = {
   enabled: false,
   target: "face",
@@ -6373,6 +6391,7 @@ const FACEREFINE_DEFAULTS = {
   steps: 4,
   canvasSize: 512,
   feather: 16,
+  cropFactor: null,
   select: "largest_face",
   postproc: false
 };
@@ -6389,6 +6408,7 @@ function getFaceRefineState(){
     steps: parseInt($("faceRefineStepsSlider")?.value || "4", 10),
     canvasSize: parseInt($("faceRefineCanvasMode")?.value || "512", 10),
     feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
+    cropFactor: ($("faceRefineCropSlider")?.dataset.explicit === "1") ? parseFloat($("faceRefineCropSlider").value) : null,
     select: $("faceRefineSelectMode")?.value || "largest_face",
     postproc: $("faceRefinePostprocToggle")?.checked ?? false,
     refFace1: uploadedRefFace1 || localRefFace1 || null,
@@ -6429,6 +6449,14 @@ function setFaceRefineUI(s){
     $("faceRefineFeatherSlider").value = f;
     if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
     if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  }
+  if($("faceRefineCropSlider")){
+    const el = $("faceRefineCropSlider");
+    const explicit = s.cropFactor != null && !isNaN(parseFloat(s.cropFactor));
+    const cf = explicit ? parseFloat(s.cropFactor) : frDefaultCropFactor(s.target || $("faceRefineTarget")?.value || "face");
+    el.value = cf;
+    el.dataset.explicit = explicit ? "1" : "";
+    updateFaceRefineCropLabel(cf, explicit);
   }
   if($("faceRefineSelectMode") && s.select){
     $("faceRefineSelectMode").value = s.select;
@@ -6728,6 +6756,8 @@ function attachAttentionOptimizerListeners(){
   $("faceRefineTarget")?.addEventListener("change", (e) => {
     const s = getFaceRefineState();
     s.target = e.target.value;
+    s.cropFactor = null;
+    setFaceRefineUI(s);
     saveFaceRefine(s);
     scheduleSaveSettings();
   });
@@ -6761,6 +6791,19 @@ function attachAttentionOptimizerListeners(){
     if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
     const s = getFaceRefineState();
     s.feather = f;
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
+  $("faceRefineCropSlider")?.addEventListener("input", (e) => {
+    e.target.dataset.explicit = "1";
+    updateFaceRefineCropLabel(parseFloat(e.target.value) || 3.0, true);
+    saveFaceRefine(getFaceRefineState());
+    scheduleSaveSettings();
+  });
+  $("faceRefineCropSlider")?.addEventListener("dblclick", () => {
+    const s = getFaceRefineState();
+    s.cropFactor = null;
+    setFaceRefineUI(s);
     saveFaceRefine(s);
     scheduleSaveSettings();
   });
@@ -9983,7 +10026,7 @@ function buildGraph(j){
       images: [N.FACE_COMPONENTS, 0],
       detector: elemCfg1.detector,
       confidence: 0.35,
-      crop_factor: elemCfg1.cropFactor,
+      crop_factor: frCropFactor(frState, elemCfg1),
       canvas_width: frCanvasSize,
       canvas_height: frCanvasSize,
       canvas_mode: "manual",
@@ -10172,7 +10215,7 @@ function buildGraph(j){
         images: [N.FACE_STITCH, 0],
         detector: elemCfg2.detector,
         confidence: 0.35,
-        crop_factor: elemCfg2.cropFactor,
+        crop_factor: frCropFactor(frState, elemCfg2),
         canvas_width: frCanvasSize,
         canvas_height: frCanvasSize,
         canvas_mode: "manual",
@@ -10888,7 +10931,7 @@ function buildGraph(j){
       images: finalImagesSource,
       detector: elemCfg1.detector,
       confidence: 0.35,
-      crop_factor: elemCfg1.cropFactor,
+      crop_factor: frCropFactor(frState, elemCfg1),
       canvas_width: frCanvasSize,
       canvas_height: frCanvasSize,
       canvas_mode: "manual",
@@ -11073,7 +11116,7 @@ function buildGraph(j){
         images: [N.FACE_STITCH, 0],
         detector: elemCfg2.detector,
         confidence: 0.35,
-        crop_factor: elemCfg2.cropFactor,
+        crop_factor: frCropFactor(frState, elemCfg2),
         canvas_width: frCanvasSize,
         canvas_height: frCanvasSize,
         canvas_mode: "manual",

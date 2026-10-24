@@ -129,6 +129,11 @@
             <input type="range" id="faceRefineFeatherSlider" min="4" max="32" step="2" value="16">
             <div class="slider-val" id="faceRefineFeatherVal">16 px</div>
           </div>
+          <div class="row slider-row">
+            <label title="Contexto alrededor del elemento detectado. Más bajo = el elemento ocupa más del recorte (menos reducción en caras grandes). Doble clic: valor por defecto.">Factor de recorte (Crop factor) <span class="hint" id="faceRefineCropHint">(3.0 · por defecto)</span></label>
+            <input type="range" id="faceRefineCropSlider" min="1.2" max="3.5" step="0.1" value="3.0">
+            <div class="slider-val" id="faceRefineCropVal">3.0x</div>
+          </div>
           <div class="row">
             <label>Modo de selección</label>
             <select id="faceRefineSelectMode">

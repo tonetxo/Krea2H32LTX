@@ -485,6 +485,19 @@ const ELEMENT_REFINE_CONFIG = {
 let uploadedRefFace1=null, localRefFace1=null;
 let uploadedRefFace2=null, localRefFace2=null;
 
+// crop_factor efectivo: valor explícito del slider o, si es null, el propio del elemento
+function frDefaultCropFactor(target){
+  return (ELEMENT_REFINE_CONFIG[target === "face_hands" ? "face" : target] || ELEMENT_REFINE_CONFIG.face).cropFactor;
+}
+function frCropFactor(frState, elemCfg){
+  const cf = parseFloat(frState && frState.cropFactor);
+  return (cf >= 1 && cf <= 5) ? cf : elemCfg.cropFactor;
+}
+function updateFaceRefineCropLabel(cf, explicit){
+  if($("faceRefineCropVal")) $("faceRefineCropVal").textContent = cf.toFixed(1) + "x";
+  if($("faceRefineCropHint")) $("faceRefineCropHint").textContent = `(${cf.toFixed(1)}${explicit ? "" : " · por defecto"})`;
+}
+
 const FACEREFINE_DEFAULTS = {
   enabled: false,
   target: "face",
@@ -492,6 +505,7 @@ const FACEREFINE_DEFAULTS = {
   steps: 4,
   canvasSize: 512,
   feather: 16,
+  cropFactor: null,
   select: "largest_face",
   postproc: false
 };
@@ -508,6 +522,7 @@ function getFaceRefineState(){
     steps: parseInt($("faceRefineStepsSlider")?.value || "4", 10),
     canvasSize: parseInt($("faceRefineCanvasMode")?.value || "512", 10),
     feather: parseInt($("faceRefineFeatherSlider")?.value || "16", 10),
+    cropFactor: ($("faceRefineCropSlider")?.dataset.explicit === "1") ? parseFloat($("faceRefineCropSlider").value) : null,
     select: $("faceRefineSelectMode")?.value || "largest_face",
     postproc: $("faceRefinePostprocToggle")?.checked ?? false,
     refFace1: uploadedRefFace1 || localRefFace1 || null,
@@ -548,6 +563,14 @@ function setFaceRefineUI(s){
     $("faceRefineFeatherSlider").value = f;
     if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
     if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  }
+  if($("faceRefineCropSlider")){
+    const el = $("faceRefineCropSlider");
+    const explicit = s.cropFactor != null && !isNaN(parseFloat(s.cropFactor));
+    const cf = explicit ? parseFloat(s.cropFactor) : frDefaultCropFactor(s.target || $("faceRefineTarget")?.value || "face");
+    el.value = cf;
+    el.dataset.explicit = explicit ? "1" : "";
+    updateFaceRefineCropLabel(cf, explicit);
   }
   if($("faceRefineSelectMode") && s.select){
     $("faceRefineSelectMode").value = s.select;
@@ -847,6 +870,8 @@ function attachAttentionOptimizerListeners(){
   $("faceRefineTarget")?.addEventListener("change", (e) => {
     const s = getFaceRefineState();
     s.target = e.target.value;
+    s.cropFactor = null;
+    setFaceRefineUI(s);
     saveFaceRefine(s);
     scheduleSaveSettings();
   });
@@ -880,6 +905,19 @@ function attachAttentionOptimizerListeners(){
     if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
     const s = getFaceRefineState();
     s.feather = f;
+    saveFaceRefine(s);
+    scheduleSaveSettings();
+  });
+  $("faceRefineCropSlider")?.addEventListener("input", (e) => {
+    e.target.dataset.explicit = "1";
+    updateFaceRefineCropLabel(parseFloat(e.target.value) || 3.0, true);
+    saveFaceRefine(getFaceRefineState());
+    scheduleSaveSettings();
+  });
+  $("faceRefineCropSlider")?.addEventListener("dblclick", () => {
+    const s = getFaceRefineState();
+    s.cropFactor = null;
+    setFaceRefineUI(s);
     saveFaceRefine(s);
     scheduleSaveSettings();
   });
@@ -4102,7 +4140,7 @@ function buildGraph(j){
       images: [N.FACE_COMPONENTS, 0],
       detector: elemCfg1.detector,
       confidence: 0.35,
-      crop_factor: elemCfg1.cropFactor,
+      crop_factor: frCropFactor(frState, elemCfg1),
       canvas_width: frCanvasSize,
       canvas_height: frCanvasSize,
       canvas_mode: "manual",
@@ -4291,7 +4329,7 @@ function buildGraph(j){
         images: [N.FACE_STITCH, 0],
         detector: elemCfg2.detector,
         confidence: 0.35,
-        crop_factor: elemCfg2.cropFactor,
+        crop_factor: frCropFactor(frState, elemCfg2),
         canvas_width: frCanvasSize,
         canvas_height: frCanvasSize,
         canvas_mode: "manual",
@@ -5007,7 +5045,7 @@ function buildGraph(j){
       images: finalImagesSource,
       detector: elemCfg1.detector,
       confidence: 0.35,
-      crop_factor: elemCfg1.cropFactor,
+      crop_factor: frCropFactor(frState, elemCfg1),
       canvas_width: frCanvasSize,
       canvas_height: frCanvasSize,
       canvas_mode: "manual",
@@ -5192,7 +5230,7 @@ function buildGraph(j){
         images: [N.FACE_STITCH, 0],
         detector: elemCfg2.detector,
         confidence: 0.35,
-        crop_factor: elemCfg2.cropFactor,
+        crop_factor: frCropFactor(frState, elemCfg2),
         canvas_width: frCanvasSize,
         canvas_height: frCanvasSize,
         canvas_mode: "manual",
