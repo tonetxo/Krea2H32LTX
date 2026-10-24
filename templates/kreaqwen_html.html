@@ -21,8 +21,13 @@
         </div>
         <div class="row two-col" style="margin-top:8px;">
           <div>
-            <label title="SkipLayerGuidanceDiTSimple: salta estas capas single en la rama negativa. Oficial: 22 (24/26 también ayudan). Vacío = desactivado.">MOSS · SLG capas (vacío = off)</label>
-            <input type="text" id="mossSlgLayers" value="22" placeholder="22">
+            <label title="SkipLayerGuidanceDiTSimple: salta estas capas single en la rama negativa. Oficial: 22. Añadir 24/26 da más detalle y saturación, pero deteriora el texto. Vacío = desactivado.">MOSS · SLG capas (vacío = off)</label>
+            <input type="text" id="mossSlgLayers" value="22" placeholder="22" list="mossSlgPresets">
+            <datalist id="mossSlgPresets">
+              <option value="22">Oficial (sutil, seguro con texto)</option>
+              <option value="22,24">Más detalle</option>
+              <option value="22,24,26">Fuerte: satura y deteriora el texto</option>
+            </datalist>
           </div>
           <div>
             <label title="Fracción final del muestreo en la que actúa el SLG (template oficial: 0.5).">MOSS · SLG fin</label>

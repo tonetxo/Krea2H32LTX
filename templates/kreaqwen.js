@@ -3474,9 +3474,12 @@ function applyKreaQwenWorkflow(workflow){
   if($("refinerAttentionBackend")) $("refinerAttentionBackend").value = attnRef?.inputs?.attention || "none";
 
   // --- MOSS SLG (SkipLayerGuidanceDiTSimple) ---
-  // Imágenes MOSS sin nodo SLG se generaron con el SLG desactivado (o con CFG 1).
-  if(unetBaseFam === "moss" || unetRefFam === "moss"){
-    const slg = Object.values(g).find(n => n.class_type === "SkipLayerGuidanceDiTSimple");
+  // Sin nodo SLG: solo significa "desactivado" si alguna etapa MOSS usó CFG > 1; con CFG 1
+  // nunca se inyecta, así que se conserva el valor actual del campo.
+  const mossCfgOn = (unetBaseFam === "moss" && Number(g[N.SAMPLER_BASE]?.inputs?.cfg) > 1) ||
+                    (hasRefiner && unetRefFam === "moss" && Number(g[N.SAMPLER_REFINER]?.inputs?.cfg) > 1);
+  const slg = Object.values(g).find(n => n.class_type === "SkipLayerGuidanceDiTSimple");
+  if(slg || mossCfgOn){
     if($("mossSlgLayers")) $("mossSlgLayers").value = slg?.inputs?.single_layers ?? "";
     if(slg?.inputs?.end_percent != null && $("mossSlgEnd")) $("mossSlgEnd").value = slg.inputs.end_percent;
     applied.push("SLG MOSS");
