@@ -22,8 +22,13 @@
           <textarea id="prompt2" placeholder="Describe la acción o evolución de la escena en el segundo segmento..."></textarea>
         </div>
         <div class="btn-row" style="margin-top:6px;">
-          <button id="btnPrompt2FromEnhancer" class="ghost btn-mini" title="Copiar el texto mejorado por Ollama a este Prompt 2">📋 Pegar de Enhancer</button>
+          <button id="btnEnhancePrompt2" class="ghost btn-mini" title="Mejora este Prompt 2 con el modelo, modo y estilo del Enhancer; el resultado sustituye a Prompt 2">✨ Mejorar prompt</button>
           <button id="btnClearPrompt2" class="ghost btn-mini" title="Limpiar Prompt 2">✕ Limpiar</button>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Cambios a aplicar <span class="hint">(pulido sobre Prompt 2; Ctrl+Enter)</span></label>
+          <textarea class="enhancer-output" id="prompt2RefineInput" placeholder="p. ej.: que gire hacia la cámara, más lento..."></textarea>
+          <button id="btnRefinePrompt2" class="primary" style="width:100%; margin-top:6px;">Aplicar cambios</button>
         </div>
         <div class="row" style="margin-top:8px;">
           <label>Modo de continuidad en grafo</label>

@@ -6140,15 +6140,40 @@ window.addEventListener("DOMContentLoaded", () => {
 
   if($("btnRefreshHistory")) $("btnRefreshHistory").addEventListener("click", () => { loadVideoHistory(); });
 
-  if($("btnPrompt2FromEnhancer")) $("btnPrompt2FromEnhancer").addEventListener("click", () => {
-    let text = $("enhancerOutput")?.value || "";
-    text = text.replace(/\n*--- Ollama · [^\n]+ ---/g, "").trim();
-    if(text){
+  // Pulido de Prompt 2: mismo system prompt que "Aplicar al resultado", pero sobre Prompt 2
+  // y escribiendo en él en vivo (si falla o viene vacío, se restaura el texto previo).
+  async function refinePrompt2(){
+    const model = $("enhancerModel")?.value;
+    if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
+    const changes = $("prompt2RefineInput").value.trim();
+    if(!changes){ log("⚠️ Escribe los cambios que quieres aplicar a Prompt 2", "l-err"); return; }
+    const base = $("prompt2").value.trim();
+    if(!base){ log("⚠️ Prompt 2 está vacío", "l-err"); return; }
+    const btn = $("btnRefinePrompt2");
+    btn.disabled = true;
+    btn.textContent = "Aplicando cambios...";
+    try {
+      const { text, elapsedMs } = await streamOllamaGenerate({
+        model,
+        system: ENHANCER_REFINE_SYSTEM,
+        prompt: `EXISTING PROMPT:\n${base}\n\nREQUESTED CHANGES:\n${changes}`,
+        options: { num_ctx: 4096, temperature: 0.4 }
+      }, $("prompt2"));
+      if(!text){ $("prompt2").value = base; log("Respuesta vacía del LLM: Prompt 2 sin cambios.", "l-err"); return; }
       $("prompt2").value = text;
-      log("Prompt de Enhancer copiado a Prompt 2 (Segmento 2)", "l-ok");
-    } else {
-      log("No hay texto generado en el Enhancer", "l-warn");
+      log(`✏️ Cambios aplicados a Prompt 2 en ${fmtMs(elapsedMs)}.`, "l-ok");
+      $("prompt2RefineInput").select();
+    } catch(e){
+      $("prompt2").value = base;
+      log("Error al aplicar cambios a Prompt 2: " + e.message, "l-err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Aplicar cambios";
     }
+  }
+  $("btnRefinePrompt2")?.addEventListener("click", refinePrompt2);
+  $("prompt2RefineInput")?.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); refinePrompt2(); }
   });
 
   if($("btnClearPrompt2")) $("btnClearPrompt2").addEventListener("click", () => {
@@ -6392,7 +6417,9 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   })();
 
-  $("btnEnhance")?.addEventListener("click", async () => {
+  // target: "prompt" (Prompt 1, resultado en Resultado LLM) o "prompt2" (texto base = Prompt 2
+  // y el resultado se escribe además en Prompt 2).
+  async function runEnhance(target){
     const chainMode = $("enhancerChainMode")?.value || "ollama";
     if(chainMode === "off"){
       log("⚠️ Cadena de mejora desactivada. Activa 'LLM' para usar el botón.", "l-warn");
@@ -6404,7 +6431,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const styleKey = $("enhancerStyle")?.value || "A";
     const data = loadSysPrompts();
     const system = getCurrentSysPrompt(data, mode, styleKey);
-    let userPrompt = $("prompt")?.value?.trim() || "";
+    let userPrompt = $(target)?.value?.trim() || "";
 
     if(mode === "text" && styleKey === "D"){
       const p1 = $("prompt")?.value?.trim() || "";
@@ -6418,7 +6445,7 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt base primero en Prompt 1", "l-warn"); return; }
+    if(mode !== "vision" && !userPrompt){ log(`⚠️ Escribe un prompt base primero en ${target === "prompt2" ? "Prompt 2" : "Prompt 1"}`, "l-warn"); return; }
 
     const payload = { model, system, prompt: userPrompt || "Describe this image for video generation.", stream: false, options: { num_ctx: 8192 } };
 
@@ -6440,8 +6467,8 @@ window.addEventListener("DOMContentLoaded", () => {
         const targetDesc = isSeg2StyleG
           ? "Slot 1 (Imagen base Seg 1)"
           : (isSeg2StyleF
-            ? (sharedRefs ? "Slot 2, 3 o 4" : "Slot 3 o 4 (Segmento 2)")
-            : (sharedRefs ? "los slots de entrada (1 a 4)" : "Slot 1 o 2 (Segmento 1)"));
+            ? (sharedRefs ? "los slots 2 a 6" : "Slot 3, 4 o 6 (Segmento 2)")
+            : (sharedRefs ? "los slots de entrada (1 a 6)" : "Slot 1, 2 o 5 (Segmento 1)"));
         log(`⚠️ Carga al menos una imagen en ${targetDesc} para usar este estilo en modo Visión.`, "l-err");
         return;
       }
@@ -6531,26 +6558,39 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    const btn = $("btnEnhance");
+    const btn = $(target === "prompt2" ? "btnEnhancePrompt2" : "btnEnhance");
+    const btnText = btn.textContent;
     btn.disabled = true;
     btn.textContent = "Mejorando...";
+    // Prompt 2 se reescribe en vivo sobre su propio campo; se guarda el original para
+    // restaurarlo si el LLM falla o no devuelve nada.
+    const prompt2Before = $("prompt2").value;
     $("enhancerOutput").value = "";
     if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
     try {
       log(`🧠 Solicitando mejora al LLM (${model}, modo ${mode}, estilo ${styleKey})...`, "l-busy");
-      const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+      const { text, elapsedMs } = await streamOllamaGenerate(payload, $(target === "prompt2" ? "prompt2" : "enhancerOutput"));
       const timeStr = fmtMs(elapsedMs);
       $("enhancerOutput").value = text;
       if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
-      log(`✅ Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Puedes aplicarlo a Prompt 1 ("Usar como prompt") o a Prompt 2 ("Pegar de Enhancer").`, "l-ok");
+      if(target === "prompt2"){
+        $("prompt2").value = text.trim() ? enhancerOutputText(text) : prompt2Before;
+        if(text.trim()) log(`✅ Prompt 2 mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}).`, "l-ok");
+        else log("Respuesta vacía del LLM: Prompt 2 sin cambios.", "l-err");
+      } else {
+        log(`✅ Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Pulsa "Usar como prompt" para aplicarlo a Prompt 1.`, "l-ok");
+      }
     } catch(e){
       log(`❌ Error al mejorar prompt con LLM: ${e.message}`, "l-err");
       $("enhancerOutput").value = "Error: " + e.message;
+      if(target === "prompt2") $("prompt2").value = prompt2Before;
     } finally {
       btn.disabled = false;
-      btn.textContent = "Mejorar prompt";
+      btn.textContent = btnText;
     }
-  });
+  }
+  $("btnEnhance")?.addEventListener("click", () => runEnhance("prompt"));
+  $("btnEnhancePrompt2")?.addEventListener("click", () => runEnhance("prompt2"));
 
   // Tras cargar los modelos de Ollama / llama.cpp, restaurar configuración guardada.
   (async () => {
