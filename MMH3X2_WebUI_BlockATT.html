@@ -579,9 +579,9 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
         </div>
       </div>
 
-      <!-- MEDIOS DE ENTRADA: 4 IMÁGENES + 1 VÍDEO -->
+      <!-- MEDIOS DE ENTRADA: 6 IMÁGENES + 1 VÍDEO -->
       <div class="panel">
-        <h2>Imágenes de Referencia (Hasta 4)</h2>
+        <h2>Imágenes de Referencia (Hasta 6)</h2>
         <div class="hint" style="font-size:10px;margin-bottom:6px;">Arrastra o haz clic en cada recuadro. Arrastra entre slots o desde el historial para intercambiar.</div>
         <div class="media-grid-4">
           <!-- IMAGEN 1: Base Seg 1 -->
@@ -630,6 +630,30 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <div class="ph" id="phImg4">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
             <img id="previewSlotImg4" style="display:none;" alt="Img 4">
             <div class="media-slot-info" id="infoImg4"></div>
+          </div>
+
+          <!-- IMAGEN 5: Ref Seg 1 -->
+          <div class="media-slot" id="slotImg5" data-slot="5">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 5 · Ref Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg5" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput5" accept="image/*">
+            <div class="ph" id="phImg5">arrastra o clic<br><span class="hint">(ref seg 1)</span></div>
+            <img id="previewSlotImg5" style="display:none;" alt="Img 5">
+            <div class="media-slot-info" id="infoImg5"></div>
+          </div>
+
+          <!-- IMAGEN 6: Ref Seg 2 -->
+          <div class="media-slot" id="slotImg6" data-slot="6">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 6 · Ref Seg 2</span>
+              <button class="media-slot-del" id="btnDelImg6" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput6" accept="image/*">
+            <div class="ph" id="phImg6">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
+            <img id="previewSlotImg6" style="display:none;" alt="Img 6">
+            <div class="media-slot-info" id="infoImg6"></div>
           </div>
         </div>
 
@@ -5978,6 +6002,9 @@ const CONFIG = {
     IMG2: "81",
     IMG3: "82",
     IMG4: "83",
+    // Slots 5/6: LoadImage inyectados en buildGraph solo si hay imagen
+    IMG5: "92_img5",
+    IMG6: "93_img6",
     SPARSE_ATTN: "88",
     BLOCK_SPARSE: "90",
     AIMDO: "91",
@@ -6495,8 +6522,14 @@ let mediaSlots = {
   1: { file: null, dataUrl: null, uploaded: null, name: "" },
   2: { file: null, dataUrl: null, uploaded: null, name: "" },
   3: { file: null, dataUrl: null, uploaded: null, name: "" },
-  4: { file: null, dataUrl: null, uploaded: null, name: "" }
+  4: { file: null, dataUrl: null, uploaded: null, name: "" },
+  5: { file: null, dataUrl: null, uploaded: null, name: "" },
+  6: { file: null, dataUrl: null, uploaded: null, name: "" }
 };
+// Qué slots ve cada segmento (el 1 es siempre ref_image_0 del Seg 1)
+const SEG1_REF_SLOTS = [2, 5];
+const SEG2_REF_SLOTS = [3, 4, 6];
+const SHARED_REF_SLOTS = [2, 3, 4, 5, 6];
 let videoSlot = { file: null, dataUrl: null, uploaded: null, name: "" };
 let audioSlots = {
   1: { file: null, dataUrl: null, uploaded: null, name: "" },
@@ -8323,12 +8356,7 @@ async function enqueueFaceRefineCurrent(slotIndex = 3){
     uploadedRefFace1: uploadedRefFace1 ? {...uploadedRefFace1} : null,
     uploadedRefFace2: uploadedRefFace2 ? {...uploadedRefFace2} : null,
     postFx: getPostFxState(),
-    mediaSlotsSnapshot: {
-      1: mediaSlots[1]?.uploaded ? { ...mediaSlots[1].uploaded } : null,
-      2: mediaSlots[2]?.uploaded ? { ...mediaSlots[2].uploaded } : null,
-      3: mediaSlots[3]?.uploaded ? { ...mediaSlots[3].uploaded } : null,
-      4: mediaSlots[4]?.uploaded ? { ...mediaSlots[4].uploaded } : null
-    },
+    mediaSlotsSnapshot: Object.fromEntries([1, 2, 3, 4, 5, 6].map(i => [i, mediaSlots[i]?.uploaded ? { ...mediaSlots[i].uploaded } : null])),
     audioSlotsSnapshot: {
       1: audioSlots[1]?.uploaded ? { ...audioSlots[1].uploaded } : null,
       2: audioSlots[2]?.uploaded ? { ...audioSlots[2].uploaded } : null
@@ -8778,7 +8806,7 @@ async function restoreSavedMedia(){
     if(rec.key && rec.key.startsWith("slot_") && rec.key !== "slot_vid" && !rec.key.startsWith("slot_audio_")){
       const slotIdx = parseInt(rec.key.replace("slot_", ""), 10);
       if(slotIdx === 1 && refQueryImagePending) continue;
-      if(slotIdx >= 1 && slotIdx <= 4 && rec.dataUrl){
+      if(slotIdx >= 1 && slotIdx <= 6 && rec.dataUrl){
         setMediaSlotData(slotIdx, null, rec.dataUrl, rec.name || `slot_${slotIdx}.png`, false);
         if(rec.uploaded) mediaSlots[slotIdx].uploaded = rec.uploaded;
         restoredAny = true;
@@ -8904,10 +8932,10 @@ function attachAutoSaveListeners(){
 }
 
 // ==========================================
-// GESTIÓN DE MEDIOS (4 IMÁGENES + 1 VÍDEO)
+// GESTIÓN DE MEDIOS (6 IMÁGENES + 1 VÍDEO)
 // ==========================================
 function setupMediaSlots(){
-  for(let i = 1; i <= 4; i++){
+  for(let i = 1; i <= 6; i++){
     const slotEl = $(`slotImg${i}`);
     const fileInput = $(`fileInput${i}`);
     const delBtn = $(`btnDelImg${i}`);
@@ -9025,7 +9053,7 @@ function setupMediaSlots(){
       if(item.kind === 'file' && item.type.startsWith('image/')){
         const blob = item.getAsFile();
         let target = 1;
-        for(let s = 1; s <= 4; s++){
+        for(let s = 1; s <= 6; s++){
           if(!mediaSlots[s].dataUrl && !mediaSlots[s].file){ target = s; break; }
         }
         handleImageFile(target, blob);
@@ -9164,7 +9192,7 @@ function clearVideoSlot(){
 
 async function ensureAllMediaUploaded(){
   let needUpload = 0;
-  for(let i = 1; i <= 4; i++){
+  for(let i = 1; i <= 6; i++){
     const slot = mediaSlots[i];
     if((slot.file || slot.dataUrl) && !slot.uploaded) needUpload++;
   }
@@ -9178,7 +9206,7 @@ async function ensureAllMediaUploaded(){
     log(`📤 Subiendo ${needUpload} archivo(s) de medios a ComfyUI...`, "l-busy");
   }
 
-  for(let i = 1; i <= 4; i++){
+  for(let i = 1; i <= 6; i++){
     const slot = mediaSlots[i];
     if(slot.file && !slot.uploaded){
       slot.uploaded = await uploadSingleFile(slot.file, `mmh3x2_slot_${i}.png`);
@@ -9339,11 +9367,11 @@ function updateRefNumberingHint(){
   const has = (i) => !!(mediaSlots[i]?.uploaded || mediaSlots[i]?.file || mediaSlots[i]?.dataUrl);
   let seg1, seg2;
   if(!shared){
-    seg1 = [has(1) ? "Img1" : null, has(2) ? "Img2" : null].filter(Boolean);
-    seg2 = ["1er frame Seg 1", has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
+    seg1 = [1, ...SEG1_REF_SLOTS].filter(has).map(i => "Img" + i);
+    seg2 = ["1er frame Seg 1", ...SEG2_REF_SLOTS.filter(has).map(i => "Img" + i)];
   } else {
-    seg1 = [has(1) ? "Img1" : null, has(2) ? "Img2" : null, has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
-    seg2 = ["1er frame Seg 1", has(2) ? "Img2" : null, has(3) ? "Img3" : null, has(4) ? "Img4" : null].filter(Boolean);
+    seg1 = [1, ...SHARED_REF_SLOTS].filter(has).map(i => "Img" + i);
+    seg2 = ["1er frame Seg 1", ...SHARED_REF_SLOTS.filter(has).map(i => "Img" + i)];
   }
   const num = (arr) => arr.length ? arr.map((n, i) => `P${i + 1}=${n}`).join(" · ") : "T2V puro (sin refs)";
   hint.textContent = `Seg 1 ve: ${num(seg1)}  |  Seg 2 ve: ${num(seg2)}`;
@@ -9437,12 +9465,8 @@ function buildGraph(j){
   if(!purgeVram) delete g["87"];
 
   // Instantánea de medios (inmunidad a cambios en UI durante el render)
-  const mSlots = j?.mediaSlotsSnapshot || {
-    1: mediaSlots[1]?.uploaded ? { ...mediaSlots[1].uploaded } : (mediaSlots[1]?.name ? { name: mediaSlots[1].name } : null),
-    2: mediaSlots[2]?.uploaded ? { ...mediaSlots[2].uploaded } : (mediaSlots[2]?.name ? { name: mediaSlots[2].name } : null),
-    3: mediaSlots[3]?.uploaded ? { ...mediaSlots[3].uploaded } : (mediaSlots[3]?.name ? { name: mediaSlots[3].name } : null),
-    4: mediaSlots[4]?.uploaded ? { ...mediaSlots[4].uploaded } : (mediaSlots[4]?.name ? { name: mediaSlots[4].name } : null)
-  };
+  const mSlots = j?.mediaSlotsSnapshot || Object.fromEntries([1, 2, 3, 4, 5, 6].map(i => [i,
+    mediaSlots[i]?.uploaded ? { ...mediaSlots[i].uploaded } : (mediaSlots[i]?.name ? { name: mediaSlots[i].name } : null)]));
   const aSlots = j?.audioSlotsSnapshot || {
     1: audioSlots[1]?.uploaded ? { ...audioSlots[1].uploaded } : (audioSlots[1]?.file ? { name: audioSlots[1].file.name } : null),
     2: audioSlots[2]?.uploaded ? { ...audioSlots[2].uploaded } : (audioSlots[2]?.file ? { name: audioSlots[2].file.name } : null)
@@ -10465,7 +10489,7 @@ function buildGraph(j){
   if(g[N.GUIDER_2]?.inputs) g[N.GUIDER_2].inputs.model = [currentModelNode, 0];
   if(g[N.SCHEDULER_2]?.inputs) g[N.SCHEDULER_2].inputs.model = [currentModelNode, 0];
 
-  // 10. Conexión dinámica y limpia de Imágenes de Entrada (Slots 1..4)
+  // 10. Conexión dinámica y limpia de Imágenes de Entrada (Slots 1..6)
   // Limpiar referencias previas de imágenes en ambos segmentos para evitar entradas fantasma
   if(g[N.REF2V_SEG1]?.inputs){
     for(let i = 0; i < 8; i++) delete g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${i}`];
@@ -10495,63 +10519,36 @@ function buildGraph(j){
   if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs.ref_image_size = refSize;
   if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs.ref_image_size = refSize;
 
-  if(!sharedRefs){
-    // Modo estándar / NO compartido:
-    // Seg 1 ve: Img1 (ref_image_0), e Img2 (ref_image_1) si se ha subido
-    let seg1Idx = slotHasImg(1) ? 1 : 0;
-    if(slotHasImg(2)){
-      if(g[N.IMG2]?.inputs) g[N.IMG2].inputs.image = getSlotImgName(2);
-      if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${seg1Idx++}`] = [N.IMG2, 0];
-      usedSlots.add(2);
-    }
-    // Seg 2 ve: Last frame de Seg 1 (ref_image_0), e Img3 / Img4 si se han subido
-    let seg2Idx = 0;
-    if(g[N.REF2V_SEG2]?.inputs){
-      g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.LAST_FRAME, 0];
-    }
-    if(slotHasImg(3)){
-      if(g[N.IMG3]?.inputs) g[N.IMG3].inputs.image = getSlotImgName(3);
-      if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.IMG3, 0];
-      usedSlots.add(3);
-    }
-    if(slotHasImg(4)){
-      if(g[N.IMG4]?.inputs) g[N.IMG4].inputs.image = getSlotImgName(4);
-      if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.IMG4, 0];
-      usedSlots.add(4);
-    }
-  } else {
-    // Modo Compartido:
-    // Seg 1 ve: Img1 (0) + todos los slots 2, 3, 4 que tengan imagen subida
-    let seg1Idx = slotHasImg(1) ? 1 : 0;
-    const nodeMap = { 2: N.IMG2, 3: N.IMG3, 4: N.IMG4 };
-    [2, 3, 4].forEach(s => {
-      if(slotHasImg(s)){
-        const nid = nodeMap[s];
-        if(g[nid]?.inputs) g[nid].inputs.image = getSlotImgName(s);
-        if(g[N.REF2V_SEG1]?.inputs) g[N.REF2V_SEG1].inputs[`ref_images.ref_image_${seg1Idx++}`] = [nid, 0];
-        usedSlots.add(s);
-      }
+  // Slots 5/6 no existen en el workflow: se clonan del LoadImage de Img2 solo si se usan
+  [[5, N.IMG5], [6, N.IMG6]].forEach(([s, nid]) => {
+    if(slotHasImg(s) && g[N.IMG2]) g[nid] = { ...g[N.IMG2], inputs: { ...g[N.IMG2].inputs }, _meta: { title: `Load Image ${s}` } };
+  });
+  const nodeMap = { 2: N.IMG2, 3: N.IMG3, 4: N.IMG4, 5: N.IMG5, 6: N.IMG6 };
+  // Estándar: Seg 1 ve Img1 + SEG1_REF_SLOTS; Seg 2 ve last frame de Seg 1 + SEG2_REF_SLOTS.
+  // Compartido: ambos ven además todos los SHARED_REF_SLOTS con imagen.
+  const linkRefs = (segNode, startIdx, slots) => {
+    let idx = startIdx;
+    slots.forEach(s => {
+      if(!slotHasImg(s)) return;
+      const nid = nodeMap[s];
+      if(g[nid]?.inputs) g[nid].inputs.image = getSlotImgName(s);
+      if(g[segNode]?.inputs) g[segNode].inputs[`ref_images.ref_image_${idx++}`] = [nid, 0];
+      usedSlots.add(s);
     });
-    // Seg 2 ve: Last frame (0) + todos los slots 2, 3, 4 que tengan imagen subida
-    let seg2Idx = 0;
-    if(g[N.REF2V_SEG2]?.inputs){
-      g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [N.LAST_FRAME, 0];
-    }
-    [2, 3, 4].forEach(s => {
-      if(slotHasImg(s)){
-        const nid = nodeMap[s];
-        if(g[nid]?.inputs) g[nid].inputs.image = getSlotImgName(s);
-        if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs[`ref_images.ref_image_${seg2Idx++}`] = [nid, 0];
-        usedSlots.add(s);
-      }
-    });
+  };
+  if(g[N.REF2V_SEG2]?.inputs){
+    g[N.REF2V_SEG2].inputs["ref_images.ref_image_0"] = [N.LAST_FRAME, 0];
   }
+  linkRefs(N.REF2V_SEG1, slotHasImg(1) ? 1 : 0, sharedRefs ? SHARED_REF_SLOTS : SEG1_REF_SLOTS);
+  linkRefs(N.REF2V_SEG2, 1, sharedRefs ? SHARED_REF_SLOTS : SEG2_REF_SLOTS);
 
   // Pruning: eliminar del grafo los nodos LoadImage que no se hayan subido o no se usen
   if(!usedSlots.has(1) && g[N.IMG1]) delete g[N.IMG1];
   if(!usedSlots.has(2) && g[N.IMG2]) delete g[N.IMG2];
   if(!usedSlots.has(3) && g[N.IMG3]) delete g[N.IMG3];
   if(!usedSlots.has(4) && g[N.IMG4]) delete g[N.IMG4];
+  if(!usedSlots.has(5) && g[N.IMG5]) delete g[N.IMG5];
+  if(!usedSlots.has(6) && g[N.IMG6]) delete g[N.IMG6];
 
   // Si Slot 1 no tiene imagen (T2V) o el usuario fuerza un Aspect Ratio específico,
   // asignamos width/height numéricos a los nodos MiniMax H3 y eliminamos los nodos 77 y 78
@@ -11542,12 +11539,7 @@ async function queueJob(runMode){
     blendStrength: parseFloat($("blendStrength")?.value || "0.35"),
     blendFrames: parseInt($("blendFrames")?.value || "4", 10),
     blendMode: $("blendMode")?.value || "transition_only",
-    mediaSlotsSnapshot: {
-      1: mediaSlots[1]?.uploaded ? { ...mediaSlots[1].uploaded } : null,
-      2: mediaSlots[2]?.uploaded ? { ...mediaSlots[2].uploaded } : null,
-      3: mediaSlots[3]?.uploaded ? { ...mediaSlots[3].uploaded } : null,
-      4: mediaSlots[4]?.uploaded ? { ...mediaSlots[4].uploaded } : null
-    },
+    mediaSlotsSnapshot: Object.fromEntries([1, 2, 3, 4, 5, 6].map(i => [i, mediaSlots[i]?.uploaded ? { ...mediaSlots[i].uploaded } : null])),
     audioSlotsSnapshot: {
       1: audioSlots[1]?.uploaded ? { ...audioSlots[1].uploaded } : null,
       2: audioSlots[2]?.uploaded ? { ...audioSlots[2].uploaded } : null
@@ -11932,12 +11924,12 @@ async function loadKrea2Recent(){
       div.className = "gallery-item";
       div.innerHTML = `<img src="${url}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${escapeHtml(String(ts))} · ${sizeKB}KB</div>`;
       div.addEventListener("click", () => {
-        // Primer slot libre (1..4)
+        // Primer slot libre (1..6)
         let target = -1;
-        for(let s = 1; s <= 4; s++){
+        for(let s = 1; s <= 6; s++){
           if(!mediaSlots[s].dataUrl && !mediaSlots[s].file){ target = s; break; }
         }
-        if(target < 0){ log("⚠️ Los 4 slots de imagen están ocupados. Quita alguna imagen primero.", "l-warn"); return; }
+        if(target < 0){ log("⚠️ Los 6 slots de imagen están ocupados. Quita alguna imagen primero.", "l-warn"); return; }
         fetch(url).then(r2 => r2.blob()).then(blob => {
           const file = new File([blob], it.filename, { type: blob.type || "image/png" });
           handleImageFile(target, file);
@@ -11971,11 +11963,11 @@ $("krea2RecentToggle")?.addEventListener("click", () => {
   if(isOpen && !$("krea2RecentGrid").dataset.loaded) loadKrea2Recent();
 });
 
-// Drop de imágenes Krea2 recientes sobre los slots 1..4.
+// Drop de imágenes Krea2 recientes sobre los slots 1..6.
 // El drop nativo de archivos del SO ya está en setupMediaSlots; aquí añadimos
 // el caso "URL arrastrada" (desde esta u otra UI).
 function enableKrea2RecentSlotDrop(){
-  for(let i = 1; i <= 4; i++){
+  for(let i = 1; i <= 6; i++){
     const slotEl = $(`slotImg${i}`);
     if(!slotEl) continue;
     slotEl.addEventListener("dragover", (e) => {
@@ -12367,10 +12359,10 @@ window.addEventListener("DOMContentLoaded", () => {
       const isSeg2StyleF = (styleKey === "F");
       const isSeg2StyleG = (styleKey === "G");
       const allowedSlots = isSeg2StyleG
-        ? [1, 2]
+        ? [1, ...SEG1_REF_SLOTS]
         : (isSeg2StyleF
-          ? (sharedRefs ? [2, 3, 4] : [3, 4])
-          : (sharedRefs ? [1, 2, 3, 4] : [1, 2]));
+          ? (sharedRefs ? SHARED_REF_SLOTS : SEG2_REF_SLOTS)
+          : (sharedRefs ? [1, ...SHARED_REF_SLOTS] : [1, ...SEG1_REF_SLOTS]));
 
       const availableSlots = [];
       for(const i of allowedSlots){
