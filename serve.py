@@ -203,7 +203,7 @@ def _parse_byte_range(header, total):
 
 
 # Routes that should be proxied to the backend instead of served as files.
-PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt", "/free")
+PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt", "/free", "/ltxweb/")
 OLLAMA_PREFIXES = ("/api",)
 LLAMACPP_PREFIXES = ("/llamacpp",)
 WS_PREFIX = "/ws"

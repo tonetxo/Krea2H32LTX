@@ -3628,9 +3628,20 @@ function initCommon(){
       btnOffload.disabled = true;
       btnOffload.textContent = "Descargando...";
       try {
-        const r = await postComfyBackend("/free", { unload_models: true, free_memory: false });
-        if(!r || !r.ok) throw new Error(r ? "HTTP " + r.status : "Sin respuesta");
-        log("⚡ VRAM liberada: modelos descargados a RAM (conservados en memoria para generar sin leer del disco).", "l-ok");
+        // /free unload_models con DynamicVRAM también suelta los modelos de RAM (relectura
+        // de disco en la siguiente carga); /ltxweb/offload_vram (comfy_nodes/ltxweb_videofx)
+        // solo vacía la VRAM. No puede ir como prompt: la caché expulsaría los loaders.
+        const r = await postComfyBackend("/ltxweb/offload_vram", {});
+        if(r && r.ok){
+          const d = await r.json();
+          log(`⚡ VRAM liberada (${d.freed_gb} GB): modelos conservados en RAM.`, "l-ok");
+        } else if(r && r.status === 409){
+          log("⚠️ Hay jobs en cola: descarga la VRAM cuando termine la generación.", "l-warn");
+        } else {
+          const r2 = await postComfyBackend("/free", { unload_models: true, free_memory: false });
+          if(!r2 || !r2.ok) throw new Error(r2 ? "HTTP " + r2.status : "Sin respuesta");
+          log("⚠️ Ruta /ltxweb/offload_vram no disponible: usado /free, que también suelta los modelos de RAM (se releerán del disco). Copia comfy_nodes/ltxweb_videofx a custom_nodes y reinicia ComfyUI.", "l-warn");
+        }
       } catch(e){
         log("⚠️ Error descargando VRAM: " + e.message, "l-err");
       } finally {

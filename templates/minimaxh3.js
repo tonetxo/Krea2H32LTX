@@ -6895,9 +6895,10 @@ function finishCurrentJob(){
 }
 
 async function enqueueGeneration(){
-  // Mitigación OOM: liberar VRAM del backend antes de encolar (no interrumpe
-  // jobs en curso; aplica cuando el worker itere).
-  try { fetch(server()+"/free", { method:"POST", headers:{"Content-Type":"application/json"}, body:"{\"unload_models\":true}" }).catch(()=>{}); } catch(_){}
+  // Mitigación OOM: liberar VRAM del backend antes de encolar. Vía
+  // /ltxweb/offload_vram y no /free: este suelta también los modelos de RAM y
+  // obliga a releerlos del disco. Con jobs en curso responde 409 y no hace nada.
+  try { fetch(server()+"/ltxweb/offload_vram", { method:"POST" }).catch(()=>{}); } catch(_){}
   const job = snapshotJob();
   if(activeJob){
     jobQueue.push(job);
