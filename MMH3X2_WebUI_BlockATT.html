@@ -535,12 +535,15 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
               <label style="margin-bottom:0;">Resultado LLM</label>
               <span id="enhancerMetaInfo" style="font-size:10px; color:var(--accent);"></span>
             </div>
-            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado del LLM aparecerá aquí..."></textarea>
+            <textarea class="enhancer-output" id="enhancerOutput" placeholder="El resultado del LLM aparecerá aquí (editable: puedes pegar o retocar texto)..."></textarea>
           </div>
           <div class="enhancer-row">
             <label>Cambios a aplicar <span class="hint">(pulido sobre el resultado; Ctrl+Enter)</span></label>
             <textarea class="enhancer-output" id="enhancerRefineInput" placeholder="p. ej.: que sea de noche, quita el sombrero, plano más cerrado..."></textarea>
-            <button id="btnRefinePrompt" class="primary" style="width:100%; margin-top:6px;">Aplicar cambios</button>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <button id="btnRefinePrompt" class="primary" style="flex:1;" title="Pule el texto de Resultado LLM (o el prompt si está vacío)">Aplicar al resultado</button>
+              <button id="btnRefineFromPrompt" class="primary" style="flex:1;" title="Pule el prompt actual (p. ej. el restaurado al cargar un vídeo); el resultado va a Resultado LLM">Aplicar al prompt</button>
+            </div>
           </div>
           <div class="enhancer-actions">
             <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
@@ -5094,8 +5097,8 @@ function generateEvolved(prompt, mode, strength, count){
 // --- INIT: all top-level code that uses $ or CONFIG ---
 // Called by the UI-specific JS after CONFIG is defined.
 // --- PULIDO ITERATIVO DEL PROMPT ---
-// Reescribe el último resultado del enhancer (o el prompt actual si no hay) aplicando solo
-// los cambios pedidos. El resultado vuelve a #enhancerOutput, así se puede encadenar.
+// Reescribe el último resultado del enhancer (o el prompt actual si no hay, o siempre con
+// fromPrompt) aplicando solo los cambios pedidos. El resultado vuelve a #enhancerOutput, así se puede encadenar.
 // Cada UI puede definir CONFIG.parseEnhancerOutput(raw) para extraer el texto (p.ej. JSON).
 const ENHANCER_REFINE_SYSTEM = `You are an expert editor of prompts for image and video generation models.
 You receive an existing prompt and a list of requested changes (the changes may be written in another language).
@@ -5108,13 +5111,13 @@ function enhancerOutputText(raw){
   return raw.replace(/\n*--- (?:Ollama|llama\.cpp) · [^\n]+ ---/g, "").trim();
 }
 
-async function refineEnhancedPrompt(){
+async function refineEnhancedPrompt(fromPrompt = false){
   const model = $("enhancerModel").value;
   if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
   const changes = $("enhancerRefineInput").value.trim();
   if(!changes){ log("⚠️ Escribe los cambios que quieres aplicar al prompt", "l-err"); return; }
   const out = $("enhancerOutput").value.trim();
-  const base = (out && !out.startsWith("Error:")) ? enhancerOutputText(out) : $("prompt").value.trim();
+  const base = (!fromPrompt && out && !out.startsWith("Error:")) ? enhancerOutputText(out) : $("prompt").value.trim();
   if(!base){ log("⚠️ No hay prompt que pulir: escribe uno o pulsa 'Mejorar prompt' primero", "l-err"); return; }
 
   const payload = {
@@ -5123,7 +5126,8 @@ async function refineEnhancedPrompt(){
     prompt: `EXISTING PROMPT:\n${base}\n\nREQUESTED CHANGES:\n${changes}`,
     options: { num_ctx: 4096, temperature: 0.4 }
   };
-  const btn = $("btnRefinePrompt");
+  const btn = $(fromPrompt ? "btnRefineFromPrompt" : "btnRefinePrompt");
+  const btnText = btn.textContent;
   btn.disabled = true;
   btn.textContent = "Aplicando cambios...";
   $("enhancerOutput").value = "";
@@ -5145,7 +5149,7 @@ async function refineEnhancedPrompt(){
     log("Error al aplicar cambios: " + e.message, "l-err");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Aplicar cambios";
+    btn.textContent = btnText;
   }
 }
 
@@ -5226,7 +5230,8 @@ function initCommon(){
     populateStyleSelect(data, $("enhancerMode").value);
   });
 
-  $("btnRefinePrompt").addEventListener("click", refineEnhancedPrompt);
+  $("btnRefinePrompt").addEventListener("click", () => refineEnhancedPrompt());
+  $("btnRefineFromPrompt").addEventListener("click", () => refineEnhancedPrompt(true));
   $("enhancerRefineInput").addEventListener("keydown", (e) => {
     if(e.key === "Enter" && (e.ctrlKey || e.metaKey)){ e.preventDefault(); refineEnhancedPrompt(); }
   });

@@ -56,12 +56,15 @@
               <label style="margin-bottom:0;">Resultado LLM</label>
               <span id="enhancerMetaInfo" style="font-size:10px; color:var(--accent);"></span>
             </div>
-            <textarea class="enhancer-output" id="enhancerOutput" readonly placeholder="El resultado del LLM aparecerá aquí..."></textarea>
+            <textarea class="enhancer-output" id="enhancerOutput" placeholder="El resultado del LLM aparecerá aquí (editable: puedes pegar o retocar texto)..."></textarea>
           </div>
           <div class="enhancer-row">
             <label>Cambios a aplicar <span class="hint">(pulido sobre el resultado; Ctrl+Enter)</span></label>
             <textarea class="enhancer-output" id="enhancerRefineInput" placeholder="p. ej.: que sea de noche, quita el sombrero, plano más cerrado..."></textarea>
-            <button id="btnRefinePrompt" class="primary" style="width:100%; margin-top:6px;">Aplicar cambios</button>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <button id="btnRefinePrompt" class="primary" style="flex:1;" title="Pule el texto de Resultado LLM (o el prompt si está vacío)">Aplicar al resultado</button>
+              <button id="btnRefineFromPrompt" class="primary" style="flex:1;" title="Pule el prompt actual (p. ej. el restaurado al cargar un vídeo); el resultado va a Resultado LLM">Aplicar al prompt</button>
+            </div>
           </div>
           <div class="enhancer-actions">
             <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
