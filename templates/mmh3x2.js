@@ -598,6 +598,8 @@ let mediaSlots = {
 const SEG1_REF_SLOTS = [2, 5];
 const SEG2_REF_SLOTS = [3, 4, 6];
 const SHARED_REF_SLOTS = [2, 3, 4, 5, 6];
+// En compartido el Seg 2 también ve la Img1 base (identidad original), tras el last frame
+const SHARED_SEG2_REF_SLOTS = [1, ...SHARED_REF_SLOTS];
 let videoSlot = { file: null, dataUrl: null, uploaded: null, name: "" };
 let audioSlots = {
   1: { file: null, dataUrl: null, uploaded: null, name: "" },
@@ -3436,10 +3438,10 @@ function updateRefNumberingHint(){
   let seg1, seg2;
   if(!shared){
     seg1 = [1, ...SEG1_REF_SLOTS].filter(has).map(i => "Img" + i);
-    seg2 = ["1er frame Seg 1", ...SEG2_REF_SLOTS.filter(has).map(i => "Img" + i)];
+    seg2 = ["Último frame Seg 1", ...SEG2_REF_SLOTS.filter(has).map(i => "Img" + i)];
   } else {
     seg1 = [1, ...SHARED_REF_SLOTS].filter(has).map(i => "Img" + i);
-    seg2 = ["1er frame Seg 1", ...SHARED_REF_SLOTS.filter(has).map(i => "Img" + i)];
+    seg2 = ["Último frame Seg 1", ...SHARED_SEG2_REF_SLOTS.filter(has).map(i => "Img" + i)];
   }
   const num = (arr) => arr.length ? arr.map((n, i) => `P${i + 1}=${n}`).join(" · ") : "T2V puro (sin refs)";
   hint.textContent = `Seg 1 ve: ${num(seg1)}  |  Seg 2 ve: ${num(seg2)}`;
@@ -4591,9 +4593,9 @@ function buildGraph(j){
   [[5, N.IMG5], [6, N.IMG6]].forEach(([s, nid]) => {
     if(slotHasImg(s) && g[N.IMG2]) g[nid] = { ...g[N.IMG2], inputs: { ...g[N.IMG2].inputs }, _meta: { title: `Load Image ${s}` } };
   });
-  const nodeMap = { 2: N.IMG2, 3: N.IMG3, 4: N.IMG4, 5: N.IMG5, 6: N.IMG6 };
+  const nodeMap = { 1: N.IMG1, 2: N.IMG2, 3: N.IMG3, 4: N.IMG4, 5: N.IMG5, 6: N.IMG6 };
   // Estándar: Seg 1 ve Img1 + SEG1_REF_SLOTS; Seg 2 ve last frame de Seg 1 + SEG2_REF_SLOTS.
-  // Compartido: ambos ven además todos los SHARED_REF_SLOTS con imagen.
+  // Compartido: Seg 1 ve Img1 + SHARED_REF_SLOTS; Seg 2 ve last frame + SHARED_SEG2_REF_SLOTS.
   const linkRefs = (segNode, startIdx, slots) => {
     let idx = startIdx;
     slots.forEach(s => {
@@ -4608,7 +4610,7 @@ function buildGraph(j){
     g[N.REF2V_SEG2].inputs["ref_images.ref_image_0"] = [N.LAST_FRAME, 0];
   }
   linkRefs(N.REF2V_SEG1, slotHasImg(1) ? 1 : 0, sharedRefs ? SHARED_REF_SLOTS : SEG1_REF_SLOTS);
-  linkRefs(N.REF2V_SEG2, 1, sharedRefs ? SHARED_REF_SLOTS : SEG2_REF_SLOTS);
+  linkRefs(N.REF2V_SEG2, 1, sharedRefs ? SHARED_SEG2_REF_SLOTS : SEG2_REF_SLOTS);
 
   // Pruning: eliminar del grafo los nodos LoadImage que no se hayan subido o no se usen
   if(!usedSlots.has(1) && g[N.IMG1]) delete g[N.IMG1];
@@ -6456,7 +6458,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const allowedSlots = isSeg2StyleG
         ? [1, ...SEG1_REF_SLOTS]
         : (isSeg2StyleF
-          ? (sharedRefs ? SHARED_REF_SLOTS : SEG2_REF_SLOTS)
+          ? (sharedRefs ? SHARED_SEG2_REF_SLOTS : SEG2_REF_SLOTS)
           : (sharedRefs ? [1, ...SHARED_REF_SLOTS] : [1, ...SEG1_REF_SLOTS]));
 
       const availableSlots = [];
@@ -6467,7 +6469,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const targetDesc = isSeg2StyleG
           ? "Slot 1 (Imagen base Seg 1)"
           : (isSeg2StyleF
-            ? (sharedRefs ? "los slots 2 a 6" : "Slot 3, 4 o 6 (Segmento 2)")
+            ? (sharedRefs ? "los slots 1 a 6" : "Slot 3, 4 o 6 (Segmento 2)")
             : (sharedRefs ? "los slots de entrada (1 a 6)" : "Slot 1, 2 o 5 (Segmento 1)"));
         log(`⚠️ Carga al menos una imagen en ${targetDesc} para usar este estilo en modo Visión.`, "l-err");
         return;
