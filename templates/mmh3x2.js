@@ -3381,9 +3381,11 @@ function updateCalculatedResolution(origW, origH){
   else if(arSelect === "21:9") ar = 21 / 9;
   else ar = (origW && origH) ? (origW / origH) : (16 / 9);
 
-  const targetPixels = mp * 1000000;
+  // Igual que ResolutionSelector / ImageScaleToTotalPixels de ComfyUI (y MiniMaxH3):
+  // 1 MP = 1024², cada lado redondeado a 32 por separado.
+  const targetPixels = mp * 1024 * 1024;
   let h = Math.round(Math.sqrt(targetPixels / ar) / 32) * 32;
-  let w = Math.round((h * ar) / 32) * 32;
+  let w = Math.round(Math.sqrt(targetPixels * ar) / 32) * 32;
   w = Math.max(256, w);
   h = Math.max(256, h);
 
