@@ -589,6 +589,7 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
         <h2>Imágenes de Referencia (Hasta 6)</h2>
         <div class="hint" style="font-size:10px;margin-bottom:6px;">Arrastra o haz clic en cada recuadro. Arrastra entre slots o desde el historial para intercambiar.</div>
         <div class="media-grid-4">
+          <!-- Columna izquierda = Seg 1 (1, 2, 5); derecha = Seg 2 (3, 4, 6) -->
           <!-- IMAGEN 1: Base Seg 1 -->
           <div class="media-slot" id="slotImg1" data-slot="1">
             <div class="media-slot-header">
@@ -601,18 +602,6 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <div class="media-slot-info" id="infoImg1"></div>
           </div>
 
-          <!-- IMAGEN 2: Ref Seg 1 -->
-          <div class="media-slot" id="slotImg2" data-slot="2">
-            <div class="media-slot-header">
-              <span class="media-slot-badge">Img 2 · Ref Seg 1</span>
-              <button class="media-slot-del" id="btnDelImg2" title="Quitar imagen">✕</button>
-            </div>
-            <input type="file" id="fileInput2" accept="image/*">
-            <div class="ph" id="phImg2">arrastra o clic<br><span class="hint">(ref seg 1)</span></div>
-            <img id="previewSlotImg2" style="display:none;" alt="Img 2">
-            <div class="media-slot-info" id="infoImg2"></div>
-          </div>
-
           <!-- IMAGEN 3: Ref Seg 2 -->
           <div class="media-slot" id="slotImg3" data-slot="3">
             <div class="media-slot-header">
@@ -623,6 +612,18 @@ video{width:100%;border-radius:5px;background:#000;display:block;max-height:48vh
             <div class="ph" id="phImg3">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
             <img id="previewSlotImg3" style="display:none;" alt="Img 3">
             <div class="media-slot-info" id="infoImg3"></div>
+          </div>
+
+          <!-- IMAGEN 2: Ref Seg 1 -->
+          <div class="media-slot" id="slotImg2" data-slot="2">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 2 · Ref Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg2" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput2" accept="image/*">
+            <div class="ph" id="phImg2">arrastra o clic<br><span class="hint">(ref seg 1)</span></div>
+            <img id="previewSlotImg2" style="display:none;" alt="Img 2">
+            <div class="media-slot-info" id="infoImg2"></div>
           </div>
 
           <!-- IMAGEN 4: Ref Seg 2 -->
