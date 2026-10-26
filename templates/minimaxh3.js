@@ -1945,7 +1945,7 @@ function renderRefAudios(){
       const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       if(f && f.type.startsWith("audio/")){
         ref.local = f; ref.uploaded = null;
-        dbSaveMedia(`refAud_${i}`, { kind: "file", name: f.name || "", type: f.type || "audio/mpeg" }).catch(()=>{});
+        dbSaveMedia(`refAud_${i}`, { kind: "file", name: f.name || "", type: f.type || "audio/mpeg", blob: f }).catch(()=>{});
         renderRefAudios();
         log(`🎵 Audio de referencia ${i+1}: ${f.name}`, "l-ok");
       }
@@ -1960,7 +1960,7 @@ function renderRefAudios(){
         const f = inp.files && inp.files[0];
         if(!f) return;
         ref.local = f; ref.uploaded = null;
-        dbSaveMedia(`refAud_${i}`, { kind: "file", name: f.name || "", type: f.type || "audio/mpeg" }).catch(()=>{});
+        dbSaveMedia(`refAud_${i}`, { kind: "file", name: f.name || "", type: f.type || "audio/mpeg", blob: f }).catch(()=>{});
         renderRefAudios();
         log(`🎵 Audio de referencia ${i+1}: ${f.name}`, "l-ok");
       });
@@ -7192,9 +7192,11 @@ async function restoreMiniMaxH3MediaFromDB(){
       } else if(e.key.startsWith("refImg_") && e.data){
         const idx = parseInt(e.key.replace("refImg_",""),10);
         if(refImages[idx]){ refImages[idx].local = e.data; refImages[idx].uploaded = null; }
+      } else if(e.key.startsWith("refAud_") && e.blob){
+        const idx = parseInt(e.key.replace("refAud_",""),10);
+        if(refAudios[idx]){ refAudios[idx].local = new File([e.blob], e.name || "restored_audio", { type: e.type || e.blob.type }); refAudios[idx].uploaded = null; }
       }
-      // refVid_/refAud_: no se persisten blobs de vídeo/audio (grandes); solo
-      // metadatos, por lo que NO son restaurables entre sesiones.
+      // refVid_: no se persisten blobs de vídeo (grandes); solo metadatos.
     } catch(err){ console.warn("Error restaurando medio", e.key, err); }
   }
   renderR2V();
