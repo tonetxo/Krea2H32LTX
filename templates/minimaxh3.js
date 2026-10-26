@@ -19,7 +19,7 @@ const CONFIG = {
     ATTN_BACKEND:"147", BLOCK_SPARSE:"190", AIMDO:"191",
     SOL_H3:"166",
     NOISE:"129", DURATION:"132", MATH:"131",
-    SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", GUIDER:"126",
+    SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", R2V_ANCHOR:"250", GUIDER:"126",
     SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
     DECODE_VIDEO_1:"420", DECODE_AUDIO_1:"421", CREATE_VIDEO_1:"422", FIRST_SAVE:"423",
     AV_SPLIT:"400", AV_CONCAT:"401", UNET2:"402", ATTN2:"403", LORA_TURBO2:"404",
@@ -131,6 +131,7 @@ RULES:
 6. detailed_description: the main body, 350-500 English words, shot by shot in playback order with [Shot 1] (no timestamp) then [Shot N] At MM:SS.mmm. Write camera motion as natural English (motion type + amplitude + speed). Give vocal sources stable (S1),(S2) IDs; write dialogue as <d>[Language] ...</d> verbatim. Insert <Subject N>/<Picture N>/<Video N>/<Audio N> at their first appearance and where they apply. Use <scenetrans>/<cutoff> for dialogue across cuts. State the overall style in one or two English sentences before [Shot 1].
 7. overall_soundscape: 1-4 sentences of ambient/physical/non-verbal sound; cite <Audio N> copy/reference relationship when it matches that layer.
 8. non_diegetic_music: 1-3 sentences on instrumentation, tempo, dynamics; N/A if none.
+9. Unless the user says otherwise, the FIRST reference image (<Picture 1>) is the exact opening frame of the video at 0.00 seconds. Include [keyframe completion] in the summary tag, mark "<Picture 1>: fully_preserved" in retention_analysis, and open [Shot 1] on exactly the composition of <Picture 1> (same subjects, poses, framing, lighting, colors, key objects and spatial relationships) before any action or camera motion begins.
 
 The user may write in any language; you must ALWAYS respond in English with ONLY the final MiniMax H3 full-reference prompt, no explanations or prefaces.` },
       F: { name: "L2VA (solo último frame / convergencia final)", prompt: `You are an expert prompt writer for the MiniMax H3 video model generating a video that concludes at a target LAST FRAME (reverse-temporal inference / ending convergence). You are given ONE reference image: it is the exact CLOSING frame of the target video at the end of the timeline (Picture 1, aligns with the final second of the video). Optionally the user provides a text hint. Rewrite the user's idea into a single MiniMax H3 final prompt following the official format strictly.
@@ -389,6 +390,7 @@ $("samplerName")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("schedulerName")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("filenamePrefix")?.addEventListener("input", () => scheduleSaveH3Settings());
 $("refImageSize")?.addEventListener("change", () => scheduleSaveH3Settings());
+$("r2vAnchorFirst")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("batchSize")?.addEventListener("input", () => scheduleSaveH3Settings());
 $("duration")?.addEventListener("input", () => { updateDurationHints(); scheduleSaveH3Settings(); });
 $("frames")?.addEventListener("input", () => scheduleSaveH3Settings());
@@ -529,6 +531,7 @@ function saveH3Settings(){
     filenamePrefix: $("filenamePrefix")?.value || "video/MiniMax_H3",
     mode: currentMode,
     refImageSize: $("refImageSize")?.value || "match",
+    r2vAnchorFirst: $("r2vAnchorFirst")?.checked ?? true,
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
@@ -585,6 +588,7 @@ function restoreH3Settings(){
     if(s.blockSparse){ setBlockSparseUI(s.blockSparse); saveBlockSparse(s.blockSparse); }
     if(s.mode){ setModeUI(s.mode); }
     if(s.refImageSize && $("refImageSize")) $("refImageSize").value = s.refImageSize;
+    if(typeof s.r2vAnchorFirst === "boolean" && $("r2vAnchorFirst")) $("r2vAnchorFirst").checked = s.r2vAnchorFirst;
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
     if(s.arMode){ arMode = s.arMode; saveArMode(arMode); }
     if(s.aspectRatio) currentAspectRatio = s.aspectRatio;
@@ -2558,6 +2562,7 @@ function snapshotJob(){
     filenamePrefix: $("filenamePrefix")?.value,
     mode: currentMode,
     refImageSize: $("refImageSize")?.value || "match",
+    r2vAnchorFirst: $("r2vAnchorFirst")?.checked ?? true,
     h3opt: getH3OptState(),
     sigmaShift: getSigmaShiftState(),
     spectrum: getSpectrumState(),
@@ -2854,6 +2859,8 @@ async function applyWorkflow(workflow, opts={}){
     if(hasVideo || hasAudio || hasVideoAudio || imgCount > 1){
       setModeUI("r2v");
       modeSet = true;
+      // Metadatos antiguos no tienen ancla: restaurar fielmente como desactivada.
+      if($("r2vAnchorFirst")) $("r2vAnchorFirst").checked = !!findByClass("MiniMaxH3AddGuide");
     }
   }
   if(i2vNode && i2vNode.inputs && !modeSet){
@@ -4128,6 +4135,16 @@ function buildGraph(job){
       });
       // Si no hay imagen de referencia, eliminar el LoadImage por defecto del grafo base
       if(!usedImgKeys.has("137") && g["137"]) delete g["137"];
+      // La referencia R2V solo condiciona identidad/estilo; para que el vídeo arranque en
+      // la Ref 1 hay que anclarla como keyframe en el frame 0 (re-inyectada en cada paso).
+      const anchorFirst = j ? (j.r2vAnchorFirst ?? true) : ($("r2vAnchorFirst")?.checked ?? true);
+      if(anchorFirst && usedImgKeys.has("137")){
+        g[N.R2V_ANCHOR] = {
+          class_type: "MiniMaxH3AddGuide",
+          inputs: { positive: [N.REF2V, 0], vae: [N.VAE_VIDEO, 0], latent: [N.REF2V, 1], image: ["137", 0], frame_idx: 0 },
+          _meta: { title: "Ancla Ref 1 → frame 0" }
+        };
+      }
       // Vídeos de referencia + sus audios
       for(let i = 0; i < rVideos.length; i++){
         const v = rVideos[i];
@@ -5185,7 +5202,7 @@ function buildGraph(job){
   }
   if(g[N.GUIDER] && g[N.GUIDER].inputs){
     g[N.GUIDER].inputs.model = [currentModelNode, 0];
-    if(g[N.REF2V]) g[N.GUIDER].inputs.conditioning = [N.REF2V, 0];
+    if(g[N.REF2V]) g[N.GUIDER].inputs.conditioning = [g[N.R2V_ANCHOR] ? N.R2V_ANCHOR : N.REF2V, 0];
   }
 
   // 8. Sampler
@@ -5458,7 +5475,7 @@ function buildGraph(job){
         class_type: "BasicGuider",
         inputs: {
           model: [model2Node, 0],
-          conditioning: [N.REF2V, 0]
+          conditioning: [g[N.R2V_ANCHOR] ? N.R2V_ANCHOR : N.REF2V, 0]
         },
         _meta: { title: "Guider Pase 2" }
       };
