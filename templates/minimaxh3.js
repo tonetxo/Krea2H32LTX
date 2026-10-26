@@ -19,7 +19,7 @@ const CONFIG = {
     ATTN_BACKEND:"147", BLOCK_SPARSE:"190", AIMDO:"191",
     SOL_H3:"166",
     NOISE:"129", DURATION:"132", MATH:"131",
-    SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", R2V_ANCHOR:"250", GUIDER:"126",
+    SCHEDULER:"124", SAMPLER_SELECT:"123", REF2V:"136", R2V_ANCHOR:"250", R2V_ANCHOR2:"251", GUIDER:"126",
     SAMPLER:"125", LATENT_UPSCALE:"165", DECODE_VIDEO:"122", DECODE_AUDIO:"121",
     DECODE_VIDEO_1:"420", DECODE_AUDIO_1:"421", CREATE_VIDEO_1:"422", FIRST_SAVE:"423",
     AV_SPLIT:"400", AV_CONCAT:"401", UNET2:"402", ATTN2:"403", LORA_TURBO2:"404",
@@ -5470,12 +5470,21 @@ function buildGraph(job){
         delete g[N.SOL_H3_2];
       }
 
-      // 5. BasicGuider para el pase 2: reutiliza condicionamiento de ReferenceToVideo
+      // 5. BasicGuider para el pase 2: reutiliza condicionamiento de ReferenceToVideo.
+      // El ancla del frame 0 se re-codifica sobre el latente reescalado: el keyframe
+      // debe tener la resolución del pase 2, no la del pase 1.
+      if(g[N.R2V_ANCHOR]){
+        g[N.R2V_ANCHOR2] = {
+          class_type: "MiniMaxH3AddGuide",
+          inputs: { ...g[N.R2V_ANCHOR].inputs, latent: [N.AV_CONCAT, 0] },
+          _meta: { title: "Ancla Ref 1 → frame 0 (Pase 2)" }
+        };
+      }
       g[N.GUIDER2] = {
         class_type: "BasicGuider",
         inputs: {
           model: [model2Node, 0],
-          conditioning: [g[N.R2V_ANCHOR] ? N.R2V_ANCHOR : N.REF2V, 0]
+          conditioning: [g[N.R2V_ANCHOR2] ? N.R2V_ANCHOR2 : N.REF2V, 0]
         },
         _meta: { title: "Guider Pase 2" }
       };
@@ -5580,6 +5589,7 @@ function buildGraph(job){
       delete g[N.PREVIEW2];
       delete g[N.SIGMAS2];
       delete g[N.GUIDER2];
+      delete g[N.R2V_ANCHOR2];
       delete g[N.SAMPLER2];
       delete g[N.MEM_OPT2];
       delete g[N.SPARSE_ATTN2];
