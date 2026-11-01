@@ -1,0 +1,1527 @@
+// krea2.js — Krea2-specific JavaScript.
+// Injected AFTER common.js. CONFIG must be defined before initCommon().
+
+const CONFIG = {
+  PROMPTS_KEY: 'krea2_prompts',
+  LORA_STATE_KEY: 'krea2_loras_state',
+  ENHANCER_SYSKEY: 'krea2_enhancer_sysprompts',
+  SERVERURL_KEY: 'krea2_serverUrl',
+  DEFAULT_BACKEND_PORT: "7821",
+  UI_TYPE: "krea2",
+  DEFAULT_MODEL: "Krea2_Turbo_convrot_int8mixed.safetensors",
+  N: {UNET:"1",ATTN_BACKEND:"2",PROMPT:"57",PROJECTOR:"35",ENHANCER:"101",LORA1:"40",LORA2:"60",LORA3:"68",VAE_DECODE:"43",SAMPLER:"45",PURGE:"55",RES_SELECTOR:"69",SEED_VARIANCE:"70",PREVIEW:"5",SAVE:"100"},
+  loras: [{on:true, lora:"", strength:0.4},{on:false, lora:"", strength:0.5},{on:false, lora:"", strength:0.4}],
+  ENHANCER_DEFAULT_PROMPTS: {
+    text: {
+      A: { name: "Estilo A (photorealistic)", prompt: "You are an expert in prompts for Krea2/Flux2 image generation. Transform the user's idea into a detailed photorealistic prompt. Include: subject, lighting, colors, texture, composition, and atmosphere. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
+      B: { name: "Estilo B (artistic)", prompt: "You are a creative assistant specialized in artistic image prompts. Take the user's idea and turn it into an evocative, artistic prompt. Use descriptive, poetic language. Focus on style, mood, and visual impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+    },
+    vision: {
+      A: { name: "Estilo A (descriptive)", prompt: "You are an expert at describing images for image generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, and style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      B: { name: "Estilo B (stylized)", prompt: "You are a digital artist. Look at the image and turn it into a stylized artistic description. Focus on the artistic style, color palette, and emotional impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      C: { name: "Estilo C (literal caption)", prompt: "You are an image captioning specialist. Describe the provided image factually and concisely in 1-3 sentences. No artistic interpretation, no camera instructions, no stylistic flourishes. Just what is visible: main subjects, setting, lighting, and notable details. The user may write in any language; you must ALWAYS respond in English with ONLY the caption, no explanations or preambles." },
+    },
+  },
+};
+
+const N = CONFIG.N;
+initCommon();
+
+let currentOutputMedia = null;
+let currentRefVariantIndex = -1;
+
+// Construye el parámetro ?ref= que entienden LTXV/MiniMaxH3/MMH3X2: incluye el
+// subfolder (p.ej. "krea2/afiador") para que /view encuentre la imagen. Sin él,
+// el receptor asume "krea2" y las imágenes en subcarpetas dan 404.
+function buildRefParam(filename, subfolder){
+  const sf = (subfolder || "").replace(/^\/+|\/+$/g, "");
+  return encodeURIComponent((sf ? sf + "/" : "") + filename);
+}
+// Extrae filename+subfolder de una URL /view y devuelve el ?ref= listo.
+function refFromViewSrc(src){
+  const m = src.match(/[?&]filename=([^&]+)/);
+  if(!m) return null;
+  const sm = src.match(/[?&]subfolder=([^&]*)/);
+  const filename = decodeURIComponent(m[1]);
+  const subfolder = sm ? decodeURIComponent(sm[1]) : "";
+  return { filename, subfolder, ref: buildRefParam(filename, subfolder) };
+}
+
+// Krea2 no usa el nodo TextGenerateLTX2Prompt de LTXV, así que la cadena de
+// mejora solo tiene sentido en modo Ollama. Limitamos el selector y ocultamos
+// los controles exclusivos de LTX2 para no confundir al usuario.
+(function initKrea2EnhancerUI(){
+  const chain = $("enhancerChainMode");
+  if(chain){
+    chain.innerHTML = `
+      <option value="off">Desactivado</option>
+      <option value="ollama">Ollama</option>
+    `;
+    chain.value = "ollama";
+  }
+  const ltx2Controls = ["ltx2Temperature", "ltx2Seed", "ltx2PreviewText"];
+  for(const id of ltx2Controls){
+    const el = $(id);
+    const row = el?.closest(".enhancer-row");
+    if(row) row.style.display = "none";
+  }
+  const ltx2Labels = document.querySelectorAll(".enhancer-row label");
+  for(const lbl of ltx2Labels){
+    if(lbl.textContent.includes("LTX2")){
+      const row = lbl.closest(".enhancer-row");
+      if(row) row.style.display = "none";
+    }
+  }
+})();
+
+// --- CALLBACKS FOR common.js ---
+CONFIG.findMedia = function(nodeOutput){
+  for(const k of["videos","gifs","images"]) if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length-1];
+  return null;
+};
+CONFIG.showMedia = function(slot, media, options){ showImage(media); };
+CONFIG.addToVariantGallery = addToVariantGallery;
+CONFIG.renderVariantMedia = function(card, url, media){
+  return `<img src="${escapeHtml(url)}">`;
+};
+// Metadata para el tooltip de la variant-card: captura sliders/LoRAs en el
+// momento de crear la tarjeta.
+CONFIG.variantMeta = function(){
+  const rows = [
+    ["Modelo", $("modelSelect")?.value || ""],
+    ["Atención", $("attentionBackend")?.value || "comfy kitchen attention"],
+    ["MP", parseFloat($("mpSlider")?.value || 0).toFixed(2)],
+    ["Aspecto", $("aspectRatio")?.value || ""],
+    ["Steps", $("steps")?.value || ""],
+    ["Eta", parseFloat($("etaSlider")?.value || 0).toFixed(2)],
+    ["Sampler", $("samplerName")?.value || ""],
+    ["Scheduler", $("schedulerName")?.value || ""],
+    ["Projector", `${$("projectorPreset")?.value || ""} @ ${parseFloat($("projectorStrength")?.value || 0).toFixed(2)}`],
+  ];
+  const enhOn = $("enhancerEnabled")?.classList.contains("on");
+  if(enhOn){
+    rows.push(["Enhancer", `${parseFloat($("enhancerStrength")?.value || 0).toFixed(2)} (ts ${parseFloat($("enhancerTextScale")?.value || 0).toFixed(2)})`]);
+  }
+  rows.push(["Variance", `${$("variancePreset")?.value || ""} / ${$("protectMode")?.value || ""}`]);
+  const loraList = (typeof loras !== "undefined" && Array.isArray(loras)) ? loras : [];
+  const lorasMeta = loraList.map(l => ({
+    name: l.lora ? l.lora.replace(/^.*\//, "") : "",
+    strength: l.strength != null ? Number(l.strength).toFixed(2) : null,
+    on: !!l.on,
+  }));
+  return { title: "Parámetros Krea2", rows, loras: lorasMeta };
+};
+CONFIG.onSeedUpdate = function(realSeed){ /* Krea2 logs only; no seed UI toggle */ };
+CONFIG.onPromptError = function(pid){};
+CONFIG.startNextVariant = function(index){ runSingleGeneration(index); };
+CONFIG.onBatchComplete = function(){
+  if(typeof finishCurrentJob === "function") finishCurrentJob();
+};
+CONFIG.onStopCurrent = function(pid){
+  clearPreview();
+};
+CONFIG.onStopAll = function(){
+  // common.js ya vació pendingSeeds/handledPrompts/timers; solo estado propio.
+  currentPromptId = null;
+  const t1 = $("time1");
+  if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
+  clearPreview();
+  jobQueue = [];
+  activeJob = null;
+  if(typeof updateQueueUI === "function") updateQueueUI();
+  enableStopButtons(false);
+};
+
+CONFIG.onPreview = function(url, meta){
+  const img = $("outputImg"), empty = $("empty1"), dl = $("dl1");
+  if(img && empty){
+    img.src = url;
+    img.style.display = "block";
+    empty.style.display = "none";
+    if(dl) dl.style.display = "none";
+    const info = $("imgInfo");
+    if(info) info.textContent = "⚡ Vista previa (TAE VAE / Latent)";
+  }
+};
+
+CONFIG.onClearPreview = function(){
+  if(!currentOutputMedia){
+    const img = $("outputImg"), empty = $("empty1"), dl = $("dl1");
+    if(img){ img.style.display = "none"; img.removeAttribute("src"); }
+    if(empty) empty.style.display = "flex";
+    if(dl) dl.style.display = "none";
+    const info = $("imgInfo");
+    if(info) info.textContent = "";
+  }
+};
+
+// --- Krea2 displayResult callback ---
+CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
+  const timeText = tTotal || "";
+  const outNode = entry.outputs[N.SAVE] || entry.outputs[N.PREVIEW] || entry.outputs[N.VAE_DECODE];
+  if(window.DEBUG) console.debug("[displayResult]", promptId, "keys=", Object.keys(entry.outputs||{}), "out=", !!outNode);
+  if(!outNode) {
+    return { foundOutput: false };
+  }
+  const media = CONFIG.findMedia(outNode);
+  if(window.DEBUG) console.debug("[displayResult] media=", media);
+  if(!media) {
+    return { foundOutput: false };
+  }
+  showImage(media);
+  const t1 = $("time1");
+  if(t1 && timeText){ t1.textContent = `⏱ ${timeText}`; t1.classList.remove("live"); }
+  addToVariantGallery(media, realSeed, timeText);
+  return { foundOutput: true };
+};
+
+// --- SHOW IMAGE ---
+function showImage(media){
+  if(!media) return;
+  currentOutputMedia = media;
+  const url=`${server()}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
+  const img=$("outputImg"), empty=$("empty1"), dl=$("dl1");
+  img.src=url; img.style.display="block"; empty.style.display="none";
+  dl.href=url; dl.style.display="inline";
+  img.onload = () => {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if(w && h){
+      const d = gcd(w, h) || 1;
+      $("imgInfo").textContent = `${w}×${h} · ${w/d}:${h/d}`;
+    }
+  };
+  outputZoom.resetZoom();
+}
+
+// --- ZOOM / PAN / FULLSCREEN ---
+// setupZoomPan and getImageVisibleRect are now in common.js
+
+const outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
+const refZoom = setupZoomPan("refWrap", "refImg", "btnResetZoomRef", "btnFullscreenRef");
+
+// Navegación de la imagen de referencia en pantalla completa con flechas
+function navigateRefVariant(dir){
+  const grid = $("variantGrid");
+  if(!grid) return;
+  const cards = Array.from(grid.querySelectorAll(".variant-card"));
+  if(!cards.length) return;
+  if(currentRefVariantIndex < 0) currentRefVariantIndex = 0;
+  let newIdx = currentRefVariantIndex + dir;
+  if(newIdx < 0) newIdx = cards.length - 1;
+  if(newIdx >= cards.length) newIdx = 0;
+  currentRefVariantIndex = newIdx;
+  const card = cards[newIdx];
+  const url = `${server()}/view?filename=${encodeURIComponent(card.dataset.filename)}&subfolder=${encodeURIComponent(card.dataset.subfolder)}&type=${encodeURIComponent(card.dataset.type)}`;
+  loadRefImage(url);
+  currentOutputMedia = { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type };
+}
+
+document.addEventListener("keydown", (e) => {
+  if(!outputZoom.isFullscreen() && !refZoom.isFullscreen()) return;
+  if(e.key === "ArrowLeft"){ e.preventDefault(); navigateRefVariant(-1); }
+  if(e.key === "ArrowRight"){ e.preventDefault(); navigateRefVariant(1); }
+});
+
+// Swipe táctil para cambiar de imagen (móvil)
+outputZoom.onSwipe((dir) => navigateRefVariant(dir));
+refZoom.onSwipe((dir) => navigateRefVariant(dir));
+
+$("btnSendLtxv").addEventListener("click", async () => {
+  if(!currentOutputMedia || !currentOutputMedia.filename){
+    log("⚠️ Primero genera una imagen para poder enviarla a LTXV.", "l-err");
+    return;
+  }
+  const filename = currentOutputMedia.filename;
+  const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
+  await openExternalWebUIRef(targetPort, "LTXV_WebUI.html", filename, currentOutputMedia.subfolder, "LTXV");
+});
+
+$("btnSendH3")?.addEventListener("click", async () => {
+  if(!currentOutputMedia || !currentOutputMedia.filename){
+    log("⚠️ Primero genera una imagen para poder enviarla a MiniMax H3.", "l-err");
+    return;
+  }
+  const filename = currentOutputMedia.filename;
+  const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
+  await openExternalWebUIRef(targetPort, "MiniMaxH3_WebUI.html", filename, currentOutputMedia.subfolder, "MiniMax H3");
+});
+
+$("btnSendX2")?.addEventListener("click", async () => {
+  if(!currentOutputMedia || !currentOutputMedia.filename){
+    log("⚠️ Primero genera una imagen para poder enviarla a MMH3X2.", "l-err");
+    return;
+  }
+  const filename = currentOutputMedia.filename;
+  const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
+  await openExternalWebUIRef(targetPort, "MMH3X2_WebUI.html", filename, currentOutputMedia.subfolder, "MMH3X2");
+});
+
+// Global fullscreen handler removed — setupZoomPan handles enter/exit per wrap.
+
+// --- VARIANT GALLERY (Krea2 image version with IndexedDB) ---
+function addToVariantGallery(media, seedValue, timeText) {
+    if(!media || !media.filename) {
+        log("⚠️ No se encontró imagen de salida para añadir a la galería de variantes.", "l-err");
+        return;
+    }
+    const box = $("variantGalleryBox");
+    const grid = $("variantGrid");
+    box.style.display = "block";
+
+    const meta = CONFIG.variantMeta ? CONFIG.variantMeta() : null;
+    const card = buildVariantCard(grid, box, media, seedValue, timeText, null, null, "var", meta);
+    const url = mediaViewUrl(media, { anchor: "" });
+
+    // Añadir enlace de descarga extra (específico de la galería Krea2).
+    const icons = card.querySelector(".variant-icons");
+    if(icons){
+      const dl = document.createElement("a");
+      dl.href = url;
+      dl.download = "";
+      dl.style.cssText = "color:var(--accent);text-decoration:none";
+      dl.textContent = "⬇";
+      dl.addEventListener("click", (e) => e.stopPropagation());
+      icons.insertBefore(dl, icons.firstChild);
+    }
+
+    const hasSeed = seedValue !== null && seedValue !== undefined;
+    if(hasSeed) {
+        const seedSpan = card.querySelector('.variant-seed-display');
+        seedSpan.addEventListener('click', (e) => {
+            e.stopPropagation();
+            copySeedToClipboard(seedSpan, seedValue);
+        });
+    }
+
+    const delBtn = card.querySelector(".variant-del-btn");
+    delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const updateCount = (grid, box) => {
+            const remaining = grid.querySelectorAll(".variant-card").length;
+            $("variantCount").textContent = `(${remaining})`;
+            if(remaining === 0) box.style.display = "none";
+        };
+        deleteMediaFile(card, delBtn, {
+            filename: card.dataset.filename,
+            subfolder: card.dataset.subfolder,
+            type: card.dataset.type,
+        }, grid, box, "Variante", updateCount, updateCount);
+    });
+
+    card.addEventListener("click", (e) => {
+      if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn")) return;
+      loadRefImage(url);
+      fetch(url).then(r => r.blob()).then(blob => {
+        const reader = new FileReader();
+        reader.onload = (ev) => addToGallery(ev.target.result);
+        reader.readAsDataURL(blob);
+      }).catch(e => log("⚠️ No se pudo añadir al historial: "+e.message, "l-warn"));
+      currentOutputMedia = { filename: card.dataset.filename, subfolder: card.dataset.subfolder, type: card.dataset.type };
+      currentRefVariantIndex = Array.from(grid.children).indexOf(card);
+    });
+
+    $("variantCount").textContent = `(${grid.querySelectorAll(".variant-card").length})`;
+}
+
+// --- REFERENCE IMAGE ---
+function loadRefImage(url){
+  const img = $("refImg"), wrap = $("refWrap"), ph = $("refPlaceholder"), dz = $("refDropzone"), info = $("refInfo");
+  const newImg = document.createElement("img");
+  newImg.id = "refImg";
+  newImg.style.cssText = "display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;";
+  img.parentNode.replaceChild(newImg, img);
+  refZoom.resetZoom();
+  newImg.src = url;
+  newImg.style.display = "block";
+  wrap.style.visibility = "visible";
+  ph.style.display = "none";
+  dz.style.display = "flex";
+  dz.style.padding = "4px 8px";
+  dz.style.minHeight = "auto";
+  dz.querySelector(".ph").textContent = "arrastra otra imagen para reemplazar";
+  newImg.onload = () => {
+    const w = newImg.naturalWidth, h = newImg.naturalHeight;
+    if(w && h){
+      const d = gcd(w, h) || 1;
+      info.textContent = `${w}×${h} · ${w/d}:${h/d}`;
+      const ar = w / h;
+      const mp = (w * h) / 1_000_000;
+      const ratios = {
+        "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
+        "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
+        "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
+      };
+      let best = "", bestDiff = Infinity;
+      for(const [label, val] of Object.entries(ratios)){
+        const diff = Math.abs(ar - val);
+        if(diff < bestDiff){ bestDiff = diff; best = label; }
+      }
+      $("aspectRatio").value = best;
+      const mpSlider = $("mpSlider");
+      mpSlider.value = Math.min(Math.max(mp, parseFloat(mpSlider.min)), parseFloat(mpSlider.max));
+      mpSlider.value = Math.round(parseFloat(mpSlider.value) * 10) / 10;
+      $("mpVal").textContent = parseFloat(mpSlider.value).toFixed(2);
+    }
+  };
+  extractWorkflowFromImage(url);
+}
+
+// --- EXTRACCIÓN DE WORKFLOW DESDE METADATOS PNG / SWARMUI ---
+function extractWorkflowFromImage(url){
+  return fetch(url).then(r => r.arrayBuffer()).then(buf => {
+    const bytes = new Uint8Array(buf);
+    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return null;
+    let pos = 8;
+    let workflowRaw = null;
+    let swarmRaw = null;
+    while(pos < bytes.length - 8){
+      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      if(type === "tEXt"){
+        const dataStart = pos + 8;
+        let nullPos = dataStart;
+        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
+        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
+        if(keyword === "prompt" || keyword === "workflow"){
+          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
+        }
+        if(keyword === "sui_image_params" || keyword === "parameters"){
+          swarmRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
+        }
+        if(workflowRaw && swarmRaw) break;
+      }
+      if(type === "IEND") break;
+      pos = pos + 12 + len;
+    }
+    if(swarmRaw){
+      let swarm;
+      try { swarm = JSON.parse(swarmRaw); } catch(e){ console.warn("No se pudo parsear metadatos SwarmUI:", e.message); }
+      if(swarm){
+        applySwarmParams(swarm);
+        return true;
+      }
+    }
+    if(workflowRaw == null) return null;
+    let workflow;
+    try {
+      workflow = JSON.parse(workflowRaw);
+    } catch(e1){
+      const first = workflowRaw.indexOf("{");
+      const last = workflowRaw.lastIndexOf("}");
+      if(first !== -1 && last > first){
+        try { workflow = JSON.parse(workflowRaw.slice(first, last + 1)); }
+        catch(e2){ console.warn("No se pudo parsear workflow de metadatos:", e2.message); return null; }
+      } else {
+        console.warn("No se pudo parsear workflow de metadatos:", e1.message);
+        return null;
+      }
+    }
+    applyWorkflow(workflow);
+    return true;
+  }).catch(e => { console.warn("No se pudo leer metadatos:", e.message); return null; });
+}
+
+function applySwarmParams(swarm){
+  const p = swarm.sui_image_params || swarm;
+  const applied = [];
+  const missing = [];
+
+  if(p.prompt){
+    $("prompt").value = p.prompt;
+    applied.push("prompt");
+  } else { missing.push("prompt"); }
+
+  if(p.seed != null && p.seed >= 0){
+    $("samplerSeed").value = p.seed;
+    $("segSamplerFixed").classList.add("on");
+    $("segSamplerRandom").classList.remove("on");
+    $("samplerSeed").disabled = false;
+    applied.push("semilla");
+  } else { missing.push("semilla"); }
+
+  // Sampler / Scheduler / Steps: los nombres de SwarmUI no siempre coinciden con
+  // los del pack RES4LYF, así que solo se aplican si existen como opción.
+  if(p.sampler && $("samplerName")){
+    const opt = Array.from($("samplerName").options).find(o => o.value === p.sampler);
+    if(opt){ $("samplerName").value = p.sampler; applied.push("sampler"); }
+    else missing.push("sampler");
+  }
+  if(p.scheduler && $("schedulerName")){
+    const opt = Array.from($("schedulerName").options).find(o => o.value === p.scheduler);
+    if(opt){ $("schedulerName").value = p.scheduler; applied.push("scheduler"); }
+    else missing.push("scheduler");
+  }
+  if(p.steps != null && $("steps")){
+    const n = parseInt(p.steps, 10);
+    if(!isNaN(n) && n > 0){ $("steps").value = n; applied.push("steps"); }
+  }
+  saveKrea2Sampler();
+
+  if(p.width != null && p.height != null){
+    const w = +p.width, h = +p.height;
+    const mpSlider = $("mpSlider");
+    const mp = Math.min(Math.max((w*h)/1_000_000, parseFloat(mpSlider.min)), parseFloat(mpSlider.max));
+    mpSlider.value = Math.round(mp * 10) / 10;
+    $("mpVal").textContent = parseFloat(mpSlider.value).toFixed(2);
+    const ar = w / h;
+    const ratios = {
+      "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
+      "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
+      "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
+    };
+    let best = "", bestDiff = Infinity;
+    for(const [label, val] of Object.entries(ratios)){
+      const diff = Math.abs(ar - val);
+      if(diff < bestDiff){ bestDiff = diff; best = label; }
+    }
+    $("aspectRatio").value = best;
+    applied.push("resolución");
+  } else { missing.push("resolución"); }
+
+  if(p.model){
+    const sel = $("modelSelect");
+    let found = false;
+    for(const opt of sel.options){
+      if(opt.value === p.model || opt.value === "flux2/" + p.model || p.model.endsWith("/"+opt.value) || opt.value === p.model.replace("flux2/","")){
+        opt.selected = true; found = true; break;
+      }
+    }
+    if(found) applied.push("modelo"); else missing.push("modelo");
+  } else { missing.push("modelo"); }
+
+  if(Array.isArray(p.loras) && p.loras.length){
+    const weights = Array.isArray(p.loraweights) ? p.loraweights : [];
+    for(let i = 0; i < 3; i++){
+      if(i < p.loras.length){
+        const ln = p.loras[i];
+        const lw = parseFloat(weights[i] != null ? weights[i] : 1);
+        loras[i].lora = ln.replace(/^K2\//, "").replace(/^.*\//, "");
+        loras[i].on = true;
+        loras[i].strength = isNaN(lw) ? 1 : lw;
+      } else {
+        loras[i].on = false;
+      }
+    }
+    renderLoras();
+    saveLoraState();
+    applied.push("LoRAs");
+  } else { missing.push("LoRAs"); }
+
+  const appliedMsg = applied.length ? "✅ Usados: " + applied.join(", ") : "";
+  const missingMsg = missing.length ? "⚠️ Sin coincidencia: " + missing.join(", ") : "";
+  if(appliedMsg) log(appliedMsg, "l-ok");
+  if(missingMsg) log(missingMsg, "l-warn");
+  if(applied.length) log("📋 Parámetros SwarmUI restaurados desde metadatos.", "l-ok");
+  else log("ℹ️ No se encontraron parámetros SwarmUI aplicables.", "l-warn");
+}
+
+function applyWorkflow(workflow){
+  const g = workflow;
+
+  if(g[N.PROMPT]) $("prompt").value = g[N.PROMPT].inputs.string || "";
+
+  if(g[N.UNET]){
+    const name = g[N.UNET].inputs.unet_name || "";
+    const sel = $("modelSelect");
+    for(const opt of sel.options){
+      if(opt.value === name || opt.value === "flux2/" + name || name.endsWith("/"+opt.value) || opt.value === name.replace("flux2/","")){
+        opt.selected = true; break;
+      }
+    }
+  }
+
+  const kitchenNode = g[N.ATTN_BACKEND] || Object.values(g).find(node => node && (node.class_type === "ModelAttentionBackend" || node.class_type?.includes("AttentionBackend")));
+  if(kitchenNode && kitchenNode.inputs && kitchenNode.inputs.attention){
+    if($("attentionBackend")) $("attentionBackend").value = kitchenNode.inputs.attention;
+    saveKrea2AttnBackend(kitchenNode.inputs.attention);
+  }
+
+  if(g[N.RES_SELECTOR]){
+    const ar = g[N.RES_SELECTOR].inputs.aspect_ratio;
+    if(ar) $("aspectRatio").value = ar;
+    const mp = g[N.RES_SELECTOR].inputs.megapixels;
+    if(mp != null){
+      $("mpSlider").value = Math.min(Math.max(mp, 0.1), 4.0);
+    }
+    if($("mpSlider") && $("mpVal")) $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
+  }
+
+  if(g[N.PROJECTOR]){
+    if(g[N.PROJECTOR].inputs.preset) $("projectorPreset").value = g[N.PROJECTOR].inputs.preset;
+    if(g[N.PROJECTOR].inputs.strength != null){
+      $("projectorStrength").value = g[N.PROJECTOR].inputs.strength;
+      $("projectorStrengthVal").textContent = parseFloat(g[N.PROJECTOR].inputs.strength).toFixed(2);
+    }
+  }
+
+  if(g[N.ENHANCER]){
+    const enabled = g[N.ENHANCER].inputs.enabled;
+    const sw = $("enhancerEnabled");
+    sw.classList.toggle("on", !!enabled);
+    $("enhancerEnabledLabel").textContent = enabled ? "activado" : "desactivado";
+    $("enhancerEnabledLabel").style.color = enabled ? "var(--accent)" : "var(--muted-2)";
+    if(g[N.ENHANCER].inputs.strength != null){
+      $("enhancerStrength").value = g[N.ENHANCER].inputs.strength;
+      $("enhancerStrengthVal").textContent = parseFloat(g[N.ENHANCER].inputs.strength).toFixed(2);
+    }
+    if(g[N.ENHANCER].inputs.text_scale != null){
+      $("enhancerTextScale").value = g[N.ENHANCER].inputs.text_scale;
+      $("enhancerTextScaleVal").textContent = parseFloat(g[N.ENHANCER].inputs.text_scale).toFixed(2);
+    }
+    if(g[N.ENHANCER].inputs.strength != null && g[N.ENHANCER].inputs.text_scale != null){
+      const linked = parseFloat(g[N.ENHANCER].inputs.strength) === parseFloat(g[N.ENHANCER].inputs.text_scale);
+      $("enhancerLinkTextScale").checked = linked;
+      $("textScaleRow").style.display = linked ? "none" : "";
+    }
+  }
+
+  if(g[N.SEED_VARIANCE]){
+    if(g[N.SEED_VARIANCE].inputs.variance_preset) $("variancePreset").value = g[N.SEED_VARIANCE].inputs.variance_preset;
+    if(g[N.SEED_VARIANCE].inputs.protect_mode) $("protectMode").value = g[N.SEED_VARIANCE].inputs.protect_mode;
+    const seed = g[N.SEED_VARIANCE].inputs.seed;
+    if(seed != null && seed >= 0){
+      $("varianceSeed").value = seed;
+      $("segVarianceFixed").classList.add("on");
+      $("segVarianceRandom").classList.remove("on");
+      $("varianceSeed").disabled = false;
+    }
+  }
+
+  for(let i = 0; i < 3; i++){
+    const nodeId = [N.LORA1, N.LORA2, N.LORA3][i];
+    const node = g[nodeId];
+    if(!node) continue;
+    const loraName = node.inputs.lora_name || "";
+    const strength = node.inputs.strength_model;
+    if(loraName && loraName !== "None"){
+      loras[i].lora = loraName.replace("K2/", "");
+      loras[i].on = (strength != null && strength > 0);
+      loras[i].strength = (strength != null) ? strength : 0;
+    }
+  }
+  renderLoras();
+  saveLoraState();
+
+  if(g[N.SAMPLER]){
+    if(g[N.SAMPLER].inputs.sampler_name && $("samplerName")) $("samplerName").value = g[N.SAMPLER].inputs.sampler_name;
+    if(g[N.SAMPLER].inputs.scheduler && $("schedulerName")) $("schedulerName").value = g[N.SAMPLER].inputs.scheduler;
+    if(g[N.SAMPLER].inputs.eta != null){
+      $("etaSlider").value = g[N.SAMPLER].inputs.eta;
+      $("etaVal").textContent = parseFloat(g[N.SAMPLER].inputs.eta).toFixed(2);
+    }
+    if(g[N.SAMPLER].inputs.steps != null) $("steps").value = g[N.SAMPLER].inputs.steps;
+    const seed = g[N.SAMPLER].inputs.seed;
+    if(seed != null && seed >= 0){
+      $("samplerSeed").value = seed;
+      $("segSamplerFixed").classList.add("on");
+      $("segSamplerRandom").classList.remove("on");
+      $("samplerSeed").disabled = false;
+    }
+    saveKrea2Sampler();
+  }
+
+  log("📋 Parámetros restaurados desde metadatos de la imagen.", "l-ok");
+}
+
+// --- HISTORIAL DE IMÁGENES (IndexedDB; ver createImageHistory en common.js) ---
+const imageHistory = createImageHistory({
+  dbName: "krea2_gallery_db",
+  gridId: "galleryGrid",
+  filePrefix: "krea2_history",
+  onSelect: (dataUrl) => loadRefImage(dataUrl),
+});
+const addToGallery = imageHistory.add;
+const clearGallery = imageHistory.clear;
+imageHistory.render();
+$("btnClearGallery").addEventListener("click", clearGallery);
+
+$("galleryToggle").addEventListener("click", () => {
+  const h = $("galleryToggle");
+  const b = $("galleryBody");
+  h.classList.toggle("open");
+  b.classList.toggle("open");
+  const arrow = h.querySelector(".arrow");
+  arrow.textContent = h.classList.contains("open") ? "▼" : "▶";
+});
+
+// --- REFERENCE IMAGE DROPZONE ---
+(function(){
+  const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef"), wrap = $("refWrap");
+  if(!dz) return;
+  btn.addEventListener("click", (e) => { e.stopPropagation(); input.click(); });
+  document.addEventListener("dragover", e => e.preventDefault());
+  document.addEventListener("drop", e => e.preventDefault());
+  function onDragEnter(e){ e.preventDefault(); dz.classList.add("drag"); }
+  function onDragOver(e){ e.preventDefault(); dz.classList.add("drag"); }
+  function onDragLeave(){ dz.classList.remove("drag"); }
+  function onDrop(e){
+    e.preventDefault();
+    e.stopPropagation();
+    dz.classList.remove("drag");
+    const files = e.dataTransfer?.files;
+    if(files && files.length > 0) handleRefFile(files[0]);
+  }
+  dz.addEventListener("dragenter", onDragEnter);
+  dz.addEventListener("dragover", onDragOver);
+  dz.addEventListener("dragleave", onDragLeave);
+  dz.addEventListener("drop", onDrop);
+  if(wrap){
+    wrap.addEventListener("dragenter", onDragEnter);
+    wrap.addEventListener("dragover", onDragOver);
+    wrap.addEventListener("dragleave", onDragLeave);
+    wrap.addEventListener("drop", onDrop);
+  }
+  input.addEventListener("change", e => { if(e.target.files[0]) handleRefFile(e.target.files[0]); });
+})();
+
+function handleRefFile(f){
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    addToGallery(e.target.result);
+    loadRefImage(e.target.result);
+  };
+  reader.readAsDataURL(f);
+}
+
+// --- RESOLUCIÓN ---
+$("mpSlider").addEventListener("input",()=>{$("mpVal").textContent=parseFloat($("mpSlider").value).toFixed(2);});
+
+// --- KREA2 ENHANCER ---
+$("projectorStrength").addEventListener("input",()=>{$("projectorStrengthVal").textContent=parseFloat($("projectorStrength").value).toFixed(2);});
+
+function syncEnhancerLink(fromSlider){
+  const linked = $("enhancerLinkTextScale").checked;
+  if(!linked) return;
+  if(fromSlider === "strength"){
+    $("enhancerTextScale").value = $("enhancerStrength").value;
+    $("enhancerTextScaleVal").textContent = parseFloat($("enhancerTextScale").value).toFixed(2);
+  } else {
+    $("enhancerStrength").value = $("enhancerTextScale").value;
+    $("enhancerStrengthVal").textContent = parseFloat($("enhancerStrength").value).toFixed(2);
+  }
+}
+$("enhancerStrength").addEventListener("input",()=>{
+  $("enhancerStrengthVal").textContent=parseFloat($("enhancerStrength").value).toFixed(2);
+  syncEnhancerLink("strength");
+});
+$("enhancerTextScale").addEventListener("input",()=>{
+  $("enhancerTextScaleVal").textContent=parseFloat($("enhancerTextScale").value).toFixed(2);
+  syncEnhancerLink("textscale");
+});
+$("enhancerLinkTextScale").addEventListener("change",()=>{
+  const linked = $("enhancerLinkTextScale").checked;
+  $("textScaleRow").style.display = linked ? "none" : "";
+  if(linked){
+    $("enhancerTextScale").value = $("enhancerStrength").value;
+    $("enhancerTextScaleVal").textContent = parseFloat($("enhancerStrength").value).toFixed(2);
+  }
+  try { localStorage.setItem("krea2_enhancer_link_text_scale", linked ? "1" : "0"); } catch(_){}
+});
+try {
+  const saved = localStorage.getItem("krea2_enhancer_link_text_scale");
+  if(saved === "0"){
+    $("enhancerLinkTextScale").checked = false;
+    $("textScaleRow").style.display = "";
+  }
+} catch(_){}
+(function(){
+  const sw=$("enhancerEnabled");
+  sw.addEventListener("click",()=>{
+    sw.classList.toggle("on");
+    $("enhancerEnabledLabel").textContent=sw.classList.contains("on")?"activado":"desactivado";
+    $("enhancerEnabledLabel").style.color=sw.classList.contains("on")?"var(--accent)":"var(--muted-2)";
+  });
+})();
+
+// --- SEMILLAS ---
+$("segVarianceRandom").addEventListener("click",()=>{$("segVarianceRandom").classList.add("on");$("segVarianceFixed").classList.remove("on");$("varianceSeed").disabled=true;});
+$("segVarianceFixed").addEventListener("click",()=>{$("segVarianceFixed").classList.add("on");$("segVarianceRandom").classList.remove("on");$("varianceSeed").disabled=false;});
+$("segSamplerRandom").addEventListener("click",()=>{$("segSamplerRandom").classList.add("on");$("segSamplerFixed").classList.remove("on");$("samplerSeed").disabled=true;});
+$("segSamplerFixed").addEventListener("click",()=>{$("segSamplerFixed").classList.add("on");$("segSamplerRandom").classList.remove("on");$("samplerSeed").disabled=false;});
+
+// --- ETA ---
+$("etaSlider").addEventListener("input",()=>{$("etaVal").textContent=parseFloat($("etaSlider").value).toFixed(2);});
+
+// --- SAMPLER / SCHEDULER (parametrización del nodo ClownsharKSampler_Beta) ---
+const KREA2_SAMPLER_KEY = "krea2_sampler_settings";
+const KREA2_SAMPLER_DEFAULTS = { sampler: "exponential/ddim", scheduler: "beta57", eta: 0.5, steps: 8 };
+
+function loadKrea2Sampler(){
+  try { return Object.assign({}, KREA2_SAMPLER_DEFAULTS, JSON.parse(localStorage.getItem(KREA2_SAMPLER_KEY) || "{}")); }
+  catch(_) { return {...KREA2_SAMPLER_DEFAULTS}; }
+}
+function saveKrea2Sampler(){
+  try {
+    localStorage.setItem(KREA2_SAMPLER_KEY, JSON.stringify({
+      sampler: $("samplerName")?.value || KREA2_SAMPLER_DEFAULTS.sampler,
+      scheduler: $("schedulerName")?.value || KREA2_SAMPLER_DEFAULTS.scheduler,
+      eta: parseFloat($("etaSlider")?.value || String(KREA2_SAMPLER_DEFAULTS.eta)),
+      steps: parseInt($("steps")?.value || String(KREA2_SAMPLER_DEFAULTS.steps), 10),
+    }));
+  } catch(_){}
+}
+function setKrea2SamplerUI(s){
+  if($("samplerName") && s.sampler) $("samplerName").value = s.sampler;
+  if($("schedulerName") && s.scheduler) $("schedulerName").value = s.scheduler;
+  if($("etaSlider") && s.eta != null){
+    $("etaSlider").value = s.eta;
+    if($("etaVal")) $("etaVal").textContent = parseFloat(s.eta).toFixed(2);
+  }
+  if($("steps") && s.steps != null) $("steps").value = s.steps;
+}
+const _krea2Sampler = loadKrea2Sampler();
+setKrea2SamplerUI(_krea2Sampler);
+$("samplerName")?.addEventListener("change", saveKrea2Sampler);
+$("schedulerName")?.addEventListener("change", saveKrea2Sampler);
+$("steps")?.addEventListener("input", saveKrea2Sampler);
+$("etaSlider")?.addEventListener("input", saveKrea2Sampler);
+
+const savedKrea2Prefix = localStorage.getItem("krea2_filename_prefix");
+if(savedKrea2Prefix && $("filenamePrefix")) $("filenamePrefix").value = savedKrea2Prefix;
+$("filenamePrefix")?.addEventListener("input", (e) => {
+  localStorage.setItem("krea2_filename_prefix", e.target.value.trim());
+});
+
+const KREA2_ATTN_KEY = 'krea2_attention_backend';
+function loadKrea2AttnBackend(){
+  try {
+    return localStorage.getItem(KREA2_ATTN_KEY) || "comfy kitchen attention";
+  } catch(_) { return "comfy kitchen attention"; }
+}
+function saveKrea2AttnBackend(val){
+  try { localStorage.setItem(KREA2_ATTN_KEY, val); } catch(_) {}
+}
+const savedKrea2Attn = loadKrea2AttnBackend();
+if($("attentionBackend")) $("attentionBackend").value = savedKrea2Attn;
+$("attentionBackend")?.addEventListener("change", (e) => {
+  saveKrea2AttnBackend(e.target.value);
+});
+
+const KREA2_KEEP_RAM_KEY = 'krea2_keep_model_in_ram';
+function loadKrea2KeepRam(){
+  try {
+    const val = localStorage.getItem(KREA2_KEEP_RAM_KEY);
+    return val === null ? true : val === "1";
+  } catch(_) { return true; }
+}
+function saveKrea2KeepRam(val){
+  try { localStorage.setItem(KREA2_KEEP_RAM_KEY, val ? "1" : "0"); } catch(_) {}
+}
+if($("keepModelInRam")){
+  $("keepModelInRam").checked = loadKrea2KeepRam();
+  $("keepModelInRam").addEventListener("change", (e) => {
+    saveKrea2KeepRam(e.target.checked);
+  });
+}
+
+let jobQueue = [];
+let activeJob = null;
+let jobCounter = 0;
+
+function updateQueueUI(){
+  const count = jobQueue.length;
+  const clearBtn = $("btnClearQueue");
+  if(clearBtn) clearBtn.disabled = count === 0;
+
+  // Auto-recuperación si activeJob quedó huérfano con ComfyUI en reposo
+  // (patrón mmh3x2/minimaxh3): un POST colgado dejaba la cola atascada.
+  if(activeJob && typeof serverQueueState !== "undefined" && serverQueueState.running === 0 && serverQueueState.pending === 0){
+    queueIdleCount = (queueIdleCount || 0) + 1;
+    if(queueIdleCount >= 2){
+      queueIdleCount = 0;
+      console.warn("Liberando activeJob huérfano (ComfyUI está en reposo)");
+      log("🧟 Job activo huérfano liberado (ComfyUI está en reposo); retomando la cola...", "l-warn");
+      activeJob = null;
+      currentPromptId = null;
+      enableStopButtons(false);
+      if(jobQueue.length > 0){
+        const nextJob = jobQueue.shift();
+        updateQueueUI();
+        log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
+        startJob(nextJob);
+      }
+      return;
+    }
+  } else {
+    queueIdleCount = 0;
+  }
+
+  // Cálculo de variantes/imágenes pendientes
+  const activeRemainingVars = activeJob ? Math.max(1, (totalBatchSize - currentBatchIndex)) : 0;
+  const queueVariants = jobQueue.reduce((acc, j) => acc + (j.batchSize || 1), 0);
+  const totalLocalImages = (activeJob ? activeRemainingVars : 0) + queueVariants;
+  const serverPending = (typeof serverQueueState !== "undefined" && serverQueueState.pending) ? serverQueueState.pending : 0;
+  const serverRunning = (typeof serverQueueState !== "undefined" && serverQueueState.running) ? serverQueueState.running : 0;
+  const totalPendingGlobal = totalLocalImages + serverPending;
+
+  // Badge total
+  const totalNumEl = $("queueTotalNum");
+  const totalBadgeEl = $("queueTotalBadge");
+  if(totalNumEl) totalNumEl.textContent = totalPendingGlobal;
+  if(totalBadgeEl){
+    if(totalPendingGlobal > 0) totalBadgeEl.classList.add("active");
+    else totalBadgeEl.classList.remove("active");
+  }
+
+  // Tarjeta Esta WebUI
+  const webuiSummary = $("queueWebuiSummary");
+  const webuiDetail = $("queueWebuiDetail");
+  if(webuiSummary){
+    if(count === 0 && !activeJob){
+      webuiSummary.textContent = "0 en espera";
+    } else {
+      webuiSummary.textContent = `${count} en cola (${queueVariants} imgs)`;
+    }
+  }
+  if(webuiDetail){
+    if(activeJob){
+      webuiDetail.textContent = `▶ Job #${activeJob.id} · Var ${currentBatchIndex + 1}/${totalBatchSize}`;
+    } else {
+      webuiDetail.textContent = "En reposo";
+    }
+  }
+
+  // Tarjeta Servidor ComfyUI
+  const srvSummary = $("queueServerSummary");
+  const srvDetail = $("queueServerDetail");
+  if(srvSummary){
+    srvSummary.textContent = `${serverPending} en espera`;
+  }
+  if(srvDetail){
+    srvDetail.textContent = `${serverRunning} en GPU · ${serverPending} en cola ComfyUI`;
+  }
+
+  // Desplegable de trabajos en cola
+  const accordion = $("queueItemsAccordion");
+  const itemsTitle = $("queueItemsTitle");
+  const itemsList = $("queueItemsList");
+  if(itemsTitle) itemsTitle.textContent = `Ver trabajos en cola (${count})`;
+  if(accordion){
+    accordion.style.display = count > 0 ? "block" : "none";
+  }
+  if(itemsList && count > 0){
+    itemsList.innerHTML = "";
+    jobQueue.forEach((job, idx) => {
+      const row = document.createElement("div");
+      row.className = "queue-item-row";
+      const pText = escapeHtml((job.prompt || "sin prompt").trim());
+      const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
+      row.innerHTML = `
+        <div class="queue-item-left" title="${pText}">
+          <span class="queue-item-id">#${job.id}</span>
+          <span class="queue-item-desc">${pShort} · ${job.batchSize || 1} var(s)</span>
+        </div>
+        <span class="queue-item-del" title="Eliminar este trabajo de la cola">×</span>
+      `;
+      row.querySelector(".queue-item-del").addEventListener("click", (e) => {
+        e.stopPropagation();
+        jobQueue.splice(idx, 1);
+        updateQueueUI();
+        log(`🗑️ Job #${job.id} eliminado de la cola.`, "l-ok");
+      });
+      itemsList.appendChild(row);
+    });
+  }
+}
+
+$("queueItemsToggle")?.addEventListener("click", () => {
+  $("queueItemsAccordion")?.classList.toggle("open");
+});
+
+function snapshotJob(){
+  return {
+    id: ++jobCounter,
+    prompt: $("prompt").value,
+    model: $("modelSelect")?.value,
+    attentionBackend: $("attentionBackend")?.value || "comfy kitchen attention",
+    megapixels: parseFloat($("mpSlider")?.value || "1.0"),
+    aspectRatio: $("aspectRatio")?.value,
+    projectorPreset: $("projectorPreset")?.value,
+    projectorStrength: parseFloat($("projectorStrength")?.value || "1.0"),
+    enhancerEnabled: $("enhancerEnabled")?.classList.contains("on"),
+    enhancerStrength: parseFloat($("enhancerStrength")?.value || "0.5"),
+    enhancerTextScale: parseFloat($("enhancerTextScale")?.value || "0.5"),
+    variancePreset: $("variancePreset")?.value,
+    protectMode: $("protectMode")?.value,
+    varianceSeedMode: $("segVarianceRandom")?.classList.contains("on") ? "random" : "fixed",
+    varianceSeedValue: parseInt($("varianceSeed")?.value || "315489554057974", 10),
+    eta: parseFloat($("etaSlider")?.value || "0.5"),
+    steps: parseInt($("steps")?.value || "8", 10),
+    sampler: $("samplerName")?.value || KREA2_SAMPLER_DEFAULTS.sampler,
+    scheduler: $("schedulerName")?.value || KREA2_SAMPLER_DEFAULTS.scheduler,
+    samplerSeedMode: $("segSamplerRandom")?.classList.contains("on") ? "random" : "fixed",
+    samplerSeedValue: parseInt($("samplerSeed")?.value || "1062442950133633", 10),
+    batchSize: parseInt($("batchSize")?.value || "1", 10),
+    filenamePrefix: $("filenamePrefix")?.value,
+    keepModelInRam: $("keepModelInRam") ? $("keepModelInRam").checked : true,
+    loras: JSON.parse(JSON.stringify(loras)),
+    createdAt: Date.now(),
+  };
+}
+
+// --- BUILD GRAPH ---
+function buildGraph(job){
+  const j = job || activeJob || null;
+  const g=JSON.parse(JSON.stringify(BASE_GRAPH));
+  const modelChoice = (j ? j.model : $("modelSelect")?.value) || "";
+  // Las listas nuevas traen la carpeta ("flux2/x", "K2/x"); un nombre sin
+  // carpeta (ajustes o prompts guardados antes) sigue siendo de flux2/.
+  g[N.UNET].inputs.unet_name = modelChoice.includes("/") ? modelChoice : "flux2/" + modelChoice;
+
+  // Backend de atención (Comfy Kitchen INT8 / PyTorch)
+  const attnChoice = (j ? j.attentionBackend : $("attentionBackend")?.value) || "comfy kitchen attention";
+  let currentModelNode = N.UNET;
+  if(attnChoice && attnChoice !== "none"){
+    g[N.ATTN_BACKEND] = {
+      inputs: {
+        attention: attnChoice,
+        model: [N.UNET, 0]
+      },
+      class_type: "ModelAttentionBackend",
+      _meta: {
+        title: "Model Attention Backend (Kitchen)"
+      }
+    };
+    currentModelNode = N.ATTN_BACKEND;
+  }
+  g[N.PROJECTOR].inputs.model = [currentModelNode, 0];
+
+  g[N.PROMPT].inputs.string = ((j ? j.prompt : $("prompt").value) || "").trim();
+  g[N.RES_SELECTOR].inputs.megapixels = j ? j.megapixels : parseFloat($("mpSlider").value);
+  g[N.RES_SELECTOR].inputs.aspect_ratio = j ? j.aspectRatio : $("aspectRatio").value;
+  g[N.PROJECTOR].inputs.preset = j ? j.projectorPreset : $("projectorPreset").value;
+  g[N.PROJECTOR].inputs.strength = j ? j.projectorStrength : parseFloat($("projectorStrength").value);
+  
+  const enhancerEnabled = j ? j.enhancerEnabled : $("enhancerEnabled").classList.contains("on");
+  if(enhancerEnabled){
+    g[N.ENHANCER].inputs.enabled = true;
+    g[N.ENHANCER].inputs.strength = j ? j.enhancerStrength : parseFloat($("enhancerStrength").value);
+    g[N.ENHANCER].inputs.text_scale = j ? j.enhancerTextScale : parseFloat($("enhancerTextScale").value);
+  } else {
+    delete g[N.ENHANCER];
+    if(g[N.LORA1] && g[N.LORA1].inputs.model && g[N.LORA1].inputs.model[0] === N.ENHANCER){
+      g[N.LORA1].inputs.model = [N.PROJECTOR, 0];
+    }
+  }
+  
+  g[N.SEED_VARIANCE].inputs.variance_preset = j ? j.variancePreset : $("variancePreset").value;
+  g[N.SEED_VARIANCE].inputs.protect_mode = j ? j.protectMode : $("protectMode").value;
+  const varSeedMode = j ? j.varianceSeedMode : ($("segVarianceRandom").classList.contains("on") ? "random" : "fixed");
+  const varSeedVal = j ? j.varianceSeedValue : parseInt($("varianceSeed").value, 10);
+  g[N.SEED_VARIANCE].inputs.seed = (varSeedMode === "random") ? -1 : varSeedVal;
+  
+  const jobLoras = j ? j.loras : loras;
+  const loraNodes = [N.LORA1, N.LORA2, N.LORA3];
+  for(let i = 0; i < 3; i++){
+    const nodeKey = loraNodes[i];
+    if(!g[nodeKey]) continue;
+    const loraObj = jobLoras[i];
+    const name = loraObj ? loraObj.lora : "";
+    
+    let resolvedName = name;
+    let exists = false;
+    if(name && typeof AVAILABLE_LORAS !== "undefined"){
+      const targetBase = name.replace(/^.*\//, "").toLowerCase();
+      const matched = AVAILABLE_LORAS.find(al => al.replace(/^.*\//, "").toLowerCase() === targetBase);
+      if(matched){
+        resolvedName = matched;
+        exists = true;
+      }
+    }
+
+    const shouldBypass = !loraObj || !loraObj.on || !exists;
+    if(shouldBypass){
+      const parentModel = g[nodeKey].inputs.model;
+      if(i === 0){
+        if(g[N.LORA2]) g[N.LORA2].inputs.model = parentModel;
+        else if(g[N.LORA3]) g[N.LORA3].inputs.model = parentModel;
+        else g[N.SAMPLER].inputs.model = parentModel;
+      } else if(i === 1){
+        if(g[N.LORA3]) g[N.LORA3].inputs.model = parentModel;
+        else g[N.SAMPLER].inputs.model = parentModel;
+      } else if(i === 2){
+        g[N.SAMPLER].inputs.model = parentModel;
+      }
+      delete g[nodeKey];
+    } else {
+      g[nodeKey].inputs.lora_name = "K2/" + resolvedName;
+      g[nodeKey].inputs.strength_model = loraObj.strength;
+    }
+  }
+
+  g[N.SAMPLER].inputs.eta = j ? j.eta : parseFloat($("etaSlider").value);
+  g[N.SAMPLER].inputs.steps = j ? j.steps : parseInt($("steps").value, 10);
+  g[N.SAMPLER].inputs.sampler_name = (j ? j.sampler : $("samplerName")?.value) || KREA2_SAMPLER_DEFAULTS.sampler;
+  g[N.SAMPLER].inputs.scheduler = (j ? j.scheduler : $("schedulerName")?.value) || KREA2_SAMPLER_DEFAULTS.scheduler;
+  const sampSeedMode = j ? j.samplerSeedMode : ($("segSamplerRandom").classList.contains("on") ? "random" : "fixed");
+  const sampSeedVal = j ? j.samplerSeedValue : parseInt($("samplerSeed").value, 10);
+  g[N.SAMPLER].inputs.seed = (sampSeedMode === "random") ? -1 : sampSeedVal;
+
+  const prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "krea2/imagen";
+  const saveNode = g[N.SAVE];
+  if(saveNode && saveNode.inputs){
+    saveNode.inputs.filename_prefix = prefix;
+  }
+
+  // Gestión de memoria: mantener modelo en RAM (evita recarga de disco entre variantes)
+  const keepInRam = j && j.keepModelInRam !== undefined ? j.keepModelInRam : ($("keepModelInRam") ? $("keepModelInRam").checked : true);
+  if(keepInRam){
+    delete g[N.PURGE];
+  } else if(g[N.PURGE] && g[N.PURGE].inputs){
+    g[N.PURGE].inputs.purge_models = true;
+    g[N.PURGE].inputs.purge_cache = true;
+  }
+
+  return g;
+}
+
+// --- GENERACIÓN ---
+async function runSingleGeneration(index) {
+    if(!activeJob) return; // guard: stop deja la cola vacía; evita la generación zombi del setTimeout pendiente
+    try {
+        const graph = buildGraph(activeJob);
+        const jobSeedMode = activeJob ? activeJob.samplerSeedMode : (batchSeedMode || "random");
+        const jobSeedValue = activeJob ? activeJob.samplerSeedValue : parseInt($("samplerSeed").value, 10);
+        const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
+        graph[N.SAMPLER].inputs.seed = seedUsed;
+
+        const varIndex = ++variantCounter;
+        log(`🚀 Procesando variante ${varIndex} (batch ${index + 1}/${totalBatchSize}) (seed ${seedUsed})...`);
+        const r = await fetch(server()+"/prompt",{
+          signal: AbortSignal.timeout(60000), // colgado → activeJob fantasma
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({
+            prompt:graph,
+            client_id:CLIENT_ID,
+            extra_data: {
+              extra_pnginfo: {
+                workflow: graph,
+                prompt: graph
+              },
+              preview_method: getPreviewMethod()
+            }
+          })
+        });
+        if(!r.ok){
+            const t = await r.text().catch(()=> "");
+            throw new Error("HTTP "+r.status+" "+t.slice(0,300));
+        }
+        const data = await r.json();
+        if(data.error) throw new Error(JSON.stringify(data.error));
+
+        pendingSeeds[data.prompt_id] = seedUsed;
+        currentPromptId = data.prompt_id;
+        startTimer(data.prompt_id, 1);
+        pollFallback(data.prompt_id);
+    } catch(err) {
+        log(`❌ No se pudo encolar la variante ${index + 1}: ${err.message}`, "l-err");
+        currentBatchIndex++;
+        processNextBatch();
+    }
+}
+
+async function startJob(job){
+  activeJob = job;
+  updateQueueUI();
+  try {
+    await ensureSocketConnected();
+    totalBatchSize = job.batchSize || 1;
+    currentBatchIndex = 0;
+    batchSeedMode = job.samplerSeedMode || "random";
+    setRun("busy", `Job #${job.id} en proceso · ${job.batchSize} variante(s)...`);
+    enableStopButtons(true);
+    await runSingleGeneration(0);
+  } catch(err) {
+    log(`❌ Error al iniciar Job #${job.id}: ${err.message || err}`, "l-err");
+    setRun("bad", "Error");
+    finishCurrentJob();
+  }
+}
+
+function finishCurrentJob(){
+  activeJob = null;
+  if(jobQueue.length > 0){
+    const next = jobQueue.shift();
+    updateQueueUI();
+    log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
+    startJob(next);
+  } else {
+    setRun("ok", "en reposo");
+    // Preview de muestreo obsoleto al quedar en reposo (final de job, error o stop).
+    clearPreview();
+    log("🏁 Cola vacía. Todos los jobs completados.", "l-ok");
+    enableStopButtons(false);
+    updateQueueUI();
+  }
+}
+
+async function enqueueGeneration(){
+  const job = snapshotJob();
+  if(activeJob){
+    jobQueue.push(job);
+    updateQueueUI();
+    log(`📥 Job #${job.id} añadido a la cola (${jobQueue.length} en espera). Puedes seguir cambiando parámetros o encolar más imágenes.`, "l-info");
+  } else {
+    await startJob(job);
+  }
+}
+
+$("btnClearQueue")?.addEventListener("click", () => {
+  const count = jobQueue.length;
+  jobQueue = [];
+  updateQueueUI();
+  if(count) log(`🧹 Cola vacía (${count} job(s) eliminados).`, "l-ok");
+});
+
+$("btnGenerate").addEventListener("click", () => enqueueGeneration());
+
+// --- ENHANCER HELPERS (Krea2-specific) ---
+async function getVisibleRegionBase64(srcUrl, wrapId, maxSide){
+  const wrap = $(wrapId);
+  const img = wrap ? wrap.querySelector("img") : null;
+  if(!wrap || !img) return imageToResizedBase64(srcUrl, maxSide);
+  const transform = getComputedStyle(img).transform;
+  let scale = 1, tx = 0, ty = 0;
+  if(transform && transform !== "none"){
+    const m = new DOMMatrix(transform);
+    scale = m.a;
+    tx = m.m41;
+    ty = m.m42;
+  }
+  const resp = await fetch(srcUrl);
+  const blob = await resp.blob();
+  const bitmap = await createImageBitmap(blob);
+  const natW = bitmap.width;
+  const natH = bitmap.height;
+  const wrapRect = wrap.getBoundingClientRect();
+  const imgRect = img.getBoundingClientRect();
+  const renderedW = imgRect.width / scale;
+  const renderedH = imgRect.height / scale;
+  const baseScaleX = natW / renderedW;
+  const baseScaleY = natH / renderedH;
+  const viewportX = -tx;
+  const viewportY = -ty;
+  const sx = viewportX / scale;
+  const sy = viewportY / scale;
+  const sw = wrapRect.width / scale;
+  const sh = wrapRect.height / scale;
+  let sxNat = sx * baseScaleX;
+  let syNat = sy * baseScaleY;
+  let swNat = sw * baseScaleX;
+  let shNat = sh * baseScaleY;
+  sxNat = Math.max(0, Math.min(natW, sxNat));
+  syNat = Math.max(0, Math.min(natH, syNat));
+  swNat = Math.max(0, Math.min(natW - sxNat, swNat));
+  shNat = Math.max(0, Math.min(natH - syNat, shNat));
+  const outScale = Math.min(1, maxSide / Math.max(swNat, shNat));
+  const outW = Math.max(1, Math.round(swNat * outScale));
+  const outH = Math.max(1, Math.round(shNat * outScale));
+  const c = document.createElement("canvas");
+  c.width = outW; c.height = outH;
+  c.getContext("2d").drawImage(bitmap, sxNat, syNat, swNat, shNat, 0, 0, outW, outH);
+  bitmap.close();
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+
+// --- ENHANCER (Krea2 btnEnhance uses fetchWithRetry) ---
+  $("btnEnhance").addEventListener("click", async () => {
+    const chainMode = $("enhancerChainMode")?.value || "ollama";
+    if(chainMode === "off"){
+      log("⚠️ Cadena de mejora desactivada. Activa 'LLM' para usar el botón.", "l-warn");
+      return;
+    }
+    const model = $("enhancerModel").value;
+    if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
+    const mode = $("enhancerMode").value;
+    const styleKey = $("enhancerStyle").value;
+    const data = loadSysPrompts();
+    const system = getCurrentSysPrompt(data, mode, styleKey);
+    const userPrompt = $("prompt").value.trim();
+    if(!userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+
+    const payload = { model, system, prompt: userPrompt, options: { num_ctx: 4096 } };
+
+    $("btnEnhance").disabled = true;
+    $("btnEnhance").textContent = "Mejorando...";
+    $("enhancerOutput").value = "";
+    if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
+    try {
+      const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+      const timeStr = fmtMs(elapsedMs);
+      $("enhancerOutput").value = text;
+      if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
+      log(`Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Pulsa 'Usar como prompt' para aplicarlo.`, "l-ok");
+    } catch(e) {
+      log("Error al mejorar: "+e.message, "l-err");
+      $("enhancerOutput").value = "Error: "+e.message;
+    } finally {
+      $("btnEnhance").disabled = false;
+      $("btnEnhance").textContent = "Mejorar prompt";
+    }
+  });
+
+// --- CAPTION (Krea2-specific) ---
+$("btnCaption").addEventListener("click", async () => {
+  const model = $("enhancerModel").value;
+  if(!model){ log("Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("Primero carga una imagen de referencia", "l-err"); return;
+  }
+  const mode = $("enhancerMode").value;
+  const styleKey = $("enhancerStyle").value;
+  const data = loadSysPrompts();
+  const system = getCurrentSysPrompt(data, mode, styleKey);
+
+  $("btnCaption").disabled = true;
+  $("btnCaption").textContent = "Analizando imagen...";
+  $("enhancerOutput").value = "";
+  if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
+  try {
+    const b64 = await getVisibleRegionBase64(refImgEl.src, "refWrap", 768);
+    const userPrompt = $("prompt").value.trim();
+    const captionPrompt = userPrompt
+      ? `Describe this image. User guidance: ${userPrompt}`
+      : "Describe this image.";
+    const payload = {
+      model, system, prompt: captionPrompt, images: [b64],
+      options: { num_ctx: 4096, temperature: 0.4 }
+    };
+    const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const timeStr = fmtMs(elapsedMs);
+    if(!text){
+      log("Respuesta vacia.", "l-err");
+      $("enhancerOutput").value = "El modelo no devolvio texto.";
+    } else {
+      $("enhancerOutput").value = text;
+      if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
+      log(`Caption Ollama generado en ${timeStr} (${model}, ${mode}/${styleKey}, ${text.length} chars).`, "l-ok");
+      log("Pulsa 'Usar como prompt' para aplicarlo, o pulsa 'Generar' si ya esta activo.", "l-info");
+    }
+  } catch(e) {
+    log("Error en caption: "+e.message, "l-err");
+    $("enhancerOutput").value = "Error: "+e.message;
+  } finally {
+    $("btnCaption").disabled = false;
+    $("btnCaption").textContent = "Caption (imagen referencia)";
+  }
+});
+
+$("btnSendRefLtxv").addEventListener("click", async () => {
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia.", "l-err");
+    return;
+  }
+  const src = refImgEl.src;
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
+  const openLtxv = async (filename, subfolder) => {
+    await openExternalWebUIRef(targetPort, "LTXV_WebUI.html", filename, subfolder, "LTXV");
+  };
+
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openLtxv(fromView.filename, fromView.subfolder);
+    return;
+  }
+
+  // data:URL: la imagen es local del navegador. La subimos a nuestro endpoint
+  // /api/krea2_upload, que la guarda en output/krea2/, y le pasamos ese
+  // filename a LTXV, que la encontrará en el panel "Imágenes Krea2 recientes".
+  if(!src.startsWith("data:")){
+    log("⚠️ Origen de imagen no soportado: "+src.slice(0,40), "l-err");
+    return;
+  }
+  log("⏳ Subiendo imagen de referencia para enviarla a LTXV...", "l-info");
+  try {
+    const blob = await (await fetch(src)).blob();
+    const ts = Date.now();
+    const ext = (blob.type && blob.type.split("/")[1]) || "png";
+    const filename = `ref_${ts}.${ext.replace(/[^a-z0-9]/i,"")}`;
+    const fd = new FormData();
+    fd.append("image", new File([blob], filename, { type: blob.type || "image/png" }));
+    const r = await fetch("/api/krea2_upload", { method: "POST", body: fd });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const finalName = (data.name || filename).replace(/^.*\//, "");
+    log("✅ Imagen subida a output/krea2/"+finalName, "l-ok");
+    openLtxv(finalName);
+  } catch(e){
+    log("❌ No se pudo enviar la imagen a LTXV: "+e.message, "l-err");
+  }
+});
+
+$("btnSendRefH3")?.addEventListener("click", async () => {
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia.", "l-err");
+    return;
+  }
+  const src = refImgEl.src;
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
+  const openH3 = async (filename, subfolder) => {
+    await openExternalWebUIRef(targetPort, "MiniMaxH3_WebUI.html", filename, subfolder, "MiniMax H3");
+  };
+
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openH3(fromView.filename, fromView.subfolder);
+    return;
+  }
+
+  if(!src.startsWith("data:")){
+    log("⚠️ Origen de imagen no soportado: "+src.slice(0,40), "l-err");
+    return;
+  }
+  log("⏳ Subiendo imagen de referencia para enviarla a MiniMax H3...", "l-info");
+  try {
+    const blob = await (await fetch(src)).blob();
+    const ts = Date.now();
+    const ext = (blob.type && blob.type.split("/")[1]) || "png";
+    const filename = `ref_${ts}.${ext.replace(/[^a-z0-9]/i,"")}`;
+    const fd = new FormData();
+    fd.append("image", new File([blob], filename, { type: blob.type || "image/png" }));
+    const r = await fetch("/api/krea2_upload", { method: "POST", body: fd });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const finalName = (data.name || filename).replace(/^.*\//, "");
+    log("✅ Imagen subida a output/krea2/"+finalName, "l-ok");
+    openH3(finalName);
+  } catch(e){
+    log("❌ No se pudo enviar la imagen a MiniMax H3: "+e.message, "l-err");
+  }
+});
+
+$("btnSendRefX2")?.addEventListener("click", async () => {
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia.", "l-err");
+    return;
+  }
+  const src = refImgEl.src;
+  const here = window.location;
+  const targetHost = here.hostname;
+  const targetPort = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
+  const openX2 = async (filename, subfolder) => {
+    await openExternalWebUIRef(targetPort, "MMH3X2_WebUI.html", filename, subfolder, "MMH3X2");
+  };
+
+  const fromView = refFromViewSrc(src);
+  if(fromView){
+    openX2(fromView.filename, fromView.subfolder);
+    return;
+  }
+
+  if(!src.startsWith("data:")){
+    log("⚠️ Origen de imagen no soportado: "+src.slice(0,40), "l-err");
+    return;
+  }
+  log("⏳ Subiendo imagen de referencia para enviarla a MMH3X2...", "l-info");
+  try {
+    const blob = await (await fetch(src)).blob();
+    const ts = Date.now();
+    const ext = (blob.type && blob.type.split("/")[1]) || "png";
+    const filename = `ref_${ts}.${ext.replace(/[^a-z0-9]/i,"")}`;
+    const fd = new FormData();
+    fd.append("image", new File([blob], filename, { type: blob.type || "image/png" }));
+    const r = await fetch("/api/krea2_upload", { method: "POST", body: fd });
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const finalName = (data.name || filename).replace(/^.*\//, "");
+    log("✅ Imagen subida a output/krea2/"+finalName, "l-ok");
+    openX2(finalName);
+  } catch(e){
+    log("❌ No se pudo enviar la imagen a MMH3X2: "+e.message, "l-err");
+  }
+});
+
+$("btnLoadMeta").addEventListener("click", async () => {
+  const refImgEl = $("refImg");
+  if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+    log("⚠️ Primero carga una imagen de referencia", "l-err"); return;
+  }
+  $("btnLoadMeta").disabled = true;
+  $("btnLoadMeta").textContent = "Leyendo metadatos...";
+  try {
+    const found = await extractWorkflowFromImage(refImgEl.src);
+    if(found === null) log("ℹ️ Esta imagen no contiene metadatos de workflow.", "l-info");
+  } catch(e) {
+    log("❌ Error leyendo metadatos: "+e.message, "l-err");
+  } finally {
+    $("btnLoadMeta").disabled = false;
+    $("btnLoadMeta").textContent = "Cargar metadatos";
+  }
+});
+
+// --- EVOLVE / TRANSMUTAR PROMPT ---
+// EVOLVE_VOCAB, EVOLVE_SYNONYMS y generateEvolved() están en common.js.
+
+makeCollapsible("evolveToggle", "evolveBody");
+$("evolveStrength")?.addEventListener("input", (e) => {
+  $("evolveStrengthVal").textContent = e.target.value + "%";
+});
+$("btnEvolve")?.addEventListener("click", () => {
+  const prompt = $("prompt").value.trim();
+  if(!prompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+  const mode = $("evolveMode").value;
+  const strength = parseInt($("evolveStrength").value, 10);
+  const count = parseInt($("evolveCount").value, 10) || 4;
+  const variants = generateEvolved(prompt, mode, strength, count);
+  $("evolveOutput").value = variants.map((v, i) => `--- Variant ${i + 1} ---\n${v}`).join("\n\n");
+  log(`🧬 ${count} variantes generadas (${mode}, ${strength}%)`, "l-ok");
+});
+$("btnEvolveUse")?.addEventListener("click", () => {
+  const text = $("evolveOutput").value.trim();
+  if(!text){ log("⚠️ Genera variantes primero", "l-err"); return; }
+  const first = text.split(/--- Variant \d+ ---/)[1]?.trim() || text.split("\n\n")[0]?.trim();
+  if(first){
+    $("prompt").value = first;
+    log("✏️ Prompt actualizado con la variante #1", "l-ok");
+  }
+});
+
+// --- DRAG HACIA FUERA (Krea2) ---
+// Imagen final e imagen de referencia: arrastrables hacia LTXV (dropzone de
+// entrada), otra pestaña, o el escritorio.
+makeDragSource($("outputImg"), () => currentOutputMedia || null);
+// #refImg tiene pointer-events:none (para zoom/pan), así que escuchamos en
+// #refWrap que sí recibe eventos.
+$("refWrap")?.addEventListener("dragstart", (e) => {
+  const src = $("refImg")?.src;
+  if(!src){ e.preventDefault(); return; }
+  // Intentar extraer filename/subfolder/type de la query string del backend.
+  let media = null;
+  try {
+    const u = new URL(src);
+    const filename = u.searchParams.get("filename");
+    if(filename){
+      media = {
+        filename,
+        subfolder: u.searchParams.get("subfolder") || "",
+        type: u.searchParams.get("type") || "output",
+      };
+    }
+  } catch(_){}
+  if(!media){ e.preventDefault(); return; }
+  const url = mediaViewUrl(media, { anchor: "" });
+  e.dataTransfer.effectAllowed = "copy";
+  e.dataTransfer.setData("text/uri-list", url);
+  e.dataTransfer.setData("text/plain", url);
+  e.dataTransfer.setData(LTXV_MEDIA_MIME, JSON.stringify(media));
+  const isVideo = /\.(mp4|webm|mov|mkv|avi)$/i.test(media.filename);
+  const mime = isVideo ? "video/mp4" : "image/png";
+  e.dataTransfer.setData("DownloadURL", `${mime}:${media.filename}:${url}`);
+});
+
+// Dropzone de referencia de Krea2: aceptar drag desde LTXV (vídeo frame o
+// imagen de entrada) o desde el historial de LTXV. Si no hay archivos del OS,
+// descargamos la URL arrastrada y la cargamos como referencia.
+enableInterUIDrop($("refDropzone"), (file, filename) => handleRefFile(file));
+enableInterUIDrop($("refWrap"), (file, filename) => handleRefFile(file));

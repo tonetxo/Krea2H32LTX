@@ -1,0 +1,1386 @@
+"""Static file server with no-cache headers + backend proxy.
+
+Used by lanzar_ltxv.sh. Serves LTXV_WebUI.html and proxies API
+requests to the ComfyUI backend (127.0.0.1:7821) so the phone can
+reach the backend through the same port 8000 (no extra firewall
+rules, no CORS issues).
+
+Backend routes proxied:
+  /system_stats, /prompt, /history/*, /view, /upload/image, /ws
+
+Custom routes:
+  /api/krea2_list -> lists PNGs in KREA2_OUTPUT_DIR (default: ComfyUI/output/krea2)
+
+Usage: python3 serve.py [PORT] [BACKEND_URL] [KREA2_OUTPUT_DIR] [HOST]
+  PORT              default 8000
+  BACKEND_URL       default http://127.0.0.1:7821
+  KREA2_OUTPUT_DIR  default auto-detected
+  HOST              default 127.0.0.1 (use 0.0.0.0 for LAN access)
+"""
+import glob
+import heapq
+import http.server
+import json
+import os
+import re
+import select
+import socket
+import socketserver
+import subprocess
+import sys
+import time
+import urllib.request
+import urllib.error
+import urllib.parse
+
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+HOST = sys.argv[4] if len(sys.argv) > 4 else os.environ.get("HOST", "127.0.0.1")
+
+import config_loader
+
+def get_backend():
+    if len(sys.argv) > 2:
+        return sys.argv[2]
+    env = os.environ.get("BACKEND_URL")
+    if env:
+        return env
+    return config_loader.get_comfyui_url()
+
+BACKEND = get_backend()
+OLLAMA = config_loader.get_ollama_url()
+LLAMACPP = config_loader.get_llamacpp_url()
+
+# ComfyUI's output dir holds subfolders per SaveImage filename_prefix.
+# Override via env var KREA2_OUTPUT_DIR or third CLI arg.
+def _resolve_krea2_dir():
+    if len(sys.argv) > 3:
+        return os.path.expanduser(sys.argv[3])
+    env = os.environ.get("KREA2_OUTPUT_DIR")
+    if env:
+        return os.path.expanduser(env)
+    out = os.path.join(config_loader.get_output_dir(), "krea2")
+    return out
+
+KREA2_OUTPUT_DIR = _resolve_krea2_dir()
+
+# Caché simple por endpoint para /api/krea2_list y /api/ltxv_list.
+# Evita hacer glob+stat en cada refresh. TTL bajo (5s) para que el usuario vea
+# borrados/adiciones recientes sin esperar a que expire. Invalidado en file_delete.
+_LIST_CACHE = {}  # key -> (expires_at, payload_dict)
+LIST_CACHE_TTL = 5.0  # segundos
+
+# ComfyUI's install root (parent of /output and /temp). Used to validate
+# that file_delete targets are inside the backend's writable areas.
+def _resolve_comfyui_root():
+    return config_loader.get_comfyui_root()
+
+COMFYUI_ROOT = os.path.realpath(_resolve_comfyui_root())
+ALLOWED_DELETE_DIRS = (
+    os.path.realpath(os.path.join(COMFYUI_ROOT, "output")),
+    os.path.realpath(os.path.join(COMFYUI_ROOT, "temp")),
+)
+
+# Listados de galería (/api/*_list): carpeta bajo output/, patrones glob, máximo
+# de elementos y subcadenas a excluir. LTXV y MiniMaxH3 listan lo mismo (todos
+# los MP4 de output/), así que comparten entrada y caché.
+MEDIA_LISTS = {
+    "krea2": {
+        "subdir": None,
+        "patterns": ("**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.webp"),
+        "limit": 60,
+        # Imágenes auxiliares de diagnóstico (last frame / refgrid de MMH3X2),
+        # que no son salidas de Krea2.
+        "exclude": ("_lastframe", "_refgrid"),
+    },
+    "videos": {"subdir": None, "patterns": ("**/*.mp4",), "limit": 100, "exclude": ()},
+    # MMH3X2 guarda en output/video/ con prefijos variados (plano1_cont, ...):
+    # se listan todos los MP4 de ahí, no solo los "MiniMax_H3_*".
+    "mmh3x2": {"subdir": "video", "patterns": ("**/*.mp4",), "limit": 100, "exclude": ()},
+}
+
+
+def _build_media_list(spec):
+    """Ficheros más recientes primero, con rutas relativas a output/."""
+    output_dir = os.path.join(COMFYUI_ROOT, "output")
+    root = output_dir
+    if spec["subdir"] and os.path.isdir(os.path.join(output_dir, spec["subdir"])):
+        root = os.path.join(output_dir, spec["subdir"])
+    entries = []  # (mtime, size, path)
+    seen = set()  # alias por symlink o .jpg/.jpeg del mismo fichero
+    try:
+        for pattern in spec["patterns"]:
+            for p in glob.glob(os.path.join(root, pattern), recursive=True):
+                if any(x in p for x in spec["exclude"]):
+                    continue
+                rp = os.path.realpath(p)
+                if rp in seen:
+                    continue
+                seen.add(rp)
+                try:
+                    st = os.stat(p)
+                except OSError:
+                    continue
+                entries.append((st.st_mtime, st.st_size, p))
+    except OSError as e:
+        sys.stderr.write(f"[serve] media list error ({root}): {e}\n")
+    items = []
+    # nlargest == sorted(reverse=True)[:n] (mismo orden estable), sin ordenar todo.
+    for mtime, size, p in heapq.nlargest(spec["limit"], entries, key=lambda e: e[0]):
+        parts = os.path.relpath(p, output_dir).split(os.sep)
+        items.append({
+            "filename": parts[-1],
+            "subfolder": "/".join(parts[:-1]),
+            "type": "output",
+            "mtime": int(mtime),
+            "size": size,
+        })
+    return {"dir": output_dir, "count": len(items), "items": items}
+
+
+
+def _parse_time_arg(value):
+    """Valida y normaliza un argumento de tiempo para ffmpeg.
+
+    Acepta:
+      - Segundos (int o float): 5, 5.5, "12.34"
+      - Formato sexagesimal: HH:MM:SS[.mmm], MM:SS[.mmm], H:MM:SS[.mmm]
+
+    Devuelve (segundos_como_string, error_message): siempre en segundos, para
+    que el llamador pueda operar con float() (p.ej. calcular la duración -t).
+    Si value está vacío, devuelve ("", None). En caso de error, el primer
+    elemento es "".
+    """
+    if not value:
+        return "", None
+    value = value.strip()
+    # Formato numérico puro (segundos)
+    try:
+        f = float(value)
+        if f < 0:
+            return "", "el tiempo no puede ser negativo"
+        return str(f), None
+    except ValueError:
+        pass
+    # Formato sexagesimal: HH:MM:SS[.mmm] o MM:SS[.mmm]
+    m = (re.fullmatch(r"(\d+):(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?", value)
+         or re.fullmatch(r"()(\d{1,2}):(\d{1,2})(?:\.(\d{1,3}))?", value))
+    if m:
+        h, mn, s, ms = m.groups()
+        h, mn, s = int(h or 0), int(mn), int(s)
+        if mn >= 60 or s >= 60:
+            return "", "minutos/segundos fuera de rango"
+        frac = float("0." + ms) if ms else 0.0
+        return str(h * 3600 + mn * 60 + s + frac), None
+    return "", "formato no reconocido (usa segundos o HH:MM:SS.mmm)"
+
+
+def _parse_byte_range(header, total):
+    """Interpreta un Range de un solo tramo: 'bytes=a-b', 'bytes=a-' o 'bytes=-n'
+    (los últimos n bytes). Devuelve (start, end) inclusivos, "unsatisfiable"
+    (-> 416), o None si no hay cabecera, no se entiende o pide varios tramos:
+    entonces se sirve el fichero entero, como permite la RFC 9110."""
+    if not header or not header.startswith("bytes="):
+        return None
+    spec = header[6:].strip()
+    if "," in spec:
+        return None
+    m = re.fullmatch(r"(\d*)-(\d*)", spec)
+    if not m or not (m.group(1) or m.group(2)):
+        return None
+    first, last = m.groups()
+    if not first:  # sufijo: últimos N bytes
+        n = int(last)
+        if n == 0 or total == 0:
+            return "unsatisfiable"
+        return (max(0, total - n), total - 1)
+    start = int(first)
+    if start >= total:
+        return "unsatisfiable"
+    end = int(last) if last else total - 1
+    if end < start:
+        return None
+    return (start, min(end, total - 1))
+
+
+# Routes that should be proxied to the backend instead of served as files.
+PROXY_PREFIXES = ("/system_stats", "/prompt", "/history", "/upload/image", "/queue", "/interrupt", "/free", "/ltxweb/")
+OLLAMA_PREFIXES = ("/api",)
+LLAMACPP_PREFIXES = ("/llamacpp",)
+WS_PREFIX = "/ws"
+
+# Únicos ficheiros estáticos que se sirven: las páginas generadas
+# (LTXV_WebUI.html, MMH3X2_WebUI_BlockATT.html, ...). El resto del repo
+# (.git/, config.json, prompts_*.json, notas) no debe quedar expuesto en la LAN.
+STATIC_PAGE_RE = re.compile(r"^/[A-Za-z0-9]+_WebUI(?:_[A-Za-z0-9]+)?\.html$")
+
+# Puertos de las WebUIs de este equipo: un Origin con el mismo hostname y uno
+# de estos puertos se considera propio (envío cruzado entre UIs).
+UI_PORTS = {str(PORT)} | {
+    str(config_loader.get_port(name, default))
+    for name, default in (("ltxv", 8000), ("krea2", 8001), ("minimaxh3", 8002),
+                          ("mmh3x2", 8003), ("kreaqwen", 8004))
+}
+
+
+class ProxyHandler(http.server.SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+        super().end_headers()
+
+    def log_message(self, format, *args):
+        sys.stderr.write("[serve] " + (format % args) + "\n")
+
+    def handle(self):
+        # Silenciar ConnectionResetError / BrokenPipeError cuando el navegador
+        # cancela peticiones (típico al hacer scroll en la galería de thumbnails:
+        # el IntersectionObserver dispara muchas /view y el navegador las aborta).
+        try:
+            super().handle()
+        except (ConnectionResetError, BrokenPipeError):
+            pass
+
+    # ---- WebSocket proxy (/ws) ----
+    def _ws_proxy(self):
+        """Upgrade the client connection to WebSocket and relay to backend WS.
+
+        Stdlib only: open a raw TCP socket to the backend, perform the WS
+        handshake ourselves (forwarding the client's Sec-WebSocket-Key so the
+        backend computes the matching Sec-WebSocket-Accept), then bridge raw
+        bytes between browser and backend until either side closes. We do not
+        parse WS framing: close-frame handling and (de)compression are
+        negotiated end-to-end between the browser and the backend.
+        """
+        # Validar origen: solo same-origin puede conectar WebSocket.
+        if not self._allowed_origin():
+            sys.stderr.write("[serve] WS rechazado: origen no permitido\n")
+            try:
+                self.send_response(403)
+                self.end_headers()
+            except OSError:
+                pass
+            return
+        client = self.connection
+        backend_host, backend_port = self._parse_backend_ws_host_port()
+        query = self.path.split("?", 1)[1] if "?" in self.path else ""
+        backend_path = "/ws" + ("?" + query if query else "")
+
+        # Connect a raw socket to the backend WS endpoint.
+        try:
+            backend = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            backend.connect((backend_host, backend_port))
+        except OSError as e:
+            sys.stderr.write(f"[serve] WS backend connect failed: {e}\n")
+            try:
+                self.send_response(502)
+                self.end_headers()
+            except OSError:
+                pass
+            return
+
+        # Build the upgrade request. Forward the client's Sec-WebSocket-Key
+        # verbatim so the backend's Sec-WebSocket-Accept matches what the
+        # browser expects, and forward Protocol/Extensions so subprotocol and
+        # permessage-deflate are negotiated end-to-end.
+        ws_key = self.headers.get("Sec-WebSocket-Key") or "dGhlIHNhbXBsZSBub25jZQ=="
+        ws_version = self.headers.get("Sec-WebSocket-Version", "13")
+        ws_protocol = self.headers.get("Sec-WebSocket-Protocol")
+        ws_extensions = self.headers.get("Sec-WebSocket-Extensions")
+        req_lines = [
+            f"GET {backend_path} HTTP/1.1",
+            f"Host: {backend_host}:{backend_port}",
+            "Upgrade: websocket",
+            "Connection: Upgrade",
+            f"Sec-WebSocket-Key: {ws_key}",
+            f"Sec-WebSocket-Version: {ws_version}",
+        ]
+        if ws_protocol:
+            req_lines.append(f"Sec-WebSocket-Protocol: {ws_protocol}")
+        if ws_extensions:
+            req_lines.append(f"Sec-WebSocket-Extensions: {ws_extensions}")
+        req_lines.append("")
+        req_lines.append("")
+        try:
+            backend.sendall("\r\n".join(req_lines).encode("latin-1"))
+        except OSError as e:
+            sys.stderr.write(f"[serve] WS backend send handshake failed: {e}\n")
+            backend.close()
+            return
+
+        # Read the backend's 101 Switching Protocols response (headers only,
+        # but keep any trailing bytes that may be the start of a WS frame).
+        backend.settimeout(10)
+        resp = b""
+        try:
+            while b"\r\n\r\n" not in resp:
+                chunk = backend.recv(4096)
+                if not chunk:
+                    break
+                resp += chunk
+        except socket.timeout:
+            sys.stderr.write("[serve] WS backend handshake timed out\n")
+            backend.close()
+            return
+        finally:
+            backend.settimeout(None)
+
+        if not resp.startswith(b"HTTP/1.1 101"):
+            sys.stderr.write(f"[serve] WS backend handshake failed: {resp[:120]!r}\n")
+            backend.close()
+            try:
+                self.send_response(502)
+                self.end_headers()
+            except OSError:
+                pass
+            return
+
+        # Split the 101 headers from any piggybacked WS frame bytes.
+        sep = resp.find(b"\r\n\r\n") + 4
+        handshake = resp[:sep]
+        leftover = resp[sep:]
+
+        # Forward the 101 verbatim to the browser (correct Sec-WebSocket-Accept).
+        # From here on we bypass http.server's response machinery.
+        try:
+            client.sendall(handshake)
+        except OSError as e:
+            sys.stderr.write(f"[serve] WS client send handshake failed: {e}\n")
+            backend.close()
+            return
+
+        if leftover:
+            try:
+                client.sendall(leftover)
+            except OSError:
+                pass
+
+        # Tell http.server we've taken over the socket; do not handle another
+        # request on it.
+        self.close_connection = True
+
+        # Bidirectional raw byte bridge until either side closes.
+        socks = [client, backend]
+        try:
+            while True:
+                readable, _, _ = select.select(socks, [], [], 60.0)
+                if not readable:
+                    continue
+                for s in readable:
+                    other = backend if s is client else client
+                    try:
+                        data = s.recv(65536)
+                    except OSError:
+                        data = b""
+                    if not data:
+                        return
+                    try:
+                        other.sendall(data)
+                    except OSError:
+                        return
+        finally:
+            for s in (backend, client):
+                try:
+                    s.close()
+                except OSError:
+                    pass
+
+    def _parse_backend_ws_host_port(self):
+        """Return (host, port) for the backend WebSocket from BACKEND URL."""
+        from urllib.parse import urlparse
+        parsed = urlparse(get_backend())
+        host = parsed.hostname or "127.0.0.1"
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        return host, port
+
+    def _allowed_origin(self):
+        """Devuelve el Origin del cliente si es propio, o None si no lo es.
+
+        Propio = mismo Host (host:port) que esta petición, o mismo hostname con
+        el puerto de otra de nuestras WebUIs. Funciona igual en local y en LAN
+        (móvil / otro PC abren http://<IP>:<puerto>, y Origin y Host coinciden).
+        Bloquea que webs externas abiertas en el mismo navegador alcancen el
+        proxy o los endpoints locales."""
+        origin = self.headers.get("Origin")
+        if not origin:
+            return None
+        host = self.headers.get("Host")
+        if not host:
+            return None
+        # El Host header ya contiene el puerto que el navegador usó para llegar.
+        for scheme in ("http", "https"):
+            if origin == f"{scheme}://{host}":
+                return origin
+        try:
+            o = urllib.parse.urlsplit(origin)
+            h = urllib.parse.urlsplit("//" + host)
+            if (o.scheme in ("http", "https") and o.hostname and h.hostname
+                    and o.hostname.lower() == h.hostname.lower()
+                    and str(o.port) in UI_PORTS):
+                return origin
+        except ValueError:
+            pass
+        return None
+
+    def _request_allowed(self):
+        """Filtro anti-CSRF / lectura cruzada para proxy y endpoints locales.
+
+        Rechaza lo que el navegador marca como cross-site y cualquier Origin
+        ajeno. Las peticiones sin Origin (navegación directa, <video src>,
+        curl) se permiten: un navegador siempre envía Origin en los fetch/POST
+        cross-origin, y sin cabeceras CORS la web ajena no puede leer la
+        respuesta."""
+        if self.headers.get("Sec-Fetch-Site", "").lower() == "cross-site":
+            return False
+        if self.headers.get("Origin") is None:
+            return True
+        return self._allowed_origin() is not None
+
+    def _deny_foreign(self):
+        """Responde 403 y devuelve True si la petición viene de una web ajena."""
+        if self._request_allowed():
+            return False
+        sys.stderr.write(
+            f"[serve] Rechazado (origen ajeno): {self.command} {self.path.split('?')[0]} "
+            f"Origin={self.headers.get('Origin')!r} Sec-Fetch-Site={self.headers.get('Sec-Fetch-Site')!r}\n")
+        try:
+            self._send_json(403, {"error": "forbidden: petición desde un origen no permitido"})
+        except OSError:
+            pass
+        return True
+
+    def _send_cors_headers(self, client_origin):
+        """Cabeceras CORS solo para orígenes propios (nunca '*')."""
+        if client_origin:
+            self.send_header("Access-Control-Allow-Origin", client_origin)
+            self.send_header("Access-Control-Allow-Credentials", "true")
+            self.send_header("Access-Control-Allow-Headers", "Range, Content-Type, Authorization")
+            self.send_header("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges")
+        self.send_header("Vary", "Origin")
+
+    def _serve_static(self, method):
+        """Sirve solo las páginas *_WebUI*.html; todo lo demás, 404."""
+        path = urllib.parse.urlsplit(self.path).path
+        if not STATIC_PAGE_RE.match(path):
+            self.send_error(404, "Not Found")
+            return
+        if method == "HEAD":
+            super().do_HEAD()
+        else:
+            super().do_GET()
+
+    def _cors_preflight(self):
+        origin = self._allowed_origin()
+        if not origin:
+            # Origen no permitido: respondemos sin cabeceras CORS, el navegador bloqueará.
+            self.send_response(204)
+            self.end_headers()
+            return
+        req_method = self.headers.get("Access-Control-Request-Method", "POST")
+        req_headers = self.headers.get("Access-Control-Request-Headers", "Content-Type")
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", req_headers)
+        self.send_header("Access-Control-Max-Age", "43200")
+        self.send_header("Access-Control-Allow-Credentials", "true")
+        self.end_headers()
+
+    def _is_page_route(self):
+        """Páginas HTML (y la raíz que redirige a ellas): se pueden abrir desde
+        un enlace externo, así que no pasan por el filtro de origen."""
+        path = self.path.split("?")[0]
+        return path in ("/", "/index.html") or bool(STATIC_PAGE_RE.match(path))
+
+    # ---- Enrutado ----
+    # Rutas exactas atendidas por este servidor: path -> {método: (método, args)}.
+    # Lo que no esté aquí pasa a los prefijos del proxy y, si tampoco encaja,
+    # a las páginas estáticas.
+    EXACT_ROUTES = {
+        "/view":                 {"GET": ("_do_view", ("GET",)), "HEAD": ("_do_view", ("HEAD",))},
+        "/api/krea2_list":       {"GET": ("_do_media_list", ("krea2",))},
+        "/api/ltxv_list":        {"GET": ("_do_media_list", ("videos",))},
+        "/api/minimaxh3_list":   {"GET": ("_do_media_list", ("videos",))},
+        "/api/mmh3x2_list":      {"GET": ("_do_media_list", ("mmh3x2",))},
+        "/api/prompts":          {"GET": ("_do_prompts_get", ()), "POST": ("_do_prompts_post", ())},
+        "/api/ui_launch":        {"GET": ("_do_ui_launch", ())},
+        "/api/file_delete":      {"POST": ("_do_file_delete", ())},
+        "/api/krea2_upload":     {"POST": ("_do_krea2_upload", ())},
+        "/api/video_preprocess": {"POST": ("_do_video_preprocess", ())},
+    }
+    # Prefijos reenviados, por prioridad: (prefijos, backend, preflight_local).
+    # El preflight CORS de Ollama / llama.cpp lo respondemos aquí; el de
+    # ComfyUI se reenvía.
+    PROXY_ROUTES = (
+        (OLLAMA_PREFIXES, lambda: OLLAMA, True),
+        (LLAMACPP_PREFIXES, lambda: LLAMACPP, True),
+        (PROXY_PREFIXES, get_backend, False),
+    )
+
+    def _dispatch(self, method):
+        path = self.path.split("?")[0]
+        # Páginas: se pueden abrir desde un enlace externo, sin filtro de origen.
+        if method in ("GET", "HEAD") and self._is_page_route():
+            if path in ("/", "/index.html"):
+                self.send_response(302)
+                self.send_header("Location", "/LTXV_WebUI.html")
+                # Sin cuerpo: Content-Length explícito para no dejar colgado un
+                # cliente HTTP/1.1 keep-alive esperando el body.
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+            else:
+                self._serve_static(method)
+            return
+        if self._deny_foreign():
+            return
+        if path.startswith(WS_PREFIX):
+            self._ws_proxy()
+            return
+        handlers = self.EXACT_ROUTES.get(path)
+        if handlers is not None:
+            if method == "OPTIONS":
+                self._cors_preflight()  # endpoints propios: preflight same-origin
+            elif method in handlers:
+                name, args = handlers[method]
+                getattr(self, name)(*args)
+            else:
+                self._send_json(405, {"error": "method not allowed"})
+            return
+        for prefixes, backend, local_preflight in self.PROXY_ROUTES:
+            if any(path.startswith(p) for p in prefixes):
+                if method == "OPTIONS" and local_preflight:
+                    self._cors_preflight()
+                else:
+                    self._proxy(method, backend())
+                return
+        if method in ("GET", "HEAD"):
+            self._serve_static(method)
+        else:
+            self.send_error(405, "Method Not Allowed")
+
+    def do_GET(self):
+        self._dispatch("GET")
+
+    def do_HEAD(self):
+        self._dispatch("HEAD")
+
+    def do_POST(self):
+        self._dispatch("POST")
+
+    def do_OPTIONS(self):
+        self._dispatch("OPTIONS")
+
+    # Tope de body multipart: validar el Content-Length ANTES de leer el body,
+    # para que un Content-Length arbitrario no OOMee el proceso.
+    MAX_MULTIPART_BODY = 256 * 1024 * 1024  # 256 MB (vídeo preprocesado)
+
+    def _parse_multipart_parts(self, max_body=MAX_MULTIPART_BODY):
+        """Parsea un POST multipart/form-data y devuelve un dict {field_name: {...}}.
+
+        Devuelve None si no es multipart, o ('too_large', None) si el body
+        supera max_body (el llamador decide el error a devolver)."""
+        import re
+        ctype = self.headers.get("Content-Type", "")
+        if not ctype.startswith("multipart/form-data"):
+            return None
+        m = re.search(r'boundary=([^;]+)', ctype)
+        if not m:
+            return None
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except ValueError:
+            return None
+        if length <= 0:
+            return None
+        if length > max_body:
+            return ("too_large", None)
+        boundary = m.group(1).strip().strip('"').strip("'")
+        body = self.rfile.read(length)
+        delim = b"--" + boundary.encode()
+        parts = body.split(delim)
+        out = {}
+        for part in parts:
+            part = part.strip(b"\r\n")
+            if not part or part == b"--":
+                continue
+            header_end = part.find(b"\r\n\r\n")
+            offset = 4
+            if header_end == -1:
+                header_end = part.find(b"\n\n")
+                offset = 2
+            if header_end == -1:
+                continue
+            headers_raw = part[:header_end].decode("latin-1")
+            content = part[header_end + offset:]
+            # Tras el split por boundary, el contenido de cada parte termina con
+            # el CRLF (o LF) que precede al siguiente boundary. Lo quitamos.
+            if content.endswith(b"\r\n"):
+                content = content[:-2]
+            elif content.endswith(b"\n"):
+                content = content[:-1]
+            fn_match = re.search(r'filename="([^"]+)"', headers_raw)
+            name_match = re.search(r'name="([^"]+)"', headers_raw)
+            if name_match:
+                out[name_match.group(1)] = {
+                    "filename": fn_match.group(1) if fn_match else "",
+                    "data": content,
+                    "headers": headers_raw,
+                }
+        return out
+
+    def _do_krea2_upload(self):
+        """Guarda un blob de imagen en KREA2_OUTPUT_DIR para compartir con LTXV."""
+        # Same-origin estricto: no permitir que sitios externos suban archivos.
+        if not self._allowed_origin():
+            self._send_json(403, {"error": "forbidden: solo same-origin puede subir archivos"})
+            return
+        parts = self._parse_multipart_parts()
+        if isinstance(parts, tuple) and parts and parts[0] == "too_large":
+            self._send_json(413, {"error": "body demasiado grande (máx 256 MB)"})
+            return
+        if not parts or "image" not in parts:
+            self._send_json(400, {"error": "falta campo image"})
+            return
+        img = parts["image"]
+        data = img["data"]
+        if len(data) == 0:
+            self._send_json(400, {"error": "imagen vacía"})
+            return
+        if len(data) > 20 * 1024 * 1024:
+            self._send_json(413, {"error": "imagen demasiado grande (máx 20 MB)"})
+            return
+        # Determinar extensión por Content-Type o filename original.
+        ct = ""
+        for h in img["headers"].splitlines():
+            if h.lower().startswith("content-type:"):
+                ct = h.split(":", 1)[1].strip()
+                break
+        ext_map = {
+            "image/png": ".png",
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/webp": ".webp",
+        }
+        ext = ".png"
+        if ct in ext_map:
+            ext = ext_map[ct]
+        orig = img["filename"]
+        if orig:
+            _, e = os.path.splitext(orig)
+            e = e.lower()
+            if e in (".png", ".jpg", ".jpeg", ".webp"):
+                ext = ".jpg" if e == ".jpeg" else e
+        filename = f"ref_{int(time.time() * 1000)}{ext}"
+        os.makedirs(KREA2_OUTPUT_DIR, exist_ok=True)
+        path = os.path.join(KREA2_OUTPUT_DIR, filename)
+        try:
+            with open(path, "wb") as f:
+                f.write(data)
+            _LIST_CACHE.pop("krea2", None)
+            sys.stderr.write(f"[serve] krea2_upload: {path}\n")
+            self._send_json(200, {
+                "name": filename,
+                "subfolder": "krea2",
+                "type": "output",
+                "size": len(data),
+            })
+        except OSError as e:
+            self._send_json(500, {"error": str(e)})
+
+    def _do_video_preprocess(self):
+        """Recibe un vídeo (mp4/webm/mov) + parámetros de preprocesado y lo
+        reduce con ffmpeg para evitar OOM/subir el original a ComfyUI.
+
+        Multipart: image=<file> + campos de texto: scale, ar_lock,
+        trim_start, trim_end, skip_frames. Devuelve JSON:
+          {video: {name, subfolder, type}, audio: {name, subfolder, type}|null}
+        El audio (cuando existe y se pide) sigue el mismo recorte que el vídeo.
+        """
+        if not self._allowed_origin():
+            self._send_json(403, {"error": "forbidden: solo same-origin puede subir archivos"})
+            return
+        parts = self._parse_multipart_parts()
+        if isinstance(parts, tuple) and parts and parts[0] == "too_large":
+            self._send_json(413, {"error": "vídeo demasiado grande (máx 256 MB)"})
+            return
+        if not parts or "image" not in parts:
+            self._send_json(400, {"error": "falta campo image"})
+            return
+        img = parts["image"]
+        data = img["data"]
+        if len(data) == 0:
+            self._send_json(400, {"error": "vídeo vacío"})
+            return
+
+        def field(name, default):
+            f = parts.get(name)
+            if f is None or not f["data"]:
+                return default
+            return f["data"].decode("utf-8", "replace").strip()
+
+        scale = field("scale", "1") or "1"
+        trim_start_raw = field("trim_start", "")
+        trim_end_raw = field("trim_end", "")
+        skip_frames = field("skip_frames", "1")
+        use_audio = field("use_audio", "false").lower() in ("true", "1", "on")
+        volume = field("volume", "1")
+        normalize = field("normalize", "false").lower() in ("true", "1", "on")
+
+        try:
+            scale = float(scale)
+        except ValueError:
+            scale = 1.0
+        try:
+            skip = int(skip_frames)
+        except ValueError:
+            skip = 1
+        skip = max(1, min(skip, 60))
+        try:
+            vol = float(volume)
+        except ValueError:
+            vol = 1.0
+
+        trim_start, trim_start_error = _parse_time_arg(trim_start_raw)
+        trim_end, trim_end_error = _parse_time_arg(trim_end_raw)
+        if trim_start_error:
+            self._send_json(400, {"error": f"trim_start inválido: {trim_start_error}"})
+            return
+        if trim_end_error:
+            self._send_json(400, {"error": f"trim_end inválido: {trim_end_error}"})
+            return
+
+        input_dir = os.path.join(COMFYUI_ROOT, "input", "reference")
+        os.makedirs(input_dir, exist_ok=True)
+
+        base = "ref_" + str(int(time.time() * 1000))
+        src = os.path.join(input_dir, base + "_src.mp4")
+        out_video = os.path.join(input_dir, base + ".mp4")
+        out_audio = os.path.join(input_dir, base + "_audio.m4a")
+
+        def ffmpeg_trimmed():
+            # -ss y -t como opciones de ENTRADA: el seek no decodifica lo anterior
+            # al corte (exacto al fotograma al recodificar) y -t limita el tramo
+            # de la fuente. Como opción de salida, -t mediría tras el select de
+            # skip_frames y leería el doble de fuente; y -ss de salida con
+            # skip>1 no producía vídeo.
+            cmd = ["ffmpeg", "-y"]
+            if trim_start:
+                cmd += ["-ss", trim_start]
+            if trim_end:
+                cmd += ["-t", str(max(0.0, float(trim_end) - (float(trim_start) if trim_start else 0.0)))]
+            cmd += ["-i", src]
+            return cmd
+
+        def run_ffmpeg(cmd, out_path, what):
+            r = subprocess.run(cmd, capture_output=True, timeout=300)
+            if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+                return True
+            if what is None:
+                return False
+            tail = r.stderr.decode("utf-8", "replace").strip().splitlines()[-1:] or [""]
+            raise RuntimeError(f"ffmpeg no produjo {what} de salida: {tail[0][:300]}")
+
+        try:
+            with open(src, "wb") as f:
+                f.write(data)
+
+            # --- dimensiones originales + detección de streams ---
+            vw = vh = 0
+            has_video = False
+            has_audio = False
+            try:
+                out = subprocess.run(
+                    ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                     "-show_entries", "stream=width,height", "-of", "csv=p=0", src],
+                    capture_output=True, text=True, timeout=60)
+                dims = out.stdout.strip().split(",")
+                if len(dims) == 2 and dims[0].isdigit() and dims[1].isdigit():
+                    vw, vh = int(dims[0]), int(dims[1])
+                    has_video = True
+            except Exception:
+                pass
+            try:
+                out = subprocess.run(
+                    ["ffprobe", "-v", "error", "-select_streams", "a:0",
+                     "-show_entries", "stream=codec_name", "-of", "csv=p=0", src],
+                    capture_output=True, text=True, timeout=60)
+                has_audio = bool(out.stdout.strip())
+            except Exception:
+                pass
+
+            # --- solo audio (pista sin vídeo) ---
+            if not has_video:
+                if not has_audio:
+                    raise RuntimeError("sin pista de vídeo ni audio")
+                acmd = ffmpeg_trimmed()
+                af_parts = []
+                if vol != 1.0:
+                    af_parts.append(f"volume={vol}")
+                if normalize:
+                    # EBU R128 a -16 LUFS + limitador de pico -1.5 dBTP para evitar saturación en la mezcla.
+                    af_parts.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+                    af_parts.append("alimiter=limit=0.95:level=disabled")
+                if af_parts:
+                    acmd += ["-af", ",".join(af_parts)]
+                acmd += ["-vn", "-c:a", "aac", "-b:a", "128k", out_audio]
+                run_ffmpeg(acmd, out_audio, "audio")
+                audio_result = {"name": base + "_audio.m4a", "subfolder": "reference", "type": "input"}
+                self._send_json(200, {"video": None, "audio": audio_result})
+                return
+
+            # --- vf (escalado + skip) ---
+            vf = []
+            if vw and vh and scale > 0 and scale != 1.0:
+                nw = max(2, int(vw * scale) // 2 * 2)
+                nh = max(2, int(vh * scale) // 2 * 2)
+                # Escala uniforme: el aspecto se conserva siempre, así que el
+                # campo ar_lock del cliente no cambia nada aquí.
+                vf.append(f"scale={nw}:{nh}")
+            if skip > 1:
+                vf.append(f"select='not(mod(n,{skip}))'")
+                vf.append("setpts=N/FRAME_RATE/TB")
+
+            cmd = ffmpeg_trimmed()
+            if vf:
+                cmd += ["-vf", ",".join(vf)]
+            cmd += ["-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+                    "-pix_fmt", "yuv420p", out_video]
+            run_ffmpeg(cmd, out_video, "vídeo")
+
+            # --- audio (mismo trim) ---
+            audio_result = None
+            if use_audio:
+                acmd = ffmpeg_trimmed()
+                af_parts = []
+                if vol != 1.0:
+                    af_parts.append(f"volume={vol}")
+                if normalize:
+                    af_parts.append("loudnorm=I=-16:TP=-1.5:LRA=11")
+                    af_parts.append("alimiter=limit=0.95:level=disabled")
+                if af_parts:
+                    acmd += ["-af", ",".join(af_parts)]
+                acmd += ["-vn", "-c:a", "aac", "-b:a", "128k", out_audio]
+                if run_ffmpeg(acmd, out_audio, None):
+                    audio_result = {"name": base + "_audio.m4a", "subfolder": "reference", "type": "input"}
+
+            video_result = {"name": base + ".mp4", "subfolder": "reference", "type": "input"}
+            self._send_json(200, {"video": video_result, "audio": audio_result})
+        except subprocess.TimeoutExpired:
+            self._send_json(500, {"error": "timeout procesando vídeo"})
+        except RuntimeError as e:
+            # Errores de flujo propios (sin pistas, ffmpeg sin output): respuesta
+            # HTTP correcta en vez de tumbar la conexión sin respuesta.
+            self._send_json(500, {"error": str(e)})
+        except OSError as e:
+            self._send_json(500, {"error": str(e)})
+        except Exception as e:  # nunca dejar sin respuesta al cliente
+            self._send_json(500, {"error": f"{type(e).__name__}: {e}"})
+        finally:
+            try:
+                if os.path.exists(src):
+                    os.remove(src)
+            except OSError:
+                pass
+
+    # Arranque automático de otras WebUIs: /api/ui_launch?target=<name>.
+    # Comprueba si el puerto de la WebUI pedida responde; si no, lanza otra
+    # instancia de serve.py para ella (misma sintaxis que los lanzar_*.sh) y
+    # espera a que esté en pie antes de responder.
+    def _resolve_ui_ports(self):
+        return {
+            "ltxv": config_loader.get_port("ltxv", 8000),
+            "krea2": config_loader.get_port("krea2", 8001),
+            "minimaxh3": config_loader.get_port("minimaxh3", 8002),
+            "mmh3x2": config_loader.get_port("mmh3x2", 8003),
+            "kreaqwen": config_loader.get_port("kreaqwen", 8004),
+        }
+    UI_PAGES = {
+        "ltxv": "LTXV_WebUI.html",
+        "krea2": "Krea2_WebUI.html",
+        "minimaxh3": "MiniMaxH3_WebUI.html",
+        "mmh3x2": "MMH3X2_WebUI.html",
+        "kreaqwen": "KreaQwen_WebUI.html",
+    }
+    def _port_usable(self, port, host="127.0.0.1", timeout=1.0):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(timeout)
+            return s.connect_ex((host, int(port))) == 0
+    def _do_ui_launch(self):
+        qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        name = (qs.get("target") or [""])[0].lower().strip()
+        ports = self._resolve_ui_ports()
+        page = self.UI_PAGES.get(name)
+        if(not page) or name not in ports:
+            self._send_json(400, {"error": f"webui desconocida: {name or '(vacía)'}"})
+            return
+        port = int(ports[name])
+        if(port == PORT or self._port_usable(port)):
+            self._send_json(200, {"ok": True, "already_running": True, "port": port, "page": page})
+            return
+        here = os.path.dirname(os.path.realpath(__file__))
+        # El HTML no se versiona (lleva los modelos locales): se regenera antes de servirlo, como en los lanzar_*.sh.
+        if subprocess.run([sys.executable, os.path.join(here, f"generar_{name}.py")], cwd=here, capture_output=True).returncode != 0:
+            self._send_json(500, {"error": f"no se pudo generar {page}"})
+            return
+        args = [sys.executable, os.path.join(here, "serve.py"), str(port)]
+        # conservar BACKEND_URL (argv2) y KREA2_OUTPUT_DIR (argv3) si se lanzaron así
+        if len(sys.argv) > 2: args.append(sys.argv[2])
+        if len(sys.argv) > 3: args.append(sys.argv[3])
+        env = dict(os.environ)
+        env.setdefault("HOST", "0.0.0.0")
+        proc = subprocess.Popen(args, cwd=here,
+                                env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                start_new_session=True)
+        for _ in range(30):  # espera hasta 15s
+            time.sleep(0.5)
+            if self._port_usable(port):
+                self._send_json(200, {"ok": True, "started": True, "pid": proc.pid, "port": port, "page": page})
+                return
+        self._send_json(500, {"error": f"no quedó en pie la WebUI '{name}' (:{port}) tras el arranque"})
+    def _do_media_list(self, name):
+        """Listado de galería con caché corta (ver MEDIA_LISTS)."""
+        cached = _LIST_CACHE.get(name)
+        if cached and cached[0] > time.time():
+            self._send_json(200, cached[1])
+            return
+        result = _build_media_list(MEDIA_LISTS[name])
+        _LIST_CACHE[name] = (time.time() + LIST_CACHE_TTL, result)
+        self._send_json(200, result)
+
+    def _do_view(self, method="GET"):
+        """Serve media files directly from ComfyUI output/temp/input directories with Range support,
+        falling back to proxying to ComfyUI if not found on local disk."""
+        parsed = urllib.parse.urlparse(self.path)
+        qs = urllib.parse.parse_qs(parsed.query)
+        filename = qs.get("filename", [""])[0]
+        subfolder = qs.get("subfolder", [""])[0]
+        ftype = qs.get("type", ["output"])[0]
+
+        # Parámetros inválidos: 400, no se reenvían al backend.
+        if not filename or ".." in filename or "/" in filename or "\\" in filename:
+            self._send_json(400, {"error": "filename inválido"})
+            return
+        # Sin rutas absolutas: os.path.join("/x/output", "/etc") descartaría la base.
+        if ".." in subfolder or subfolder.startswith(("/", "\\")) or os.path.isabs(subfolder):
+            self._send_json(400, {"error": "subfolder inválido"})
+            return
+        if ftype not in ("output", "temp", "input"):
+            self._send_json(400, {"error": "type inválido"})
+            return
+
+        # El fichero debe quedar dentro de su carpeta de tipo (output/temp/input),
+        # no en cualquier parte de la raíz de ComfyUI.
+        type_root = os.path.realpath(os.path.join(COMFYUI_ROOT, ftype))
+        base = os.path.join(type_root, subfolder) if subfolder else type_root
+        target = os.path.realpath(os.path.join(base, filename))
+
+        if not target.startswith(type_root + os.sep) or not os.path.isfile(target):
+            # No está en disco local (o es un symlink fuera): que lo sirva ComfyUI,
+            # que aplica sus propias validaciones.
+            self._proxy(method, get_backend())
+            return
+
+        try:
+            total_size = os.path.getsize(target)
+        except OSError:
+            self._proxy(method, get_backend())
+            return
+
+        ext = os.path.splitext(target)[1].lower()
+        content_types = {
+            ".mp4": "video/mp4",
+            ".webm": "video/webm",
+            ".mkv": "video/x-matroska",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+            ".gif": "image/gif",
+            ".json": "application/json",
+            ".wav": "audio/wav",
+            ".mp3": "audio/mpeg",
+        }
+        content_type = content_types.get(ext, "application/octet-stream")
+
+        client_origin = self._allowed_origin()
+        byte_range = _parse_byte_range(self.headers.get("Range"), total_size)
+        if byte_range == "unsatisfiable":
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{total_size}")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+
+        if byte_range:
+            try:
+                start, end = byte_range
+                length = end - start + 1
+
+                self.send_response(206)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Range", f"bytes {start}-{end}/{total_size}")
+                self.send_header("Content-Length", str(length))
+                self.send_header("Accept-Ranges", "bytes")
+                self._send_cors_headers(client_origin)
+                self.send_header("Connection", "close")
+                self.close_connection = True
+                self.end_headers()
+
+                if method == "HEAD":
+                    return
+
+                with open(target, "rb") as f:
+                    f.seek(start)
+                    remaining = length
+                    while remaining > 0:
+                        chunk = f.read(min(remaining, 65536))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        remaining -= len(chunk)
+                try:
+                    self.wfile.flush()
+                except Exception:
+                    pass
+            except (ConnectionResetError, BrokenPipeError):
+                return
+            except OSError:
+                return
+        else:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(total_size))
+            self.send_header("Accept-Ranges", "bytes")
+            self._send_cors_headers(client_origin)
+            self.send_header("Connection", "close")
+            self.close_connection = True
+            self.end_headers()
+
+            if method == "HEAD":
+                return
+
+            try:
+                with open(target, "rb") as f:
+                    chunk = f.read(65536)
+                    while chunk:
+                        self.wfile.write(chunk)
+                        chunk = f.read(65536)
+                try:
+                    self.wfile.flush()
+                except Exception:
+                    pass
+            except (ConnectionResetError, BrokenPipeError):
+                return
+            except OSError:
+                return
+
+    def _do_file_delete(self):
+        """Delete a file inside ComfyUI's output/ or temp/. Validates path and origin."""
+        # Same-origin estricto: bloquea que una web externa abierta en el navegador
+        # pueda borrar archivos del disco del usuario vía CSRF.
+        if not self._allowed_origin():
+            self._send_json(403, {"error": "forbidden: solo same-origin puede llamar a file_delete"})
+            return
+        length = self._content_length()
+        if length is None:
+            self._send_json(400, {"error": "Content-Length inválido"})
+            return
+        if length > 1024 * 1024:  # Limit payload to 1MB
+            self._send_json(400, {"error": "Content-Length demasiado grande"})
+            return
+        raw = self.rfile.read(length) if length > 0 else b""
+        try:
+            payload = json.loads(raw) if raw else {}
+        except json.JSONDecodeError:
+            self._send_json(400, {"error": "JSON inválido"})
+            return
+        filename = payload.get("filename", "")
+        subfolder = payload.get("subfolder", "")
+        ftype = payload.get("type", "output")
+        if not filename or "/" in filename or "\\" in filename or ".." in filename:
+            self._send_json(400, {"error": "filename inválido"})
+            return
+        if ".." in subfolder or subfolder.startswith("/") or subfolder.startswith("\\"):
+            self._send_json(400, {"error": "subfolder inválido"})
+            return
+        if ftype not in ("output", "temp", "input"):
+            self._send_json(400, {"error": "type inválido"})
+            return
+        base = os.path.join(COMFYUI_ROOT, ftype)
+        if subfolder:
+            base = os.path.join(base, subfolder)
+        target = os.path.realpath(os.path.join(base, filename))
+        # Path must resolve inside one of the allowed directories
+        if not any(target.startswith(d + os.sep) or target == d for d in ALLOWED_DELETE_DIRS):
+            self._send_json(403, {"error": "path fuera de zonas permitidas", "target": target})
+            return
+        if not os.path.isfile(target):
+            self._send_json(404, {"error": "no existe", "target": target})
+            return
+        try:
+            os.remove(target)
+            sys.stderr.write(f"[serve] file_delete: {target}\n")
+            # Invalidar cachés de listado para que el siguiente /api/*_list refleje el borrado.
+            _LIST_CACHE.clear()
+            self._send_json(200, {"ok": True, "deleted": target})
+        except OSError as e:
+            self._send_json(500, {"error": str(e)})
+
+    def _do_prompts_get(self):
+        query = urllib.parse.urlparse(self.path).query
+        params = urllib.parse.parse_qs(query)
+        key = params.get("key", ["default"])[0]
+        safe_key = re.sub(r"[^a-zA-Z0-9_]", "", key) or "default"
+        filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), f"prompts_{safe_key}.json")
+        # X-Prompts-Exists distingue "nunca se guardó nada" (el cliente puede
+        # subir sus prompts locales) de "se borraron todos" (no resucitarlos).
+        if os.path.isfile(filepath):
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self._send_json(200, data, {"X-Prompts-Exists": "1"})
+                return
+            except Exception as e:
+                sys.stderr.write(f"[serve] Error leyendo {filepath}: {e}\n")
+        self._send_json(200, {}, {"X-Prompts-Exists": "0"})
+
+    def _do_prompts_post(self):
+        length = self._content_length()
+        if length is None or length <= 0 or length > 10 * 1024 * 1024:
+            self._send_json(400, {"error": "payload inválido"})
+            return
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+            key = body.get("key", "default")
+            safe_key = re.sub(r"[^a-zA-Z0-9_]", "", key) or "default"
+            prompts = body.get("prompts", {})
+            if not isinstance(prompts, dict):
+                self._send_json(400, {"error": "prompts debe ser un objeto"})
+                return
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            filepath = os.path.join(base_dir, f"prompts_{safe_key}.json")
+            tmp_path = filepath + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(prompts, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_path, filepath)
+            sys.stderr.write(f"[serve] Guardados {len(prompts)} prompts en {filepath}\n")
+            self._send_json(200, {"ok": True, "count": len(prompts)})
+        except Exception as e:
+            sys.stderr.write(f"[serve] Error guardando prompts: {e}\n")
+            self._send_json(500, {"error": str(e)})
+
+    def _content_length(self):
+        """Content-Length como int (0 si falta); None si es inválido o negativo.
+        Un int() sin proteger tumbaba el hilo sin responder al cliente."""
+        raw = self.headers.get("Content-Length")
+        if raw is None:
+            return 0
+        try:
+            n = int(raw)
+        except ValueError:
+            return None
+        return n if n >= 0 else None
+
+    def _send_json(self, status, obj, extra_headers=None):
+        body = json.dumps(obj).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
+        for k, v in (extra_headers or {}).items():
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _proxy(self, method, base):
+        """Forward the request to `base` and relay the response."""
+        path_to_forward = self.path
+        if base == LLAMACPP and path_to_forward.startswith("/llamacpp"):
+            path_to_forward = path_to_forward[len("/llamacpp"):]
+            if not path_to_forward.startswith("/"):
+                path_to_forward = "/" + path_to_forward
+        # http.server decodifica la línea de petición como latin-1: un cliente que
+        # envíe bytes no ASCII sin codificar (p.ej. "sofá" en crudo) hacía que
+        # urllib reventase con UnicodeEncodeError y el cliente se quedaba sin
+        # respuesta. Se recuperan los bytes originales y se codifican con %XX.
+        path_to_forward = urllib.parse.quote(
+            path_to_forward.encode("latin-1", "replace"), safe="/?&=%:+,;@!$'()*~#[]")
+        target = base + path_to_forward
+        body = None
+        if method in ("POST", "PUT", "PATCH"):
+            length = self._content_length()
+            if length is None:
+                self._send_json(400, {"error": "Content-Length inválido"})
+                return
+            # Tope para evitar que un cliente (o un atacante desde una web maliciosa)
+            # OOMee el proceso enviando cuerpos enormes al proxy. 100 MB es amplio
+            # para los payloads de /prompt (workflow JSON) y de /upload/image (imágenes
+            # y vídeos cortos). Subidas de vídeo muy grandes deberían trocearse por
+            # el cliente o subirse directamente a ComfyUI.
+            if length > 100 * 1024 * 1024:
+                self.send_error(413, "Payload Too Large (máx 100 MB en el proxy)")
+                return
+            body = self.rfile.read(length) if length > 0 else b""
+
+        # Exclude accept-encoding to prevent backend from returning compressed data,
+        # which would require complex decompression logic and cause client issues
+        # since we strip the Content-Encoding headers from the response.
+        # Exclude cookie/authorization too: el proxy no debe reenviar credenciales
+        # de sesión que pertenezcan a otros servicios de 127.0.0.1.
+        req = urllib.request.Request(
+            target,
+            data=body,
+            headers={
+                k: v
+                for k, v in self.headers.items()
+                if k.lower()
+                not in ("host", "connection", "transfer-encoding", "content-length",
+                        "origin", "accept-encoding", "cookie", "authorization")
+            },
+            method=method,
+        )
+        # Forzar cierre de conexión tras la respuesta: evita reuse de sockets
+        # que Ollama o llama-server puedan haber reseteado por carga/descarga de modelos.
+        req.add_header("Connection", "close")
+
+        # Si reenviamos a Ollama o llama.cpp, reescribimos el Origin: Ollama y llama-server
+        # esperan peticiones locales para evitar bloqueos CORS. Este rewrite afecta ÚNICAMENTE
+        # al tráfico proxy saliente; los endpoints locales siguen protegidos por _allowed_origin().
+        if base == OLLAMA:
+            req.add_header("Origin", "http://127.0.0.1:11434")
+        elif base == LLAMACPP:
+            req.add_header("Origin", "http://127.0.0.1:8080")
+
+        # Siempre añadimos los headers CORS correctos para el cliente en la respuesta,
+        # pero solo si el origen del cliente es same-origin (mismo host:port).
+        client_origin = self._allowed_origin()
+
+        # Reintentos transparentes en caso de saturación transitoria del backend
+        resp = None
+        for attempt in range(3):
+            try:
+                resp = urllib.request.urlopen(req, timeout=600)
+                break
+            except urllib.error.HTTPError as e:
+                # 4xx / 5xx del backend son respuestas válidas, no reintentar
+                try:
+                    self.send_response(e.code)
+                    for k, v in e.headers.items():
+                        kl = k.lower()
+                        if kl not in ("transfer-encoding", "connection", "content-encoding") and not kl.startswith("access-control-"):
+                            self.send_header(k, v)
+                    if not self.path.split("?")[0].startswith("/view"):
+                        self.send_header("Connection", "close")
+                        self.close_connection = True
+                    self._send_cors_headers(client_origin)
+                    self.end_headers()
+                    chunk = e.read(65536)
+                    while chunk:
+                        self.wfile.write(chunk)
+                        chunk = e.read(65536)
+                finally:
+                    e.close()
+                return
+            except (urllib.error.URLError, ConnectionError, OSError) as e:
+                if attempt < 2 and method in ("GET", "HEAD"):
+                    time.sleep(0.25 * (attempt + 1))
+                    continue
+                reason = getattr(e, "reason", str(e))
+                reason_str = str(reason)
+                if "reset" in reason_str.lower() or "broken pipe" in reason_str.lower():
+                    sys.stderr.write(f"[serve] Backend reset: {reason_str} -> {target}\n")
+                    self.send_error(504, f"Backend cerró la conexión (puede estar cargando el modelo): {reason_str}")
+                else:
+                    sys.stderr.write(f"[serve] Backend unreachable ({attempt+1}/3): {reason_str} -> {target}\n")
+                    self.send_error(502, f"Backend unreachable: {reason_str}")
+                return
+
+        if resp is None:
+            return
+
+        try:
+            self.send_response(resp.status)
+            # Copy response headers (except transfer-encoding / connection / access-control)
+            for k, v in resp.headers.items():
+                kl = k.lower()
+                if kl not in ("transfer-encoding", "connection", "content-encoding") and not kl.startswith("access-control-"):
+                    self.send_header(k, v)
+            self.send_header("Connection", "close")
+            self.close_connection = True
+            
+            self._send_cors_headers(client_origin)
+            self.end_headers()
+
+            # Stream the body
+            is_streaming = (
+                "event-stream" in resp.headers.get("Content-Type", "").lower()
+                or "application/x-ndjson" in resp.headers.get("Content-Type", "").lower()
+                or "chunked" in resp.headers.get("Transfer-Encoding", "").lower()
+            )
+            chunk_size = 512 if is_streaming else 65536
+            while True:
+                chunk = resp.read(chunk_size)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                if is_streaming:
+                    try:
+                        self.wfile.flush()
+                    except Exception:
+                        pass
+            try:
+                self.wfile.flush()
+            except Exception:
+                pass
+        except (ConnectionError, BrokenPipeError):
+            return
+        except OSError as e:
+            if e.errno in (32, 104):  # EPIPE, ECONNRESET
+                return
+            self.send_error(502, f"Backend error: {e}")
+        finally:
+            if resp:
+                try:
+                    resp.close()
+                except Exception:
+                    pass
+
+
+class ReusableServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        # Silenciar tracebacks por conexiones canceladas por el cliente
+        # (ConnectionResetError, BrokenPipeError: típicos al hacer scroll
+        # en galerías de thumbnails donde el navegador aborta /view).
+        import sys as _sys
+        e = _sys.exc_info()[1]
+        if isinstance(e, (ConnectionResetError, BrokenPipeError)):
+            return
+        super().handle_error(request, client_address)
+
+
+def main():
+    try:
+        with ReusableServer((HOST, PORT), ProxyHandler) as httpd:
+            sys.stderr.write(
+                f"[serve] Sirviendo en {HOST}:{PORT} (proxy -> {BACKEND}, krea2 -> {KREA2_OUTPUT_DIR}, delete-allowed -> {ALLOWED_DELETE_DIRS}, no-cache)\n"
+            )
+            sys.stderr.flush()
+            httpd.serve_forever()
+    except OSError as e:
+        if e.errno == 98:  # Address already in use
+            sys.stderr.write(f"❌ Error: El puerto {PORT} ya está en uso. Cierra el proceso que lo está usando o elige otro puerto.\n")
+        else:
+            sys.stderr.write(f"❌ Error al iniciar el servidor: {e}\n")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        sys.stderr.write("[serve] Ctrl+C, saliendo.\n")
+
+
+if __name__ == "__main__":
+    main()

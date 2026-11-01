@@ -1,0 +1,314 @@
+"""Shared logic for the LTXV and Krea2 HTML generators.
+
+Both generators call `generate_html()` with a config dict describing
+their specific paths, placeholders, and template files.
+"""
+
+import json
+import os
+
+TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+
+
+def get_file_list(directory, ext='.safetensors', fallback=None):
+    """Acepta un directorio (str) o una lista de tuplas (directorio, prefijo_relativo).
+    El prefijo_relativo se antepone a los nombres de archivo para que ComfyUI
+    pueda encontrarlos en su carpeta de checkpoints.
+    """
+    if directory is None:
+        return [fallback] if fallback else []
+    if isinstance(directory, str):
+        entries = [(directory, '')]
+    else:
+        try:
+            entries = list(directory)
+        except TypeError:
+            return [fallback] if fallback else []
+    exts = tuple(ext) if isinstance(ext, (list, tuple, set)) else (ext,)
+    files = []
+    for d, prefix in entries:
+        if not os.path.exists(d):
+            continue
+        # followlinks=True: ComfyUI (SwarmUI) organiza modelos con symlinks a
+        # otros discos (p.ej. Stable-Diffusion/ltxv -> /media/.../ltxv). Sin
+        # seguirlos, esos modelos no llegan a AVAILABLE_MODELS mientras que el
+        # COMBO del backend sí los ve.
+        for root, _, file_list in os.walk(d, followlinks=True):
+            for f in file_list:
+                if f.endswith(exts):
+                    rel = os.path.relpath(os.path.join(root, f), d)
+                    if rel.startswith('..'):
+                        rel = f
+                    rel = rel.replace('\\', '/')
+                    if prefix and rel.startswith(prefix + '/'):
+                        rel = rel[len(prefix) + 1:]
+                    full_name = (prefix + '/' + rel) if prefix else rel
+                    files.append(full_name)
+    files = sorted(set(files))
+    return files if files else ([fallback] if fallback else [])
+
+
+def get_lora_list(directory, fallback="ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors"):
+    """Legacy path: used when the caller passes a single `lora_dir` string.
+
+    New callers should prefer `lora_dirs` (list of (dir, prefix) tuples) and
+    use the shared `get_file_list()` logic. This helper is kept for backward
+    compatibility with `generar_ltxv.py` and `generar_krea2.py`.
+    """
+    loras = []
+    if not directory or not os.path.exists(directory):
+        return [fallback] if fallback else []
+    for root, _, files in os.walk(directory, followlinks=True):
+        for file in files:
+            if file.endswith('.safetensors'):
+                rel_path = os.path.relpath(os.path.join(root, file), directory)
+                loras.append(rel_path.replace('\\', '/'))
+    loras.sort()
+    if loras:
+        return loras
+    return [fallback] if fallback else []
+
+
+def filter_names(names, include=None, exclude=None):
+    """Filtra nombres de modelo (rutas relativas): si hay `include`, deben
+    contener alguna de esas subcadenas; y no deben contener ninguna de
+    `exclude`. Siempre subcadena y sin distinguir mayúsculas: antes cada lista
+    usaba un criterio distinto (prefijo, o sensible a mayúsculas), y p.ej. un
+    model_exclude '/boogu/' nunca coincidía con un nombre relativo.
+    """
+    inc = [x.lower() for x in (include or ())]
+    exc = [x.lower() for x in (exclude or ())]
+    return [
+        n for n in names
+        if (not inc or any(x in n.lower() for x in inc))
+        and not any(x in n.lower() for x in exc)
+    ]
+
+
+def get_vae_list(directory, fallback="LTX-2/pruna_ltx2.3_vae_comfy_bf16.safetensors"):
+    return get_file_list(directory, fallback=fallback)
+
+
+def _read_template(name):
+    """Read a template file from the templates/ directory."""
+    path = os.path.join(TEMPLATES_DIR, name)
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
+def generate_html(config):
+    """Generate a self-contained HTML file from templates.
+
+    config keys:
+        json_file:       path to the workflow JSON
+        output_html:     path to write the generated HTML
+        title:           <title> text
+        enhancer_title:  enhancer panel header text
+        head_template:    'common_head.html'
+        common_html:     'common_html.html'
+        ui_html:         'ltxv_html.html' or 'krea2_html.html'
+        base_css:        'base.css'
+        ui_css:          'ltxv.css' or 'krea2.css'
+        ui_js:           'ltxv.js' or 'krea2.js'
+        model_dirs:      dir or list of (dir, prefix) tuples for models
+        model_fallback:  fallback model name
+        model_include/model_exclude, vae_*, unet_*, clip_*: substrings
+                         (see filter_names) to keep / drop from each list
+        lora_dir:        directory for LoRAs
+        lora_fallback:   fallback LoRA name
+        unet_dirs:       optional dir or list of (dir, prefix) for UNet models
+        unet_fallback:   fallback UNet name
+        clip_dirs:       optional dir or list of (dir, prefix) for CLIP models
+        clip_fallback:   fallback CLIP name
+        header_title:    e.g. "LTXV" or "Krea2"
+        header_sub:      e.g. "grafo: LTXV_DMD_OK"
+        model_count_label: "modelos" or "" (for the success message)
+        ltxv_ui_port:    port where the LTXV UI is served (for the "send to LTXV"
+                        button in both UIs). Default "8000".
+    """
+    # --- Read workflow JSON ---
+    if not os.path.exists(config['json_file']):
+        print(f"❌ Error: No se encontró '{config['json_file']}'")
+        return
+    with open(config['json_file'], 'r', encoding='utf-8') as f:
+        graph_json = f.read()
+
+    # --- Build model, LoRA and VAE lists ---
+    model_ext = config.get('model_ext', '.safetensors')
+    raw_models = get_file_list(config['model_dirs'], ext=model_ext, fallback=config['model_fallback'])
+    model_files = filter_names(raw_models, config.get('model_include'), config.get('model_exclude'))
+    model_js_array = json.dumps(model_files)
+
+    if config.get('lora_dirs'):
+        lora_files = get_file_list(config['lora_dirs'], fallback=config.get('lora_fallback'))
+    else:
+        lora_files = get_lora_list(config.get('lora_dir'), fallback=config.get('lora_fallback'))
+    lora_js_array = json.dumps(lora_files)
+
+    if config.get('vae_dirs'):
+        raw_vaes = get_file_list(config['vae_dirs'], fallback=config.get('vae_fallback'))
+    else:
+        raw_vaes = get_vae_list(config.get('vae_dir'), fallback=config.get('vae_fallback'))
+    vae_files = filter_names(raw_vaes, config.get('vae_include'), config.get('vae_exclude'))
+    vae_js_array = json.dumps(vae_files)
+
+    # --- UNet / CLIP lists (optional, used by MiniMaxH3) ---
+    if config.get('unet_dirs'):
+        raw_unets = get_file_list(config['unet_dirs'], fallback=config.get('unet_fallback'))
+        unet_files = filter_names(raw_unets, config.get('unet_include'), config.get('unet_exclude'))
+    else:
+        unet_files = []
+    unet_js_array = json.dumps(unet_files)
+
+    if config.get('clip_dirs'):
+        raw_clips = get_file_list(config['clip_dirs'], fallback=config.get('clip_fallback'))
+        clip_files = filter_names(raw_clips, config.get('clip_include'), config.get('clip_exclude'))
+    else:
+        clip_files = []
+    clip_js_array = json.dumps(clip_files)
+
+    if config.get('interp_dir'):
+        raw_interps = get_file_list(config['interp_dir'], fallback=config.get('interp_fallback', 'rife_v4.26.safetensors'))
+        interp_files = raw_interps
+    else:
+        interp_files = []
+    interp_js_array = json.dumps(interp_files)
+
+    if config.get('upscale_dirs'):
+        raw_upscale = get_file_list(config['upscale_dirs'], ext=('.pth', '.safetensors'), fallback=config.get('upscale_fallback', '4xPurePhoto-Span.pth'))
+    elif config.get('upscale_dir'):
+        raw_upscale = get_file_list([(config['upscale_dir'], '')], ext=('.pth', '.safetensors'), fallback=config.get('upscale_fallback', '4xPurePhoto-Span.pth'))
+    else:
+        raw_upscale = []
+    clean_upscale = []
+    for u in raw_upscale:
+        cu = u.replace('Ligazón para upscale_models/', '').replace('Ligazón para upscale_models\\', '')
+        if cu not in clean_upscale:
+            clean_upscale.append(cu)
+    upscale_js_array = json.dumps(clean_upscale)
+
+    ltxv_ui_port = config.get('ltxv_ui_port', '8000')
+    minimaxh3_ui_port = config.get('minimaxh3_ui_port', '8002')
+    mmh3x2_ui_port = config.get('mmh3x2_ui_port', '8003')
+    kreaqwen_ui_port = config.get('kreaqwen_ui_port', '8004')
+
+    # --- LUTs (.cube) para el post-procesado (opcional) ---
+    lut_dirs = config.get('lut_dirs')
+    if lut_dirs is None:
+        try:
+            import config_loader
+            lut_dirs = config_loader.get_lut_dirs()
+        except Exception:
+            lut_dirs = []
+    lut_files = []
+    for d in lut_dirs or []:
+        for root, _, file_list in os.walk(d, followlinks=True):
+            for f in file_list:
+                if f.lower().endswith('.cube'):
+                    if f not in lut_files:
+                        lut_files.append(f)
+    lut_files.sort()
+    lut_js_array = json.dumps(lut_files)
+
+    # --- Assemble CSS ---
+    css = _read_template('base.css') + '\n' + _read_template(config['ui_css'])
+
+    # --- Assemble HTML body ---
+    common_html = _read_template('common_html.html')
+    ui_html = _read_template(config['ui_html'])
+
+    # --- Assemble JS ---
+    # Order: BASE_GRAPH + AVAILABLE_MODELS + AVAILABLE_LORAS + LTXV_UI_PORT (placeholders),
+    #         then common.js (defines $, log, server, initCommon, etc. — no CONFIG access at top level),
+    #         then UI-specific JS (defines CONFIG, N, calls initCommon(), UI functions).
+    ui_js = _read_template(config['ui_js'])
+    common_js = _read_template('common.js')
+
+    js_block = (
+        "const BASE_GRAPH = __GRAPH_JSON__;\n"
+        "const AVAILABLE_MODELS = __MODEL_LIST__;\n"
+        "const AVAILABLE_LORAS = __LORA_LIST__;\n"
+        "const AVAILABLE_VAES = __VAE_LIST__;\n"
+        "const AVAILABLE_UNETS = __UNET_LIST__;\n"
+        "const AVAILABLE_CLIPS = __CLIP_LIST__;\n"
+        "const AVAILABLE_INTERP_MODELS = __INTERP_LIST__;\n"
+        "const AVAILABLE_UPSCALE_MODELS = __UPSCALE_LIST__;\n"
+        "const AVAILABLE_LUTS = __LUT_LIST__;\n"
+        "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
+        "const MINIMAXH3_UI_PORT = __MINIMAXH3_UI_PORT__;\n"
+        "const MMH3X2_UI_PORT = __MMH3X2_UI_PORT__;\n"
+        "const KREAQWEN_UI_PORT = __KREAQWEN_UI_PORT__;\n"
+        + common_js + "\n"
+        + ui_js
+    )
+
+    # --- Assemble full HTML ---
+    head = _read_template('common_head.html')
+    head = head.replace('__TITLE__', config['title'])
+    head = head.replace('__CSS__', css)
+
+    common_html = common_html.replace('__ENHANCER_TITLE__', config['enhancer_title'])
+
+    server_panel = ""
+    prompt_panels = common_html
+    if '<h2>Servidor</h2>' in common_html:
+        idx_serv = common_html.find('<h2>Servidor</h2>')
+        start_panel = common_html.rfind('<div class="panel">', 0, idx_serv)
+        end_panel = common_html.find('</div></div>', idx_serv) + 12
+        if start_panel != -1 and end_panel != -1:
+            server_panel = common_html[start_panel:end_panel]
+            prompt_panels = (common_html[:start_panel] + common_html[end_panel:]).strip()
+
+    if '__SERVER_PANEL__' in ui_html:
+        ui_html = ui_html.replace('__SERVER_PANEL__', server_panel)
+    if '__PROMPT_PANELS__' in ui_html:
+        ui_html = ui_html.replace('__PROMPT_PANELS__', prompt_panels)
+    ui_html = ui_html.replace('__COMMON_PANELS__', common_html)
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+{head}
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1>{config['header_title']} <span>//</span> panel pro</h1><div class="sub">{config['header_sub']}</div></div>
+{ui_html}
+</div>
+<script>
+{js_block}
+</script>
+</body>
+</html>
+"""
+
+    # --- Substitute placeholders ---
+    # El JSON del workflow se incrusta dentro de un <script>: escapamos "</"
+    # para que ningún texto (p.ej. un prompt con "</script>") pueda cerrar el
+    # bloque de script e inyectar HTML. JS parsea "<\\/" igual que "</".
+    safe_graph_json = graph_json.replace('</', '<\\/')
+    html = html.replace('__GRAPH_JSON__', safe_graph_json)
+    html = html.replace('__MODEL_LIST__', model_js_array)
+    html = html.replace('__LORA_LIST__', lora_js_array)
+    html = html.replace('__VAE_LIST__', vae_js_array)
+    html = html.replace('__UNET_LIST__', unet_js_array)
+    html = html.replace('__CLIP_LIST__', clip_js_array)
+    html = html.replace('__INTERP_LIST__', interp_js_array)
+    html = html.replace('__LTXV_UI_PORT__', json.dumps(ltxv_ui_port))
+    html = html.replace('__MINIMAXH3_UI_PORT__', json.dumps(minimaxh3_ui_port))
+    html = html.replace('__MMH3X2_UI_PORT__', json.dumps(mmh3x2_ui_port))
+    html = html.replace('__KREAQWEN_UI_PORT__', json.dumps(kreaqwen_ui_port))
+    html = html.replace('__UPSCALE_LIST__', upscale_js_array)
+    html = html.replace('__LUT_LIST__', lut_js_array)
+
+    # --- Write output ---
+    with open(config['output_html'], 'w', encoding='utf-8') as f:
+        f.write(html)
+
+    # --- Success message ---
+    model_count = len(model_files)
+    lora_count = len(lora_files)
+    if config.get('model_count_label'):
+        print(f"✅ HTML generado con {model_count} {config['model_count_label']} y {lora_count} LoRAs.")
+    else:
+        print(f"✅ HTML generado con {lora_count} LoRAs.")

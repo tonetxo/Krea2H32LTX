@@ -1,0 +1,41 @@
+#!/bin/bash
+# Configuración
+HTML_FILE="MMH3X2_WebUI.html"
+PORT=8003
+BROWSER="google-chrome"
+
+echo "Iniciando servidor local para MMH3X2 Panel..."
+
+# El HTML no se versiona (lleva la lista de modelos y LoRAs locales): se regenera en cada arranque.
+python3 generar_mmh3x2.py || { echo "❌ Error: no se pudo generar $HTML_FILE"; exit 1; }
+
+if command -v ss >/dev/null 2>&1; then
+  BACKEND_BIND=$(ss -tlnp 2>/dev/null | awk '/:(7821|8188) /{print $4; exit}')
+  if [ -n "$BACKEND_BIND" ] && echo "$BACKEND_BIND" | grep -q '^127\.'; then
+    echo "Aviso: El backend (ComfyUI) solo escucha en $BACKEND_BIND."
+    echo "Si abres esta UI desde otro dispositivo en la LAN, relánzalo con --listen 0.0.0.0."
+  fi
+fi
+
+if command -v ss >/dev/null 2>&1; then
+  UI_BIND=$(ss -tlnp 2>/dev/null | awk -v p=":$PORT " '$4 ~ p {print $0; exit}')
+  if [ -n "$UI_BIND" ]; then
+    echo "Aviso: Ya hay algo escuchando en :$PORT: $UI_BIND"
+  fi
+fi
+
+echo "Abriendo navegador en http://localhost:$PORT/$HTML_FILE ..."
+# Esperar a que serve.py acepte conexiones antes de abrir la pestaña;
+# si no, Chrome muestra "No se puede acceder a este sitio web".
+(
+  for _ in $(seq 1 100); do
+    (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null && break
+    sleep 0.1
+  done
+  "$BROWSER" "http://localhost:$PORT/$HTML_FILE"
+) >/dev/null 2>&1 &
+
+echo "Sirviendo en el puerto $PORT (Ctrl+C para detener)..."
+HOST=0.0.0.0 python3 serve.py "$PORT" "$@"
+
+echo "Servidor detenido."

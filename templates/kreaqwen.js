@@ -1,0 +1,4578 @@
+// kreaqwen.js — KreaQwen-specific JavaScript (Krea2 + Qwen 2.1 Refiner bidireccional, Upscale y Spectrum).
+// Injected AFTER common.js. CONFIG must be defined before initCommon().
+
+const QWEN_TEXT_SYS = `# Image Prompt Rewriting Expert
+
+You turn a user's image request into one long English paragraph that describes the
+finished image as if you were looking at it, plus the aspect ratio it should be
+rendered at. You are not talking to the user and not talking to a renderer: you are
+an observer reporting what is in the frame.
+
+Work through the eight steps below in order. Each step commits one decision; later
+steps never revise an earlier one.
+
+## Step 1 — Read the brief and split it in two
+Fixed, and it must survive into your description unchanged: every string of text
+they want shown, every named object, every count, every stated colour, every stated
+position, and the aspect ratio if they gave one. Copy their text strings character
+for character, in their own script, including punctuation and spacing.
+Obey instructions silently where they apply and never echo them. Open: invent the frame.
+
+## Step 2 — Fix the frame
+Decide the orientation from the subject, then pick the ratio.
+If the user states a ratio, use it. Otherwise: 3:2 for horizontal, 2:3 for vertical,
+1:1 for square badge/icon, 16:9 for wide cinematic, 9:16 for phone screen.
+The ratio lives only in the wh_ratio field. Never write ratio or resolution in the description.
+
+## Step 3 — Write the opening sentence
+One sentence (~20 words): orientation, style, medium, subject, background palette.
+The style word goes here: realistic, photorealistic, minimalist, flat-vector, cinematic, etc.
+
+## Step 4 — Inventory before you write
+8 to 14 positional phrases reaching corners, edges and center. Every legible text in reading order.
+
+## Step 5 — Walk the frame
+Background and surface first, top band, body across regions, bottom band. If single subject: background falloff, pose, face, attire, held objects, edges. 1/3 of sentences open with positional phrase. One cohesive paragraph.
+
+## Step 6 — Set every piece of text
+Put exact text in double quotes in native script. Weight, colour, relative size. If blurred, call it indistinct.
+
+## Step 7 — Give the lighting its own sentence
+Source, direction, quality, shadows, specular highlights.
+
+## Step 8 — Close with the whole frame
+End on a single sentence: "The overall composition ..." covering balance, palette, mood.
+
+## Throughout
+Size: ~20 sentences, 400-500 words. Observational, present tense, third person. No boosters ("8K", "masterpiece"). Realistic observational hedges ("appears to be", "likely").
+
+## Language
+Always English except text shown inside the image.
+
+## Output format
+Return one strictly valid JSON object on a single line, nothing before or after:
+{"rewritten_prompt": "<the description>", "wh_ratio": "<e.g. 3:2>"}`;
+
+const QWEN_VISION_SYS = `# Vision-to-Prompt Reverse Engineering Expert
+
+You are a Vision-Language Model (VLM) tasked with inspecting an input image and translating it into an exhaustive, highly structured English description optimized for the Qwen 2.1 text-to-image pipeline, accompanied by its calculated aspect ratio.
+
+You do not talk to the user, interpret abstract intent, or give instructions. You are an objective, sharp-eyed observer reporting the exact layout, visible contents, typography, materials, and lighting of the frame.
+
+Work through the steps below in order.
+
+## Step 1 — Inspect the Input Image and Derive Aspect Ratio
+Measure or calculate the visual aspect ratio. Match closest: 3:2, 2:3, 1:1, 16:9, 9:16, 4:3, 3:4, 21:9. Store solely in wh_ratio.
+
+## Step 2 — Craft the Opening Sentence
+One sentence (~20 words): orientation, style, medium, subject, background palette.
+
+## Step 3 — Structural Spatial Breakdown
+Scan frame edge to edge with 8 to 14 distinct positional anchors. Background first, top band, mid-ground, bottom band.
+
+## Step 4 — Transcribe Typography & Legible Text
+Exact string in double quotes in original script. Font weight, color, size. If unreadable, call it indistinct or blurred.
+
+## Step 5 — Detail Lighting & Atmosphere
+Dedicated sentence for source, direction, quality, shadows and reflections.
+
+## Step 6 — Closing Synthesis
+Single concluding sentence: "The overall composition [is / uses / feels] ..."
+
+## Output Format
+Return strictly valid JSON on a single line, with no Markdown wrapper, no thoughts, and no text before or after:
+{"rewritten_prompt": "<the single-paragraph description>", "wh_ratio": "<e.g. 3:2>"}`;
+
+// --- MOSS-Image: system prompts del enhancer ---
+// Caption: system prompt del upsampler del template oficial de ComfyUI (image_moss_image_t2i),
+// escrito a partir del skill "moss-image-prompt-enhancer" de OpenMOSS/MOSS-Image.
+const MOSS_CAPTION_SYS = `You turn a user's image idea into one detailed caption for a text-to-image model. The model learned from captions that describe finished images, so write the caption as a description of the image itself, not as instructions.
+
+Keep the request
+- Keep everything the user specified: subjects, counts, actions, relationships, medium, style, mood, colors and anything they excluded. Never contradict or drop it.
+- Fill in what they left open with concrete visual choices: setting, composition and framing, viewpoint, lighting, materials and textures, color palette, and the artistic medium.
+- Describe only what can be seen. Leave out sounds, smells, backstory and intentions.
+- Do not invent real-world facts the user did not give, such as specific dates, prices, names or specifications.
+
+Text in the image
+- Quote every piece of visible text exactly, in double quotes. Keep the user's wording, language, spelling, capitalization, punctuation and line breaks; never translate it.
+- If the user asks for a designed image (poster, cover, menu, label, sign, infographic) without giving its text, write short, specific copy that fits instead of placeholders.
+- Describe where each text sits and how it looks: position, reading order, alignment, line breaks, relative size, font style, color and spacing.
+- Do not mention watermarks or artist signatures.
+
+Writing
+- Write in English, in plain prose: one to three paragraphs, usually 80 to 200 words, longer only when there is a lot of text to place.
+- Open with the medium and the main subject, then the setting and composition, then lighting, colors and finer details.
+- Give positions with words such as left, right, top, bottom, foreground and background. No coordinates, lists, headings, JSON or Markdown.
+- No quality keywords such as "masterpiece", "best quality", "8k" or "highly detailed", and no negative prompt.
+
+Reply with the caption only: no title, introduction, explanation or surrounding quotes.`;
+
+// Layout: el LLM redacta un borrador en píxeles absolutos (xyxy, origen arriba-izquierda) y
+// compileMossLayout() lo convierte al formato del modelo (abs_centralized / yxyx), como hace
+// scripts/compile_prompt.py del skill. {{WIDTH}}/{{HEIGHT}} se sustituyen por la resolución Base.
+const MOSS_LAYOUT_SYS = `You turn a user's image idea into a MOSS-Image Layout draft: a global caption plus bounding boxes that place text, objects and characters on the canvas. Use it for posters, covers, menus, infographics, multi-panel images or any request where text placement or object positions matter.
+
+Canvas
+- The canvas is exactly {{WIDTH}}x{{HEIGHT}} pixels. Use "width": {{WIDTH}} and "height": {{HEIGHT}}.
+- Boxes are [x_min, y_min, x_max, y_max] in actual pixels from the top-left corner, with 0 <= x_min < x_max <= {{WIDTH}} and 0 <= y_min < y_max <= {{HEIGHT}}. No normalized or centered coordinates.
+
+Schema (no other fields are allowed)
+{"width": W, "height": H, "bbox_coord_space": "abs", "bbox_format": "xyxy",
+ "summary": {"meta": ["medium/genre tags"], "canvas": "single", "caption": "global description of the whole image, its style, palette and lighting"},
+ "items": [{"label": "object" | "character" | "text", "caption": "visible appearance; for text: typography, size, color, surface", "text": "exact visible characters (text items only)", "bbox": [x1, y1, x2, y2]}]}
+- summary.canvas is "single", "multi_panel" or "collage"; summary.meta and summary.palette are optional string arrays. Items may also carry optional "tags" and "palette" string arrays.
+- items is a flat, nonempty array. Never add children, parent, id or elements.
+
+Content
+- Keep everything the user specified: subjects, counts, relationships, medium, style, mood, exclusions and intended wording. Fill open gaps with concrete visual choices.
+- Quote visible text exactly in the "text" field, in its original language, spelling, capitalization and punctuation; never translate it. Use \\n inside the JSON string for intended line breaks. If the user asks for a designed image without giving its copy, write short, specific copy instead of placeholders.
+- Use boxes for coherent visible units; split text only when independent placement matters. Boxes may overlap when the image calls for it. A box is a placement annotation, not a border or panel to draw.
+- Size text boxes so the copy is readable at this resolution: a short title needs a wide, tall box; a paragraph needs room for its lines.
+- Establish reading order and hierarchy. Captions describe only what is visible, in English, with no quality keywords and no negative prompt.
+
+Reply with the JSON object only: no Markdown fences, no explanations.`;
+
+// Visión: describe la imagen de referencia como un caption de entrenamiento de MOSS-Image
+// (inspirado en el prompt de recaptioning del USERGUIDE de MOSS-Image).
+const MOSS_VISION_SYS = `You are an image recaptioner for the MOSS-Image text-to-image model. Look at the image and write one detailed caption that describes the finished image itself, so the model can recreate it.
+
+- Describe the composition, key subjects, actions, setting, colors, lighting, materials and artistic style. Include only what is visible.
+- Preserve every piece of visible text exactly, in double quotes, excluding watermarks. Do not translate, paraphrase, romanize or normalize it. Describe its layout: line breaks, reading order, relative position, alignment, size hierarchy, font style, color and spacing.
+- Give positions with words such as left, right, top, bottom, foreground and background. No coordinates, lists, headings, JSON or Markdown.
+- Do not mention watermarks, artist signatures or borders. No quality keywords and no negative prompt.
+- If the user adds guidance, follow it while keeping the caption faithful to the image.
+- Write in English, in plain prose: one to three paragraphs, usually 80 to 200 words.
+
+Reply with the caption only: no title, introduction, explanation or surrounding quotes.`;
+
+const CONFIG = {
+  PROMPTS_KEY: 'kreaqwen_prompts',
+  // Clave en desuso: kreaqwen gestiona 2x4 LoRAs con sus claves propias
+  // (kreaqwen_base_loras / kreaqwen_refiner_loras) y NO define CONFIG.loras,
+  // por lo que loadLoraState() de common.js no aplica aquí.
+  LORA_STATE_KEY: 'kreaqwen_loras_state',
+  ENHANCER_SYSKEY: 'kreaqwen_enhancer_sysprompts',
+  SERVERURL_KEY: 'kreaqwen_serverUrl',
+  DEFAULT_BACKEND_PORT: "7821",
+  UI_TYPE: "kreaqwen",
+  N: {
+    UNET_BASE: "4",
+    ATTN_BASE: "102",
+    CLIP_BASE: "100",
+    POS_BASE: "6",
+    NEG_BASE: "7",
+    LATENT_BASE: "5",
+    SAMPLER_BASE: "10",
+    VAE_BASE: "101",
+    DECODE_BASE: "8",
+    PREVIEW_BASE: "50",
+    UPSCALE_LOADER: "27",
+    UPSCALE_MODEL: "28",
+    IMAGE_SCALE: "26",
+    VAE_REFINER: "106",
+    ENCODE_REFINER: "25",
+    UNET_REFINER: "20",
+    ATTN_REFINER: "107",
+    CLIP_REFINER: "105",
+    POS_REFINER: "109",
+    NEG_REFINER: "110",
+    SAMPLER_REFINER: "23",
+    DECODE_REFINER: "24",
+    SAVE_IMAGE: "9",
+    FACE_CROP: "301",
+    FACE_ENCODE: "302",
+    FACE_SAMPLER: "303",
+    FACE_DECODE: "304",
+    FACE_STITCH: "305",
+    FACE_FRAME: "306"
+  },
+  ENHANCER_DEFAULT_PROMPTS: {
+    text: {
+      A: { name: "Qwen 2.1 Oficial (Rewriter JSON)", prompt: QWEN_TEXT_SYS },
+      B: { name: "Krea2 Fotorrealista", prompt: "You are an expert in prompts for Krea2/Flux2 image generation. Transform the user's idea into a detailed photorealistic prompt. Include: subject, lighting, colors, texture, composition, and atmosphere. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
+      C: { name: "Krea2 Artístico / Cinematográfico", prompt: "You are a creative assistant specialized in artistic image prompts. Take the user's idea and turn it into an evocative, artistic prompt. Use descriptive, poetic language. Focus on style, mood, and visual impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+
+      MOSS: { name: "MOSS-Image Caption (skill oficial)", prompt: MOSS_CAPTION_SYS },
+      MOSS_LAYOUT: { name: "MOSS-Image Layout (JSON con cajas)", prompt: MOSS_LAYOUT_SYS },
+    },
+    vision: {
+      A: { name: "Qwen 2.1 VLM Oficial (Reverse Eng JSON)", prompt: QWEN_VISION_SYS },
+      B: { name: "Krea2 Visión Descriptiva", prompt: "You are an expert at describing images for image generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, and style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      C: { name: "Krea2 Visión Estilizada", prompt: "You are a digital artist. Look at the image and turn it into a stylized artistic description. Focus on the artistic style, color palette, and emotional impact. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+
+      MOSS: { name: "MOSS-Image Visión (recaption)", prompt: MOSS_VISION_SYS },
+    },
+  },
+};
+
+const N = CONFIG.N;
+initCommon();
+
+let currentBaseMedia = null;
+let currentFinalMedia = null;
+let currentViewMode = "final"; // "final" or "base"
+let jobQueue = [];
+let activeJob = null;
+let jobCounter = 0;
+
+// Construye el parámetro ?ref= que entienden LTXV/MiniMaxH3/MMH3X2: incluye el
+// subfolder (p.ej. "kreaqwen/imagen") para que /view encuentre la imagen.
+function buildRefParam(filename, subfolder){
+  const sf = (subfolder || "").replace(/^\/+|\/+$/g, "");
+  return encodeURIComponent((sf ? sf + "/" : "") + filename);
+}
+// Extrae filename+subfolder de una URL /view y devuelve el ?ref= listo.
+function refFromViewSrc(src){
+  if(!src) return null;
+  const m = src.match(/[?&]filename=([^&]+)/);
+  if(!m) return null;
+  const sm = src.match(/[?&]subfolder=([^&]*)/);
+  const filename = decodeURIComponent(m[1]);
+  const subfolder = sm ? decodeURIComponent(sm[1]) : "";
+  return { filename, subfolder, ref: buildRefParam(filename, subfolder) };
+}
+
+// Helper ratio match
+const RATIO_MAP = {
+  "1:1": "1:1 (Square)",
+  "2:3": "2:3 (Portrait Photo)",
+  "3:2": "3:2 (Photo)",
+  "3:4": "3:4 (Portrait Standard)",
+  "4:3": "4:3 (Standard)",
+  "9:16": "9:16 (Portrait Widescreen)",
+  "16:9": "16:9 (Widescreen)",
+  "21:9": "21:9 (Ultrawide)"
+};
+
+// Sincronización de dimensiones Base y Upscale
+function calculateDimensions(megapixels, aspectRatioStr){
+  let wRatio = 16, hRatio = 9;
+  if(aspectRatioStr.includes("1:1")) { wRatio = 1; hRatio = 1; }
+  else if(aspectRatioStr.includes("2:3")) { wRatio = 2; hRatio = 3; }
+  else if(aspectRatioStr.includes("3:2")) { wRatio = 3; hRatio = 2; }
+  else if(aspectRatioStr.includes("3:4")) { wRatio = 3; hRatio = 4; }
+  else if(aspectRatioStr.includes("4:3")) { wRatio = 4; hRatio = 3; }
+  else if(aspectRatioStr.includes("9:16")) { wRatio = 9; hRatio = 16; }
+  else if(aspectRatioStr.includes("16:9")) { wRatio = 16; hRatio = 9; }
+  else if(aspectRatioStr.includes("21:9")) { wRatio = 21; hRatio = 9; }
+
+  const targetPixels = megapixels * 1024 * 1024;
+  const scale = Math.sqrt(targetPixels / (wRatio * hRatio));
+  let w = Math.round((wRatio * scale) / 16) * 16;
+  let h = Math.round((hRatio * scale) / 16) * 16;
+  return { w: Math.max(256, w), h: Math.max(256, h) };
+}
+
+function updateDimensionHints(){
+  const mp = parseFloat($("mpSlider")?.value || "1.0");
+  const ar = $("aspectRatio")?.value || "16:9 (Widescreen)";
+  const factor = parseFloat($("upscaleFactor")?.value || "1.5");
+  const baseDim = calculateDimensions(mp, ar);
+  const upW = Math.round((baseDim.w * factor) / 8) * 8;
+  const upH = Math.round((baseDim.h * factor) / 8) * 8;
+
+  if($("resHint")) $("resHint").textContent = `Dimensiones base estimadas: ${baseDim.w} x ${baseDim.h} px`;
+  if($("targetResHint")) $("targetResHint").textContent = `Resolución tras upscale (${factor.toFixed(2)}x): ~${upW} x ${upH} px`;
+}
+
+// --- CLASIFICACION DE ARQUITECTURA POR UNET ---
+// Krea2 y Klein viven AMBOS bajo flux2/, asi que el directorio no distingue nada:
+// hay que mirar el nombre del modelo. Verificado empiricamente contra este ComfyUI:
+//   - Krea2   ("krea")  -> CLIP type 'krea2',      CLIP qwen3vl_4b, VAE 16ch (Wan21)
+//   - Qwen2.1 ("qwen")  -> CLIP type 'qwen_image', CLIP qwen3vl_8b, VAE 64ch (QwenImage21)
+//   - Flux2/Klein ("klein"/"flux2") -> CLIP type 'flux2', CLIP qwen3vl_8b, VAE 128ch (Flux2)
+//   - Flux3/Klein ("flux3")         -> CLIP type 'flux3', CLIP qwen3vl_4b, VAE 128ch (Flux2)
+//   - MOSS-Image ("moss")           -> CLIP type 'moss_image', CLIP qwen3.5_9b, VAE 128ch (Flux2 small)
+// Un CLIP con el type o el tamano equivocado produce "mat1 and mat2 shapes cannot be multiplied"
+// (7680 = 4B con tap de 3 capas; Klein 9B espera 12288 = 8B; Flux3 espera 20480 = 4B con 8 capas).
+// OJO: Flux3 vive en flux2/, asi que "flux3" debe comprobarse antes que "flux2".
+function unetArchFamily(unetName){
+  const u = (unetName || "").toLowerCase();
+  if(u.includes("moss")) return "moss";
+  if(u.includes("krea")) return "krea2";
+  if(u.includes("qwen")) return "qwen21";
+  if(u.includes("flux3")) return "flux3";
+  if(u.includes("klein") || u.includes("flux2")) return "flux2";
+  return "krea2";
+}
+
+// Determina la precisión óptima de carga para el UNET en este hardware (RTX 5070 Ti).
+// Para modelos ya cuantizados (int8/convrot/nvfp4) se mantiene 'default' para usar sus tensores nativos.
+// Para modelos FP16/BF16 (como Krea2 Habanero o Klein), 'fp8_e4m3fn_fast' ahorra un 50% de VRAM y acelera los tensor cores.
+function resolveWeightDtype(selectedOption, unetName){
+  if(selectedOption && selectedOption !== "auto") return selectedOption;
+  const u = (unetName || "").toLowerCase();
+  if(u.includes("int8") || u.includes("convrot") || u.includes("nvfp4") || u.includes("fp8")) {
+    return "default";
+  }
+  return "fp8_e4m3fn_fast";
+}
+
+// CLIP requerido por cada arquitectura (fichero + type de CLIPLoader).
+const ARCH_CLIP = {
+  krea2:  { keyword: "qwen3vl_4b", type: "krea2" },
+  qwen21: { keyword: "qwen3vl_8b_nvfp4_heretic", type: "qwen_image" },
+  flux2:  { keyword: "qwen3vl_8b", type: "flux2" },
+  flux3:  { keyword: "qwen3vl_4b", type: "flux3" },
+  moss:   { keyword: "qwen3.5_9b_w4a8_gptq", type: "moss_image" },
+};
+
+function archClipType(family){
+  return (ARCH_CLIP[family] || ARCH_CLIP.krea2).type;
+}
+function archClipKeyword(family, unetName){
+  if(family === "flux2" && klein4b(unetName)) return "qwen_3_4b";
+  return (ARCH_CLIP[family] || ARCH_CLIP.krea2).keyword;
+}
+
+// Klein 4B usa Qwen3 4B; Klein 9B (y variantes sin tamano en el nombre) usa Qwen3 8B.
+function klein4b(unetName){
+  return /(^|[^0-9.])4b/.test((unetName || "").toLowerCase());
+}
+
+// ¿Sirve este text encoder para la arquitectura del UNET? Se mira el tamano del LLM
+// (4B/8B) y si es Qwen3-VL: Krea2/Flux3 necesitan el camino QWEN3VL_4B de ComfyUI,
+// Qwen 2.1 el QWEN3VL_8B; Flux2/Klein acepta Qwen3 o Qwen3-VL del tamano correcto;
+// MOSS-Image solo acepta Qwen3.5 9B (ComfyUI exige TEModel.QWEN35_9B para 'moss_image').
+function clipFitsFamily(clipName, family, unetName){
+  const c = (clipName || "").toLowerCase();
+  if(family === "moss") return c.includes("qwen3.5_9b");
+  const size = /(^|[^0-9.])4b/.test(c) ? "4b" : /(^|[^0-9.])8b/.test(c) ? "8b" : null;
+  const isVl = c.includes("qwen3vl");
+  const isQwen3 = isVl || c.includes("qwen_3_");
+  if(family === "krea2" || family === "flux3") return isVl && size === "4b";
+  if(family === "qwen21") return isVl && size === "8b";
+  if(family === "flux2") return isQwen3 && size === (klein4b(unetName) ? "4b" : "8b");
+  return true;
+}
+
+// Solo cambia el text encoder si el actual NO es compatible: respeta la variante que haya
+// elegido el usuario (fp8/int8/nvfp4...) mientras encaje con la arquitectura.
+function ensureCompatibleClip(clipSel, family, unetName){
+  if(!clipSel || clipFitsFamily(clipSel.value, family, unetName)) return false;
+  const opts = [...clipSel.options].filter(o => clipFitsFamily(o.value, family, unetName));
+  if(!opts.length) return false;
+  const kw = archClipKeyword(family, unetName).toLowerCase();
+  const pick = opts.find(o => o.value.toLowerCase().startsWith(kw + ".")) ||
+               opts.find(o => o.value.toLowerCase().includes(kw)) || opts[0];
+  const prev = clipSel.value;
+  clipSel.value = pick.value;
+  log(`Text encoder "${prev}" no vale para ${family}: cambiado a "${pick.value}".`, "l-warn");
+  return true;
+}
+
+// --- Compatibilidad VAE por ARQUITECTURA (canales latentes) ---
+// ComfyUI asigna a cada UNet un "latent_format" con un numero fijo de canales, y el
+// VAEDecode falla si el VAE no coincide (p.ej. "tensor a (16) must match tensor b (128)").
+//   - Krea2  -> latent_format Wan21   -> 16 canales. VAE: wan_2.1_vae o qwen_image_vae.
+//   - Qwen2.1 -> latent_format QwenImage21 -> 64 canales. VAE: qwen_image_2.1_vae.
+//   - Flux2  -> latent_format Flux2   -> 128 canales. VAE: flux2-vae.
+//   - MOSS   -> latent_format Flux2   -> 128 canales. VAE: flux2-vae_small (decoder reducido).
+// OJO: el nombre del fichero engana. "QwenImage/qwen_image_vae" es 16ch (vale para Krea2),
+// mientras que "QwenImage/qwen_image_2.1_vae" es 64ch (solo Qwen 2.1). No vale fiarse del
+// directorio ni de la palabra "qwen"/"flux" en la ruta.
+function vaeLatentFamily(vaeName){
+  const v = (vaeName || "").toLowerCase();
+  if(v.includes("upscale2x")) return "vaeutils";              // VAEUtils (no VAEDecode)
+  if(v.includes("flux2-vae")) return "flux2";                // 128ch
+  if(v.includes("qwen_image_2.1_vae") ||
+     v.includes("texture_fix_vae_for_qwen_image_2.1")) return "qwen21"; // 64ch
+  return "krea2";                                             // 16ch (Wan21)
+}
+
+// Familia de latentes (VAE) del UNET: Flux3 y MOSS comparten el latent_format Flux2 (128ch).
+function latentFamily(family){
+  return (family === "flux3" || family === "moss") ? "flux2" : family;
+}
+function unetVaeFamily(unetName){
+  return latentFamily(unetArchFamily(unetName));
+}
+
+function compatibleVaes(family){
+  family = latentFamily(family);
+  const all = (typeof AVAILABLE_VAES !== "undefined" && Array.isArray(AVAILABLE_VAES)) ? AVAILABLE_VAES : [];
+  return all.filter(v => vaeLatentFamily(v) === family);
+}
+
+function fallbackVae(family){
+  const list = compatibleVaes(family);
+  // MOSS-Image se entrena con el VAE pequeno de Flux2; Flux2/Klein prefiere el completo.
+  if(family === "moss"){
+    return list.find(v => v.toLowerCase().includes("flux2-vae_small")) ||
+           list[0] || "moss/flux2-vae_small.safetensors";
+  }
+  family = latentFamily(family);
+  if(family === "qwen21"){
+    return list.find(v => v.toLowerCase().includes("texture_fix_vae_for_qwen_image_2.1")) ||
+           list.find(v => v.toLowerCase().includes("qwen_image_2.1_vae")) ||
+           list[0] || "QwenImage/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors";
+  }
+  if(family === "flux2"){
+    return list.find(v => /flux2-vae\.safetensors$/i.test(v)) ||
+           list.find(v => v.toLowerCase().includes("flux2-vae")) ||
+           list[0] || "Flux/flux2-vae.safetensors";
+  }
+  // Krea2 (16ch): el workflow nativo KreaQwen_Native.json usa qwen_image_vae para la base Krea2.
+  return list.find(v => v.toLowerCase().includes("qwen_image_vae")) ||
+         list.find(v => v.toLowerCase().includes("wan_2.1_vae")) ||
+         list[0] || "QwenImage/qwen_image_vae.safetensors";
+}
+
+function fill(elId, list, fallbackKeyword){
+  const sel = $(elId);
+  if(!sel) return;
+  sel.innerHTML = "";
+  list.forEach(item => {
+    const opt = document.createElement("option");
+    opt.value = item;
+    opt.textContent = item;
+    sel.appendChild(opt);
+  });
+  if(fallbackKeyword){
+    for(const opt of sel.options){
+      if(opt.value.toLowerCase().includes(fallbackKeyword.toLowerCase())){
+        opt.selected = true; break;
+      }
+    }
+  }
+}
+
+function selectOrFallback(selId, list, fallbackKeyword){
+  const sel = $(selId);
+  if(!sel) return;
+  const current = sel.value;
+  fill(selId, list, fallbackKeyword);
+  // Si el valor anterior sigue disponible, conservarlo; si no, usar fallback.
+  let restored = false;
+  for(const opt of sel.options){
+    if(opt.value === current){ opt.selected = true; restored = true; break; }
+  }
+  if(!restored){
+    for(const opt of sel.options){
+      if(opt.value.toLowerCase().includes(fallbackKeyword.toLowerCase())){
+        opt.selected = true; break;
+      }
+    }
+  }
+}
+
+// Familia del ultimo UNET con el que se rellenó cada selector de VAE: MOSS y Flux2
+// comparten latentes (128ch), asi que selectOrFallback conservaria el VAE anterior;
+// al cruzar de una a otra se pasa al VAE propio de la nueva familia.
+const lastVaeArch = {};
+
+function updateVaeSelectors(){
+  for(const [vaeId, unetId] of [["baseVaeSelect", "baseUnetSelect"], ["refinerVaeSelect", "refinerUnetSelect"]]){
+    const arch = unetArchFamily($(unetId)?.value);
+    const crossed = lastVaeArch[vaeId] && lastVaeArch[vaeId] !== arch &&
+                    (lastVaeArch[vaeId] === "moss" || arch === "moss");
+    lastVaeArch[vaeId] = arch;
+    selectOrFallback(vaeId, compatibleVaes(arch), vaeShortKw(arch));
+    if(crossed && $(vaeId)) $(vaeId).value = fallbackVae(arch);
+  }
+}
+
+function vaeShortKw(family){
+  if(family === "qwen21") return "texture_fix_vae_for_qwen_image_2.1";
+  if(family === "moss") return "flux2-vae_small";
+  if(family === "flux2" || family === "flux3") return "flux2-vae";
+  return "qwen_image_vae";
+}
+
+// Poblar selectores de modelos
+function populateModelSelects(){
+  const unets = typeof AVAILABLE_UNETS !== "undefined" ? AVAILABLE_UNETS : [];
+  const clips = typeof AVAILABLE_CLIPS !== "undefined" ? AVAILABLE_CLIPS : [];
+  const upscales = typeof AVAILABLE_UPSCALE_MODELS !== "undefined" ? AVAILABLE_UPSCALE_MODELS : [];
+
+  fill("baseUnetSelect", unets, "habanero_int8mixed");
+  fill("refinerUnetSelect", unets, "qwen_image_2.1_turbo");
+  fill("baseClipSelect", clips, "qwen3vl_4b_int8_convrot");
+  fill("refinerClipSelect", clips, "qwen3vl_8b_nvfp4_heretic");
+  fill("upscaleModelSelect", upscales, "4xPurePhoto-Span.pth");
+  updateVaeSelectors();
+}
+
+// --- Perfiles de arquitectura para ajustes automáticos ---
+const ARCH_PROFILES = {
+  krea: {
+    steps: 8,
+    cfg: 1.0,
+    sampler: "euler",
+    scheduler: "simple",
+    refinerSteps: 6,
+    refinerCfg: 1.0,
+    refinerSampler: "euler",
+    refinerScheduler: "simple",
+    refinerDenoise: 0.35,
+    clip: "qwen3vl_4b"
+  },
+  qwen: {
+    steps: 20,
+    cfg: 1.0,
+    sampler: "euler",
+    scheduler: "simple",
+    refinerSteps: 20,
+    refinerCfg: 1.0,
+    refinerSampler: "euler",
+    refinerScheduler: "simple",
+    refinerDenoise: 0.30,
+    clip: "qwen3vl_8b"
+  },
+  flux2: {
+    steps: 8,
+    cfg: 1.0,
+    sampler: "euler",
+    scheduler: "simple",
+    refinerSteps: 6,
+    refinerCfg: 1.0,
+    refinerSampler: "euler",
+    refinerScheduler: "simple",
+    refinerDenoise: 0.35,
+    clip: "qwen3vl_8b"
+  },
+  flux3: {
+    steps: 8,
+    cfg: 1.0,
+    sampler: "euler",
+    scheduler: "simple",
+    refinerSteps: 6,
+    refinerCfg: 1.0,
+    refinerSampler: "euler",
+    refinerScheduler: "simple",
+    refinerDenoise: 0.35,
+    clip: "qwen3vl_4b"
+  },
+  // MOSS-Image (template oficial de ComfyUI, PR #17095): 25 pasos, CFG 2.5, er_sde/simple,
+  // shift 5 (el del modelo). OpenMOSS recomienda 50 pasos / CFG 3 / euler para máxima calidad.
+  moss: {
+    steps: 25,
+    cfg: 2.5,
+    sampler: "er_sde",
+    scheduler: "simple",
+    refinerSteps: 12,
+    refinerCfg: 2.5,
+    refinerSampler: "er_sde",
+    refinerScheduler: "simple",
+    refinerDenoise: 0.35,
+    clip: "qwen3.5_9b_w4a8_gptq"
+  }
+};
+
+// La familia de arquitectura y la clave de perfil no siempre coinciden de nombre.
+function profileForFamily(family){
+  if(family === "qwen21") return "qwen";
+  if(family === "flux2") return "flux2";
+  if(family === "flux3") return "flux3";
+  if(family === "moss") return "moss";
+  return "krea";
+}
+
+// Estado de "tocado por el usuario": solo se resetea a perfil si el campo aún está limpio.
+const userTouched = new Set();
+
+function markTouched(elId){ userTouched.add(elId); }
+function isTouched(elId){ return userTouched.has(elId); }
+function resetTouched(){ userTouched.clear(); }
+
+function setInputValue(elId, value, { silent = false, mark = true } = {}){
+  const el = $(elId);
+  if(!el) return false;
+  if(el.value === String(value)) return false;
+  el.value = value;
+  if(!silent) el.dispatchEvent(new Event("input", { bubbles: true }));
+  if(mark) markTouched(elId);
+  return true;
+}
+
+// Aplica un perfil SOLO a la etapa indicada (stage: "base" | "refiner" | "base_only").
+// Antes aplicaba base y refiner siempre, de modo que dos llamadas seguidas (una por
+// etapa) se pisaban entre si y la base terminaba con los valores del refiner.
+function applyProfile(profile, stage){
+  const p = ARCH_PROFILES[profile];
+  if(!p) return;
+  if(stage === "base" || stage === "base_only"){
+    if(!isTouched("baseSteps")) setInputValue("baseSteps", p.steps, { silent: true, mark: false });
+    if(!isTouched("baseCfg")) setInputValue("baseCfg", p.cfg, { silent: true, mark: false });
+    if(!isTouched("baseSamplerName")) setInputValue("baseSamplerName", p.sampler, { silent: true, mark: false });
+    if(!isTouched("baseSchedulerName")) setInputValue("baseSchedulerName", p.scheduler, { silent: true, mark: false });
+  }
+  if(stage === "refiner"){
+    if(!isTouched("refinerSteps")) setInputValue("refinerSteps", p.refinerSteps, { silent: true, mark: false });
+    if(!isTouched("refinerCfg")) setInputValue("refinerCfg", p.refinerCfg, { silent: true, mark: false });
+    if(!isTouched("refinerSamplerName")) setInputValue("refinerSamplerName", p.refinerSampler, { silent: true, mark: false });
+    if(!isTouched("refinerSchedulerName")) setInputValue("refinerSchedulerName", p.refinerScheduler, { silent: true, mark: false });
+    if(!isTouched("refinerDenoise")){
+      setInputValue("refinerDenoise", p.refinerDenoise, { silent: true, mark: false });
+      if($("refinerDenoiseVal")) $("refinerDenoiseVal").textContent = p.refinerDenoise.toFixed(2);
+    }
+  }
+}
+
+// Valores por defecto propios del modo Krea2 (jibMix) → Qwen 2.1 Turbo; prevalecen sobre
+// los perfiles de arquitectura, salvo en los campos que el usuario ya haya tocado.
+const KREA_QWEN_DEFAULTS = {
+  baseWeightDtype: "auto",
+  baseClipSelect: "qwen3vl_4b_int8_convrot",
+  baseAttentionBackend: "comfy kitchen attention",
+  baseSteps: 10,
+  baseCfg: 1.0,
+  baseSamplerName: "er_sde",
+  baseSchedulerName: "bong_tangent",
+  refinerWeightDtype: "auto",
+  refinerClipSelect: "qwen3vl_8b_nvfp4_heretic",
+  refinerAttentionBackend: "comfy kitchen attention",
+  refinerDenoise: 0.2,
+  refinerSteps: 8,
+  refinerCfg: 1.0,
+  refinerSamplerName: "lcm",
+  refinerSchedulerName: "align_your_steps"
+};
+
+function applyModeOverrides(defaults){
+  for(const [id, value] of Object.entries(defaults)){
+    if(isTouched(id)) continue;
+    // En selects de ficheros (CLIP) el valor es una palabra clave de la ruta.
+    const el = $(id);
+    if(el?.tagName === "SELECT" && ![...el.options].some(o => o.value === String(value))){
+      const opt = [...el.options].find(o => o.value.toLowerCase().includes(String(value).toLowerCase()));
+      if(opt) el.value = opt.value;
+      continue;
+    }
+    setInputValue(id, value, { silent: true, mark: false });
+  }
+  if(defaults.refinerDenoise != null && !isTouched("refinerDenoise") && $("refinerDenoiseVal")){
+    $("refinerDenoiseVal").textContent = Number($("refinerDenoise")?.value || defaults.refinerDenoise).toFixed(2);
+  }
+}
+
+// Gestión del modo de combinación
+function applyComboMode(mode){
+  const selBaseU = $("baseUnetSelect");
+  const selRefU = $("refinerUnetSelect");
+  const selBaseC = $("baseClipSelect");
+  const selRefC = $("refinerClipSelect");
+  const hint = $("comboHint");
+  const refWrap = $("refinerControls")?.closest(".panel");
+
+  // Selecciona en un <select> la primera opcion cuya ruta contenga la palabra dada.
+  function selectByKw(sel, kw){
+    if(!sel) return;
+    for(const opt of sel.options){
+      if(opt.value.toLowerCase().includes(kw.toLowerCase())){
+        opt.selected = true; break;
+      }
+    }
+  }
+  // Selecciona un UNET por FAMILIA de arquitectura (krea2/qwen21/flux2), no por ruta:
+  // Krea2 y Klein comparten el directorio flux2/ y no deben confundirse.
+  // `preferKw` permite elegir el modelo de referencia de esa familia (p.ej. jibMixKrea2).
+  function selectByFamily(sel, family, preferKw){
+    if(!sel) return;
+    let chosen = null;
+    for(const opt of sel.options){
+      if(unetArchFamily(opt.value) !== family) continue;
+      if(!chosen) chosen = opt;
+      if(preferKw && opt.value.toLowerCase().includes(preferKw.toLowerCase())){ chosen = opt; break; }
+    }
+    if(chosen) chosen.selected = true;
+  }
+
+  // Aplica perfil y ademas fija el CLIP (fichero+type) coherente con el UNET.
+  function setStage(unetSel, clipSel, family, stage, preferKw){
+    selectByFamily(unetSel, family, preferKw);
+    // No se fuerza el text encoder preferido: solo se corrige si es incompatible.
+    ensureCompatibleClip(clipSel, family, unetSel?.value);
+    applyProfile(profileForFamily(family), stage);
+  }
+
+  if(mode === "krea_qwen"){
+    setStage(selBaseU, selBaseC, "krea2", "base", "habanero_int8mixed");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen_image_2.1_turbo");
+    applyModeOverrides(KREA_QWEN_DEFAULTS);
+    if(hint) hint.textContent = "Krea2 compone la escena con estética fotográfica cinematográfica; Qwen 2.1 refina microtexturas y nitidez tras el reescalado.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "qwen_krea"){
+    setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC");
+    setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
+    if(hint) hint.textContent = "Qwen 2.1 genera la composición con adherencia profunda al prompt; Krea2 aporta riqueza tonal y grano en la pasada de refinamiento.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "krea_krea"){
+    setStage(selBaseU, selBaseC, "krea2", "base", "habanero_int8mixed");
+    setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
+    if(hint) hint.textContent = "Pipeline homogéneo Krea2: generación inicial y refinado en superresolución dentro del modelo Flux2.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "qwen_qwen"){
+    setStage(selBaseU, selBaseC, "qwen21", "base", "qwen-image-2.1-UC");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen-image-2.1-UC");
+    if(hint) hint.textContent = "Pipeline homogéneo Qwen 2.1: renderizado y refinado con máxima nitidez textual y detalle anatómico.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_qwen"){
+    setStage(selBaseU, selBaseC, "moss", "base", "moss_image_sft");
+    setStage(selRefU, selRefC, "qwen21", "refiner", "qwen_image_2.1_turbo");
+    if(hint) hint.textContent = "MOSS-Image compone la escena con texto y layout precisos (bilingüe EN/ZH); Qwen 2.1 refina microtexturas tras el reescalado. Usa un denoise bajo para no alterar el texto.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_krea"){
+    setStage(selBaseU, selBaseC, "moss", "base", "moss_image_sft");
+    setStage(selRefU, selRefC, "krea2", "refiner", "habanero_int8mixed");
+    if(hint) hint.textContent = "MOSS-Image compone la escena con texto y layout precisos; Krea2 aporta estética fotográfica, riqueza tonal y grano en el refinado. Usa un denoise bajo para no alterar el texto.";
+    if($("refinerEnabled")) $("refinerEnabled").checked = true;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = true;
+    if(refWrap) refWrap.style.opacity = "1";
+  } else if(mode === "moss_only"){
+    setStage(selBaseU, selBaseC, "moss", "base_only", "moss_image_sft");
+    if($("refinerEnabled")) $("refinerEnabled").checked = false;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = false;
+    if(hint) hint.textContent = "MOSS-Image en una sola pasada: renderizado de texto y layouts JSON (usa el enhancer 'MOSS Layout'). SFT = texto/layout más limpios; Base = mejor con LoRAs.";
+    if(refWrap) refWrap.style.opacity = "0.6";
+  } else if(mode === "base_only"){
+    // En base_only heredamos el perfil (pero no tocamos el text encoder) del modelo base actual
+    const baseFam = unetArchFamily(selBaseU?.value);
+    ensureCompatibleClip(selBaseC, baseFam, selBaseU?.value);
+    applyProfile(profileForFamily(baseFam), "base_only");
+    if($("refinerEnabled")) $("refinerEnabled").checked = false;
+    if($("upscaleEnabled")) $("upscaleEnabled").checked = false;
+    if(hint) hint.textContent = "Generación directa de una sola pasada sin escalado ni refiner.";
+    if(refWrap) refWrap.style.opacity = "0.6";
+  }
+  updateVaeSelectors();
+}
+
+// Invertir orden Base y Refiner
+function invertOrder(){
+  const swap = (id1, id2) => {
+    const el1 = $(id1), el2 = $(id2);
+    if(el1 && el2){ const tmp = el1.value; el1.value = el2.value; el2.value = tmp; }
+  };
+  
+  const v1 = $("baseVaeSelect")?.value;
+  const v2 = $("refinerVaeSelect")?.value;
+
+  swap("baseUnetSelect", "refinerUnetSelect");
+  swap("baseClipSelect", "refinerClipSelect");
+  // Los ajustes de muestreo viajan con su modelo: se intercambian en vez de reaplicar perfiles.
+  swap("baseWeightDtype", "refinerWeightDtype");
+  swap("baseAttentionBackend", "refinerAttentionBackend");
+  swap("baseSteps", "refinerSteps");
+  swap("baseCfg", "refinerCfg");
+  swap("baseSamplerName", "refinerSamplerName");
+  swap("baseSchedulerName", "refinerSchedulerName");
+  
+  updateVaeSelectors();
+  
+  if($("baseVaeSelect")) $("baseVaeSelect").value = v2;
+  if($("refinerVaeSelect")) $("refinerVaeSelect").value = v1;
+  
+  ensureCompatibleClip($("baseClipSelect"), unetArchFamily($("baseUnetSelect")?.value), $("baseUnetSelect")?.value);
+  ensureCompatibleClip($("refinerClipSelect"), unetArchFamily($("refinerUnetSelect")?.value), $("refinerUnetSelect")?.value);
+
+  const modeSel = $("comboMode");
+  const bFam = unetArchFamily($("baseUnetSelect")?.value);
+  const rFam = unetArchFamily($("refinerUnetSelect")?.value);
+  const newMode = (bFam === "krea2" && rFam === "qwen21") ? "krea_qwen" :
+                  (bFam === "qwen21" && rFam === "krea2") ? "qwen_krea" :
+                  (bFam === "krea2" && rFam === "krea2") ? "krea_krea" :
+                  (bFam === "qwen21" && rFam === "qwen21") ? "qwen_qwen" :
+                  (bFam === "moss" && rFam === "qwen21") ? "moss_qwen" :
+                  (bFam === "moss" && rFam === "krea2") ? "moss_krea" : "";
+  if(newMode && modeSel) modeSel.value = newMode;
+  
+  log("⇄ Orden de modelos invertido.", "l-ok");
+}
+
+// Recalcula CLIP (solo si es incompatible) y perfil de una etapa a partir de su UNET actual.
+function syncStageToUnet(unetSelId, clipSelId, prefix){
+  const family = unetArchFamily($(unetSelId)?.value);
+  ensureCompatibleClip($(clipSelId), family, $(unetSelId)?.value);
+  applyProfile(profileForFamily(family), prefix);
+  return family;
+}
+
+// Cálculo preciso de aspect ratio y dimensiones de imagen
+function getAspectRatioString(w, h){
+  if(!w || !h) return "";
+  const r = w / h;
+  const known = [
+    { ratio: 1.0, label: "1:1" },
+    { ratio: 16 / 9, label: "16:9" },
+    { ratio: 9 / 16, label: "9:16" },
+    { ratio: 3 / 2, label: "3:2" },
+    { ratio: 2 / 3, label: "2:3" },
+    { ratio: 4 / 3, label: "4:3" },
+    { ratio: 3 / 4, label: "3:4" },
+    { ratio: 21 / 9, label: "21:9" },
+    { ratio: 9 / 21, label: "9:21" }
+  ];
+  for(const k of known){
+    if(Math.abs(r - k.ratio) < 0.08) return k.label;
+  }
+  function gcd(a, b){ return b ? gcd(b, a % b) : a; }
+  const d = gcd(w, h) || 1;
+  const rw = Math.round(w / d);
+  const rh = Math.round(h / d);
+  return (rw < 100 && rh < 100) ? `${rw}:${rh}` : `${r.toFixed(2)}:1`;
+}
+
+function updateViewerDimensions(){
+  const imgEl = $("outputImg");
+  const infoEl = $("imgInfo");
+  const badgeEl = $("imgDimBadge");
+  if(!imgEl || !imgEl.naturalWidth || !imgEl.naturalHeight){
+    if(badgeEl) badgeEl.style.display = "none";
+    return;
+  }
+  const w = imgEl.naturalWidth;
+  const h = imgEl.naturalHeight;
+  const ratioStr = getAspectRatioString(w, h);
+  const textFull = `${w}×${h} · ${ratioStr}`;
+  if(infoEl) infoEl.textContent = textFull;
+  if(badgeEl){
+    badgeEl.textContent = `${w}×${h} (${ratioStr})`;
+    badgeEl.style.display = "block";
+  }
+}
+
+// Visor dual (Final vs Base)
+function showImageView(mode){
+  currentViewMode = mode;
+  const tabFinal = $("tabViewFinal"), tabBase = $("tabViewBase");
+  const imgEl = $("outputImg"), titleEl = $("lblViewerTitle"), dl = $("dl1");
+  const mediaObj = (mode === "final") ? currentFinalMedia : currentBaseMedia;
+
+  if(mode === "final"){
+    tabFinal?.classList.add("active");
+    tabBase?.classList.remove("active");
+    if(titleEl) titleEl.innerHTML = 'Imagen <em style="color:var(--accent)">final refinada</em>';
+  } else {
+    tabBase?.classList.add("active");
+    tabFinal?.classList.remove("active");
+    if(titleEl) titleEl.innerHTML = 'Imagen <em style="color:var(--accent)">base borrador</em>';
+  }
+
+  if(mediaObj && mediaObj.url){
+    imgEl.src = mediaObj.url;
+    imgEl.style.display = "block";
+    if($("empty1")) $("empty1").style.display = "none";
+    if(dl){
+      dl.href = mediaObj.url;
+      dl.download = `kreaqwen_${mode}_${mediaObj.media?.filename || 'imagen.png'}`;
+      dl.style.display = "inline";
+    }
+    imgEl.onload = () => {
+      updateViewerDimensions();
+      if(window.outputZoom) window.outputZoom.resetZoom();
+    };
+    if(imgEl.complete && imgEl.naturalWidth){
+      updateViewerDimensions();
+      if(window.outputZoom) window.outputZoom.resetZoom();
+    }
+  } else {
+    imgEl.style.display = "none";
+    if($("empty1")) $("empty1").style.display = "flex";
+    if(dl) dl.style.display = "none";
+    if($("imgDimBadge")) $("imgDimBadge").style.display = "none";
+    if($("imgInfo")) $("imgInfo").textContent = "";
+  }
+}
+
+// Parser JSON inteligente del resultado del enhancer Qwen 2.1.
+// Devuelve el texto a aplicar y, si el JSON trae "wh_ratio", lo auto-selecciona
+// en el selector de relación de aspecto. No escribe en #prompt (lo decide quien
+// lo invoca): así puede usarse tanto desde "Usar como prompt" como desde el
+// interceptor de captura registrado en initKreaQwenUI().
+// Port de scripts/compile_prompt.py (skill moss-image-prompt-enhancer): valida un borrador
+// de Layout en píxeles absolutos (xyxy) y lo convierte al formato que espera MOSS-Image
+// (abs_centralized / yxyx, una sola línea, sin width/height). Lanza Error si no es válido.
+function compileMossLayout(draft){
+  const req = (cond, msg) => { if(!cond) throw new Error(msg); };
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+  const fields = (v, allowed, required, loc) => {
+    req(isObj(v), `${loc} debe ser un objeto`);
+    const unknown = Object.keys(v).filter(k => !allowed.includes(k));
+    const missing = required.filter(k => !(k in v));
+    req(!unknown.length, `${loc}: campos desconocidos ${unknown.join(", ")}`);
+    req(!missing.length, `${loc}: faltan campos ${missing.join(", ")}`);
+  };
+  const text = (v, loc) => req(typeof v === "string" && v.trim() !== "", `${loc} debe ser texto no vacío`);
+  const strings = (v, loc) => { req(Array.isArray(v), `${loc} debe ser un array`); v.forEach((x, i) => text(x, `${loc}[${i}]`)); };
+  const r9 = x => Math.round(x * 1e9) / 1e9;
+
+  const rootFields = ["width", "height", "bbox_coord_space", "bbox_format", "summary", "items"];
+  fields(draft, rootFields, rootFields, "Layout");
+  const { width, height } = draft;
+  for(const [name, v] of [["width", width], ["height", height]]){
+    req(Number.isInteger(v) && v > 0 && v % 16 === 0, `${name} debe ser un entero positivo múltiplo de 16`);
+  }
+  req(draft.bbox_coord_space === "abs", "bbox_coord_space debe ser abs");
+  req(draft.bbox_format === "xyxy", "bbox_format debe ser xyxy");
+
+  const summary = draft.summary;
+  fields(summary, ["caption", "meta", "canvas", "palette"], ["caption"], "summary");
+  text(summary.caption, "summary.caption");
+  if("canvas" in summary) req(["single", "multi_panel", "collage"].includes(summary.canvas), "summary.canvas debe ser single, multi_panel o collage");
+  for(const k of ["meta", "palette"]) if(k in summary) strings(summary[k], `summary.${k}`);
+
+  req(Array.isArray(draft.items) && draft.items.length, "items debe ser un array plano no vacío");
+  const items = draft.items.map((item, i) => {
+    const loc = `items[${i}]`;
+    fields(item, ["label", "caption", "bbox", "text", "tags", "palette"], ["label", "caption", "bbox"], loc);
+    req(["object", "character", "text"].includes(item.label), `${loc}.label debe ser object, character o text`);
+    text(item.caption, `${loc}.caption`);
+    if(item.label === "text") req("text" in item, `${loc}: un item de texto necesita "text"`);
+    if("text" in item) text(item.text, `${loc}.text`);
+    for(const k of ["tags", "palette"]) if(k in item) strings(item[k], `${loc}.${k}`);
+    const b = item.bbox;
+    req(Array.isArray(b) && b.length === 4 && b.every(v => typeof v === "number" && Number.isFinite(v)), `${loc}.bbox debe ser [x1,y1,x2,y2]`);
+    const [x1, y1, x2, y2] = b;
+    req(x1 < x2 && y1 < y2, `${loc}.bbox debe tener ancho y alto positivos`);
+    req(x1 >= 0 && x2 <= width && y1 >= 0 && y2 <= height, `${loc}.bbox se sale del lienzo ${width}x${height}`);
+    // Bordes enteros (floor arriba/izquierda, ceil abajo/derecha) antes de centrar.
+    const hw = Math.floor(width / 2), hh = Math.floor(height / 2);
+    const box = [Math.floor(r9(y1)) - hh, Math.floor(r9(x1)) - hw, Math.ceil(r9(y2)) - hh, Math.ceil(r9(x2)) - hw];
+    req(box[0] < box[2] && box[1] < box[3], `${loc}.bbox es demasiado pequeña`);
+    const out = {};
+    for(const [k, v] of Object.entries(item)) out[k] = (k === "bbox") ? box : v;
+    return out;
+  });
+  return { prompt: JSON.stringify({ summary, items, bbox_coord_space: "abs_centralized", bbox_format: "yxyx" }), width, height };
+}
+
+// Salida de los presets MOSS: {"caption": "..."} o un borrador de Layout. Devuelve el
+// prompt listo, o null si el texto no es JSON de MOSS (se trata como texto normal).
+function parseMossEnhancerOutput(rawText){
+  const a = rawText.indexOf("{"), b = rawText.lastIndexOf("}");
+  if(a < 0 || b <= a) return null;
+  let parsed;
+  try { parsed = JSON.parse(rawText.slice(a, b + 1)); } catch(e){ return null; }
+  if(!parsed || typeof parsed !== "object") return null;
+  if(Object.keys(parsed).length === 1 && typeof parsed.caption === "string") return parsed.caption.trim();
+  if(!Array.isArray(parsed.items) || parsed.bbox_coord_space !== "abs") return null;
+  try {
+    const { prompt, width, height } = compileMossLayout(parsed);
+    const cur = calculateDimensions(parseFloat($("mpSlider")?.value || "1.0"), $("aspectRatio")?.value || "16:9 (Widescreen)");
+    if(cur.w !== width || cur.h !== height){
+      log(`⚠️ Layout MOSS pensado para ${width}x${height}, pero la resolución Base es ${cur.w}x${cur.h}: las cajas no coincidirán. Ajusta MP/relación de aspecto o regenera el layout.`, "l-warn");
+    } else {
+      log(`🧩 Layout MOSS compilado (${parsed.items.length} elementos, ${width}x${height}).`, "l-ok");
+    }
+    return prompt;
+  } catch(e){
+    log(`❌ Layout MOSS no válido: ${e.message}. Se usa el texto tal cual; pide al LLM que lo corrija.`, "l-err");
+    return null;
+  }
+}
+
+function parseEnhancerResult(rawText){
+  if(!rawText) return "";
+  let textToApply = rawText.trim();
+  let ratioToApply = null;
+
+  const moss = parseMossEnhancerOutput(textToApply);
+  if(moss) return moss;
+
+  // Intentar parsear JSON estricto o regex de bloque JSON
+  try {
+    const jsonMatch = textToApply.match(/\{[\s\S]*"rewritten_prompt"[\s\S]*\}/);
+    if(jsonMatch){
+      const parsed = JSON.parse(jsonMatch[0]);
+      if(parsed.rewritten_prompt) textToApply = parsed.rewritten_prompt.trim();
+      if(parsed.wh_ratio) ratioToApply = parsed.wh_ratio.trim();
+    }
+  } catch(e){
+    console.debug("Enhancer output no es JSON estricto, usando texto directo:", e);
+  }
+
+  // Si devuelve wh_ratio, auto-seleccionar ratio
+  if(ratioToApply && RATIO_MAP[ratioToApply]){
+    const targetOpt = RATIO_MAP[ratioToApply];
+    if($("aspectRatio")){
+      $("aspectRatio").value = targetOpt;
+      updateDimensionHints();
+      log(`🎯 Relación de aspecto auto-ajustada por Qwen a ${ratioToApply}`, "l-ok");
+    }
+  }
+
+  return textToApply;
+}
+
+// El pulido de prompt de common.js extrae el texto del resultado con este mismo parser.
+CONFIG.parseEnhancerOutput = parseEnhancerResult;
+
+// Gestión de LoRAs (4 por modelo)
+let baseLoras = [
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false }
+];
+
+let refinerLoras = [
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false },
+  { lora: "", strength: 1.0, on: false }
+];
+
+function loadLoraStates(){
+  // Validar estructura: si el localStorage está corrupto (no-array, longitud
+  // errónea u objeto sin .lora), mantenemos el default y NO abortamos la
+  // inicialización de la UI con un TypeError en renderLoraGroup.
+  const isValid = (arr, len) => Array.isArray(arr) && arr.length === len
+    && arr.every(l => l && typeof l === "object" && typeof l.lora === "string" && typeof l.on === "boolean");
+  try {
+    const b = localStorage.getItem("kreaqwen_base_loras");
+    if(b){
+      const parsed = JSON.parse(b);
+      if(isValid(parsed, baseLoras.length)) baseLoras = parsed;
+    }
+  } catch(e){ console.warn("kreaqwen_loras base corruptos, usando defaults"); }
+  try {
+    const r = localStorage.getItem("kreaqwen_refiner_loras");
+    if(r){
+      const parsed = JSON.parse(r);
+      if(isValid(parsed, refinerLoras.length)) refinerLoras = parsed;
+    }
+  } catch(e){ console.warn("kreaqwen_loras refiner corruptos, usando defaults"); }
+}
+
+function saveLoraStates(){
+  try {
+    localStorage.setItem("kreaqwen_base_loras", JSON.stringify(baseLoras));
+    localStorage.setItem("kreaqwen_refiner_loras", JSON.stringify(refinerLoras));
+  } catch(e){}
+  if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+}
+
+const loraSearchQueries = {};
+
+function buildLoraOptions(loraOptions, currentVal, filterText = ""){
+  const q = (filterText || "").trim().toLowerCase();
+  let opts = '<option value="">-- Ninguno --</option>';
+
+  if(!q){
+    loraOptions.forEach(path => {
+      const selected = (path === currentVal) ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      opts += `<option value="${escapeHtml(path)}" ${selected} title="${escapeHtml(path)}">${escapeHtml(displayName)}</option>`;
+    });
+    return opts;
+  }
+
+  const tokens = q.split(/\s+/).filter(Boolean);
+  const matches = loraOptions.filter(path => {
+    const low = path.toLowerCase();
+    return tokens.every(t => low.includes(t));
+  });
+
+  if(currentVal && !matches.includes(currentVal)){
+    const curName = currentVal.split('/').pop();
+    opts += `<option value="${escapeHtml(currentVal)}" selected title="${escapeHtml(currentVal)}">📌 Actual: ${escapeHtml(curName)}</option>`;
+  }
+
+  if(matches.length === 0){
+    opts += `<option value="" disabled>Sin coincidencias ("${escapeHtml(q)}")</option>`;
+  } else {
+    matches.forEach(path => {
+      const selected = (path === currentVal) ? 'selected' : '';
+      const displayName = path.split('/').pop();
+      opts += `<option value="${escapeHtml(path)}" ${selected} title="${escapeHtml(path)}">${escapeHtml(displayName)}</option>`;
+    });
+  }
+  return opts;
+}
+
+function renderLoraGroup(containerId, list, labelPrefix, onChange){
+  const wrap = $(containerId);
+  if(!wrap) return;
+  wrap.innerHTML = "";
+  const loraOptions = (typeof AVAILABLE_LORAS !== "undefined" && Array.isArray(AVAILABLE_LORAS)) ? AVAILABLE_LORAS : [];
+
+  list.forEach((l, i) => {
+    const box = document.createElement("div");
+    box.className = "lora" + (l.on ? "" : " off");
+    box.style.marginBottom = "8px";
+
+    const key = `${containerId}_${i}`;
+    const savedQuery = loraSearchQueries[key] || "";
+    const opts = buildLoraOptions(loraOptions, l.lora, savedQuery);
+
+    box.innerHTML = `
+      <div class="lora-top">
+        <div class="switch ${l.on ? 'on' : ''}" data-idx="${i}"><i></i></div>
+        <div class="lname">${labelPrefix} ${i + 1}</div>
+      </div>
+      <div style="position:relative;margin-bottom:5px;">
+        <input type="text" class="lora-search-input" data-idx="${i}" placeholder="🔍 Filtrar LoRA..." value="${escapeHtml(savedQuery)}" spellcheck="false" style="width:100%;font-size:11.5px;padding:4px 22px 4px 7px;height:26px;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);box-sizing:border-box;">
+        <span class="lora-search-clear" data-idx="${i}" title="Limpiar filtro" style="position:absolute;right:7px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:11px;color:var(--muted-2);user-select:none;${savedQuery ? '' : 'display:none;'}">✕</span>
+      </div>
+      <div class="row" style="margin-bottom:6px;">
+        <select data-field="lora" data-idx="${i}">${opts}</select>
+      </div>
+      <div class="slider-row">
+        <input type="range" min="-2" max="2" step="0.05" value="${l.strength}" data-field="strength" data-idx="${i}">
+        <div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div>
+      </div>
+    `;
+    wrap.appendChild(box);
+  });
+
+  wrap.querySelectorAll(".switch").forEach(sw => sw.addEventListener("click", () => {
+    const idx = +sw.dataset.idx;
+    list[idx].on = !list[idx].on;
+    renderLoraGroup(containerId, list, labelPrefix, onChange);
+    onChange();
+  }));
+
+  wrap.querySelectorAll('.lora-search-input').forEach(inp => {
+    const idx = +inp.dataset.idx;
+    const key = `${containerId}_${idx}`;
+    const clearBtn = wrap.querySelector(`.lora-search-clear[data-idx="${idx}"]`);
+    const sel = wrap.querySelector(`select[data-field="lora"][data-idx="${idx}"]`);
+
+    const applyFilter = () => {
+      const q = inp.value.trim();
+      loraSearchQueries[key] = q;
+      if(clearBtn) clearBtn.style.display = q ? "block" : "none";
+      if(sel){
+        sel.innerHTML = buildLoraOptions(loraOptions, list[idx].lora, q);
+      }
+    };
+
+    inp.addEventListener("input", applyFilter);
+
+    inp.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){
+        e.preventDefault();
+        const q = inp.value.trim().toLowerCase();
+        if(!q) return;
+        const tokens = q.split(/\s+/).filter(Boolean);
+        const matches = loraOptions.filter(path => {
+          const low = path.toLowerCase();
+          return tokens.every(t => low.includes(t));
+        });
+        if(matches.length > 0){
+          list[idx].lora = matches[0];
+          if(!list[idx].on){
+            list[idx].on = true;
+            const sw = wrap.querySelector(`.switch[data-idx="${idx}"]`);
+            if(sw) sw.classList.add("on");
+            const box = sw ? sw.closest(".lora") : null;
+            if(box) box.classList.remove("off");
+          }
+          applyFilter();
+          onChange();
+        }
+      } else if(e.key === "Escape"){
+        inp.value = "";
+        applyFilter();
+      }
+    });
+  });
+
+  wrap.querySelectorAll('.lora-search-clear').forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = +btn.dataset.idx;
+      const key = `${containerId}_${idx}`;
+      const inp = wrap.querySelector(`.lora-search-input[data-idx="${idx}"]`);
+      const sel = wrap.querySelector(`select[data-field="lora"][data-idx="${idx}"]`);
+      if(inp) inp.value = "";
+      loraSearchQueries[key] = "";
+      btn.style.display = "none";
+      if(sel){
+        sel.innerHTML = buildLoraOptions(loraOptions, list[idx].lora, "");
+      }
+    });
+  });
+
+  wrap.querySelectorAll('select[data-field="lora"]').forEach(sel => sel.addEventListener("change", () => {
+    const idx = +sel.dataset.idx;
+    list[idx].lora = sel.value;
+    if(sel.value && !list[idx].on){
+      list[idx].on = true;
+      const sw = wrap.querySelector(`.switch[data-idx="${idx}"]`);
+      if(sw) sw.classList.add("on");
+      const box = sw ? sw.closest(".lora") : null;
+      if(box) box.classList.remove("off");
+    }
+    onChange();
+  }));
+
+  wrap.querySelectorAll('input[data-field="strength"]').forEach(inp => inp.addEventListener("input", () => {
+    const idx = +inp.dataset.idx;
+    list[idx].strength = parseFloat(inp.value);
+    const valEl = wrap.querySelector(`[data-val="${idx}"]`);
+    if(valEl) valEl.textContent = list[idx].strength.toFixed(2);
+    onChange();
+  }));
+}
+
+// Snapshot de Job
+// --- REFINADO FACIAL (ComfyUI-H3-FaceRefine, recorte/recomposición de imagen) ---
+// Reutiliza el detector de rostros y los nodos de recorte/fusión del pack H3
+// FaceRefine (ya instalado), pero sustituye la cadena de latentes de vídeo
+// (MiniMaxH3ReferenceToVideo / H3InjectVideoLatent / H3PerFrameDenoise) por un
+// VAEEncode -> KSampler -> VAEDecode nativo sobre la imagen final.
+const FACEREFINE_KEY = "kreaqwen_facerefine_state";
+const FACEREFINE_DEFAULTS = {
+  enabled: false,
+  denoise: 0.40,
+  steps: 10,
+  canvasSize: 768,
+  feather: 12,
+  select: "largest_face"
+};
+function loadFaceRefine(){
+  try { return Object.assign({}, FACEREFINE_DEFAULTS, JSON.parse(localStorage.getItem(FACEREFINE_KEY) || "{}")); }
+  catch(_) { return {...FACEREFINE_DEFAULTS}; }
+}
+function saveFaceRefine(s){ try { localStorage.setItem(FACEREFINE_KEY, JSON.stringify(s)); } catch(_){} }
+function getFaceRefineState(){
+  return {
+    enabled: $("segFaceRefineOn")?.classList.contains("on") ?? false,
+    denoise: parseFloat($("faceRefineDenoiseSlider")?.value || "0.40"),
+    steps: parseInt($("faceRefineStepsSlider")?.value || "10", 10),
+    canvasSize: ($("faceRefineCanvasMode")?.value || "auto"),
+    feather: parseInt($("faceRefineFeatherSlider")?.value || "12", 10),
+    select: $("faceRefineSelectMode")?.value || "largest_face"
+  };
+}
+function setFaceRefineUI(s){
+  if(!s) return;
+  const on = $("segFaceRefineOn"), off = $("segFaceRefineOff");
+  const panel = $("faceRefineControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("faceRefineStepsSlider")){
+    const st = parseInt(s.steps != null ? s.steps : 10, 10);
+    $("faceRefineStepsSlider").value = st;
+    if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+    if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+  }
+  if($("faceRefineCanvasMode") && s.canvasSize){
+    $("faceRefineCanvasMode").value = String(s.canvasSize);
+  }
+  if($("faceRefineDenoiseSlider")){
+    const d = parseFloat(s.denoise != null ? s.denoise : 0.40);
+    $("faceRefineDenoiseSlider").value = d;
+    if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+    if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+  }
+  if($("faceRefineFeatherSlider")){
+    const f = parseInt(s.feather != null ? s.feather : 12, 10);
+    $("faceRefineFeatherSlider").value = f;
+    if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+    if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+  }
+  if($("faceRefineSelectMode") && s.select){
+    $("faceRefineSelectMode").value = s.select;
+  }
+}
+
+function snapshotJob(isBaseOnly = false){
+  const mp = parseFloat($("mpSlider")?.value || "1.0");
+  const ar = $("aspectRatio")?.value || "16:9 (Widescreen)";
+  const factor = parseFloat($("upscaleFactor")?.value || "1.5");
+  const baseDim = calculateDimensions(mp, ar);
+  const upW = Math.round((baseDim.w * factor) / 8) * 8;
+  const upH = Math.round((baseDim.h * factor) / 8) * 8;
+
+  return {
+    id: ++jobCounter,
+    prompt: $("prompt")?.value || "",
+    negPrompt: $("negPrompt")?.value || "",
+    comboMode: isBaseOnly ? "base_only" : ($("comboMode")?.value || "krea_qwen"),
+    mossSlgLayers: $("mossSlgLayers")?.value ?? "22",
+    mossSlgEnd: parseFloat($("mossSlgEnd")?.value || "0.5"),
+    baseUnet: $("baseUnetSelect")?.value,
+    baseWeightDtype: $("baseWeightDtype")?.value || "default",
+    baseClip: $("baseClipSelect")?.value,
+    baseVae: $("baseVaeSelect")?.value,
+    baseAttn: $("baseAttentionBackend")?.value || "comfy kitchen attention",
+    baseSteps: parseInt($("baseSteps")?.value || "8", 10),
+    baseCfg: parseFloat($("baseCfg")?.value || "1.0"),
+    baseSampler: $("baseSamplerName")?.value || "euler",
+    baseScheduler: $("baseSchedulerName")?.value || "simple",
+    seedMode: $("segSamplerRandom")?.classList.contains("on") ? "random" : "fixed",
+    seedValue: parseInt($("samplerSeed")?.value || "1062442950133633", 10),
+    baseW: baseDim.w,
+    baseH: baseDim.h,
+    baseLoras: JSON.parse(JSON.stringify(baseLoras)),
+    variancePreset: $("variancePreset")?.value || "❌ Disabled",
+    varianceFineTune: parseInt($("varianceFineTune")?.value || "100", 10),
+    varianceDirection: $("varianceDirection")?.value || "🌎 Diversity",
+    varianceShiftStrength: parseInt($("varianceShiftStrength")?.value || "150", 10),
+    varianceNoiseInjection: $("varianceNoiseInjection")?.value || "🚫 None",
+    varianceFadeCurve: $("varianceFadeCurve")?.value || "Instant",
+    protectMode: $("protectMode")?.value || "🚫 None",
+    varianceSeedMode: $("segVarianceRandom")?.classList.contains("on") ? "random" : "fixed",
+    varianceSeedValue: parseInt($("varianceSeed")?.value || "315489554057974", 10),
+    upscaleEnabled: isBaseOnly ? false : $("upscaleEnabled")?.checked,
+    upscaleModel: $("upscaleModelSelect")?.value || "4xPurePhoto-Span.pth",
+    targetW: upW,
+    targetH: upH,
+    refinerEnabled: isBaseOnly ? false : $("refinerEnabled")?.checked,
+    refinerUnet: $("refinerUnetSelect")?.value,
+    refinerWeightDtype: $("refinerWeightDtype")?.value || "default",
+    refinerClip: $("refinerClipSelect")?.value,
+    refinerVae: $("refinerVaeSelect")?.value,
+    refinerAttn: $("refinerAttentionBackend")?.value || "comfy kitchen attention",
+    refinerDenoise: parseFloat($("refinerDenoise")?.value || "0.35"),
+    refinerSteps: parseInt($("refinerSteps")?.value || "6", 10),
+    refinerCfg: parseFloat($("refinerCfg")?.value || "1.0"),
+    refinerSampler: $("refinerSamplerName")?.value || "euler",
+    refinerScheduler: $("refinerSchedulerName")?.value || "simple",
+    refinerLoras: JSON.parse(JSON.stringify(refinerLoras)),
+    spectrumEnabled: $("spectrumEnabled") ? $("spectrumEnabled").checked : true,
+    spectrumW: parseFloat($("spectrumW")?.value || "0.3"),
+    spectrumLam: parseFloat($("spectrumLam")?.value || "0.1"),
+    keepModelInRam: $("keepModelInRam")?.checked,
+    batchSize: parseInt($("batchSize")?.value || "1", 10),
+    filenamePrefix: $("filenamePrefix")?.value || "kreaqwen/imagen",
+    // Refinado facial (recorte + re-muestreo + recomposición sobre la imagen final)
+    faceRefine: getFaceRefineState(),
+    // Edición con Qwen 2.1 (img2img / faceswap)
+    qwenEdit: {
+      enabled: !!$("qwenEditEnabled")?.checked,
+      // Método: "edit" (render guiado vía TextEncodeQwenImage21) o "reactor"
+      // (ReActor directo sobre la imagen final: pose exacta sin re-render).
+      method: $("qwenEditMethod")?.value || "edit",
+      stage: $("qwenEditStage")?.value || "refiner",
+      prompt: $("qwenEditPrompt")?.value || "",
+      resolution: parseInt($("qwenEditResolution")?.value || "1024", 10),
+      // Integración anti-"pegada" del resultado del edit con la imagen objetivo:
+      // "face" (stitch facial con feather + color match), "global" (LatentBlend) o "none".
+      integrate: $("qwenEditIntegrate")?.value || "face",
+      intBlend: parseInt($("qwenEditIntBlend")?.value ?? "100", 10),
+      intFeather: parseInt($("qwenEditIntFeather")?.value ?? "20", 10),
+      intColor: !!$("qwenEditIntColor")?.checked,
+      reactorModel: $("qwenEditReactorModel")?.value || "hyperswap_1c_256.onnx",
+      reactorRestore: $("qwenEditReactorRestore")?.value || "none",
+      reactorTiming: $("qwenEditReactorTiming")?.value || "after",
+      refW: ($("refImg")?.naturalWidth) || null,
+      refH: ($("refImg")?.naturalHeight) || null,
+      refSrc: (!!$("qwenEditEnabled")?.checked ? getRefImageSrc() : null),
+      extraRefSrcs: (!!$("qwenEditEnabled")?.checked ? qwenEditExtraRefs.slice() : []),
+      refB64: null,
+      extraRefB64: [],
+    },
+    // Color Grading & Look Cinemático (misma implementación que MiniMaxH3)
+    postfx: getPostFxState(),
+    createdAt: Date.now()
+  };
+}
+
+// --- PERSISTENCIA DE SESIÓN (ajustes en localStorage) ---
+const KREAQWEN_SETTINGS_KEY = 'kreaqwen_settings_v2';
+let kreaQwenSaveTimer = null;
+
+function scheduleSaveKreaQwenSettings(){
+  clearTimeout(kreaQwenSaveTimer);
+  kreaQwenSaveTimer = setTimeout(saveKreaQwenSettings, 300);
+}
+
+function saveKreaQwenSettings(){
+  const s = {
+    prompt: $("prompt")?.value ?? "",
+    negPrompt: $("negPrompt")?.value ?? "",
+    comboMode: $("comboMode")?.value || "krea_qwen",
+    mossSlgLayers: $("mossSlgLayers")?.value ?? "22",
+    mossSlgEnd: $("mossSlgEnd")?.value || "0.5",
+    baseUnet: $("baseUnetSelect")?.value,
+    baseWeightDtype: $("baseWeightDtype")?.value || "default",
+    baseClip: $("baseClipSelect")?.value,
+    baseVae: $("baseVaeSelect")?.value,
+    baseAttn: $("baseAttentionBackend")?.value || "comfy kitchen attention",
+    baseSteps: $("baseSteps")?.value || "8",
+    baseCfg: $("baseCfg")?.value || "1.0",
+    baseSampler: $("baseSamplerName")?.value || "euler",
+    baseScheduler: $("baseSchedulerName")?.value || "simple",
+    baseLoras: JSON.parse(JSON.stringify(baseLoras)),
+
+    refinerEnabled: $("refinerEnabled")?.checked ?? true,
+    refinerUnet: $("refinerUnetSelect")?.value,
+    refinerWeightDtype: $("refinerWeightDtype")?.value || "default",
+    refinerClip: $("refinerClipSelect")?.value,
+    refinerVae: $("refinerVaeSelect")?.value,
+    refinerAttn: $("refinerAttentionBackend")?.value || "comfy kitchen attention",
+    refinerDenoise: $("refinerDenoise")?.value || "0.35",
+    refinerSteps: $("refinerSteps")?.value || "6",
+    refinerCfg: $("refinerCfg")?.value || "1.0",
+    refinerSampler: $("refinerSamplerName")?.value || "euler",
+    refinerScheduler: $("refinerSchedulerName")?.value || "simple",
+    refinerLoras: JSON.parse(JSON.stringify(refinerLoras)),
+
+    mp: $("mpSlider")?.value || "1.0",
+    aspectRatio: $("aspectRatio")?.value || "16:9 (Widescreen)",
+    upscaleEnabled: $("upscaleEnabled")?.checked ?? true,
+    upscaleFactor: $("upscaleFactor")?.value || "1.5",
+    upscaleModel: $("upscaleModelSelect")?.value || "4xPurePhoto-Span.pth",
+
+    seedMode: $("segSamplerRandom")?.classList.contains("on") ? "random" : "fixed",
+    seedValue: $("samplerSeed")?.value || "1062442950133633",
+
+    variancePreset: $("variancePreset")?.value || "❌ Disabled",
+    varianceFineTune: $("varianceFineTune")?.value || "100",
+    varianceDirection: $("varianceDirection")?.value || "🌎 Diversity",
+    varianceShiftStrength: $("varianceShiftStrength")?.value || "150",
+    varianceNoiseInjection: $("varianceNoiseInjection")?.value || "🚫 None",
+    varianceFadeCurve: $("varianceFadeCurve")?.value || "Instant",
+    protectMode: $("protectMode")?.value || "🚫 None",
+    varianceSeedMode: $("segVarianceRandom")?.classList.contains("on") ? "random" : "fixed",
+    varianceSeedValue: $("varianceSeed")?.value || "315489554057974",
+    eta: $("etaSlider")?.value || "0.5",
+
+    spectrumEnabled: $("spectrumEnabled") ? $("spectrumEnabled").checked : true,
+    spectrumW: $("spectrumW")?.value || "0.3",
+    spectrumLam: $("spectrumLam")?.value || "0.1",
+
+    qwenEditEnabled: !!$("qwenEditEnabled")?.checked,
+    qwenEditMethod: $("qwenEditMethod")?.value || "edit",
+    qwenEditStage: $("qwenEditStage")?.value || "refiner",
+    qwenEditPrompt: $("qwenEditPrompt")?.value || "",
+    qwenEditResolution: $("qwenEditResolution")?.value || "1024",
+    qwenEditIntegrate: $("qwenEditIntegrate")?.value || "face",
+    qwenEditIntBlend: $("qwenEditIntBlend")?.value || "100",
+    qwenEditIntFeather: $("qwenEditIntFeather")?.value || "20",
+    qwenEditIntColor: !!$("qwenEditIntColor")?.checked,
+    qwenEditReactorModel: $("qwenEditReactorModel")?.value || "hyperswap_1c_256.onnx",
+    qwenEditReactorRestore: $("qwenEditReactorRestore")?.value || "none",
+    qwenEditReactorTiming: $("qwenEditReactorTiming")?.value || "after",
+
+    faceRefine: getFaceRefineState(),
+
+    evolveMode: $("evolveMode")?.value,
+    evolveStrength: $("evolveStrength")?.value,
+
+    // Color Grading & Look Cinemático
+    postfx: getPostFxState(),
+
+    keepModelInRam: $("keepModelInRam")?.checked ?? true,
+    batchSize: $("batchSize")?.value || "1",
+    filenamePrefix: $("filenamePrefix")?.value || "kreaqwen/imagen",
+  };
+  try { localStorage.setItem(KREAQWEN_SETTINGS_KEY, JSON.stringify(s)); }
+  catch(e){ console.warn("Error guardando ajustes KreaQwen:", e); }
+}
+
+function restoreKreaQwenSettings(){
+  const raw = localStorage.getItem(KREAQWEN_SETTINGS_KEY);
+  if(!raw) return false;
+  try {
+    const s = JSON.parse(raw);
+    if(!s || typeof s !== "object") return false;
+
+    // Asigna un modelo guardado solo si sigue entre las opciones. Un
+    // <select>.value con un valor inexistente deja el selector VACÍO sin avisar
+    // (y el VAE del refiner se recalculaba para la familia equivocada).
+    // Si el UNET guardado ya no existe, se elige otro de su MISMA familia
+    // (un Qwen 2.1 por otro Qwen 2.1), no la primera opción de la lista: así el
+    // VAE/CLIP guardados siguen siendo compatibles y el combo no cambia.
+    const missingModels = [];
+    const restoreModel = (id, val, label) => {
+      const sel = $(id);
+      if(!sel || !val) return;
+      if([...sel.options].some(o => o.value === val)){ sel.value = val; return; }
+      let note = "";
+      if(/UnetSelect$/.test(id)){
+        const fam = unetArchFamily(val);
+        const alt = [...sel.options].find(o => unetArchFamily(o.value) === fam);
+        if(alt){ sel.value = alt.value; note = ` → "${alt.value}"`; }
+      }
+      missingModels.push(`${label} "${val}"${note}`);
+    };
+
+    if(s.prompt !== undefined && $("prompt")) $("prompt").value = s.prompt;
+    if(s.negPrompt !== undefined && $("negPrompt")) $("negPrompt").value = s.negPrompt;
+    if(s.comboMode && $("comboMode")) $("comboMode").value = s.comboMode;
+    if(s.mossSlgLayers !== undefined && $("mossSlgLayers")) $("mossSlgLayers").value = s.mossSlgLayers;
+    if(s.mossSlgEnd !== undefined && $("mossSlgEnd")) $("mossSlgEnd").value = s.mossSlgEnd;
+
+    restoreModel("baseUnetSelect", s.baseUnet, "modelo Base");
+    if(s.baseWeightDtype && $("baseWeightDtype")) $("baseWeightDtype").value = s.baseWeightDtype;
+    restoreModel("baseClipSelect", s.baseClip, "text encoder Base");
+    if(s.baseAttn && $("baseAttentionBackend")) $("baseAttentionBackend").value = s.baseAttn;
+    if(s.baseSteps !== undefined && $("baseSteps")) $("baseSteps").value = s.baseSteps;
+    if(s.baseCfg !== undefined && $("baseCfg")) $("baseCfg").value = s.baseCfg;
+    setSelectIfPresent("baseSamplerName", s.baseSampler);
+    if(s.baseScheduler && $("baseSchedulerName")) $("baseSchedulerName").value = s.baseScheduler;
+
+    if(Array.isArray(s.baseLoras) && s.baseLoras.length){
+      s.baseLoras.forEach((l, i) => { if(i < baseLoras.length && l) baseLoras[i] = l; });
+      renderLoraGroup("baseLoraList", baseLoras, "LoRA Base", saveLoraStates);
+    }
+
+    if(s.refinerEnabled !== undefined && $("refinerEnabled")) $("refinerEnabled").checked = !!s.refinerEnabled;
+    restoreModel("refinerUnetSelect", s.refinerUnet, "modelo Refiner");
+    if(s.refinerWeightDtype && $("refinerWeightDtype")) $("refinerWeightDtype").value = s.refinerWeightDtype;
+    restoreModel("refinerClipSelect", s.refinerClip, "text encoder Refiner");
+    if(s.refinerAttn && $("refinerAttentionBackend")) $("refinerAttentionBackend").value = s.refinerAttn;
+    if(s.refinerDenoise !== undefined && $("refinerDenoise")){
+      $("refinerDenoise").value = s.refinerDenoise;
+      if($("refinerDenoiseVal")) $("refinerDenoiseVal").textContent = parseFloat(s.refinerDenoise).toFixed(2);
+    }
+    if(s.refinerSteps !== undefined && $("refinerSteps")) $("refinerSteps").value = s.refinerSteps;
+    if(s.refinerCfg !== undefined && $("refinerCfg")) $("refinerCfg").value = s.refinerCfg;
+    setSelectIfPresent("refinerSamplerName", s.refinerSampler);
+    if(s.refinerScheduler && $("refinerSchedulerName")) $("refinerSchedulerName").value = s.refinerScheduler;
+
+    // Actualizar selectores VAE según UNet restaurado y asignar VAEs
+    updateVaeSelectors();
+    restoreModel("baseVaeSelect", s.baseVae, "VAE Base");
+    restoreModel("refinerVaeSelect", s.refinerVae, "VAE Refiner");
+    if(missingModels.length){
+      log(`⚠️ Ajustes guardados con modelos que ya no están disponibles: ${missingModels.join(", ")}. Se ha elegido uno equivalente; revísalo antes de generar.`, "l-warn");
+    }
+
+    if(Array.isArray(s.refinerLoras) && s.refinerLoras.length){
+      s.refinerLoras.forEach((l, i) => { if(i < refinerLoras.length && l) refinerLoras[i] = l; });
+      renderLoraGroup("refinerLoraList", refinerLoras, "LoRA Refiner", saveLoraStates);
+    }
+
+    if(s.mp !== undefined && $("mpSlider")){
+      $("mpSlider").value = s.mp;
+      if($("mpVal")) $("mpVal").textContent = parseFloat(s.mp).toFixed(2);
+    }
+    if(s.aspectRatio && $("aspectRatio")) $("aspectRatio").value = s.aspectRatio;
+    if(s.upscaleEnabled !== undefined && $("upscaleEnabled")) $("upscaleEnabled").checked = !!s.upscaleEnabled;
+    if(s.upscaleFactor !== undefined && $("upscaleFactor")){
+      $("upscaleFactor").value = s.upscaleFactor;
+      if($("upscaleFactorVal")) $("upscaleFactorVal").textContent = `${parseFloat(s.upscaleFactor).toFixed(2)}x`;
+    }
+    setSelectIfPresent("upscaleModelSelect", s.upscaleModel);
+
+    // Semillas
+    if(s.seedMode){
+      if(s.seedMode === "random"){
+        $("segSamplerRandom")?.classList.add("on");
+        $("segSamplerFixed")?.classList.remove("on");
+        if($("samplerSeed")) $("samplerSeed").disabled = true;
+      } else {
+        $("segSamplerFixed")?.classList.add("on");
+        $("segSamplerRandom")?.classList.remove("on");
+        if($("samplerSeed")) $("samplerSeed").disabled = false;
+      }
+    }
+    if(s.seedValue !== undefined && $("samplerSeed")) $("samplerSeed").value = s.seedValue;
+
+    // Varianza
+    if(s.variancePreset && $("variancePreset")) $("variancePreset").value = s.variancePreset;
+    if(s.varianceFineTune !== undefined && $("varianceFineTune")){
+      $("varianceFineTune").value = s.varianceFineTune;
+      if($("varianceFineTuneVal")) $("varianceFineTuneVal").textContent = s.varianceFineTune;
+    }
+    if(s.varianceDirection && $("varianceDirection")) $("varianceDirection").value = s.varianceDirection;
+    if(s.varianceShiftStrength !== undefined && $("varianceShiftStrength")){
+      $("varianceShiftStrength").value = s.varianceShiftStrength;
+      if($("varianceShiftStrengthVal")) $("varianceShiftStrengthVal").textContent = s.varianceShiftStrength;
+    }
+    if(s.varianceNoiseInjection && $("varianceNoiseInjection")) $("varianceNoiseInjection").value = s.varianceNoiseInjection;
+    if(s.varianceFadeCurve && $("varianceFadeCurve")) $("varianceFadeCurve").value = s.varianceFadeCurve;
+    if(s.protectMode && $("protectMode")) $("protectMode").value = s.protectMode;
+    if(s.varianceSeedMode){
+      if(s.varianceSeedMode === "random"){
+        $("segVarianceRandom")?.classList.add("on");
+        $("segVarianceFixed")?.classList.remove("on");
+        if($("varianceSeed")) $("varianceSeed").disabled = true;
+      } else {
+        $("segVarianceFixed")?.classList.add("on");
+        $("segVarianceRandom")?.classList.remove("on");
+        if($("varianceSeed")) $("varianceSeed").disabled = false;
+      }
+    }
+    if(s.varianceSeedValue !== undefined && $("varianceSeed")) $("varianceSeed").value = s.varianceSeedValue;
+    if(s.eta !== undefined && $("etaSlider")){
+      $("etaSlider").value = s.eta;
+      if($("etaVal")) $("etaVal").textContent = parseFloat(s.eta).toFixed(2);
+    }
+
+    // Spectrum
+    if(s.spectrumEnabled !== undefined && $("spectrumEnabled")) $("spectrumEnabled").checked = !!s.spectrumEnabled;
+    else if($("spectrumEnabled")) $("spectrumEnabled").checked = true;
+    if(s.spectrumW !== undefined && $("spectrumW")){
+      $("spectrumW").value = s.spectrumW;
+      if($("spectrumWVal")) $("spectrumWVal").textContent = parseFloat(s.spectrumW).toFixed(2);
+    }
+    if(s.spectrumLam !== undefined && $("spectrumLam")){
+      $("spectrumLam").value = s.spectrumLam;
+      if($("spectrumLamVal")) $("spectrumLamVal").textContent = parseFloat(s.spectrumLam).toFixed(2);
+    }
+
+    // Qwen Edit
+    if(s.qwenEditEnabled !== undefined && $("qwenEditEnabled")) $("qwenEditEnabled").checked = !!s.qwenEditEnabled;
+    if(s.qwenEditMethod && $("qwenEditMethod")) $("qwenEditMethod").value = s.qwenEditMethod;
+    if(s.qwenEditStage && $("qwenEditStage")) $("qwenEditStage").value = s.qwenEditStage;
+    if(s.qwenEditPrompt !== undefined && $("qwenEditPrompt")) $("qwenEditPrompt").value = s.qwenEditPrompt;
+    if(s.qwenEditResolution !== undefined && $("qwenEditResolution")){
+      $("qwenEditResolution").value = s.qwenEditResolution;
+      if($("qwenEditResolutionVal")) $("qwenEditResolutionVal").textContent = s.qwenEditResolution;
+    }
+    if(s.qwenEditIntegrate && $("qwenEditIntegrate")) $("qwenEditIntegrate").value = s.qwenEditIntegrate;
+    if(s.qwenEditIntBlend !== undefined && $("qwenEditIntBlend")){
+      $("qwenEditIntBlend").value = s.qwenEditIntBlend;
+      if($("qwenEditIntBlendVal")) $("qwenEditIntBlendVal").textContent = s.qwenEditIntBlend;
+    }
+    if(s.qwenEditIntFeather !== undefined && $("qwenEditIntFeather")){
+      $("qwenEditIntFeather").value = s.qwenEditIntFeather;
+      if($("qwenEditIntFeatherVal")) $("qwenEditIntFeatherVal").textContent = s.qwenEditIntFeather;
+    }
+    if(s.qwenEditIntColor !== undefined && $("qwenEditIntColor")) $("qwenEditIntColor").checked = !!s.qwenEditIntColor;
+    if(s.qwenEditReactorModel && $("qwenEditReactorModel")) $("qwenEditReactorModel").value = s.qwenEditReactorModel;
+    if(s.qwenEditReactorRestore && $("qwenEditReactorRestore")) $("qwenEditReactorRestore").value = s.qwenEditReactorRestore;
+    if(s.qwenEditReactorTiming && $("qwenEditReactorTiming")) $("qwenEditReactorTiming").value = s.qwenEditReactorTiming;
+    if(typeof updateQwenEditMethodUI === "function") updateQwenEditMethodUI();
+
+    // FaceRefine
+    if(s.faceRefine){
+      setFaceRefineUI(s.faceRefine);
+      saveFaceRefine(s.faceRefine);
+    }
+
+    if(s.evolveMode && $("evolveMode")) $("evolveMode").value = s.evolveMode;
+    if(s.evolveStrength !== undefined && $("evolveStrength")){
+      $("evolveStrength").value = s.evolveStrength;
+      if($("evolveStrengthVal")) $("evolveStrengthVal").textContent = `${s.evolveStrength}%`;
+    }
+
+    // Post-fx
+    // Color Grading & Look Cinemático
+    if(s.postfx) setPostFxUI(s.postfx);
+
+    // Varios
+    if(s.keepModelInRam !== undefined && $("keepModelInRam")) $("keepModelInRam").checked = !!s.keepModelInRam;
+    if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
+    if(s.filenamePrefix !== undefined && $("filenamePrefix")) $("filenamePrefix").value = s.filenamePrefix;
+
+    updateDimensionHints();
+    ["baseSteps","baseCfg","baseSamplerName","baseSchedulerName","refinerSteps","refinerCfg","refinerSamplerName","refinerSchedulerName","refinerDenoise"].forEach(id => markTouched(id));
+    return true;
+  } catch(e){
+    console.warn("Error restaurando ajustes KreaQwen:", e);
+    return false;
+  }
+}
+
+// La caché de prefijo de Qwen-Image 2.1 en ComfyUI peta con CFG>1 (positivo y negativo crean
+// slots de tamaño distinto y PoseBranchCache.select usa list.remove → compara tensores).
+// "off" recalcula el prefijo en cada paso: algo más lento, pero estable.
+function appendQwenCacheOff(g, stage, modelRef){
+  const id = `qwen21_cache_${stage}`;
+  g[id] = {
+    class_type: "QwenImage21Cache",
+    inputs: { model: modelRef, device: "off", dtype: "default" },
+    _meta: { title: `Qwen 2.1 Cache OFF (${stage})` }
+  };
+  return [id, 0];
+}
+
+// --- EDICIÓN CON QWEN 2.1 (nodos en el grafo) ---
+// Añade el encoder de edición y carga las referencias base64. Devuelve las
+// referencias de conditioning/latent a usar en la etapa, o null si no aplica.
+// `draftImage` (ref [id, slot] de un IMAGE ya presente en el grafo, p.ej. el
+// borrador post-upscale del Base) se conecta como images.image_1: en la vía
+// oficial de Qwen 2.1 (template image_qwen_image_2_1_image_edit de ComfyUI),
+// image_1 es el objetivo del edit y la salida sigue su composición/tamaño; las
+// referencias del usuario entran a partir de image_2 (se citan como <image2>...).
+function appendQwenEditStage(g, stage, opts){
+  const qe = opts.job.qwenEdit;
+  if(!qe || !qe.enabled) return null;
+  const b64s = [];
+  if(qe.refB64) b64s.push(qe.refB64);
+  if(Array.isArray(qe.extraRefB64)) b64s.push(...qe.extraRefB64);
+  if(b64s.length === 0 && !opts.draftImage) return null;
+
+  const nameStart = opts.draftImage ? 2 : 1;
+  const loadIds = b64s.map((b64, i) => {
+    const id = `qwen_edit_img_${stage}_${i + 1}`;
+    g[id] = {
+      class_type: "SwarmLoadImageB64",
+      inputs: { image_base64: b64 },
+      _meta: { title: `Qwen Edit Ref ${stage} ${i + 1}` }
+    };
+    return id;
+  });
+
+  // integración de rostro activa → resolución de referencia forzada a 'auto' para alinear el stitch
+  // (la salida del edit debe cuadrar 1:1 con la imagen objetivo en coordenadas de píxel).
+  const forceAutoRes = !!opts.integrateFace && qe.resolution !== 0;
+  if(forceAutoRes){
+    log(`ℹ️ Edición Qwen 2.1 (${stage}): integración de rostro activa → resolución de referencia forzada a 'auto' para alinear el stitch.`, "l-info");
+  }
+
+  const encId = `qwen_edit_encode_${stage}`;
+  const inputs = {
+    clip: opts.clipRef,
+    prompt: qe.prompt || opts.prompt || "",
+    negative_prompt: opts.negative || "",
+    resolution: forceAutoRes ? 0 : qe.resolution,
+    vae: opts.vaeRef,
+  };
+  if(opts.draftImage) inputs["images.image_1"] = opts.draftImage;
+  loadIds.forEach((id, i) => { inputs[`images.image_${nameStart + i}`] = [id, 0]; });
+
+  g[encId] = {
+    class_type: "TextEncodeQwenImage21",
+    inputs,
+    _meta: { title: `Edición Qwen 2.1 (${stage})` }
+  };
+  // targetImage: la imagen que hizo de images.image_1 (borrador en refiner, o la
+  // primera referencia en base) — es la base de la integración de rostro.
+  const targetImage = opts.draftImage || (loadIds.length ? [loadIds[0], 0] : null);
+  return { encoder: encId, latent: [encId, 2], targetImage };
+}
+
+// --- INTEGRACIÓN ANTI-"PEGADA" DEL RESULTADO DEL EDIT ---
+// El swap puede lucir pegado (tono/luz del rostro distintos a la escena). Dos
+// modos sobre la imagen final de la etapa editada:
+//  - "face": recorta el rostro con H3FaceTrackCrop sobre el resultado del edit,
+//    lo iguala en color (colour_match) y lo recompone con feather sobre la imagen
+//    objetivo (borrador del Base, o la referencia en modo base); el resto del
+//    cuadro vuelve a ser píxel original. intBlend (0-100) = opacidad del rostro
+//    pegado (H3FaceStitch.blend) — 100% rostro nuevo, 30% mayormente original.
+//  - "global": LatentBlend entre el latent editado y el latent del borrador.
+// Devuelve la referencia de imagen resultante, o null si no aplica.
+function applyQwenEditIntegration(g, editImageRef, job, stage, opts){
+  const qe = job.qwenEdit || {};
+  const mode = qe.integrate || "face";
+  if(mode === "none") return null;
+  const blendPct = Math.min(100, Math.max(0, parseInt(qe.intBlend ?? 100, 10) || 0));
+
+  if(mode === "global"){
+    if(!opts.editLatentRef || !opts.draftLatentRef){
+      log(`ℹ️ Edición Qwen 2.1 (${stage}): la mezcla global necesita un borrador en latente (solo disponible en modo refiner); se omite.`, "l-info");
+      return null;
+    }
+    const bl = `qwen_edit_int_blend_${stage}`;
+    g[bl] = {
+      class_type: "LatentBlend",
+      inputs: {
+        samples1: opts.editLatentRef,
+        samples2: opts.draftLatentRef,
+        blend_factor: blendPct / 100,
+      },
+      _meta: { title: `Edit Integration Blend (${stage})` }
+    };
+    const dc = `qwen_edit_int_decode_${stage}`;
+    g[dc] = {
+      class_type: "VAEDecode",
+      inputs: { samples: [bl, 0], vae: opts.vaeRef },
+      _meta: { title: `Edit Integration Decode (${stage})` }
+    };
+    return [dc, 0];
+  }
+
+  // mode === "face"
+  if(!opts.baseImageRef) return null;
+  // El transform del crop se expresa en el espacio de la imagen que lo generó
+  // (la salida del edit, cuyo tamaño es el de la referencia redondeado a
+  // múltiplos de 32 con round() de Python, esto es, mitad hacia el par). El
+  // H3FaceStitch exige que base_images tenga ese tamaño exacto: se reescala la
+  // imagen objetivo a las mismas dimensiones con ImageScale.
+  let baseRef = opts.baseImageRef;
+  if(opts.baseDims && opts.baseDims.w && opts.baseDims.h){
+    const roundPy = (x) => {
+      const f = Math.floor(x), d = x - f;
+      if(d > 0.5) return f + 1;
+      if(d < 0.5) return f;
+      return (f % 2 === 0) ? f : f + 1;
+    };
+    const bsc = `qwen_edit_int_base_${stage}`;
+    g[bsc] = {
+      class_type: "ImageScale",
+      inputs: {
+        image: opts.baseImageRef,
+        upscale_method: "bicubic",
+        crop: "disabled",
+        width: roundPy(opts.baseDims.w / 32) * 32,
+        height: roundPy(opts.baseDims.h / 32) * 32,
+      },
+      _meta: { title: `Edit Integration Base Resize (${stage})` }
+    };
+    baseRef = [bsc, 0];
+  }
+  const cr = `qwen_edit_int_crop_${stage}`;
+  g[cr] = {
+    class_type: "H3FaceTrackCrop",
+    inputs: {
+      images: editImageRef,
+      detector: "face_yolov8m.pt",
+      confidence: 0.35,
+      crop_factor: 3.0,
+      canvas_width: 768,
+      canvas_height: 768,
+      canvas_mode: "auto_no_downscale",
+      smooth_window: 21,
+      size_smooth_window: 51,
+      smooth_method: "gaussian",
+      size_mode: "per_frame",
+      identity_track: false,
+      identity_threshold: 0.28,
+      select: "largest_face",
+      fallback_detector: "none",
+      fallback_head_frac: 0.5,
+      select_index: 0,
+      identity_model: "insightface",
+      cut_detection: "none",
+      cut_threshold: 3.0,
+      absent_shots: "off",
+      X: 0,
+      Y: 0,
+      frame_index: 0
+    },
+    _meta: { title: `Edit Integration Crop (${stage})` }
+  };
+  const st = `qwen_edit_int_stitch_${stage}`;
+  g[st] = {
+    class_type: "H3FaceStitch",
+    inputs: {
+      base_images: baseRef,
+      refined_crops: [cr, 0],
+      transform: [cr, 1],
+      paste_region: "face_ellipse",
+      mask_dilation: 16,
+      feather: Math.min(128, Math.max(0, parseInt(qe.intFeather ?? 20, 10) || 0)),
+      colour_match: qe.intColor === false ? 0.0 : 1.0,
+      blend: blendPct / 100,
+      undetected_frames: "fade_out",
+      feather_scales_with_crop: false,
+    },
+    _meta: { title: `Edit Integration Stitch (${stage})` }
+  };
+  return [st, 0];
+}
+
+// --- FACESWAP DIRECTO VIA REACTOR (pose exacta, sin re-render) ---
+// Detecta el rostro en `imageRef` (imagen final de la etapa) y trasplanta la
+// identidad de la referencia con insightface (HyperSwap/InSwapper), que deforma
+// el rostro nuevo a la GEOMETRÍA/Pose del original — sin la deriva de pose que
+// tiene el render del edit. Sigue un ColorMatch contra la propia imagen para
+// clavar tono/luz. Devuelve la referencia de imagen final, o null sin refs.
+function applyReActorSwap(g, imageRef, job, stage){
+  const qe = job.qwenEdit || {};
+  if(!qe.refB64){
+    log("⚠️ Faceswap ReActor: carga primero una imagen de referencia (source).", "l-warn");
+    return null;
+  }
+  const lid = `qwen_edit_img_reactor_${stage}`;
+  g[lid] = {
+    class_type: "SwarmLoadImageB64",
+    inputs: { image_base64: qe.refB64 },
+    _meta: { title: `ReActor Source (${stage})` }
+  };
+  if(job.faceRefine?.enabled){
+    log("⚠️ Faceswap ReActor + FaceRefine activos: el rostro ya transplantado se re-muestreará otra vez (denoise del FaceRefine). Funde tono/texture pero puede repintar y desviar la identidad; si la cara sale 'repintada', desactiva FaceRefine.", "l-warn");
+  }
+  const sw = `reactor_swap_${stage}`;
+  g[sw] = {
+    class_type: "ReActorFaceSwapOpt",
+    inputs: {
+      enabled: true,
+      input_image: imageRef,
+      source_image: [lid, 0],
+      swap_model: qe.reactorModel || "hyperswap_1c_256.onnx",
+      facedetection: "retinaface_resnet50",
+      face_restore_model: qe.reactorRestore || "none",
+      face_restore_visibility: 1.0,
+      codeformer_weight: 0.5,
+    },
+    _meta: { title: `ReActor Swap (${stage})` }
+  };
+  // ColorMatch del swap contra la imagen de origen (tono/luz de la escena), a
+  // menos que el usuario lo desactive (el rostro conserva el tono de la ref).
+  if(qe.intColor === false){
+    return [sw, 0];
+  }
+  const cm = `reactor_colormatch_${stage}`;
+  g[cm] = {
+    class_type: "ColorMatch",
+    inputs: {
+      image_ref: imageRef,
+      image_target: [sw, 0],
+      method: "mkl",
+      strength: 1.0,
+      multithread: true,
+    },
+    _meta: { title: `ReActor ColorMatch (${stage})` }
+  };
+  return [cm, 0];
+}
+
+// --- POST-PROCESADO (ProPost Torched) ---
+// Construye la cadena de efectos sobre `imageRef` ([nodeId, slot]) y devuelve la
+// referencia de salida a conectar a SaveImage. Solo añade nodos para efectos activos.
+// Orden: Radial Blur (óptica) -> LUT (color) -> Film Grain (película) -> Vignette (lente).
+function appendPostFx(g, imageRef, job){
+  const fx = job.postfx || getPostFxState();
+  if(!fx || !fx.enabled) return imageRef;
+  const anyFx = (fx.radial?.enabled && Number(fx.radial.strength) > 0)
+    || (fx.lut?.enabled && fx.lut?.name)
+    || (fx.vignette?.enabled && Number(fx.vignette.intensity) > 0)
+    || (fx.grain?.enabled && Number(fx.grain.power) > 0);
+  if(!anyFx) return imageRef;
+
+  // El VAE de Qwen Image 2.1 decodifica en RGBA; LUT Apply (colour) solo acepta
+  // RGB. SplitImageWithAlpha (core) recorta a 3 canales y no altera imágenes RGB.
+  g["post_rgb"] = {
+    class_type: "SplitImageWithAlpha",
+    inputs: { image: imageRef },
+    _meta: { title: "Post-FX: quitar alfa" }
+  };
+  let cur = ["post_rgb", 0];
+
+  // 0. Desenfoque radial opcional (óptica de lente, ProPost Torched)
+  if(fx.radial?.enabled && Number(fx.radial.strength) > 0){
+    g["post_radialblur"] = {
+      class_type: "ProPostRadialBlur",
+      inputs: {
+        image: cur,
+        blur_strength: Number(fx.radial.strength || 64),
+        center_x: 0.5,
+        center_y: 0.5,
+        focus_spread: 2.2,
+        steps: 5,
+      },
+      _meta: { title: "ProPost Radial Blur" }
+    };
+    cur = ["post_radialblur", 0];
+  }
+
+  // 1. 3D LUT Color Grading
+  if(fx.lut?.enabled && fx.lut?.name){
+    g["post_lut"] = {
+      class_type: "LayerColor: LUT Apply",
+      inputs: {
+        image: cur,
+        LUT: fx.lut.name,
+        color_space: "linear",
+        strength: Math.round((fx.lut.strength ?? 0.8) * 100)
+      },
+      _meta: { title: "LayerColor: LUT Apply" }
+    };
+    cur = ["post_lut", 0];
+  } else {
+    delete g["post_lut"];
+  }
+
+  // 2. Viñeta y/o Grano dinámico (un solo nodo)
+  const hasVig = !!(fx.vignette?.enabled && (Number(fx.vignette.intensity) > 0));
+  const hasGrain = !!(fx.grain?.enabled && (Number(fx.grain.power) > 0));
+
+  if(hasVig || hasGrain){
+    g["post_film"] = {
+      class_type: "LayerFilter: FilmV2",
+      inputs: {
+        image: cur,
+        center_x: 0.5,
+        center_y: 0.5,
+        saturation: 1.0,
+        vignette_intensity: hasVig ? parseFloat(fx.vignette.intensity || 0.25) : 0.0,
+        grain_method: "fastgrain",
+        grain_power: hasGrain ? parseFloat(fx.grain.power || 0.15) : 0.0,
+        grain_scale: 1.0,
+        grain_sat: 0.5,
+        filmgrainer_shadows: 0.6,
+        filmgrainer_highs: 0.2,
+        blur_strength: 0,
+        blur_focus_spread: 2.2,
+        focal_depth: 0.9
+      },
+      _meta: { title: "LayerFilter: Film V2 (Vignette & Grain)" }
+    };
+    cur = ["post_film", 0];
+  } else {
+    delete g["post_film"];
+  }
+
+  return cur;
+}
+
+// --- REFINADO FACIAL SOBRE LA IMAGEN FINAL (H3 FaceRefine, imagen) ---
+// Toma la imagen final, recorta el rostro con H3FaceTrackCrop (detector YOLO del
+// pack H3 FaceRefine), lo re-muestrea con el modelo de la última etapa y lo
+// recompone con H3FaceStitch. Sustituye la cadena de latentes de vídeo del pack
+// por VAEEncode -> KSampler -> VAEDecode nativo. Devuelve la referencia de imagen
+// a guardar, o la original si está desactivado.
+function appendFaceRefine(g, imageRef, job, opts){
+  const fr = job.faceRefine;
+  if(!fr || !fr.enabled) return imageRef;
+  if(!opts || !opts.modelRef || !opts.vaeRef || !opts.posRef || !opts.negRef) return imageRef;
+
+  // "auto" (recomendado): el canvas sale del propio recorte, sin never downscale
+  // el rostro; valores numéricos mantienen el canvas manual (512/768, rápido).
+  const canvasAuto = (fr.canvasSize || "auto") === "auto";
+  const canvas = canvasAuto ? 512 : (parseInt(fr.canvasSize, 10) || 768);
+
+  g[N.FACE_CROP] = {
+    class_type: "H3FaceTrackCrop",
+    inputs: {
+      images: imageRef,
+      detector: "face_yolov8m.pt",
+      confidence: 0.35,
+      crop_factor: 3.0,
+      canvas_width: canvas,
+      canvas_height: canvas,
+      canvas_mode: canvasAuto ? "auto_no_downscale" : "manual",
+      smooth_window: 21,
+      size_smooth_window: 51,
+      smooth_method: "gaussian",
+      size_mode: "per_frame",
+      identity_track: false,
+      identity_threshold: 0.28,
+      select: fr.select || "largest_face",
+      fallback_detector: "none",
+      fallback_head_frac: 0.5,
+      select_index: 0,
+      identity_model: "insightface",
+      cut_detection: "none",
+      cut_threshold: 3.0,
+      absent_shots: "off",
+      X: 0,
+      Y: 0,
+      frame_index: 0
+    },
+    _meta: { title: "Face Track Crop" }
+  };
+
+  // H3FaceTrackCrop rellena los recortes hasta la rejilla 17k+5 de MiniMax H3 (1 imagen ->
+  // 5 frames). Con un VAE de vídeo (Wan 2.1 de Krea2) eso da 2 frames latentes y el
+  // KSampler falla en torch.cat ("Expected size 1 but got size 2"). Aquí siempre hay una
+  // sola imagen: se refina solo el primer frame (el stitch usa min(cajas, recortes)).
+  g[N.FACE_FRAME] = {
+    class_type: "ImageFromBatch",
+    inputs: {
+      image: [N.FACE_CROP, 0],
+      batch_index: 0,
+      length: 1
+    },
+    _meta: { title: "Recorte facial (1 frame)" }
+  };
+
+  g[N.FACE_ENCODE] = {
+    class_type: "VAEEncode",
+    inputs: {
+      pixels: [N.FACE_FRAME, 0],
+      vae: opts.vaeRef
+    },
+    _meta: { title: "VAE Encode (Rostro)" }
+  };
+
+  g[N.FACE_SAMPLER] = {
+    class_type: "KSampler",
+    inputs: {
+      seed: (job.seedValue != null ? job.seedValue : 0) + 7919,
+      steps: fr.steps || 10,
+      cfg: opts.cfg != null ? opts.cfg : 1.0,
+      sampler_name: opts.sampler || "euler",
+      scheduler: opts.scheduler || "simple",
+      denoise: fr.denoise || 0.40,
+      model: opts.modelRef,
+      positive: opts.posRef,
+      negative: opts.negRef,
+      latent_image: [N.FACE_ENCODE, 0]
+    },
+    _meta: { title: "KSampler (Rostro)" }
+  };
+
+  g[N.FACE_DECODE] = {
+    class_type: "VAEDecode",
+    inputs: {
+      samples: [N.FACE_SAMPLER, 0],
+      vae: opts.vaeRef
+    },
+    _meta: { title: "VAE Decode (Rostro)" }
+  };
+
+  g[N.FACE_STITCH] = {
+    class_type: "H3FaceStitch",
+    inputs: {
+      base_images: imageRef,
+      refined_crops: [N.FACE_DECODE, 0],
+      transform: [N.FACE_CROP, 1],
+      paste_region: "face_only",
+      mask_dilation: 16,
+      feather: fr.feather || 12,
+      colour_match: 1.0,
+      blend: 1.0,
+      undetected_frames: "fade_out",
+      feather_scales_with_crop: false
+    },
+    _meta: { title: "Stitch Face" }
+  };
+
+  return [N.FACE_STITCH, 0];
+}
+
+// Construcción del grafo dinámico nativo ComfyUI
+// --- Align Your Steps (como el scheduler homónimo de SwarmUI) ---
+// ComfyUI no lo ofrece como scheduler de KSampler: su nodo AlignYourStepsScheduler solo
+// trae curvas SD1/SDXL/SVD. Replicamos el SwarmKSampler: curva de sigmas específica del
+// modelo, interpolada log-lineal al nº de pasos, y la inyectamos con nodos core
+// (ManualSigmas + KSamplerSelect + SamplerCustom), así funciona también en ComfyUI puro.
+const AYS_NOISE_LEVELS = {
+  // https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo/blob/main/model_index.json (+ valor de cola)
+  qwen21: [1.0, 0.978453, 0.95418, 0.926626, 0.89508, 0.845148, 0.704534, 0.414568, 0.001]
+};
+
+function aysLoglinearInterp(levels, num){
+  const ys = levels.slice().reverse().map(Math.log);
+  const out = [];
+  for(let i = 0; i < num; i++){
+    const x = num === 1 ? 0 : i * (ys.length - 1) / (num - 1);
+    const lo = Math.floor(x), hi = Math.min(lo + 1, ys.length - 1);
+    out.push(Math.exp(ys[lo] + (ys[hi] - ys[lo]) * (x - lo)));
+  }
+  return out.reverse();
+}
+
+function aysSigmas(family, steps, denoise){
+  const levels = AYS_NOISE_LEVELS[family];
+  // Mismo recorte que KSampler con denoise < 1: horario de steps/denoise pasos, cola final.
+  const total = (denoise == null || denoise > 0.9999) ? steps : Math.floor(steps / denoise);
+  let sig = (total + 1 === levels.length) ? levels.slice() : aysLoglinearInterp(levels, total + 1);
+  sig[sig.length - 1] = 0;
+  return sig.slice(-(steps + 1));
+}
+
+// Sigue la cadena `model` hasta el loader para saber qué UNET usa un sampler.
+function traceUnetName(g, ref){
+  for(let i = 0; i < 64 && Array.isArray(ref); i++){
+    const n = g[ref[0]];
+    if(!n) return "";
+    if(n.inputs?.unet_name) return n.inputs.unet_name;
+    ref = n.inputs?.model;
+  }
+  return "";
+}
+
+// Convierte en SamplerCustom cada KSampler con scheduler "align_your_steps". Se conserva el
+// id del nodo (las referencias [id, 0] siguen valiendo) y los campos de KSampler, que ComfyUI
+// ignora pero permiten restaurar los parámetros desde los metadatos.
+function applyAlignYourSteps(g){
+  for(const [id, n] of Object.entries(g)){
+    if(n.class_type !== "KSampler" || n.inputs?.scheduler !== "align_your_steps") continue;
+    const inp = n.inputs;
+    const family = unetArchFamily(traceUnetName(g, inp.model));
+    if(!AYS_NOISE_LEVELS[family]){
+      log(`⚠️ Align Your Steps solo tiene curva para Qwen 2.1; el sampler ${id} (${family}) usa 'simple'.`, "l-warn");
+      inp.scheduler = "simple";
+      continue;
+    }
+    const sig = aysSigmas(family, inp.steps, inp.denoise);
+    g[`ays_sigmas_${id}`] = {
+      class_type: "ManualSigmas",
+      inputs: { sigmas: sig.map(v => v.toFixed(6)).join(", ") },
+      _meta: { title: `AYS Sigmas (${id})` }
+    };
+    g[`ays_sampler_${id}`] = {
+      class_type: "KSamplerSelect",
+      inputs: { sampler_name: inp.sampler_name },
+      _meta: { title: `AYS Sampler (${id})` }
+    };
+    n.class_type = "SamplerCustom";
+    Object.assign(inp, {
+      add_noise: true,
+      noise_seed: inp.seed,
+      sampler: [`ays_sampler_${id}`, 0],
+      sigmas: [`ays_sigmas_${id}`, 0]
+    });
+  }
+  return g;
+}
+
+// --- MOSS-Image ---
+// Negativo recomendado por OpenMOSS (USERGUIDE); el template de ComfyUI lo usa cuando
+// el campo negativo está vacío.
+const MOSS_DEFAULT_NEG = "nsfw, worst quality, bad anatomy, watermark, jpeg artifact";
+function mossNegative(isMoss, neg){
+  const t = (neg || "").trim();
+  return (isMoss && !t) ? MOSS_DEFAULT_NEG : t;
+}
+
+// Skip Layer Guidance "uncond skip" (SkipLayerGuidanceDiTSimple, nodo nativo): la rama
+// negativa salta las capas single indicadas. Oficial: capa 22, de 0 a 0.5 del muestreo.
+function appendMossSlg(g, stage, modelRef, j){
+  const layers = String(j.mossSlgLayers ?? "22").trim();
+  if(!layers) return modelRef;
+  const id = `moss_slg_${stage}`;
+  g[id] = {
+    class_type: "SkipLayerGuidanceDiTSimple",
+    inputs: {
+      double_layers: "",
+      single_layers: layers,
+      start_percent: 0,
+      end_percent: Math.min(1, Math.max(0.05, Number(j.mossSlgEnd) || 0.5)),
+      model: modelRef
+    },
+    _meta: { title: `MOSS SLG (${stage})` }
+  };
+  return [id, 0];
+}
+
+function buildGraph(job){
+  const j = job || activeJob || snapshotJob();
+  const g = JSON.parse(JSON.stringify(BASE_GRAPH));
+
+  // Detección de arquitectura por el modelo UNET (difusión). ComfyUI exige que el
+  // tipo de CLIPLoader coincida exactamente con la arquitectura del UNET receptor:
+  //   - Krea2   -> 'krea2'      (CLIP qwen3vl_4b, 30720 features)
+  //   - Qwen2.1 -> 'qwen_image' (CLIP qwen3vl_8b)
+  //   - Flux2/Klein -> 'flux2'  (CLIP qwen3vl_8b, 12288 features)
+  //   - Flux3/Klein -> 'flux3'  (CLIP qwen3vl_4b, 20480 features)
+  // Krea2 y Klein comparten el directorio flux2/, asi que se distinguen por el NOMBRE.
+  const famBase = unetArchFamily(j.baseUnet);
+  const famRefiner = unetArchFamily(j.refinerUnet);
+  const isQwenBase = (famBase === "qwen21");
+  const isKreaBase = (famBase === "krea2");
+  const isQwenRefiner = (famRefiner === "qwen21");
+  const isKreaRefiner = (famRefiner === "krea2");
+  const isMossBase = (famBase === "moss");
+  const isMossRefiner = (famRefiner === "moss");
+
+  // --- EDICIÓN QWEN 2.1: etapas afectadas ---
+  // Vía oficial (template image_qwen_image_2_1_image_edit de ComfyUI): conditioning
+  // del encoder de edición + latent del encoder + denoise 1.0 + CFG 1 en la etapa
+  // editada. Los pasos/denoise que muestre la UI son del usuario (el template
+  // oficial recomienda ~25 pasos euler/simple; un UNET Turbo usa su horario propio).
+  const editMethod = (j.qwenEdit?.enabled) ? (j.qwenEdit.method || "edit") : null;
+  const reactorMode = (editMethod === "reactor");
+  const qwenEditStage = (!reactorMode && j.qwenEdit?.enabled) ? (j.qwenEdit.stage || "refiner") : null;
+  const qwenEditWantsBase = !!(qwenEditStage && (qwenEditStage === "base" || qwenEditStage === "both"));
+  const qwenEditWantsRefiner = !!(qwenEditStage && (qwenEditStage === "refiner" || qwenEditStage === "both"));
+  const qwenEditIntegrate = (!reactorMode && j.qwenEdit?.enabled) ? (j.qwenEdit.integrate || "face") : "none";
+
+  // --- VALIDACIÓN DE COMPATIBILIDAD VAE/UNET (por canales latentes) ---
+  // El Wan2.1_VAE_upscale2x_imageonly_real_v1 es un VAE especial de upscaling 2x para
+  // nodos VAEUtils (como en el workflow nativo Krea2_OK.json). No puede usarse como
+  // VAE principal de un pipeline KSampler -> VAEDecode -> SaveImage/PreviewImage.
+  function famLabel(f){
+    if(f === "qwen21") return "Qwen 2.1 (64 canales · qwen_image_2.1_vae)";
+    if(f === "flux2") return "Flux2/Klein (128 canales · flux2-vae)";
+    if(f === "flux3") return "Flux3/Klein (128 canales · flux2-vae)";
+    if(f === "moss") return "MOSS-Image (128 canales · flux2-vae_small)";
+    return "Krea2 (16 canales · qwen_image_vae / wan_2.1_vae)";
+  }
+  function vaeMatches(vaeName, family){
+    return vaeLatentFamily(vaeName) === latentFamily(family);
+  }
+  // Selectores vacíos: vaeLatentFamily("") / unetArchFamily("") devuelven "krea2",
+  // así que un VAE vacío pasaba la validación de compatibilidad y llegaba a
+  // ComfyUI como vae_name '' ("Model in folder 'vae' with filename '' not found").
+  const usesRefiner = j.refinerEnabled && j.comboMode !== "base_only";
+  const emptySel = [];
+  if(!j.baseUnet) emptySel.push("modelo Base");
+  if(!j.baseClip) emptySel.push("text encoder Base");
+  if(!j.baseVae) emptySel.push("VAE Base");
+  if(usesRefiner){
+    if(!j.refinerUnet) emptySel.push("modelo Refiner");
+    if(!j.refinerClip) emptySel.push("text encoder Refiner");
+    if(!j.refinerVae) emptySel.push("VAE Refiner");
+  }
+  if(emptySel.length){
+    throw new Error(`Falta seleccionar: ${emptySel.join(", ")}. Puede que el modelo guardado en los ajustes ya no exista; elige uno en el selector.`);
+  }
+  if(vaeLatentFamily(j.baseVae) === "vaeutils"){
+    throw new Error(`VAE Base no soportado: "${j.baseVae}" es un VAE de upscaling 2x para nodos VAEUtils, no para VAEDecode/SaveImage. Usa ${fallbackVae(famBase)}.`);
+  }
+  if(j.refinerEnabled && j.comboMode !== "base_only" && vaeLatentFamily(j.refinerVae) === "vaeutils"){
+    throw new Error(`VAE Refiner no soportado: "${j.refinerVae}" es un VAE de upscaling 2x para nodos VAEUtils, no para VAEDecode/SaveImage. Usa ${fallbackVae(famRefiner)}.`);
+  }
+  if(!clipFitsFamily(j.baseClip, famBase, j.baseUnet)){
+    throw new Error(`Text encoder Base incompatible: "${j.baseClip}" no vale para "${j.baseUnet}" (${famBase}). Usa un ${archClipKeyword(famBase, j.baseUnet)}.`);
+  }
+  if(usesRefiner && !clipFitsFamily(j.refinerClip, famRefiner, j.refinerUnet)){
+    throw new Error(`Text encoder Refiner incompatible: "${j.refinerClip}" no vale para "${j.refinerUnet}" (${famRefiner}). Usa un ${archClipKeyword(famRefiner, j.refinerUnet)}.`);
+  }
+  if(!vaeMatches(j.baseVae, famBase)){
+    throw new Error(`VAE Base incompatible: "${j.baseVae}" no decodifica los latentes de ${famLabel(famBase)}. Selecciona ${fallbackVae(famBase)}.`);
+  }
+  if(j.refinerEnabled && j.comboMode !== "base_only" && !vaeMatches(j.refinerVae, famRefiner)){
+    throw new Error(`VAE Refiner incompatible: "${j.refinerVae}" no decodifica los latentes de ${famLabel(famRefiner)}. Selecciona ${fallbackVae(famRefiner)}.`);
+  }
+
+  // --- ETAPA 1 (BASE) ---
+  g[N.UNET_BASE].inputs.unet_name = j.baseUnet;
+  g[N.UNET_BASE].inputs.weight_dtype = resolveWeightDtype(j.baseWeightDtype, j.baseUnet);
+
+  let curBaseModel = [N.UNET_BASE, 0];
+  if(j.baseAttn && j.baseAttn !== "none"){
+    g[N.ATTN_BASE].inputs.attention = j.baseAttn;
+    g[N.ATTN_BASE].inputs.model = curBaseModel;
+    curBaseModel = [N.ATTN_BASE, 0];
+  } else {
+    delete g[N.ATTN_BASE];
+  }
+
+  // Encadenar LoRAs Base (hasta 4)
+  if(Array.isArray(j.baseLoras)){
+    j.baseLoras.forEach((l, i) => {
+      if(l.on && l.lora){
+        const loraNodeId = `base_lora_${i + 1}`;
+        g[loraNodeId] = {
+          class_type: "LoraLoaderModelOnly",
+          inputs: {
+            lora_name: l.lora,
+            strength_model: l.strength,
+            model: curBaseModel
+          },
+          _meta: { title: `LoRA Base ${i + 1}` }
+        };
+        curBaseModel = [loraNodeId, 0];
+      }
+    });
+  }
+
+  // Spectrum Base (Aceleración de difusión para Krea2 / Flux2 / Qwen)
+  if(j.spectrumEnabled){
+    const warmup = Math.min(4, Math.max(1, Math.floor(j.baseSteps * 0.35)));
+    g["swarm_spectrum_base"] = {
+      class_type: "SwarmSpectrum",
+      inputs: {
+        w: j.spectrumW,
+        m: 3,
+        lam: j.spectrumLam,
+        window_size: 2,
+        flex_window: 0.25,
+        warmup_steps: warmup,
+        stop_caching_step: -1,
+        steps: j.baseSteps,
+        calibrated: false,
+        calibration_strength: 0.5,
+        model: curBaseModel
+      },
+      _meta: { title: "SwarmSpectrum (Base)" }
+    };
+    curBaseModel = ["swarm_spectrum_base", 0];
+  }
+
+  if(isQwenBase && Number(j.baseCfg) > 1){
+    curBaseModel = appendQwenCacheOff(g, "base", curBaseModel);
+  }
+  if(isMossBase && Number(j.baseCfg) > 1){
+    curBaseModel = appendMossSlg(g, "base", curBaseModel, j);
+  }
+
+  g[N.SAMPLER_BASE].inputs.model = curBaseModel;
+
+  // CLIP Base
+  g[N.CLIP_BASE].inputs.clip_name = j.baseClip;
+  g[N.CLIP_BASE].inputs.type = archClipType(famBase);
+
+  g[N.POS_BASE].inputs.text = (j.prompt || "").trim();
+  // Krea 2 (Flux) no soporta prompt negativo (CFG=1), lo vaciamos. Qwen UC sí lo soporta.
+  g[N.NEG_BASE].inputs.text = isKreaBase ? "" : mossNegative(isMossBase, j.negPrompt);
+
+  // Edición con Qwen 2.1 en la etapa Base (solo si el Base es Qwen).
+  const qwenEditBase = (isQwenBase && qwenEditWantsBase)
+    ? appendQwenEditStage(g, "base", { job: j, clipRef: [N.CLIP_BASE, 0], vaeRef: [N.VAE_BASE, 0], prompt: j.prompt, negative: j.negPrompt, integrateFace: qwenEditIntegrate === "face" })
+    : null;
+
+  // RBG Smart Seed Variance Base (solo si la etapa contiene Krea2)
+  const varianceActive = j.variancePreset && !j.variancePreset.includes("Disabled");
+  if(qwenEditBase){
+    g[N.SAMPLER_BASE].inputs.positive = [qwenEditBase.encoder, 0];
+    g[N.SAMPLER_BASE].inputs.negative = [qwenEditBase.encoder, 1];
+  } else if(isKreaBase && varianceActive){
+    g["rbg_variance_base"] = {
+      class_type: "RBG_Smart_Seed_Variance",
+      inputs: {
+        variance_preset: j.variancePreset,
+        fine_tune_variance: j.varianceFineTune ?? 46,
+        model_type: "📸 Krea2 (SingleStream)",
+        fade_curve: j.varianceFadeCurve || "Instant",
+        noise_injection: j.varianceNoiseInjection || "Beginning Steps",
+        protect_mode: j.protectMode,
+        protect_regions: "",
+        direction_shift: j.varianceDirection || "🌎 Diversity",
+        shift_strength: j.varianceShiftStrength ?? 150,
+        variance_schedule: "constant",
+        cutoff_step: 8,
+        total_steps: j.baseSteps,
+        cutoff_strength: 0.1,
+        seed: j.varianceSeedValue,
+        vibe_blend: 0.59,
+        conditioning: [N.POS_BASE, 0]
+      },
+      _meta: { title: "RBG Smart Seed Variance (Base Krea2)" }
+    };
+    g[N.SAMPLER_BASE].inputs.positive = ["rbg_variance_base", 0];
+  } else {
+    g[N.SAMPLER_BASE].inputs.positive = [N.POS_BASE, 0];
+  }
+
+  g[N.LATENT_BASE].inputs.width = j.baseW;
+  g[N.LATENT_BASE].inputs.height = j.baseH;
+
+  // Con edición activa, el latent sale del encoder (resolución de la referencia,
+  // que es lo que exige Qwen 2.1 para no desplazar la edición).
+  if(qwenEditBase){
+    delete g[N.LATENT_BASE];
+    g[N.SAMPLER_BASE].inputs.latent_image = qwenEditBase.latent;
+  }
+
+  g[N.SAMPLER_BASE].inputs.steps = j.baseSteps;
+  g[N.SAMPLER_BASE].inputs.cfg = j.baseCfg;
+  g[N.SAMPLER_BASE].inputs.sampler_name = j.baseSampler;
+  g[N.SAMPLER_BASE].inputs.scheduler = j.baseScheduler;
+  g[N.SAMPLER_BASE].inputs.seed = j.seedValue;
+
+  g[N.VAE_BASE].inputs.vae_name = j.baseVae;
+
+  // --- MODO SOLO BASE (BYPASS DE UPSCALE Y REFINER) ---
+  if(!j.refinerEnabled || j.comboMode === "base_only"){
+    delete g[N.UPSCALE_LOADER];
+    delete g[N.UPSCALE_MODEL];
+    delete g[N.IMAGE_SCALE];
+    delete g[N.VAE_REFINER];
+    delete g[N.ENCODE_REFINER];
+    delete g[N.UNET_REFINER];
+    delete g[N.ATTN_REFINER];
+    delete g[N.CLIP_REFINER];
+    delete g[N.POS_REFINER];
+    delete g[N.NEG_REFINER];
+    delete g[N.SAMPLER_REFINER];
+    delete g[N.DECODE_REFINER];
+    // Faceswap directo (ReActor) sobre la imagen final, o integración
+    // anti-"pegada" del edit: en solo-base la imagen objetivo es la primera
+    // referencia; no hay latent de borrador que mezclar.
+    let baseOutRef = [N.DECODE_BASE, 0];
+    if(reactorMode){
+      const sw = applyReActorSwap(g, baseOutRef, j, "base");
+      if(sw) baseOutRef = sw;
+    } else if(qwenEditBase){
+      const integ = applyQwenEditIntegration(g, baseOutRef, j, "base", {
+        editLatentRef: null,
+        draftLatentRef: null,
+        baseImageRef: qwenEditBase.targetImage,
+        baseDims: { w: j.qwenEdit?.refW, h: j.qwenEdit?.refH },
+        vaeRef: [N.VAE_BASE, 0],
+      });
+      if(integ) baseOutRef = integ;
+    } else if(j.qwenEdit?.enabled){
+      // En bypass no se llega a los avisos de la vía completa: avisos propios.
+      if(qwenEditWantsRefiner && !qwenEditWantsBase){
+        log(`⚠️ Edición Qwen 2.1: la etapa elegida es 'Refiner', pero el Refiner está desactivado (solo base) → la edición no se aplicará. Cambia la etapa a 'Base' o activa el Refiner.`, "l-warn");
+      } else if(qwenEditWantsBase && !isQwenBase){
+        log(`⚠️ Edición Qwen 2.1: la etapa Base no usa un modelo Qwen (comprueba el modo o el UNET) → la edición no se aplicará.`, "l-warn");
+      } else {
+        log(`⚠️ Edición Qwen 2.1: sin imagen de referencia cargada → usa 'Referencias → Usar imagen de referencia'.`, "l-warn");
+      }
+    }
+    // Refinado facial opcional (reutiliza el modelo de la etapa Base) y
+    // post-procesado cosmético sobre la imagen resultante.
+    const baseFinalRef = appendFaceRefine(g, baseOutRef, j, {
+      modelRef: g[N.SAMPLER_BASE].inputs.model,
+      vaeRef: [N.VAE_BASE, 0],
+      posRef: [N.POS_BASE, 0],
+      negRef: [N.NEG_BASE, 0],
+      cfg: j.baseCfg, sampler: j.baseSampler, scheduler: j.baseScheduler
+    });
+    g[N.SAVE_IMAGE].inputs.images = appendPostFx(g, baseFinalRef, j);
+    g[N.SAVE_IMAGE].inputs.filename_prefix = j.filenamePrefix;
+    return g;
+  }
+
+  // --- INTER-ETAPA (UPSCALE NEURONAL) ---
+  if(j.upscaleEnabled){
+    g[N.UPSCALE_LOADER].inputs.model_name = j.upscaleModel;
+    g[N.IMAGE_SCALE].inputs.width = j.targetW;
+    g[N.IMAGE_SCALE].inputs.height = j.targetH;
+  } else {
+    delete g[N.UPSCALE_LOADER];
+    delete g[N.UPSCALE_MODEL];
+    g[N.IMAGE_SCALE].inputs.image = [N.DECODE_BASE, 0];
+    g[N.IMAGE_SCALE].inputs.width = j.baseW;
+    g[N.IMAGE_SCALE].inputs.height = j.baseH;
+  }
+
+  // --- ETAPA 2 (REFINER) ---
+  g[N.UNET_REFINER].inputs.unet_name = j.refinerUnet;
+  g[N.UNET_REFINER].inputs.weight_dtype = resolveWeightDtype(j.refinerWeightDtype, j.refinerUnet);
+
+  let curRefinerModel = [N.UNET_REFINER, 0];
+  if(j.refinerAttn && j.refinerAttn !== "none"){
+    g[N.ATTN_REFINER].inputs.attention = j.refinerAttn;
+    g[N.ATTN_REFINER].inputs.model = curRefinerModel;
+    curRefinerModel = [N.ATTN_REFINER, 0];
+  } else {
+    delete g[N.ATTN_REFINER];
+  }
+
+  // Encadenar LoRAs Refiner (hasta 4)
+  if(Array.isArray(j.refinerLoras)){
+    j.refinerLoras.forEach((l, i) => {
+      if(l.on && l.lora){
+        const loraNodeId = `refiner_lora_${i + 1}`;
+        g[loraNodeId] = {
+          class_type: "LoraLoaderModelOnly",
+          inputs: {
+            lora_name: l.lora,
+            strength_model: l.strength,
+            model: curRefinerModel
+          },
+          _meta: { title: `LoRA Refiner ${i + 1}` }
+        };
+        curRefinerModel = [loraNodeId, 0];
+      }
+    });
+  }
+
+  // Spectrum Refiner (Aceleración de difusión para Krea2 / Flux2 / Qwen)
+  if(j.spectrumEnabled){
+    const warmup = Math.min(3, Math.max(1, Math.floor(j.refinerSteps * 0.35)));
+    g["swarm_spectrum_refiner"] = {
+      class_type: "SwarmSpectrum",
+      inputs: {
+        w: j.spectrumW,
+        m: 3,
+        lam: j.spectrumLam,
+        window_size: 2,
+        flex_window: 0.25,
+        warmup_steps: warmup,
+        stop_caching_step: -1,
+        steps: j.refinerSteps,
+        calibrated: false,
+        calibration_strength: 0.5,
+        model: curRefinerModel
+      },
+      _meta: { title: "SwarmSpectrum (Refiner)" }
+    };
+    curRefinerModel = ["swarm_spectrum_refiner", 0];
+  }
+
+  if(isQwenRefiner && Number(j.refinerCfg) > 1){
+    curRefinerModel = appendQwenCacheOff(g, "refiner", curRefinerModel);
+  }
+  if(isMossRefiner && Number(j.refinerCfg) > 1){
+    curRefinerModel = appendMossSlg(g, "refiner", curRefinerModel, j);
+  }
+
+  g[N.SAMPLER_REFINER].inputs.model = curRefinerModel;
+
+  g[N.CLIP_REFINER].inputs.clip_name = j.refinerClip;
+  g[N.CLIP_REFINER].inputs.type = archClipType(famRefiner);
+
+  g[N.POS_REFINER].inputs.text = (j.prompt || "").trim();
+  // Krea 2 (Flux) no soporta prompt negativo, lo vaciamos. Qwen UC sí lo soporta.
+  g[N.NEG_REFINER].inputs.text = isKreaRefiner ? "" : mossNegative(isMossRefiner, j.negPrompt);
+
+  // Edición con Qwen 2.1 en la etapa Refiner vía oficial: el borrador intermedio
+  // (IMAGE del nodo 26) entra como <image1> (objetivo del edit, la salida sigue su
+  // composición), las referencias del usuario como <image2>+; el latent sale del
+  // encoder (vacío, a tamaño del objetivo) y el sampler va a denoise 1.0.
+  const qwenEditRefiner = (isQwenRefiner && qwenEditWantsRefiner)
+    ? appendQwenEditStage(g, "refiner", { job: j, clipRef: [N.CLIP_REFINER, 0], vaeRef: [N.VAE_REFINER, 0], prompt: j.prompt, negative: j.negPrompt, draftImage: [N.IMAGE_SCALE, 0], integrateFace: qwenEditIntegrate === "face" })
+    : null;
+
+  // Aviso: edición activada sin ninguna etapa Qwen compatible.
+  if(j.qwenEdit?.enabled && !reactorMode && !qwenEditBase && !qwenEditRefiner){
+    const stage = qwenEditStage || "refiner";
+    if(qwenEditWantsRefiner && !isQwenRefiner && !qwenEditWantsBase){
+      log(`⚠️ Edición Qwen 2.1: el Refiner no usa un modelo Qwen, así que la edición en esa etapa no se aplicará. Elige un UNET Qwen 2.1 en el Refiner (o modo Base→Refiner con Qwen en la etapa editada).`, "l-warn");
+    } else if(qwenEditWantsBase && !isQwenBase && !qwenEditWantsRefiner){
+      log(`⚠️ Edición Qwen 2.1: la etapa Base no usa un modelo Qwen, así que la edición ahí no se aplicará. La edición solo actúa en etapas con Qwen 2.1.`, "l-warn");
+    } else {
+      log(`⚠️ Edición Qwen 2.1: sin imagen de referencia cargada en modo base/ambas (el Refiner sí puede editar el borrador sin referencias). Usa 'Referencias → Usar imagen de referencia'.`, "l-warn");
+    }
+  }
+
+  // RBG Smart Seed Variance Refiner (solo si Krea2 está en Refiner y no en Base)
+  if(qwenEditRefiner){
+    g[N.SAMPLER_REFINER].inputs.positive = [qwenEditRefiner.encoder, 0];
+    g[N.SAMPLER_REFINER].inputs.negative = [qwenEditRefiner.encoder, 1];
+  } else if(!isKreaBase && isKreaRefiner && varianceActive){
+    g["rbg_variance_refiner"] = {
+      class_type: "RBG_Smart_Seed_Variance",
+      inputs: {
+        variance_preset: j.variancePreset,
+        fine_tune_variance: j.varianceFineTune ?? 46,
+        model_type: "📸 Krea2 (SingleStream)",
+        fade_curve: j.varianceFadeCurve || "Instant",
+        noise_injection: j.varianceNoiseInjection || "Beginning Steps",
+        protect_mode: j.protectMode,
+        protect_regions: "",
+        direction_shift: j.varianceDirection || "🌎 Diversity",
+        shift_strength: j.varianceShiftStrength ?? 150,
+        variance_schedule: "constant",
+        cutoff_step: 4,
+        total_steps: j.refinerSteps,
+        cutoff_strength: 0.1,
+        seed: j.varianceSeedValue,
+        vibe_blend: 0.59,
+        conditioning: [N.POS_REFINER, 0]
+      },
+      _meta: { title: "RBG Smart Seed Variance (Refiner Krea2)" }
+    };
+    g[N.SAMPLER_REFINER].inputs.positive = ["rbg_variance_refiner", 0];
+  } else {
+    g[N.SAMPLER_REFINER].inputs.positive = [N.POS_REFINER, 0];
+  }
+
+  g[N.VAE_REFINER].inputs.vae_name = j.refinerVae;
+
+  g[N.SAMPLER_REFINER].inputs.steps = j.refinerSteps;
+  g[N.SAMPLER_REFINER].inputs.cfg = qwenEditRefiner ? 1 : j.refinerCfg;
+  g[N.SAMPLER_REFINER].inputs.sampler_name = j.refinerSampler;
+  g[N.SAMPLER_REFINER].inputs.scheduler = j.refinerScheduler;
+  g[N.SAMPLER_REFINER].inputs.denoise = qwenEditRefiner ? 1.0 : j.refinerDenoise;
+  g[N.SAMPLER_REFINER].inputs.seed = j.seedValue + 1;
+  // Con edición el latent sale del encoder de edición (vacío, a tamaño del
+  // objetivo editado): muestrear sobre el latent del borrador (VAEEncode 1488px)
+  // descompensaría el espacio del conditioning y la integración (1472px).
+  if(qwenEditRefiner){
+    g[N.SAMPLER_REFINER].inputs.latent_image = qwenEditRefiner.latent;
+  }
+
+  // Refinado facial opcional (reutiliza el modelo de la etapa Refiner) y
+  // post-procesado cosmético sobre la imagen resultante.
+  // Faceswap directo (ReActor) sobre el final o sobre el borrador antes del
+  // refiner; o integración anti-"pegada": el rostro del edit se recompone sobre
+  // el borrador (o el latent editado se mezcla con el del borrador) antes del
+  // FaceRefine/PostFx.
+  let refinerOutRef = [N.DECODE_REFINER, 0];
+  if(reactorMode){
+    if((j.qwenEdit.reactorTiming || "after") === "before" && g[N.ENCODE_REFINER]){
+      // Swap ANTES del refiner: el refiner muestrea el latent del borrador ya
+      // trasplantado (denoise bajo del usuario funde el rostro con la escena).
+      const sw = applyReActorSwap(g, [N.IMAGE_SCALE, 0], j, "draft");
+      if(sw){
+        g[N.ENCODE_REFINER].inputs.pixels = sw;
+        // El visor "Borrador" (nodo 50) ahora debe enseñar el borrador ya con el
+        // swap, que es lo que el Refiner muestrea, no el decode pre-swap.
+        if(g[N.PREVIEW_BASE]) g[N.PREVIEW_BASE].inputs.images = sw;
+      } else {
+        const sw2 = applyReActorSwap(g, refinerOutRef, j, "refiner");
+        if(sw2) refinerOutRef = sw2;
+      }
+    } else {
+      const sw = applyReActorSwap(g, refinerOutRef, j, "refiner");
+      if(sw) refinerOutRef = sw;
+    }
+  } else if(qwenEditBase || qwenEditRefiner){
+    if(qwenEditIntegrate !== "none"){
+      const integ = applyQwenEditIntegration(g, refinerOutRef, j, "refiner", {
+        editLatentRef: [N.SAMPLER_REFINER, 0],
+        draftLatentRef: [N.ENCODE_REFINER, 0],
+        baseImageRef: (qwenEditRefiner?.targetImage) || [N.IMAGE_SCALE, 0],
+        baseDims: {
+          w: g[N.IMAGE_SCALE]?.inputs?.width,
+          h: g[N.IMAGE_SCALE]?.inputs?.height,
+        },
+        vaeRef: [N.VAE_REFINER, 0],
+      });
+      if(integ) refinerOutRef = integ;
+    }
+  }
+  const refinerFinalRef = appendFaceRefine(g, refinerOutRef, j, {
+    modelRef: g[N.SAMPLER_REFINER].inputs.model,
+    vaeRef: [N.VAE_REFINER, 0],
+    posRef: [N.POS_REFINER, 0],
+    negRef: [N.NEG_REFINER, 0],
+    cfg: j.refinerCfg, sampler: j.refinerSampler, scheduler: j.refinerScheduler
+  });
+  g[N.SAVE_IMAGE].inputs.images = appendPostFx(g, refinerFinalRef, j);
+  g[N.SAVE_IMAGE].inputs.filename_prefix = j.filenamePrefix;
+
+  return g;
+}
+
+// Metadata para variantes
+CONFIG.variantMeta = function(seedValue, timeText){
+  const realSeed = (seedValue !== null && seedValue !== undefined && seedValue !== "") 
+    ? String(seedValue) 
+    : ($("samplerSeed")?.value || "—");
+  const realTime = (timeText && String(timeText).trim()) ? String(timeText).trim() : ($("time1")?.textContent?.replace("⏱", "")?.trim() || "—");
+
+  const rows = [
+    ["Tiempo", realTime],
+    ["Semilla", realSeed],
+    ["Modo", $("comboMode")?.value || ""],
+    ["Base", $("baseUnetSelect")?.value || ""],
+    ["Refiner", $("refinerEnabled")?.checked ? ($("refinerUnetSelect")?.value || "") : "Desactivado"],
+    ["Denoise Refiner", $("refinerDenoise")?.value || ""],
+    ["Upscale Model", $("upscaleEnabled")?.checked ? ($("upscaleModelSelect")?.value || "") : "Desactivado"],
+    ["Factor Escala", `${$("upscaleFactor")?.value || "1.5"}x`],
+    ["Pasos Base/Ref", `${$("baseSteps")?.value || "8"} / ${$("refinerSteps")?.value || "6"}`],
+  ];
+  if($("variancePreset") && !$("variancePreset").value.includes("Disabled")){
+    rows.push(["Variance", `${$("variancePreset").value} (${$("protectMode")?.value || ""})`]);
+  }
+  {
+    const fr = getFaceRefineState();
+    if(fr.enabled){
+      rows.push(["FaceRefine", `on · steps ${fr.steps} · denoise ${fr.denoise.toFixed(2)} · ${fr.canvasSize}px · feather ${fr.feather}px`]);
+    }
+  }
+  const activeLoras = [];
+  baseLoras.forEach((l, i) => {
+    if(l.on && l.lora) activeLoras.push({ name: `Base: ${l.lora.split('/').pop()}`, strength: Number(l.strength).toFixed(2), on: true });
+  });
+  refinerLoras.forEach((l, i) => {
+    if(l.on && l.lora) activeLoras.push({ name: `Ref: ${l.lora.split('/').pop()}`, strength: Number(l.strength).toFixed(2), on: true });
+  });
+  return { title: "Parámetros KreaQwen", rows, loras: activeLoras };
+};
+
+// Helper URL y medios
+function getServerUrl(){
+  return (typeof server === "function") ? server() : (CONFIG.serverUrl || "http://127.0.0.1:7821");
+}
+
+// URL directa al backend ComfyUI. Con serverUrl vacío la UI habla con el proxy
+// local, que NO reenvía /free; para ese endpoint hay que ir al backend directo
+// (mismo host, puerto DEFAULT_BACKEND_PORT).
+function getDirectBackendUrl(){
+  const s = (typeof server === "function") ? server() : "";
+  if(s) return s; // servidor explícito: es el backend directo
+  const host = window.location.hostname || "127.0.0.1";
+  return `http://${host}:${DEFAULT_BACKEND_PORT}`;
+}
+
+// POST a un endpoint del backend tolerando el caso del proxy (que puede no
+// reenviar la ruta, p.ej. /free). Si el proxy responde 404/405 reintenta directo.
+async function postBackend(endpoint, body){
+  const payload = JSON.stringify(body);
+  const opts = { method: "POST", headers: { "Content-Type": "application/json" }, body: payload };
+  let r = await fetch(`${getServerUrl()}${endpoint}`, opts);
+  if(r.ok) return r;
+  // El proxy no reenvía esta ruta -> probamos el backend directo.
+  if((r.status === 404 || r.status === 405) && !(typeof server === "function" && server())){
+    r = await fetch(`${getDirectBackendUrl()}${endpoint}`, opts);
+  }
+  return r;
+}
+
+function mediaUrl(media){
+  if(!media) return "";
+  const srv = getServerUrl();
+  return `${srv}/view?filename=${encodeURIComponent(media.filename)}&subfolder=${encodeURIComponent(media.subfolder||"")}&type=${encodeURIComponent(media.type||"output")}`;
+}
+
+// Captura de medios devueltos
+CONFIG.findMedia = function(nodeOutput){
+  for(const k of ["images", "videos", "gifs"]){
+    if(nodeOutput[k]?.length) return nodeOutput[k][nodeOutput[k].length - 1];
+  }
+  return null;
+};
+
+let currentBatchStage = "base";
+
+// Monitoreo de nodo en ejecución para feedback en vivo
+CONFIG.onNodeExecuting = function(nodeId){
+  if(nodeId === N.SAMPLER_BASE){
+    currentBatchStage = "base";
+    setRun("busy", "Generando etapa Base...");
+  } else if(nodeId === N.UPSCALE_MODEL || nodeId === N.IMAGE_SCALE){
+    currentBatchStage = "upscale";
+    setRun("busy", "Reescalando imagen (Upscale)...");
+  } else if(nodeId === N.SAMPLER_REFINER){
+    currentBatchStage = "refiner";
+    setRun("busy", "Refinando imagen (Etapa Refiner)...");
+  } else if(nodeId === N.FACE_CROP){
+    setRun("busy", "Detectando y recortando rostro...");
+  } else if(nodeId === N.FACE_SAMPLER){
+    setRun("busy", "Refinando rostro (FaceRefine)...");
+  } else if(nodeId === N.FACE_STITCH){
+    setRun("busy", "Recomponiendo rostro...");
+  } else if(nodeId === N.DECODE_BASE || nodeId === N.DECODE_REFINER){
+    setRun("busy", "Decodificando VAE...");
+  }
+};
+
+// Captura de nodos ejecutados (ej. PreviewImage de Base)
+CONFIG.onNodeExecuted = function(data){
+  if(!data || !data.output) return;
+  if(data.node === N.PREVIEW_BASE || data.node === N.DECODE_BASE){
+    const media = CONFIG.findMedia(data.output);
+    if(media){
+      const url = mediaUrl(media);
+      currentBaseMedia = { media, url };
+      if(currentViewMode === "base" || !currentFinalMedia){
+        showImageView("base");
+      }
+    }
+  }
+};
+
+// Renderizado de previews en vivo (Latent2RGB / TAESD por WebSocket)
+CONFIG.onPreview = function(url, meta){
+  const img = $("outputImg"), empty = $("empty1"), dl = $("dl1"), badge = $("imgDimBadge");
+  if(img && empty){
+    img.src = url;
+    img.style.display = "block";
+    empty.style.display = "none";
+    if(dl) dl.style.display = "none";
+    if(badge) badge.style.display = "none";
+    const info = $("imgInfo");
+    if(info){
+      const stageName = (currentBatchStage === "refiner") ? "Refiner" : "Base";
+      const stepStr = (meta && meta.step != null && meta.max_steps) ? ` (${meta.step}/${meta.max_steps})` : "";
+      info.textContent = `⚡ Muestreando ${stageName}${stepStr}`;
+    }
+  }
+};
+
+// Limpieza de preview
+CONFIG.onClearPreview = function(){
+  if(!currentFinalMedia && !currentBaseMedia){
+    const img = $("outputImg"), empty = $("empty1"), dl = $("dl1"), badge = $("imgDimBadge");
+    if(img){ img.style.display = "none"; img.removeAttribute("src"); }
+    if(empty) empty.style.display = "flex";
+    if(dl) dl.style.display = "none";
+    if(badge) badge.style.display = "none";
+    const info = $("imgInfo");
+    if(info) info.textContent = "";
+  }
+};
+
+CONFIG.showMedia = function(slot, media, options){
+  const url = mediaUrl(media);
+  if(options?.node === N.PREVIEW_BASE || options?.node === N.DECODE_BASE){
+    currentBaseMedia = { media, url };
+  } else {
+    currentFinalMedia = { media, url };
+    showImageView("final");
+  }
+};
+
+CONFIG.renderVariantMedia = function(card, url, media){
+  return `<img src="${escapeHtml(url)}">`;
+};
+
+// Estado y navegación de variantes (teclado / pantalla completa)
+let currentVariantIndex = -1;
+let _variantFsOverlay = null;
+let _variantFsCleanup = null;
+let _variantFsIndex = -1;
+
+function getVariantCards(){
+  const grid = $("variantGrid");
+  if(!grid) return [];
+  return Array.from(grid.querySelectorAll(".variant-card"));
+}
+
+function selectVariantByIndex(idx){
+  const cards = getVariantCards();
+  if(!cards.length) return null;
+  if(idx < 0) idx = cards.length - 1;
+  if(idx >= cards.length) idx = 0;
+  currentVariantIndex = idx;
+  const card = cards[idx];
+  const url = `${server()}/view?filename=${encodeURIComponent(card.dataset.filename)}&subfolder=${encodeURIComponent(card.dataset.subfolder || "")}&type=${encodeURIComponent(card.dataset.type || "output")}`;
+  const mediaData = { filename: card.dataset.filename, subfolder: card.dataset.subfolder || "", type: card.dataset.type || "output" };
+  currentFinalMedia = { media: mediaData, ...mediaData, url };
+  showImageView("final");
+  extractWorkflowFromImage(url);
+  return { card, url, index: idx, total: cards.length };
+}
+
+function navigateVariant(dir){
+  const cards = getVariantCards();
+  if(!cards.length) return null;
+  if(currentVariantIndex < 0) currentVariantIndex = 0;
+  return selectVariantByIndex(currentVariantIndex + dir);
+}
+
+// Visor a pantalla completa para una variante con navegación por flechas de teclado / swipe
+function openVariantFullscreen(target){
+  closeVariantFullscreen();
+
+  const cards = getVariantCards();
+  let initialUrl = "";
+  if(typeof target === "number"){
+    _variantFsIndex = target;
+  } else if(target && target.nodeType === 1 && target.classList.contains("variant-card")){
+    _variantFsIndex = cards.indexOf(target);
+  } else if(typeof target === "string"){
+    initialUrl = target;
+    _variantFsIndex = cards.findIndex(c => {
+      const cUrl = `${server()}/view?filename=${encodeURIComponent(c.dataset.filename)}&subfolder=${encodeURIComponent(c.dataset.subfolder || "")}&type=${encodeURIComponent(c.dataset.type || "output")}`;
+      return cUrl === target || (c.dataset.filename && target.includes(encodeURIComponent(c.dataset.filename)));
+    });
+  }
+  if(_variantFsIndex < 0){
+    if(cards.length > 0) _variantFsIndex = 0;
+    else if(!initialUrl) return;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.className = "variant-fs-overlay";
+
+  const img = document.createElement("img");
+  img.draggable = false;
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "variant-fs-close";
+  closeBtn.textContent = "✕";
+  closeBtn.title = "Cerrar (Esc)";
+
+  const dl = document.createElement("a");
+  dl.className = "variant-fs-dl";
+  dl.download = "";
+  dl.textContent = "⬇ Descargar";
+  dl.title = "Descargar";
+
+  const prevBtn = document.createElement("button");
+  prevBtn.className = "variant-fs-prev";
+  prevBtn.textContent = "‹";
+  prevBtn.title = "Anterior (Flecha izquierda)";
+
+  const nextBtn = document.createElement("button");
+  nextBtn.className = "variant-fs-next";
+  nextBtn.textContent = "›";
+  nextBtn.title = "Siguiente (Flecha derecha)";
+
+  const counter = document.createElement("div");
+  counter.className = "variant-fs-counter";
+
+  overlay.appendChild(img);
+  overlay.appendChild(closeBtn);
+  overlay.appendChild(dl);
+  overlay.appendChild(prevBtn);
+  overlay.appendChild(nextBtn);
+  overlay.appendChild(counter);
+  document.body.appendChild(overlay);
+  _variantFsOverlay = overlay;
+
+  // Zoom/pan local (sin tocar el visor principal)
+  let zoom = 1, panX = 0, panY = 0, dragging = false, sx = 0, sy = 0, spx = 0, spy = 0;
+  const apply = () => { img.style.transform = `translate(${panX}px,${panY}px) scale(${zoom})`; };
+
+  function renderFsImage(idx){
+    const currentCards = getVariantCards();
+    if(currentCards.length > 0){
+      if(idx < 0) idx = currentCards.length - 1;
+      if(idx >= currentCards.length) idx = 0;
+      _variantFsIndex = idx;
+      currentVariantIndex = idx;
+      const c = currentCards[idx];
+      const fn = c.dataset.filename || "";
+      const sf = c.dataset.subfolder || "";
+      const tp = c.dataset.type || "output";
+      const u = `${server()}/view?filename=${encodeURIComponent(fn)}&subfolder=${encodeURIComponent(sf)}&type=${encodeURIComponent(tp)}`;
+      img.src = u;
+      dl.href = u;
+      dl.download = `kreaqwen_${fn || 'variante.png'}`;
+      counter.textContent = `${idx + 1} / ${currentCards.length}`;
+      prevBtn.style.display = currentCards.length > 1 ? "flex" : "none";
+      nextBtn.style.display = currentCards.length > 1 ? "flex" : "none";
+      counter.style.display = currentCards.length > 1 ? "block" : "none";
+    } else if(initialUrl){
+      img.src = initialUrl;
+      dl.href = initialUrl;
+      prevBtn.style.display = "none";
+      nextBtn.style.display = "none";
+      counter.style.display = "none";
+    }
+    zoom = 1; panX = 0; panY = 0;
+    apply();
+  }
+
+  renderFsImage(_variantFsIndex >= 0 ? _variantFsIndex : 0);
+
+  const onWheel = (e) => {
+    e.preventDefault();
+    const old = zoom;
+    zoom = Math.max(1, Math.min(20, zoom * (e.deltaY < 0 ? 1.12 : 0.88)));
+    const rect = overlay.getBoundingClientRect();
+    const mx = e.clientX - rect.left - rect.width / 2;
+    const my = e.clientY - rect.top - rect.height / 2;
+    const ratio = zoom / old;
+    panX += mx * (1 - ratio);
+    panY += my * (1 - ratio);
+    apply();
+  };
+  const onDown = (e) => {
+    if(e.target !== img && e.target !== overlay) return;
+    if(zoom <= 1) return;
+    e.preventDefault();
+    dragging = true; sx = e.clientX; sy = e.clientY; spx = panX; spy = panY;
+    overlay.classList.add("dragging");
+  };
+  const onMove = (e) => {
+    if(!dragging) return;
+    panX = spx + (e.clientX - sx);
+    panY = spy + (e.clientY - sy);
+    apply();
+  };
+  const onUp = () => {
+    if(!dragging) return;
+    dragging = false;
+    overlay.classList.remove("dragging");
+  };
+  const onKey = (e) => {
+    if(e.key === "Escape"){
+      closeVariantFullscreen();
+    } else if(e.key === "ArrowLeft"){
+      e.preventDefault();
+      renderFsImage(_variantFsIndex - 1);
+    } else if(e.key === "ArrowRight"){
+      e.preventDefault();
+      renderFsImage(_variantFsIndex + 1);
+    }
+  };
+  const onClick = (e) => { if(e.target === overlay) closeVariantFullscreen(); };
+  const onClose = (e) => { e.stopPropagation(); closeVariantFullscreen(); };
+  const onPrev = (e) => { e.stopPropagation(); renderFsImage(_variantFsIndex - 1); };
+  const onNext = (e) => { e.stopPropagation(); renderFsImage(_variantFsIndex + 1); };
+
+  // Touch swipe en móvil dentro del overlay
+  let tStartX = 0, tStartY = 0, tStartT = 0;
+  const onTouchStart = (e) => {
+    if(e.touches.length === 1){
+      tStartX = e.touches[0].clientX;
+      tStartY = e.touches[0].clientY;
+      tStartT = Date.now();
+    }
+  };
+  const onTouchEnd = (e) => {
+    if(e.changedTouches.length === 1 && zoom <= 1){
+      const dx = e.changedTouches[0].clientX - tStartX;
+      const dy = e.changedTouches[0].clientY - tStartY;
+      const dt = Date.now() - tStartT;
+      if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && dt < 800){
+        renderFsImage(_variantFsIndex + (dx < 0 ? 1 : -1));
+      }
+    }
+  };
+
+  overlay.addEventListener("wheel", onWheel, { passive: false });
+  overlay.addEventListener("mousedown", onDown);
+  overlay.addEventListener("click", onClick);
+  closeBtn.addEventListener("click", onClose);
+  prevBtn.addEventListener("click", onPrev);
+  nextBtn.addEventListener("click", onNext);
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+  overlay.addEventListener("touchstart", onTouchStart, { passive: true });
+  overlay.addEventListener("touchend", onTouchEnd, { passive: true });
+  document.addEventListener("keydown", onKey);
+
+  _variantFsCleanup = () => {
+    overlay.removeEventListener("wheel", onWheel);
+    overlay.removeEventListener("mousedown", onDown);
+    overlay.removeEventListener("click", onClick);
+    closeBtn.removeEventListener("click", onClose);
+    prevBtn.removeEventListener("click", onPrev);
+    nextBtn.removeEventListener("click", onNext);
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    overlay.removeEventListener("touchstart", onTouchStart);
+    overlay.removeEventListener("touchend", onTouchEnd);
+    document.removeEventListener("keydown", onKey);
+  };
+}
+
+function closeVariantFullscreen(){
+  if(_variantFsCleanup){ _variantFsCleanup(); _variantFsCleanup = null; }
+  if(_variantFsOverlay){ _variantFsOverlay.remove(); _variantFsOverlay = null; }
+}
+
+// Galería de variantes
+function addToVariantGallery(media, seedValue, timeText) {
+  if(!media || !media.filename) return;
+  const box = $("variantGalleryBox");
+  const grid = $("variantGrid");
+  if(!box || !grid) return;
+  box.style.display = "block";
+
+  const meta = CONFIG.variantMeta ? CONFIG.variantMeta(seedValue, timeText) : null;
+  const card = buildVariantCard(grid, box, media, seedValue, timeText, null, null, "var", meta);
+  const url = mediaUrl(media);
+
+  const icons = card.querySelector(".variant-icons");
+  if(icons){
+    const fs = document.createElement("button");
+    fs.type = "button";
+    fs.className = "variant-fs-btn";
+    fs.title = "Ver a pantalla completa";
+    fs.textContent = "⛶";
+    fs.style.cssText = "background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;line-height:1;padding:0 2px;";
+    fs.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openVariantFullscreen(card);
+    });
+    icons.insertBefore(fs, icons.firstChild);
+
+    const dl = document.createElement("a");
+    dl.href = url;
+    dl.download = "";
+    dl.style.cssText = "color:var(--accent);text-decoration:none";
+    dl.textContent = "Descargar";
+    dl.addEventListener("click", (e) => e.stopPropagation());
+    icons.insertBefore(dl, icons.firstChild);
+  }
+
+  const hasSeed = seedValue !== null && seedValue !== undefined;
+  if(hasSeed) {
+    const seedSpan = card.querySelector('.variant-seed-display');
+    if(seedSpan){
+      seedSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        copySeedToClipboard(seedSpan, seedValue);
+      });
+    }
+  }
+
+  const delBtn = card.querySelector(".variant-del-btn");
+  if(delBtn){
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const updateCount = (g, b) => {
+        const remaining = g.querySelectorAll(".variant-card").length;
+        if($("variantCount")) $("variantCount").textContent = `(${remaining})`;
+        if(remaining === 0) b.style.display = "none";
+      };
+      deleteMediaFile(card, delBtn, {
+        filename: card.dataset.filename,
+        subfolder: card.dataset.subfolder,
+        type: card.dataset.type,
+      }, grid, box, "Variante", updateCount, updateCount);
+    });
+  }
+
+  const thumbImg = card.querySelector("img");
+  if(thumbImg){
+    const applyDimTag = () => {
+      const w = thumbImg.naturalWidth, h = thumbImg.naturalHeight;
+      if(w && h){
+        const ratio = getAspectRatioString(w, h);
+        let tag = card.querySelector(".variant-dim-tag");
+        if(!tag){
+          tag = document.createElement("span");
+          tag.className = "variant-dim-tag";
+          const footer = card.querySelector(".variant-footer") || card.querySelector(".variant-icons") || card;
+          if(footer) footer.appendChild(tag);
+        }
+        tag.textContent = `${w}×${h} (${ratio})`;
+      }
+    };
+    thumbImg.onload = applyDimTag;
+    if(thumbImg.complete && thumbImg.naturalWidth) applyDimTag();
+  }
+
+  card.addEventListener("click", (e) => {
+    if(e.target.closest(".variant-seed-display") || e.target.closest("a") || e.target.closest(".variant-del-btn") || e.target.closest(".variant-fs-btn")) return;
+    // Incluir la clave "media": sendOutputToExternalUI exige mediaObj.media.filename.
+    const mediaData = { filename: card.dataset.filename, subfolder: card.dataset.subfolder || "", type: card.dataset.type || "output" };
+    currentFinalMedia = { media: mediaData, ...mediaData, url };
+    const cards = getVariantCards();
+    currentVariantIndex = cards.indexOf(card);
+    showImageView("final");
+    extractWorkflowFromImage(url);
+  });
+
+  variantCounter++;
+  if($("variantCount")) $("variantCount").textContent = `(${variantCounter})`;
+}
+
+// --- HISTORIAL DE IMÁGENES (IndexedDB; ver createImageHistory en common.js) ---
+const imageHistory = createImageHistory({
+  dbName: "kreaqwen_gallery_db",
+  gridId: "galleryGrid",
+  filePrefix: "kreaqwen_history",
+  onSelect: (dataUrl) => loadRefImage(dataUrl),
+});
+const addToGallery = imageHistory.add;
+const renderGallery = imageHistory.render;
+const clearGallery = imageHistory.clear;
+
+// Callback displayResult de ComfyUI
+CONFIG.displayResult = async function(entry, realSeed, tTotal, promptId){
+  const timeText = tTotal || "";
+  const outNodeFinal = entry.outputs[N.SAVE_IMAGE] || entry.outputs[N.DECODE_REFINER];
+  const outNodeBase = entry.outputs[N.PREVIEW_BASE] || entry.outputs[N.DECODE_BASE];
+
+  if(outNodeBase){
+    const baseMedia = CONFIG.findMedia(outNodeBase);
+    if(baseMedia){
+      const url = mediaUrl(baseMedia);
+      currentBaseMedia = { media: baseMedia, url };
+    }
+  }
+
+  const outNode = outNodeFinal || outNodeBase;
+  if(!outNode) return { foundOutput: false };
+
+  const media = CONFIG.findMedia(outNode);
+  if(!media) return { foundOutput: false };
+
+  const url = mediaUrl(media);
+  if(outNodeFinal){
+    currentFinalMedia = { media, url };
+    showImageView("final");
+  } else {
+    currentBaseMedia = { media, url };
+    showImageView("base");
+  }
+
+  const t1 = $("time1");
+  if(t1 && timeText){ t1.textContent = timeText; t1.classList.remove("live"); }
+  addToVariantGallery(media, realSeed, timeText);
+
+  // Guardar en el historial de imágenes (fetch -> dataURL -> IndexedDB).
+  try {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    const reader = new FileReader();
+    reader.onload = (ev) => addToGallery(ev.target.result);
+    reader.readAsDataURL(blob);
+  } catch(e){ console.warn("No se pudo añadir al historial:", e); }
+
+  return { foundOutput: true };
+};
+
+// Callbacks de ciclo de vida
+CONFIG.startNextVariant = function(index){ runSingleGeneration(index); };
+CONFIG.onBatchComplete = function(){
+  finishCurrentJob();
+  if(jobQueue.length > 0){
+    const next = jobQueue.shift();
+    startJob(next);
+  }
+};
+CONFIG.onStopCurrent = function(pid){};
+CONFIG.onStopAll = function(){
+  // common.js ya vació pendingSeeds/handledPrompts/timers; solo estado propio.
+  currentPromptId = null;
+  const t1 = $("time1");
+  if(t1){ t1.textContent = ""; t1.classList.remove("live"); }
+  jobQueue = [];
+  activeJob = null;
+  updateQueueUI();
+  enableStopButtons(false);
+};
+
+// Carga de imagen de referencia
+function loadRefImage(url){
+  const img = $("refImg"), wrap = $("refWrap"), ph = $("refPlaceholder"), dz = $("refDropzone"), info = $("refInfo");
+  if(!img || !wrap) return;
+  const newImg = document.createElement("img");
+  newImg.id = "refImg";
+  newImg.style.cssText = "display:block;max-width:100%;max-height:45vh;width:auto;height:auto;object-fit:contain;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;";
+  img.parentNode.replaceChild(newImg, img);
+  if(window.refZoom) window.refZoom.resetZoom();
+  newImg.src = url;
+  newImg.style.display = "block";
+  wrap.style.visibility = "visible";
+  if(ph) ph.style.display = "none";
+  if(dz){
+    dz.style.display = "flex";
+    dz.style.padding = "4px 8px";
+    dz.style.minHeight = "auto";
+    const phEl = dz.querySelector(".ph");
+    if(phEl) phEl.textContent = "arrastra otra imagen para reemplazar";
+  }
+  newImg.onload = () => {
+    const w = newImg.naturalWidth, h = newImg.naturalHeight;
+    if(w && h){
+      function gcd(a,b){ return b ? gcd(b, a % b) : a; }
+      const d = gcd(w, h) || 1;
+      if(info) info.textContent = `${w}x${h} · ${w/d}:${h/d}`;
+    }
+  };
+}
+
+const MAX_REF_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+
+function handleRefFile(f){
+  if(!f) return;
+  if(f.size && f.size > MAX_REF_SIZE_BYTES){
+    log(`⚠️ El archivo es demasiado pesado (máx 25 MB): ${(f.size / 1024 / 1024).toFixed(1)} MB`, "l-err");
+    return;
+  }
+  if(f.type && !f.type.startsWith("image/")){
+    log("⚠️ Formato de archivo no soportado. Debe ser una imagen.", "l-err");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    if(typeof addToGallery === "function") addToGallery(e.target.result);
+    loadRefImage(e.target.result);
+  };
+  reader.readAsDataURL(f);
+}
+
+// --- EDICIÓN CON QWEN 2.1 ---
+// Qwen 2.1 es también un modelo de edición (img2img / faceswap). Se usa el nodo
+// nativo TextEncodeQwenImage21, que ve las referencias por el text encoder y las
+// injerta como latentes de referencia en el conditioning. Las imágenes entran por
+// SwarmLoadImageB64 (base64 -> IMAGE), sin necesidad de subirlas al backend.
+// IMPORTANTE: el input Autogrow `images` se serializa en formato API con la clave
+// PLANA "images.image_N" (no un dict anidado); verificado contra este ComfyUI.
+let qwenEditExtraRefs = [];
+
+// Convierte el src de una imagen (dataURL o URL del backend) en base64 sin prefijo,
+// que es lo que espera SwarmLoadImageB64 (base64.b64decode directo).
+async function imageSrcToBase64(src){
+  if(!src) return null;
+  if(src.startsWith("data:")){
+    const comma = src.indexOf(",");
+    return comma >= 0 ? src.slice(comma + 1) : null;
+  }
+  try {
+    const r = await fetch(src);
+    const blob = await r.blob();
+    return await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => { const s = String(fr.result); const c = s.indexOf(","); resolve(c >= 0 ? s.slice(c + 1) : null); };
+      fr.onerror = reject;
+      fr.readAsDataURL(blob);
+    });
+  } catch(e){
+    console.warn("No se pudo convertir la referencia a base64:", e);
+    return null;
+  }
+}
+
+// Resuelve las referencias del job a base64 (async, antes de construir el grafo).
+async function resolveQwenEditRefs(job){
+  const qe = job?.qwenEdit;
+  if(!qe || !qe.enabled) return;
+  qe.refB64 = await imageSrcToBase64(qe.refSrc);
+  const list = Array.isArray(qe.extraRefSrcs) ? qe.extraRefSrcs : [];
+  qe.extraRefB64 = (await Promise.all(list.map(imageSrcToBase64))).filter(Boolean);
+}
+
+function updateQwenEditRefStatus(){
+  const st = $("qwenEditRefStatus");
+  const ex = $("qwenEditExtraStatus");
+  const map = $("qwenEditMapHint");
+  const hasRef = getRefImageSrc();
+  if(st) st.textContent = hasRef
+    ? (qwenEditExtraRefs.length ? "1 imagen principal + " + qwenEditExtraRefs.length + " extra" : "1 imagen de referencia cargada")
+    : "sin imagen de referencia";
+  if(ex) ex.textContent = qwenEditExtraRefs.length
+    ? `${qwenEditExtraRefs.length} referencia(s) extra`
+    : "sin referencias extra";
+  if(map) map.textContent = (!hasRef && $("qwenEditEnabled")?.checked)
+    ? "⚠️ Edición activada sin imagen principal: cárgala en el panel de referencia (arriba)."
+    : "La imagen principal es la del panel de referencia (arriba): entra como <image2> tras el borrador <image1> en modo refiner, y como <image1> en modo base. Las extras siguen la numeración (<image3>, <image4>) — cita en la instrucción.";
+}
+
+// --- METADATOS DE IMAGEN (cargar parámetros) ---
+// Lee el chunk tEXt "prompt"/"workflow" del PNG (ComfyUI guarda el grafo API en
+// extra_pnginfo) y restaura los controles de KreaQwen.
+function extractWorkflowFromImage(url){
+  return fetch(url).then(r => r.arrayBuffer()).then(buf => {
+    const bytes = new Uint8Array(buf);
+    if(bytes.length < 8 || bytes[0] !== 0x89 || bytes[1] !== 0x50) return null;
+    let pos = 8;
+    let workflowRaw = null;
+    while(pos < bytes.length - 8){
+      const len = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      if(type === "tEXt"){
+        const dataStart = pos + 8;
+        let nullPos = dataStart;
+        while(nullPos < dataStart + len && bytes[nullPos] !== 0) nullPos++;
+        const keyword = new TextDecoder("latin1").decode(bytes.slice(dataStart, nullPos));
+        if(keyword === "prompt" || keyword === "workflow"){
+          workflowRaw = new TextDecoder("utf-8").decode(bytes.slice(nullPos + 1, dataStart + len));
+          if(keyword === "prompt") break; // el chunk "prompt" trae el grafo API
+        }
+      }
+      if(type === "IEND") break;
+      pos = pos + 12 + len;
+    }
+    if(workflowRaw == null) return null;
+    let workflow;
+    try { workflow = JSON.parse(workflowRaw); }
+    catch(e1){
+      const first = workflowRaw.indexOf("{");
+      const last = workflowRaw.lastIndexOf("}");
+      if(first !== -1 && last > first){
+        try { workflow = JSON.parse(workflowRaw.slice(first, last + 1)); }
+        catch(e2){ console.warn("No se pudo parsear workflow de metadatos:", e2.message); return null; }
+      } else {
+        console.warn("No se pudo parsear workflow de metadatos:", e1.message);
+        return null;
+      }
+    }
+    applyKreaQwenWorkflow(workflow);
+    return true;
+  }).catch(e => { console.warn("No se pudo leer metadatos:", e.message); return null; });
+}
+
+// Busca un nodo por su id conocido dentro del grafo API.
+function _gNode(g, id){ return g && g[id]; }
+
+function applyKreaQwenWorkflow(workflow){
+  const g = workflow;
+  if(!g || typeof g !== "object"){ log("⚠️ Metadatos con formato inesperado.", "l-warn"); return; }
+  const applied = [];
+
+  const set = (id, val, cb) => {
+    const el = $(id);
+    if(el && val != null){ el.value = val; if(cb) cb(el); }
+  };
+  // Selecciona una opción cuyo path coincida (soporta prefijos de carpeta).
+  const setModel = (id, name) => {
+    const sel = $(id);
+    if(!sel || !name) return false;
+    for(const opt of sel.options){
+      if(opt.value === name || name.endsWith("/" + opt.value) || opt.value.endsWith("/" + name)){
+        opt.selected = true; return true;
+      }
+    }
+    return false;
+  };
+
+  // --- Prompt / Negativo ---
+  const posBase = _gNode(g, N.POS_BASE) || Object.values(g).find(n => n.class_type === "CLIPTextEncode");
+  const negBase = _gNode(g, N.NEG_BASE);
+  if(posBase?.inputs?.text != null){ set("prompt", posBase.inputs.text); applied.push("prompt"); }
+  if(negBase?.inputs?.text != null){ set("negPrompt", negBase.inputs.text); applied.push("negativo"); }
+
+  // --- Combinación de arquitecturas ---
+  const unetBaseFam = unetArchFamily(g[N.UNET_BASE]?.inputs?.unet_name);
+  const unetRefFam = unetArchFamily(g[N.UNET_REFINER]?.inputs?.unet_name);
+  const hasRefiner = !!g[N.UNET_REFINER];
+  let combo = "krea_qwen";
+  if(!hasRefiner) combo = (unetBaseFam === "moss") ? "moss_only" : "base_only";
+  else if(unetBaseFam === "moss" && unetRefFam === "qwen21") combo = "moss_qwen";
+  else if(unetBaseFam === "moss" && unetRefFam === "krea2") combo = "moss_krea";
+  else if(unetBaseFam === "qwen21" && unetRefFam === "qwen21") combo = "qwen_qwen";
+  else if(unetBaseFam === "krea2" && unetRefFam === "krea2") combo = "krea_krea";
+  else if(unetBaseFam === "qwen21" && unetRefFam === "krea2") combo = "qwen_krea";
+  else if(unetBaseFam === "krea2" && unetRefFam === "qwen21") combo = "krea_qwen";
+  if($("comboMode")) $("comboMode").value = combo;
+  applied.push("modo");
+
+  // --- Modelos / VAE / CLIP ---
+  if(setModel("baseUnetSelect", g[N.UNET_BASE]?.inputs?.unet_name)) applied.push("modelo base");
+  if(hasRefiner && setModel("refinerUnetSelect", g[N.UNET_REFINER]?.inputs?.unet_name)) applied.push("modelo refiner");
+  setModel("baseClipSelect", g[N.CLIP_BASE]?.inputs?.clip_name);
+  if(hasRefiner) setModel("refinerClipSelect", g[N.CLIP_REFINER]?.inputs?.clip_name);
+  // Las listas de VAE se filtran por la familia del UNET: hay que regenerarlas para el
+  // UNET restaurado antes de seleccionar su VAE (si no, el VAE no está entre las opciones).
+  updateVaeSelectors();
+  setModel("baseVaeSelect", g[N.VAE_BASE]?.inputs?.vae_name);
+  if(hasRefiner) setModel("refinerVaeSelect", g[N.VAE_REFINER]?.inputs?.vae_name);
+  if(g[N.UNET_BASE]?.inputs?.weight_dtype && $("baseWeightDtype")) $("baseWeightDtype").value = g[N.UNET_BASE].inputs.weight_dtype;
+  if(hasRefiner && g[N.UNET_REFINER]?.inputs?.weight_dtype && $("refinerWeightDtype")) $("refinerWeightDtype").value = g[N.UNET_REFINER].inputs.weight_dtype;
+
+  // --- Attention backends ---
+  const attnBase = Object.values(g).find(n => n.class_type === "ModelAttentionBackend" && JSON.stringify(n.inputs.model||[]).includes(N.UNET_BASE));
+  if($("baseAttentionBackend")) $("baseAttentionBackend").value = attnBase?.inputs?.attention || "none";
+  const attnRef = Object.values(g).find(n => n.class_type === "ModelAttentionBackend" && JSON.stringify(n.inputs.model||[]).includes(N.UNET_REFINER));
+  if($("refinerAttentionBackend")) $("refinerAttentionBackend").value = attnRef?.inputs?.attention || "none";
+
+  // --- MOSS SLG (SkipLayerGuidanceDiTSimple) ---
+  // Sin nodo SLG: solo significa "desactivado" si alguna etapa MOSS usó CFG > 1; con CFG 1
+  // nunca se inyecta, así que se conserva el valor actual del campo.
+  const mossCfgOn = (unetBaseFam === "moss" && Number(g[N.SAMPLER_BASE]?.inputs?.cfg) > 1) ||
+                    (hasRefiner && unetRefFam === "moss" && Number(g[N.SAMPLER_REFINER]?.inputs?.cfg) > 1);
+  const slg = Object.values(g).find(n => n.class_type === "SkipLayerGuidanceDiTSimple");
+  if(slg || mossCfgOn){
+    if($("mossSlgLayers")) $("mossSlgLayers").value = slg?.inputs?.single_layers ?? "";
+    if(slg?.inputs?.end_percent != null && $("mossSlgEnd")) $("mossSlgEnd").value = slg.inputs.end_percent;
+    applied.push("SLG MOSS");
+  }
+
+  // --- Samplers Base / Refiner ---
+  const sb = g[N.SAMPLER_BASE]?.inputs || {};
+  set("baseSteps", sb.steps); set("baseCfg", sb.cfg);
+  set("baseSamplerName", sb.sampler_name); set("baseSchedulerName", sb.scheduler);
+  if(sb.seed != null && sb.seed >= 0){
+    set("samplerSeed", sb.seed);
+    $("segSamplerFixed")?.classList.add("on");
+    $("segSamplerRandom")?.classList.remove("on");
+    if($("samplerSeed")) $("samplerSeed").disabled = false;
+    applied.push("semilla");
+  }
+  const sr = g[N.SAMPLER_REFINER]?.inputs || {};
+  set("refinerSteps", sr.steps); set("refinerCfg", sr.cfg);
+  set("refinerSamplerName", sr.sampler_name); set("refinerSchedulerName", sr.scheduler);
+  set("refinerDenoise", sr.denoise, (el) => { if($("refinerDenoiseVal")) $("refinerDenoiseVal").textContent = parseFloat(el.value).toFixed(2); });
+
+  // --- Refiner / Upscale activos ---
+  if($("refinerEnabled")) $("refinerEnabled").checked = hasRefiner;
+  const hasUpscale = !!g[N.UPSCALE_LOADER] || !!g[N.IMAGE_SCALE];
+  if($("upscaleEnabled")) $("upscaleEnabled").checked = hasUpscale;
+  setModel("upscaleModelSelect", g[N.UPSCALE_LOADER]?.inputs?.model_name);
+  if(g[N.IMAGE_SCALE]?.inputs){
+    const tW = g[N.IMAGE_SCALE].inputs.width, tH = g[N.IMAGE_SCALE].inputs.height;
+    if(tW && tH && g[N.LATENT_BASE]?.inputs){
+      const bw = g[N.LATENT_BASE].inputs.width, bh = g[N.LATENT_BASE].inputs.height;
+      if(bw && bh){
+        const factor = Math.min(3, Math.max(1, (tW / bw)));
+        set("upscaleFactor", Math.round(factor * 100) / 100, (el) => { if($("upscaleFactorVal")) $("upscaleFactorVal").textContent = `${parseFloat(el.value).toFixed(2)}x`; });
+      }
+    }
+  }
+
+  // --- Resolución ---
+  if(g[N.LATENT_BASE]?.inputs){
+    const w = g[N.LATENT_BASE].inputs.width, h = g[N.LATENT_BASE].inputs.height;
+    if(w && h && $("mpSlider")){
+      const mp = Math.min(Math.max((w * h) / 1_000_000, parseFloat($("mpSlider").min)), parseFloat($("mpSlider").max));
+      $("mpSlider").value = Math.round(mp * 10) / 10;
+      if($("mpVal")) $("mpVal").textContent = parseFloat($("mpSlider").value).toFixed(2);
+      const ar = w / h;
+      const ratios = {
+        "1:1 (Square)": 1, "2:3 (Portrait Photo)": 2/3, "3:2 (Photo)": 3/2,
+        "3:4 (Portrait Standard)": 3/4, "4:3 (Standard)": 4/3,
+        "9:16 (Portrait Widescreen)": 9/16, "16:9 (Widescreen)": 16/9, "21:9 (Ultrawide)": 21/9
+      };
+      let best = "", bestDiff = Infinity;
+      for(const [label, val] of Object.entries(ratios)){
+        const diff = Math.abs(ar - val);
+        if(diff < bestDiff){ bestDiff = diff; best = label; }
+      }
+      if($("aspectRatio")) $("aspectRatio").value = best;
+    }
+  }
+
+  // --- Prefix de archivo ---
+  set("filenamePrefix", g[N.SAVE_IMAGE]?.inputs?.filename_prefix);
+
+  // --- LoRAs Base / Refiner ---
+  const readLoras = (prefix, target) => {
+    let count = 0;
+    for(let i = 1; i <= 4; i++){
+      const node = g[`${prefix}${i}`];
+      if(node?.inputs?.lora_name){
+        target[i-1] = { lora: node.inputs.lora_name, strength: node.inputs.strength_model ?? 1, on: true };
+        count++;
+      } else if(target[i-1]){
+        target[i-1] = { lora: "", strength: 1, on: false };
+      }
+    }
+    return count;
+  };
+  readLoras("base_lora_", baseLoras);
+  readLoras("refiner_lora_", refinerLoras);
+  renderLoraGroup("baseLoraList", baseLoras, "LoRA Base", saveLoraStates);
+  renderLoraGroup("refinerLoraList", refinerLoras, "LoRA Refiner", saveLoraStates);
+  saveLoraStates();
+  applied.push("LoRAs");
+
+  // --- Variance (RBG) ---
+  const varNode = Object.values(g).find(n => n.class_type === "RBG_Smart_Seed_Variance");
+  if(varNode?.inputs){
+    set("variancePreset", varNode.inputs.variance_preset);
+    set("protectMode", varNode.inputs.protect_mode);
+    set("varianceFineTune", varNode.inputs.fine_tune_variance, (el) => { if($("varianceFineTuneVal")) $("varianceFineTuneVal").textContent = el.value; });
+    set("varianceDirection", varNode.inputs.direction_shift);
+    set("varianceShiftStrength", varNode.inputs.shift_strength, (el) => { if($("varianceShiftStrengthVal")) $("varianceShiftStrengthVal").textContent = el.value; });
+    set("varianceNoiseInjection", varNode.inputs.noise_injection);
+    set("varianceFadeCurve", varNode.inputs.fade_curve);
+    const seed = varNode.inputs.seed;
+    if(seed != null && seed >= 0){
+      set("varianceSeed", seed);
+      $("segVarianceFixed")?.classList.add("on");
+      $("segVarianceRandom")?.classList.remove("on");
+      if($("varianceSeed")) $("varianceSeed").disabled = false;
+    }
+    applied.push("variance");
+  }
+
+  // --- Edición Qwen 2.1 ---
+  const qwenEnc = Object.values(g).find(n => n.class_type === "TextEncodeQwenImage21");
+  const reactorNode = Object.entries(g).find(([k, n]) => k.startsWith("reactor_swap_") && n.class_type === "ReActorFaceSwapOpt");
+  if(reactorNode){
+    if($("qwenEditEnabled")) $("qwenEditEnabled").checked = true;
+    if($("qwenEditMethod")) $("qwenEditMethod").value = "reactor";
+    if($("qwenEditReactorModel")) $("qwenEditReactorModel").value = reactorNode[1].inputs.swap_model || "hyperswap_1c_256.onnx";
+    if($("qwenEditReactorRestore")) $("qwenEditReactorRestore").value = reactorNode[1].inputs.face_restore_model || "none";
+    if($("qwenEditReactorTiming")) $("qwenEditReactorTiming").value = reactorNode[0].endsWith("reactor_swap_draft") ? "before" : "after";
+    if($("qwenEditIntColor")) $("qwenEditIntColor").checked = !!Object.keys(g).some(k => k.startsWith("reactor_colormatch_"));
+    log("ℹ️ Faceswap ReActor detectado: revisa/carga de nuevo la imagen de referencia (source).", "l-info");
+    applied.push("faceswap ReActor");
+  } else if(qwenEnc?.inputs){
+    if($("qwenEditEnabled")) $("qwenEditEnabled").checked = true;
+    if($("qwenEditMethod")) $("qwenEditMethod").value = "edit";
+    set("qwenEditPrompt", qwenEnc.inputs.prompt);
+    set("qwenEditResolution", qwenEnc.inputs.resolution);
+    if($("qwenEditResolutionVal")) $("qwenEditResolutionVal").textContent = (parseInt(qwenEnc.inputs.resolution,10) === 0) ? "auto" : qwenEnc.inputs.resolution;
+    // Integración anti-"pegada" (stitch facial / LatentBlend), si el grafo la lleva.
+    const intStitch = Object.entries(g).find(([k, n]) => k.startsWith("qwen_edit_int_stitch_"));
+    const intGBlend = Object.entries(g).find(([k, n]) => k.startsWith("qwen_edit_int_blend_"));
+    if(intStitch && intStitch[1]?.inputs){
+      if($("qwenEditIntegrate")) $("qwenEditIntegrate").value = "face";
+      const inp = intStitch[1].inputs;
+      set("qwenEditIntBlend", Math.round((inp.blend ?? 1.0) * 100), (el) => { if($("qwenEditIntBlendVal")) $("qwenEditIntBlendVal").textContent = el.value; });
+      set("qwenEditIntFeather", inp.feather ?? 20, (el) => { if($("qwenEditIntFeatherVal")) $("qwenEditIntFeatherVal").textContent = el.value; });
+      if($("qwenEditIntColor")) $("qwenEditIntColor").checked = (inp.colour_match == null) ? true : inp.colour_match > 0;
+    } else if(intGBlend && intGBlend[1]?.inputs){
+      if($("qwenEditIntegrate")) $("qwenEditIntegrate").value = "global";
+      set("qwenEditIntBlend", Math.round((intGBlend[1].inputs.blend_factor ?? 1.0) * 100), (el) => { if($("qwenEditIntBlendVal")) $("qwenEditIntBlendVal").textContent = el.value; });
+    } else if(qwenEnc && $("qwenEditIntegrate")){
+      $("qwenEditIntegrate").value = "none";
+    }
+    // La imagen de referencia no se puede reconstruir de forma fiable; se avisa.
+    log("ℹ️ Edición Qwen 2.1 detectada: revisa/carga de nuevo la imagen de referencia.", "l-info");
+    applied.push("edición Qwen");
+  }
+
+  // --- Refinado facial (H3 FaceRefine) ---
+  const frCrop = g[N.FACE_CROP];
+  const frSampler = g[N.FACE_SAMPLER];
+  if(frCrop?.class_type === "H3FaceTrackCrop"){
+    const fr = loadFaceRefine();
+    fr.enabled = true;
+    if(frCrop.inputs.canvas_mode === "auto_no_downscale"){ fr.canvasSize = "auto"; }
+    else if(frCrop.inputs.canvas_width != null) fr.canvasSize = parseInt(frCrop.inputs.canvas_width, 10);
+    if(frCrop.inputs.select != null) fr.select = frCrop.inputs.select;
+    if(frSampler?.inputs){
+      if(frSampler.inputs.steps != null) fr.steps = parseInt(frSampler.inputs.steps, 10);
+      if(frSampler.inputs.denoise != null) fr.denoise = parseFloat(frSampler.inputs.denoise);
+    }
+    if(g[N.FACE_STITCH]?.inputs?.feather != null) fr.feather = parseInt(g[N.FACE_STITCH].inputs.feather, 10);
+    setFaceRefineUI(fr);
+    saveFaceRefine(fr);
+    applied.push("FaceRefine");
+  }
+
+  // --- Color Grading & Look Cinemático (nodos nuevos y legacy ProPost) ---
+  const setMasterOn = () => {
+    const on = $("segPostFxOn"), off = $("segPostFxOff"), panel = $("postFxControls");
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "block";
+  };
+  Object.values(g).forEach(node => {
+    const t = node?.class_type;
+    if(t === "LayerColor: LUT Apply"){
+      setMasterOn();
+      if(node.inputs.LUT != null && $("postFxLutSelect")) $("postFxLutSelect").value = node.inputs.LUT;
+      if(node.inputs.strength != null){
+        set("postFxLutStrength", Math.max(0, Math.min(1, Number(node.inputs.strength) / 100)), (el) => { if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat(el.value) * 100) + "%"; });
+      }
+      if($("postFxLutToggle")) $("postFxLutToggle").checked = true;
+      applied.push("post-fx (LUT)");
+    } else if(t === "LayerFilter: FilmV2"){
+      const vi = Number(node.inputs.vignette_intensity ?? 0);
+      const gp = Number(node.inputs.grain_power ?? 0);
+      if(vi > 0){
+        if($("postFxVigToggle")) $("postFxVigToggle").checked = true;
+        set("postFxVigIntensity", Math.min(0.6, vi), (el) => { if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat(el.value).toFixed(2); });
+      }
+      if(gp > 0){
+        if($("postFxGrainToggle")) $("postFxGrainToggle").checked = true;
+        set("postFxGrainPower", Math.min(0.4, gp), (el) => { if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat(el.value).toFixed(2); });
+      }
+      if(vi > 0 || gp > 0) setMasterOn();
+      applied.push("post-fx (film)");
+    } else if(t === "ProPostRadialBlur"){
+      if($( "radialEnabled")) $("radialEnabled").checked = true;
+      if(node.inputs.blur_strength != null) set("radialStrength", node.inputs.blur_strength, (el) => { if($("radialVal")) $("radialVal").textContent = el.value; });
+      applied.push("post-fx (radial)");
+    }
+  });
+  if(typeof updateQwenEditRefStatus === "function") updateQwenEditRefStatus();
+  if(typeof updateQwenEditMethodUI === "function") updateQwenEditMethodUI();
+  if(typeof updateDimensionHints === "function") updateDimensionHints();
+  if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+
+  log(`📋 Parámetros restaurados de metadatos (${applied.join(", ")}).`, "l-ok");
+}
+
+// Generación individual
+async function runSingleGeneration(index){
+  if(!activeJob) return; // guard: stop puede dejar la cola vacía entre el setTimeout y la ejecución
+  try {
+    const job = activeJob || snapshotJob();
+    const seedUsed = (job.seedMode === "random") ? randomSeed() : job.seedValue;
+    job.seedValue = seedUsed;
+    // Semilla de varianza: en modo "Aleatoria" hay que resolver una semilla real
+    // por generación. Enviar -1 no basta: el nodo hace torch.manual_seed(-1), que
+    // es determinista y produce SIEMPRE el mismo patrón de varianza.
+    if(job.varianceSeedMode === "random") job.varianceSeedValue = randomSeed();
+    log(`⏳ Preparando grafo para variante ${index + 1}/${totalBatchSize}...`, "l-info");
+    await resolveQwenEditRefs(job);
+    const graph = applyAlignYourSteps(buildGraph(job));
+
+    log(`🚀 Enviando variante ${index + 1}/${totalBatchSize} a ComfyUI...`, "l-info");
+    const srv = getServerUrl();
+    const r = await fetch(`${srv}/prompt`, {
+      signal: AbortSignal.timeout(60000), // colgado → activeJob fantasma
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: graph,
+        client_id: CLIENT_ID,
+        extra_data: {
+          extra_pnginfo: { workflow: graph, prompt: graph },
+          preview_method: getPreviewMethod()
+        }
+      })
+    });
+    if(!r.ok){
+      const t = await r.text().catch(() => "");
+      throw new Error(`HTTP ${r.status}: ${t.slice(0, 300)}`);
+    }
+    const data = await r.json();
+    if(data.error) throw new Error(JSON.stringify(data.error));
+
+    log(`📡 Recibido por ComfyUI (Prompt: ${data.prompt_id.slice(0, 8)}...). Procesando...`, "l-ok");
+    pendingSeeds[data.prompt_id] = seedUsed;
+    currentPromptId = data.prompt_id;
+    startTimer(data.prompt_id, 1);
+    pollFallback(data.prompt_id);
+  } catch(err){
+    log(`Error en variante ${index + 1}: ${err.message}`, "l-err");
+    finishCurrentJob();
+    // Drenar la cola: sin esto, un fallo de una variante deja los jobs
+    // en espera fantasma (onBatchComplete nunca dispara).
+    if(!activeJob && jobQueue.length > 0){
+      const nextJob = jobQueue.shift();
+      updateQueueUI();
+      log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
+      startJob(nextJob);
+    }
+  }
+}
+
+async function startJob(job){
+  activeJob = job;
+  updateQueueUI();
+  try {
+    await ensureSocketConnected();
+    totalBatchSize = job.batchSize || 1;
+    currentBatchIndex = 0;
+    setRun("busy", `KreaQwen #${job.id} en proceso (${job.comboMode})...`);
+    enableStopButtons(true);
+    await runSingleGeneration(0);
+  } catch(err){
+    log(`Error al iniciar KreaQwen #${job.id}: ${err.message || err}`, "l-err");
+    setRun("bad", "Error");
+    finishCurrentJob();
+  }
+}
+
+function enqueueGeneration(isBaseOnly = false){
+  if(typeof saveKreaQwenSettings === "function") saveKreaQwenSettings();
+  const job = snapshotJob(isBaseOnly);
+  if(activeJob){
+    jobQueue.push(job);
+    updateQueueUI();
+    log(`Job KreaQwen #${job.id} encolado (${jobQueue.length} pendientes).`, "l-info");
+  } else {
+    startJob(job);
+  }
+}
+
+function updateQueueUI(){
+  const count = jobQueue.length;
+  if($("btnClearQueue")) $("btnClearQueue").disabled = count === 0;
+
+  // Auto-recuperación si activeJob quedó huérfano con ComfyUI en reposo
+  // (patrón mmh3x2/minimaxh3): un POST colgado dejaba la cola atascada.
+  if(activeJob && typeof serverQueueState !== "undefined" && serverQueueState.running === 0 && serverQueueState.pending === 0){
+    queueIdleCount = (queueIdleCount || 0) + 1;
+    if(queueIdleCount >= 2){
+      queueIdleCount = 0;
+      console.warn("Liberando activeJob huérfano (ComfyUI está en reposo)");
+      log("🧟 Job activo huérfano liberado (ComfyUI está en reposo); retomando la cola...", "l-warn");
+      activeJob = null;
+      currentPromptId = null;
+      enableStopButtons(false);
+      if(jobQueue.length > 0){
+        const nextJob = jobQueue.shift();
+        updateQueueUI();
+        log(`⏭️ Iniciando siguiente job de la cola (${jobQueue.length} restantes)...`, "l-info");
+        startJob(nextJob);
+      }
+      // cae al render de abajo con el estado ya actualizado
+    }
+  } else {
+    queueIdleCount = 0;
+  }
+
+  const activeNow = activeJob; // puede haber cambiado por la recuperación
+  if($("queueWebuiSummary")) $("queueWebuiSummary").textContent = `${jobQueue.length} en espera`;
+  if($("queueWebuiDetail")) $("queueWebuiDetail").textContent = activeNow
+    ? `▶ Job #${activeNow.id} · Var ${currentBatchIndex + 1}/${totalBatchSize}`
+    : "En reposo";
+  if($("queueTotalNum")) $("queueTotalNum").textContent = `${jobQueue.length + (activeNow ? 1 : 0)}`;
+  // Render del estado del servidor ComfyUI (alimentado por el poll de common.js);
+  // sin esto el panel mostraba "0 en espera · 0 en GPU" permanente.
+  if($("queueServerSummary")) $("queueServerSummary").textContent = `${serverQueueState.pending} en espera`;
+  if($("queueServerDetail")) $("queueServerDetail").textContent = `${serverQueueState.running} en GPU · ${serverQueueState.pending} en cola ComfyUI`;
+}
+
+function finishCurrentJob(){
+  activeJob = null;
+  updateQueueUI();
+  enableStopButtons(false);
+  setRun("idle", "en reposo");
+  // Preview de muestreo obsoleto al quedar en reposo (final de job, error o stop).
+  // onClearPreview de kreaqwen respeta currentFinalMedia/currentBaseMedia:
+  // solo esconde el preview si no hay imagen final ya cargada.
+  clearPreview();
+}
+
+// --- EVOLVE / TRANSMUTAR PROMPT (portado de krea2.js) ---
+// EVOLVE_VOCAB, EVOLVE_SYNONYMS y generateEvolved() están en common.js.
+
+// KreaQwen no usa el nodo TextGenerateLTX2Prompt de LTXV: la cadena de mejora
+// solo tiene sentido en modo LLM. Limitamos el selector y ocultamos los
+// controles exclusivos de LTX2 (patrón de krea2.js/ltxv.js).
+(function initKreaQwenEnhancerUI(){
+  const chain = $("enhancerChainMode");
+  if(chain){
+    chain.innerHTML = `
+      <option value="off">Desactivado</option>
+      <option value="ollama">LLM (Ollama / llama.cpp)</option>
+    `;
+    chain.value = "ollama";
+  }
+  const ltx2Controls = ["ltx2Temperature", "ltx2Seed", "ltx2PreviewText"];
+  for(const id of ltx2Controls){
+    const el = $(id);
+    const row = el?.closest(".enhancer-row");
+    if(row) row.style.display = "none";
+  }
+  const ltx2Labels = document.querySelectorAll(".enhancer-row label");
+  for(const lbl of ltx2Labels){
+    if(lbl.textContent.includes("LTX2")){
+      const row = lbl.closest(".enhancer-row");
+      if(row) row.style.display = "none";
+    }
+  }
+})();
+
+function getRefImageSrc(){
+  const el = $("refImg");
+  if(!el || !el.src || el.src === window.location.href) return null;
+  return el.src;
+}
+
+// Los presets de Layout MOSS necesitan el tamaño exacto del lienzo (resolución Base).
+function withCanvasDims(system){
+  if(!system || !system.includes("{{")) return system;
+  const d = calculateDimensions(parseFloat($("mpSlider")?.value || "1.0"), $("aspectRatio")?.value || "16:9 (Widescreen)");
+  return system.replace(/\{\{WIDTH\}\}/g, d.w).replace(/\{\{HEIGHT\}\}/g, d.h);
+}
+
+// --- ENHANCER (texto + visión) vía streamOllamaGenerate (common.js) ---
+$("btnEnhance")?.addEventListener("click", async () => {
+  const chainMode = $("enhancerChainMode")?.value || "ollama";
+  if(chainMode === "off"){
+    log("⚠️ Cadena de mejora desactivada. Activa 'LLM' para usar el botón.", "l-warn");
+    return;
+  }
+  const model = $("enhancerModel").value;
+  if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
+  const mode = $("enhancerMode").value;
+  const styleKey = $("enhancerStyle").value;
+  const data = loadSysPrompts();
+  const system = withCanvasDims(getCurrentSysPrompt(data, mode, styleKey));
+  const userPrompt = $("prompt").value.trim();
+  if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+
+  const payload = { model, system, prompt: userPrompt || "Describe this image.", options: { num_ctx: 4096 } };
+  if(mode === "vision"){
+    const src = getRefImageSrc();
+    if(!src){ log("⚠️ Modo visión: carga una imagen de referencia primero", "l-err"); return; }
+    try {
+      payload.images = [await imageToResizedBase64(src, 768)];
+    } catch(e){
+      log("No se pudo leer la imagen: " + (e.message || e), "l-err");
+      return;
+    }
+  }
+
+  const btn = $("btnEnhance");
+  btn.disabled = true;
+  btn.textContent = "Mejorando...";
+  $("enhancerOutput").value = "";
+  if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
+  try {
+    const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const timeStr = fmtMs(elapsedMs);
+    $("enhancerOutput").value = text;
+    if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
+    log(`Prompt mejorado en ${timeStr} (${model}, ${mode}, ${styleKey}). Pulsa 'Usar como prompt' para aplicarlo.`, "l-ok");
+  } catch(e){
+    log("Error al mejorar: " + e.message, "l-err");
+    $("enhancerOutput").value = "Error: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Mejorar prompt";
+  }
+});
+
+// --- CAPTION / VISIÓN (Qwen VLM) ---
+$("btnCaption")?.addEventListener("click", async () => {
+  const model = $("enhancerModel").value;
+  if(!model){ log("Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
+  const src = getRefImageSrc();
+  if(!src){ log("⚠️ Primero carga una imagen de referencia", "l-err"); return; }
+  const mode = $("enhancerMode").value;
+  const styleKey = $("enhancerStyle").value;
+  const data = loadSysPrompts();
+  const system = getCurrentSysPrompt(data, mode, styleKey);
+
+  const btn = $("btnCaption");
+  btn.disabled = true;
+  btn.textContent = "Analizando imagen...";
+  $("enhancerOutput").value = "";
+  if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = "";
+  try {
+    const b64 = await imageToResizedBase64(src, 768);
+    const userPrompt = $("prompt").value.trim();
+    const captionPrompt = userPrompt
+      ? `Describe this image. User guidance: ${userPrompt}`
+      : "Describe this image.";
+    const payload = {
+      model, system, prompt: captionPrompt, images: [b64],
+      options: { num_ctx: 4096, temperature: 0.4 }
+    };
+    const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const timeStr = fmtMs(elapsedMs);
+    if(!text){
+      log("Respuesta vacía: el modelo de visión no devolvió texto. Prueba a liberar VRAM de ComfyUI o a elegir un modelo más pequeño.", "l-err");
+      $("enhancerOutput").value = "El modelo no devolvió texto. Suele ocurrir por falta de VRAM: pulsa 'Liberar memoria' (o baja a un modelo menor) y reintenta.";
+    } else {
+      $("enhancerOutput").value = text;
+      if($("enhancerMetaInfo")) $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${timeStr}`;
+      log(`Caption generado en ${timeStr} (${model}, ${mode}/${styleKey}, ${text.length} chars).`, "l-ok");
+      log("Pulsa 'Usar como prompt' para aplicarlo.", "l-info");
+    }
+  } catch(e){
+    log("Error en caption: " + e.message, "l-err");
+    $("enhancerOutput").value = "Error: " + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Caption (Qwen VLM)";
+  }
+});
+
+// --- EVOLVE listeners ---
+$("evolveStrength")?.addEventListener("input", (e) => {
+  if($("evolveStrengthVal")) $("evolveStrengthVal").textContent = e.target.value + "%";
+});
+$("btnEvolve")?.addEventListener("click", () => {
+  const prompt = $("prompt").value.trim();
+  if(!prompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
+  const mode = $("evolveMode").value;
+  const strength = parseInt($("evolveStrength").value, 10);
+  const count = parseInt($("evolveCount").value, 10) || 4;
+  const variants = generateEvolved(prompt, mode, strength, count);
+  $("evolveOutput").value = variants.map((v, i) => `--- Variant ${i + 1} ---\n${v}`).join("\n\n");
+  log(`🧬 ${count} variantes generadas (${mode}, ${strength}%)`, "l-ok");
+});
+$("btnEvolveUse")?.addEventListener("click", () => {
+  const text = $("evolveOutput").value.trim();
+  if(!text){ log("⚠️ Genera variantes primero", "l-err"); return; }
+  const first = text.split(/--- Variant \d+ ---/)[1]?.trim() || text.split("\n\n")[0]?.trim();
+  if(first){
+    $("prompt").value = first;
+    log("✏️ Prompt actualizado con la variante #1", "l-ok");
+  }
+});
+
+// Interceptor en fase de captura para "Usar como prompt".
+// common.js enlaza #btnUseAsPrompt y copia el texto crudo; aquí lo interceptamos
+// ANTES (capture) para aplicar el parser JSON (rewritten_prompt + wh_ratio) y
+// detener la propagación. Sin tocar common.js: las demás WebUIs no se ven afectadas.
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if(!t || t.id !== "btnUseAsPrompt") return;
+  const out = $("enhancerOutput")?.value?.trim();
+  if(!out) return; // deja que common.js muestre su aviso normal
+  const text = parseEnhancerResult(out) || out;
+  if($("prompt")) $("prompt").value = text;
+  log("✏️ Prompt actualizado desde el resultado del enhancer.", "l-ok");
+  e.stopPropagation();
+}, true);
+
+// --- COLOR GRADING & LOOK CINEMÁTICO (implementación MiniMaxH3) ---
+// Estado unificado: master on/off + LUT (LayerColor: LUT Apply) + Viñeta y Grano
+// dinámico juntos en "LayerFilter: FilmV2" + desenfoque radial (ProPost opcional).
+const KREAQWEN_COLORFX_KEY = 'kreaqwen_colorfx_v1';
+function loadColorFx(){
+  try { return JSON.parse(localStorage.getItem(KREAQWEN_COLORFX_KEY) || "null") || null; }
+  catch(_){ return null; }
+}
+function saveColorFx(s){
+  try { localStorage.setItem(KREAQWEN_COLORFX_KEY, JSON.stringify(s)); } catch(_){}
+}
+// Estado por defecto (los settings legacy de ProPost se ignoran; se usa la clave nueva).
+function defaultPostFxState(){
+  return {
+    enabled: false,
+    lut: { enabled: true, name: "", strength: 0.8 },
+    vignette: { enabled: false, intensity: 0.25 },
+    grain: { enabled: false, power: 0.15 },
+    radial: { enabled: false, strength: 64 },
+  };
+}
+function getPostFxState(){
+  return {
+    enabled: $("segPostFxOn")?.classList.contains("on") ?? false,
+    lut: {
+      enabled: $("postFxLutToggle")?.checked ?? true,
+      name: $("postFxLutSelect")?.value || "",
+      strength: parseFloat($("postFxLutStrength")?.value || "0.8")
+    },
+    vignette: {
+      enabled: $("postFxVigToggle")?.checked ?? false,
+      intensity: parseFloat($("postFxVigIntensity")?.value || "0.25")
+    },
+    grain: {
+      enabled: $("postFxGrainToggle")?.checked ?? false,
+      power: parseFloat($("postFxGrainPower")?.value || "0.15")
+    },
+    radial: {
+      enabled: $("radialEnabled")?.checked ?? false,
+      strength: parseFloat($("radialStrength")?.value || "64")
+    }
+  };
+}
+function setPostFxUI(s){
+  if(!s) return;
+  const on = $("segPostFxOn"), off = $("segPostFxOff");
+  const panel = $("postFxControls");
+  if(s.enabled){
+    on?.classList.add("on"); off?.classList.remove("on");
+    if(panel) panel.style.display = "block";
+  } else {
+    off?.classList.add("on"); on?.classList.remove("on");
+    if(panel) panel.style.display = "none";
+  }
+  if($("postFxLutToggle")) $("postFxLutToggle").checked = s.lut?.enabled ?? true;
+  if($("postFxLutSelect") && s.lut?.name) $("postFxLutSelect").value = s.lut.name;
+  if($("postFxLutStrength")){
+    $("postFxLutStrength").value = s.lut?.strength ?? 0.8;
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat($("postFxLutStrength").value) * 100) + "%";
+  }
+  if($("postFxVigToggle")) $("postFxVigToggle").checked = !!s.vignette?.enabled;
+  if($("postFxVigIntensity")){
+    $("postFxVigIntensity").value = s.vignette?.intensity ?? 0.25;
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat($("postFxVigIntensity").value).toFixed(2);
+  }
+  if($("postFxGrainToggle")) $("postFxGrainToggle").checked = !!s.grain?.enabled;
+  if($("postFxGrainPower")){
+    $("postFxGrainPower").value = s.grain?.power ?? 0.15;
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat($("postFxGrainPower").value).toFixed(2);
+  }
+  if($("radialEnabled")) $("radialEnabled").checked = !!s.radial?.enabled;
+  if($("radialStrength")){
+    $("radialStrength").value = s.radial?.strength ?? 64;
+    if($("radialVal")) $("radialVal").textContent = s.radial?.strength ?? 64;
+  }
+}
+function populatePostFxLuts(){
+  const sel = $("postFxLutSelect");
+  if(!sel) return;
+  const luts = (typeof AVAILABLE_LUTS !== "undefined" && Array.isArray(AVAILABLE_LUTS)) ? AVAILABLE_LUTS : [];
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Seleccionar LUT (.cube) --</option>';
+  for(const name of luts){
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name.endsWith(".cube") ? name.slice(0, -5) : name;
+    sel.appendChild(opt);
+  }
+  if(luts.length === 0){
+    sel.innerHTML = '<option value="">-- Sin LUTs (.cube) disponibles --</option>';
+  }
+  if(prev && luts.includes(prev)){
+    sel.value = prev;
+  }
+}
+function initPostFxListeners(){
+  const persist = () => { saveColorFx(getPostFxState()); if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings(); };
+  $("segPostFxOn")?.addEventListener("click", () => {
+    const s = getPostFxState(); s.enabled = true;
+    setPostFxUI(s); persist();
+  });
+  $("segPostFxOff")?.addEventListener("click", () => {
+    const s = getPostFxState(); s.enabled = false;
+    setPostFxUI(s); persist();
+  });
+  $("postFxLutToggle")?.addEventListener("change", persist);
+  $("postFxLutSelect")?.addEventListener("change", persist);
+  $("postFxLutStrength")?.addEventListener("input", (e) => {
+    if($("postFxLutVal")) $("postFxLutVal").textContent = Math.round(parseFloat(e.target.value) * 100) + "%";
+    persist();
+  });
+  $("postFxVigToggle")?.addEventListener("change", persist);
+  $("postFxVigIntensity")?.addEventListener("input", (e) => {
+    if($("postFxVigVal")) $("postFxVigVal").textContent = parseFloat(e.target.value).toFixed(2);
+    persist();
+  });
+  $("postFxGrainToggle")?.addEventListener("change", persist);
+  $("postFxGrainPower")?.addEventListener("input", (e) => {
+    if($("postFxGrainVal")) $("postFxGrainVal").textContent = parseFloat(e.target.value).toFixed(2);
+    persist();
+  });
+  $("radialStrength")?.addEventListener("input", (e) => {
+    if($("radialVal")) $("radialVal").textContent = e.target.value;
+    persist();
+  });
+  $("radialEnabled")?.addEventListener("change", persist);
+
+  populatePostFxLuts();
+  // Solo restaura de la clave propia si existe (deja el estado ya aplicado por
+  // restoreKreaQwenSettings si este es el único almacén con datos).
+  const st = loadColorFx();
+  if(st) setPostFxUI(st);
+}
+
+// --- EDICIÓN CON QWEN 2.1: listeners de UI ---
+function initQwenEditListeners(){
+  $("qwenEditEnabled")?.addEventListener("change", updateQwenEditRefStatus);
+
+  $("qwenEditResolution")?.addEventListener("input", (e) => {
+    const v = $("qwenEditResolutionVal");
+    if(v) v.textContent = (parseInt(e.target.value, 10) === 0) ? "auto" : e.target.value;
+  });
+
+  // Cambio de método (edit / reactor): alterna los bloques de la sección
+  // marcados con data-editmode="edit"|"reactor".
+  const updateQwenEditMethodUI = () => {
+    const m = $("qwenEditMethod")?.value || "edit";
+    document.querySelectorAll("#qwenEditBody [data-editmode]").forEach(el => {
+      el.style.display = (el.dataset.editmode === m) ? "" : "none";
+    });
+  };
+  window.updateQwenEditMethodUI = updateQwenEditMethodUI;
+  $("qwenEditMethod")?.addEventListener("change", () => {
+    updateQwenEditMethodUI();
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+  updateQwenEditMethodUI();
+
+  // Sliders de la integración anti-"pegada"
+  $("qwenEditIntBlend")?.addEventListener("input", (e) => {
+    const v = $("qwenEditIntBlendVal");
+    if(v) v.textContent = e.target.value;
+  });
+  $("qwenEditIntFeather")?.addEventListener("input", (e) => {
+    const v = $("qwenEditIntFeatherVal");
+    if(v) v.textContent = e.target.value;
+  });
+
+  // "Desactivar edición": apaga el checkbox y limpia las extra.
+  $("btnQwenEditClearRef")?.addEventListener("click", () => {
+    qwenEditExtraRefs = [];
+    if($("qwenEditEnabled")) $("qwenEditEnabled").checked = false;
+    updateQwenEditRefStatus();
+    log("Edición Qwen 2.1 desactivada (referencias extra limpiadas).", "l-info");
+  });
+
+  $("btnQwenEditAddRef")?.addEventListener("click", () => {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if(!file) return;
+      if(file.size && file.size > MAX_REF_SIZE_BYTES){
+        log(`⚠️ La imagen de referencia extra es demasiado pesada (máx 25 MB): ${(file.size / 1024 / 1024).toFixed(1)} MB`, "l-err");
+        return;
+      }
+      if(file.type && !file.type.startsWith("image/")){
+        log("⚠️ Formato de archivo no soportado. Debe ser una imagen.", "l-err");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if(qwenEditExtraRefs.length >= 2){
+          log("⚠️ Máximo 2 referencias extra.", "l-warn");
+          return;
+        }
+        qwenEditExtraRefs.push(reader.result);
+        updateQwenEditRefStatus();
+        log(`Referencia extra añadida (${qwenEditExtraRefs.length}).`, "l-ok");
+      };
+      reader.readAsDataURL(file);
+    });
+    inp.click();
+  });
+
+  $("btnQwenEditClearExtra")?.addEventListener("click", () => {
+    qwenEditExtraRefs = [];
+    updateQwenEditRefStatus();
+    log("Referencias extra limpiadas.", "l-info");
+  });
+
+  updateQwenEditRefStatus();
+}
+
+// --- REFINADO FACIAL: listeners de UI ---
+function initFaceRefineListeners(){
+  const persist = () => {
+    saveFaceRefine(getFaceRefineState());
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  };
+
+  $("segFaceRefineOn")?.addEventListener("click", () => {
+    const s = getFaceRefineState();
+    s.enabled = true;
+    setFaceRefineUI(s);
+    saveFaceRefine(s);
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+  $("segFaceRefineOff")?.addEventListener("click", () => {
+    const s = getFaceRefineState();
+    s.enabled = false;
+    setFaceRefineUI(s);
+    saveFaceRefine(s);
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+  $("faceRefineStepsSlider")?.addEventListener("input", (e) => {
+    const st = parseInt(e.target.value, 10) || 10;
+    if($("faceRefineStepsVal")) $("faceRefineStepsVal").textContent = st;
+    if($("faceRefineStepsHint")) $("faceRefineStepsHint").textContent = `(${st})`;
+    persist();
+  });
+  $("faceRefineCanvasMode")?.addEventListener("change", persist);
+  $("faceRefineDenoiseSlider")?.addEventListener("input", (e) => {
+    const d = parseFloat(e.target.value) || 0.40;
+    if($("faceRefineDenoiseVal")) $("faceRefineDenoiseVal").textContent = d.toFixed(2);
+    if($("faceRefineDenoiseHint")) $("faceRefineDenoiseHint").textContent = `(${d.toFixed(2)})`;
+    persist();
+  });
+  $("faceRefineFeatherSlider")?.addEventListener("input", (e) => {
+    const f = parseInt(e.target.value, 10) || 12;
+    if($("faceRefineFeatherVal")) $("faceRefineFeatherVal").textContent = f + " px";
+    if($("faceRefineFeatherHint")) $("faceRefineFeatherHint").textContent = `(${f} px)`;
+    persist();
+  });
+  $("faceRefineSelectMode")?.addEventListener("change", persist);
+}
+
+// Inicialización de Listeners y Componentes
+function initKreaQwenUI() {
+  populateModelSelects();
+  updateDimensionHints();
+
+  // Carga y renderizado de LoRAs (Base y Refiner)
+  loadLoraStates();
+  renderLoraGroup("baseLoraList", baseLoras, "LoRA Base", saveLoraStates);
+  renderLoraGroup("refinerLoraList", refinerLoras, "LoRA Refiner", saveLoraStates);
+
+  // Restaurar ajustes completos de sesión si existen en localStorage; si no, aplicar modo inicial por defecto
+  const restored = restoreKreaQwenSettings();
+  if(!restored){
+    resetTouched();
+    applyComboMode($("comboMode")?.value || "krea_qwen");
+    setFaceRefineUI(loadFaceRefine());
+  }
+
+  // Activación de paneles desplegables (collapsible)
+  if(typeof makeCollapsible === "function"){
+    makeCollapsible("negPromptToggle", "negPromptBody");
+    makeCollapsible("evolveToggle", "evolveBody");
+    makeCollapsible("baseLorasToggle", "baseLorasBody");
+    makeCollapsible("varianceToggle", "varianceBody");
+    makeCollapsible("refinerLorasToggle", "refinerLorasBody");
+    makeCollapsible("spectrumToggle", "spectrumBody");
+    makeCollapsible("galleryToggle", "galleryBody");
+    makeCollapsible("qwenEditToggle", "qwenEditBody");
+    makeCollapsible("faceRefineToggle", "faceRefineBody");
+  }
+
+  window.outputZoom = setupZoomPan("imgWrap", "outputImg", "btnResetZoom", "btnFullscreenImg");
+  window.refZoom = setupZoomPan("refWrap", "refImg", "btnResetZoomRef", "btnFullscreenRef");
+
+  // Navegación de variantes en pantalla completa del visor principal con flechas del teclado
+  document.addEventListener("keydown", (e) => {
+    if(_variantFsOverlay) return; // Si el modal de variantes está abierto, él gestiona sus teclas
+    if(!window.outputZoom?.isFullscreen() && !window.refZoom?.isFullscreen()) return;
+    if(e.key === "ArrowLeft"){
+      e.preventDefault();
+      navigateVariant(-1);
+    } else if(e.key === "ArrowRight"){
+      e.preventDefault();
+      navigateVariant(1);
+    }
+  });
+
+  // Swipe táctil en móvil para cambiar de variante en el visor principal
+  window.outputZoom?.onSwipe?.((dir) => navigateVariant(dir));
+  window.refZoom?.onSwipe?.((dir) => navigateVariant(dir));
+
+  // Dropzone de referencia
+  const dz = $("refDropzone"), input = $("refFileInput"), btn = $("btnBrowseRef"), wrap = $("refWrap");
+  if(dz && input && btn){
+    btn.addEventListener("click", (e) => { e.stopPropagation(); input.click(); });
+    const onDragEnter = (e) => { e.preventDefault(); dz.classList.add("drag"); };
+    const onDragOver = (e) => { e.preventDefault(); dz.classList.add("drag"); };
+    const onDragLeave = () => { dz.classList.remove("drag"); };
+    const onDrop = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      dz.classList.remove("drag");
+      const files = e.dataTransfer?.files;
+      if(files && files.length > 0) handleRefFile(files[0]);
+    };
+    dz.addEventListener("dragenter", onDragEnter);
+    dz.addEventListener("dragover", onDragOver);
+    dz.addEventListener("dragleave", onDragLeave);
+    dz.addEventListener("drop", onDrop);
+    if(wrap){
+      wrap.addEventListener("dragenter", onDragEnter);
+      wrap.addEventListener("dragover", onDragOver);
+      wrap.addEventListener("dragleave", onDragLeave);
+      wrap.addEventListener("drop", onDrop);
+    }
+    input.addEventListener("change", e => { if(e.target.files[0]) handleRefFile(e.target.files[0]); });
+  }
+
+  $("comboMode")?.addEventListener("change", (e) => {
+    resetTouched(); // Cambiar modo limpia el estado de "tocado" para que el perfil se aplique limpio.
+    applyComboMode(e.target.value);
+  });
+  $("baseUnetSelect")?.addEventListener("change", () => { syncStageToUnet("baseUnetSelect", "baseClipSelect", "base"); updateVaeSelectors(); });
+  $("refinerUnetSelect")?.addEventListener("change", () => { syncStageToUnet("refinerUnetSelect", "refinerClipSelect", "refiner"); updateVaeSelectors(); });
+  $("btnInvertOrder")?.addEventListener("click", () => { resetTouched(); invertOrder(); });
+
+  $("mpSlider")?.addEventListener("input", (e) => {
+    if($("mpVal")) $("mpVal").textContent = parseFloat(e.target.value).toFixed(2);
+    updateDimensionHints();
+  });
+  $("aspectRatio")?.addEventListener("change", updateDimensionHints);
+  $("upscaleFactor")?.addEventListener("input", (e) => {
+    if($("upscaleFactorVal")) $("upscaleFactorVal").textContent = `${parseFloat(e.target.value).toFixed(2)}x`;
+    updateDimensionHints();
+  });
+  ["baseSteps","baseCfg","baseSamplerName","baseSchedulerName","refinerSteps","refinerCfg","refinerSamplerName","refinerSchedulerName","refinerDenoise"].forEach(id => {
+    $(id)?.addEventListener("change", () => markTouched(id));
+  });
+  $("refinerDenoise")?.addEventListener("input", (e) => {
+    if($("refinerDenoiseVal")) $("refinerDenoiseVal").textContent = parseFloat(e.target.value).toFixed(2);
+  });
+  $("spectrumW")?.addEventListener("input", (e) => {
+    if($("spectrumWVal")) $("spectrumWVal").textContent = parseFloat(e.target.value).toFixed(2);
+  });
+  $("spectrumLam")?.addEventListener("input", (e) => {
+    if($("spectrumLamVal")) $("spectrumLamVal").textContent = parseFloat(e.target.value).toFixed(2);
+  });
+
+  // --- Post-procesado (ProPost Torched) ---
+  initPostFxListeners();
+
+  // --- Edición con Qwen 2.1 ---
+  initQwenEditListeners();
+
+  // --- Refinado facial (H3 FaceRefine) ---
+  initFaceRefineListeners();
+
+  // Cargar el estado persistido del refinado facial
+  setFaceRefineUI(loadFaceRefine());
+
+  // --- Cargar metadatos de la imagen de referencia ---
+  $("btnLoadMeta")?.addEventListener("click", async () => {
+    const btn = $("btnLoadMeta");
+    const src = getRefImageSrc();
+    if(!src){ log("⚠️ Primero carga una imagen de referencia", "l-err"); return; }
+    const prev = btn?.textContent;
+    if(btn){ btn.disabled = true; btn.textContent = "Leyendo metadatos..."; }
+    try {
+      const found = await extractWorkflowFromImage(src);
+      if(found === null) log("ℹ️ Esta imagen no contiene metadatos de workflow.", "l-info");
+    } catch(e){
+      log("❌ Error leyendo metadatos: " + e.message, "l-err");
+    } finally {
+      if(btn){ btn.disabled = false; btn.textContent = prev; }
+    }
+  });
+
+  // Semilla de Sampler
+  $("segSamplerRandom")?.addEventListener("click", () => {
+    $("segSamplerRandom")?.classList.add("on");
+    $("segSamplerFixed")?.classList.remove("on");
+    if($("samplerSeed")) $("samplerSeed").disabled = true;
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+  $("segSamplerFixed")?.addEventListener("click", () => {
+    $("segSamplerFixed")?.classList.add("on");
+    $("segSamplerRandom")?.classList.remove("on");
+    if($("samplerSeed")) $("samplerSeed").disabled = false;
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+
+  // Semilla de Varianza (Krea2)
+  $("segVarianceRandom")?.addEventListener("click", () => {
+    $("segVarianceRandom")?.classList.add("on");
+    $("segVarianceFixed")?.classList.remove("on");
+    if($("varianceSeed")) $("varianceSeed").disabled = true;
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+  $("segVarianceFixed")?.addEventListener("click", () => {
+    $("segVarianceFixed")?.classList.add("on");
+    $("segVarianceRandom")?.classList.remove("on");
+    if($("varianceSeed")) $("varianceSeed").disabled = false;
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+
+  // Controles de varianza RBG
+  $("varianceFineTune")?.addEventListener("input", (e) => {
+    if($("varianceFineTuneVal")) $("varianceFineTuneVal").textContent = e.target.value;
+  });
+  $("varianceShiftStrength")?.addEventListener("input", (e) => {
+    if($("varianceShiftStrengthVal")) $("varianceShiftStrengthVal").textContent = e.target.value;
+  });
+
+  $("tabViewFinal")?.addEventListener("click", () => showImageView("final"));
+  $("tabViewBase")?.addEventListener("click", () => showImageView("base"));
+
+  $("btnGenerate")?.addEventListener("click", () => enqueueGeneration(false));
+  $("btnGenerateBaseOnly")?.addEventListener("click", () => enqueueGeneration(true));
+
+  $("btnClearNegPrompt")?.addEventListener("click", () => {
+    if($("negPrompt")) $("negPrompt").value = "";
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+
+  // Persistencia reactiva continua en localStorage para cualquier cambio en controles
+  document.addEventListener("input", () => {
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+  document.addEventListener("change", () => {
+    if(typeof scheduleSaveKreaQwenSettings === "function") scheduleSaveKreaQwenSettings();
+  });
+
+  // Historial de imágenes
+  $("btnClearGallery")?.addEventListener("click", clearGallery);
+  renderGallery();
+
+  $("btnClearQueue")?.addEventListener("click", () => {
+    jobQueue = [];
+    finishCurrentJob();
+    updateQueueUI();
+    log("🗑️ Cola de trabajos vaciada y estado restablecido a reposo.", "l-info");
+  });
+
+  // --- Envío entre WebUIs (con arranque automático del destino) ---
+  async function openExternalWebUI(targetPort, targetPage, filename, subfolder, label){
+    await openExternalWebUIRef(targetPort, targetPage, filename, subfolder, label);
+  }
+
+  async function sendOutputToExternalUI(targetPort, targetPage, label){
+    const mediaObj = (currentViewMode === "final") ? currentFinalMedia : currentBaseMedia;
+    if(!mediaObj || !mediaObj.media || !mediaObj.media.filename){
+      log(`⚠️ Primero genera una imagen para poder enviarla a ${label}.`, "l-err");
+      return;
+    }
+    const filename = mediaObj.media.filename;
+    const subfolder = mediaObj.media.subfolder || "kreaqwen/imagen";
+    await openExternalWebUI(targetPort, targetPage, filename, subfolder, label);
+  }
+
+  async function sendRefToExternalUI(targetPort, targetPage, label){
+    const refImgEl = $("refImg");
+    if(!refImgEl || !refImgEl.src || refImgEl.src === window.location.href){
+      log("⚠️ Primero carga una imagen de referencia.", "l-err");
+      return;
+    }
+    const src = refImgEl.src;
+    const fromView = refFromViewSrc(src);
+    if(fromView){
+      await openExternalWebUI(targetPort, targetPage, fromView.filename, fromView.subfolder, label);
+      return;
+    }
+    if(!src.startsWith("data:")){
+      log("⚠️ Origen de imagen no soportado: " + src.slice(0, 40), "l-err");
+      return;
+    }
+    log(`⏳ Subiendo imagen de referencia para enviarla a ${label}...`, "l-info");
+    try {
+      const blob = await (await fetch(src)).blob();
+      const ts = Date.now();
+      const ext = (blob.type && blob.type.split("/")[1]) || "png";
+      const filename = `ref_${ts}.${ext.replace(/[^a-z0-9]/i, "")}`;
+      const fd = new FormData();
+      fd.append("image", new File([blob], filename, { type: blob.type || "image/png" }));
+      const r = await fetch("/api/krea2_upload", { method: "POST", body: fd });
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      const data = await r.json();
+      if(data.error) throw new Error(data.error);
+      const finalName = (data.name || filename).replace(/^.*\//, "");
+      log(`✅ Imagen subida a output/krea2/${finalName}`, "l-ok");
+      await openExternalWebUI(targetPort, targetPage, finalName, "krea2", label);
+    } catch(e){
+      log(`❌ No se pudo enviar la imagen a ${label}: ` + e.message, "l-err");
+    }
+  }
+
+  $("btnSendLtxv")?.addEventListener("click", () => {
+    const port = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
+    sendOutputToExternalUI(port, "LTXV_WebUI.html", "LTXV");
+  });
+  $("btnSendH3")?.addEventListener("click", () => {
+    const port = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
+    sendOutputToExternalUI(port, "MiniMaxH3_WebUI.html", "MiniMax H3");
+  });
+  $("btnSendX2")?.addEventListener("click", () => {
+    const port = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
+    sendOutputToExternalUI(port, "MMH3X2_WebUI.html", "MMH3X2");
+  });
+
+  $("btnSendRefLtxv")?.addEventListener("click", () => {
+    const port = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
+    sendRefToExternalUI(port, "LTXV_WebUI.html", "LTXV");
+  });
+  $("btnSendRefH3")?.addEventListener("click", () => {
+    const port = (typeof MINIMAXH3_UI_PORT !== "undefined" && MINIMAXH3_UI_PORT) ? MINIMAXH3_UI_PORT : "8002";
+    sendRefToExternalUI(port, "MiniMaxH3_WebUI.html", "MiniMax H3");
+  });
+  $("btnSendRefX2")?.addEventListener("click", () => {
+    const port = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
+    sendRefToExternalUI(port, "MMH3X2_WebUI.html", "MMH3X2");
+  });
+
+  // --- Drag & Drop saliente y recepción entre UIs ---
+  makeDragSource($("outputImg"), () => {
+    const mediaObj = (currentViewMode === "final") ? currentFinalMedia : currentBaseMedia;
+    return (mediaObj && mediaObj.media) ? mediaObj.media : null;
+  });
+  enableInterUIDrop($("refDropzone"), (file) => handleRefFile(file));
+  enableInterUIDrop($("refWrap"), (file) => handleRefFile(file));
+
+  // --- Cargar imagen pasada por query ?ref= ---
+  (async function maybeLoadFromQuery(){
+    const qs = new URLSearchParams(window.location.search);
+    const ref = qs.get("ref");
+    if(!ref) return;
+    const rawName = decodeURIComponent(ref);
+    const filename = rawName.replace(/^.*\//, "");
+    const subfolder = (rawName.includes("/") && rawName.split("/").slice(0,-1).join("/")) || "krea2";
+    const tryLoad = async (sf) => {
+      const url = `/view?filename=${encodeURIComponent(filename)}&subfolder=${encodeURIComponent(sf)}&type=${encodeURIComponent("output")}`;
+      log("⏳ Cargando imagen de referencia: "+filename+" (subfolder="+sf+")", "l-info");
+      const r = await fetch(url);
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      const blob = await r.blob();
+      if(blob.size === 0) throw new Error("respuesta vacía");
+      const file = new File([blob], filename, { type: blob.type || "image/png" });
+      handleRefFile(file);
+      log("✅ Imagen de referencia cargada: "+filename, "l-ok");
+    };
+    try {
+      await tryLoad(subfolder);
+    } catch(e1){
+      try {
+        await tryLoad("");
+      } catch(e2){
+        log("⚠️ La imagen '"+filename+"' no se pudo cargar: "+e2.message, "l-err");
+      }
+    }
+  })();
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initKreaQwenUI);
+} else {
+  initKreaQwenUI();
+}

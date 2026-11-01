@@ -1,0 +1,1200 @@
+  <div class="chain" id="chain">
+    <div class="node" data-n="img">4 imgs + 1 vid</div><div class="arrow">→</div>
+    <div class="node" data-n="seg1">seg 1</div><div class="arrow">→</div>
+    <div class="node" data-n="seg2">seg 2</div><div class="arrow">→</div>
+    <div class="node" data-n="blend">blend</div><div class="arrow">→</div>
+    <div class="node" data-n="rtx">rtx 2x</div><div class="arrow">→</div>
+    <div class="node" data-n="rife">rife x2/x4</div><div class="arrow">→</div>
+    <div class="node" data-n="out">final</div>
+  </div>
+
+  <div class="grid">
+    <!-- COLUMNA 1 (IZQUIERDA): ENTRADA, PROMPTS Y MEDIOS DE REFERENCIA -->
+    <div class="controls-col">
+      __SERVER_PANEL__
+
+      __PROMPT_PANELS__
+
+      <!-- PROMPT 2: SEGMENTO 2 / CONTINUACIÓN -->
+      <div class="panel">
+        <h2>Prompt 2 · Segmento 2 (Continuación)</h2>
+        <div class="row">
+          <textarea id="prompt2" placeholder="Describe la acción o evolución de la escena en el segundo segmento (puedes escribir una orden corta en español o un prompt completo en inglés)..."></textarea>
+        </div>
+        <div class="row" style="margin-top:6px;">
+          <label style="font-size:10px;margin-bottom:3px;">Generar / mejorar Prompt 2 aquí (antes de lanzar)</label>
+          <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            <select id="seg2EnhanceStyle" style="flex:1; min-width:190px; font-size:11px; height:28px;" title="Elige cómo redactar el Prompt 2 con IA (usa automáticamente Visión cuando corresponde)">
+              <option value="seg1_vision" selected>🖼️ Continuar desde Seg 1 (usa Img 1 + refs Seg 1)</option>
+              <option value="seg2_vision">🖼️ Continuar hacia refs de Seg 2 (usa Img 3/4/6)</option>
+              <option value="text_cont">📝 Continuar solo por texto (desde Prompt 1)</option>
+              <option value="panel_top">⚙️ Usar modo/estilo del panel Enhancer superior</option>
+            </select>
+            <button id="btnEnhancePrompt2" class="ghost btn-mini" style="height:28px;" title="Redacta el Prompt 2 completo con IA y selecciona automáticamente el modo Directo">✨ Mejorar prompt</button>
+            <button id="btnClearPrompt2" class="ghost btn-mini" style="height:28px;" title="Limpiar Prompt 2">✕ Limpiar</button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Cambios a aplicar <span class="hint">(pulido sobre Prompt 2; Ctrl+Enter)</span></label>
+          <textarea class="enhancer-output" id="prompt2RefineInput" placeholder="p. ej.: que gire hacia la cámara, más lento..."></textarea>
+          <button id="btnRefinePrompt2" class="primary" style="width:100%; margin-top:6px;">Aplicar cambios</button>
+        </div>
+        <div class="row" style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+          <label>Modo de continuidad al generar en ComfyUI</label>
+          <select id="seg2PromptMode">
+            <option value="direct" selected>Directo (usar el texto de Prompt 2 tal cual)</option>
+            <option value="ollama">Asistido en vivo (Ollama analiza el final real de Seg 1 + tu directriz)</option>
+          </select>
+          <div class="hint" id="seg2PromptModeHint" style="font-size:10px;margin-top:4px;line-height:1.35;"></div>
+        </div>
+        <div class="row" id="rowSeg2OllamaModel" style="margin-top:8px; display:none;">
+          <label>Modelo Ollama para continuidad (multimodal / visión)</label>
+          <select id="seg2OllamaModel">
+            <option value="">-- Mismo que Enhancer / Default --</option>
+          </select>
+          <div class="hint" style="font-size:10px;margin-top:2px;">Se ejecutará dentro de ComfyUI analizando los fotogramas finales del Seg 1. Debe soportar visión.</div>
+        </div>
+      </div>
+
+      <!-- MEDIOS DE ENTRADA: 6 IMÁGENES + 1 VÍDEO -->
+      <div class="panel">
+        <h2>Imágenes de Referencia (Hasta 6)</h2>
+        <div class="hint" style="font-size:10px;margin-bottom:6px;">Arrastra o haz clic en cada recuadro. Arrastra entre slots o desde el historial para intercambiar.</div>
+        <div class="media-grid-4">
+          <!-- Columna izquierda = Seg 1 (1, 2, 5); derecha = Seg 2 (3, 4, 6) -->
+          <!-- IMAGEN 1: Base Seg 1 -->
+          <div class="media-slot" id="slotImg1" data-slot="1">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 1 · Base Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg1" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput1" accept="image/*">
+            <div class="ph" id="phImg1">arrastra o clic<br><span class="hint">(inicio seg 1)</span></div>
+            <img id="previewSlotImg1" style="display:none;" alt="Img 1">
+            <div class="media-slot-info" id="infoImg1"></div>
+          </div>
+
+          <!-- IMAGEN 3: Ref Seg 2 -->
+          <div class="media-slot" id="slotImg3" data-slot="3">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 3 · Ref Seg 2</span>
+              <button class="media-slot-del" id="btnDelImg3" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput3" accept="image/*">
+            <div class="ph" id="phImg3">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
+            <img id="previewSlotImg3" style="display:none;" alt="Img 3">
+            <div class="media-slot-info" id="infoImg3"></div>
+          </div>
+
+          <!-- IMAGEN 2: Ref Seg 1 -->
+          <div class="media-slot" id="slotImg2" data-slot="2">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 2 · Ref Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg2" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput2" accept="image/*">
+            <div class="ph" id="phImg2">arrastra o clic<br><span class="hint">(ref seg 1)</span></div>
+            <img id="previewSlotImg2" style="display:none;" alt="Img 2">
+            <div class="media-slot-info" id="infoImg2"></div>
+          </div>
+
+          <!-- IMAGEN 4: Ref Seg 2 -->
+          <div class="media-slot" id="slotImg4" data-slot="4">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 4 · Ref Seg 2</span>
+              <button class="media-slot-del" id="btnDelImg4" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput4" accept="image/*">
+            <div class="ph" id="phImg4">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
+            <img id="previewSlotImg4" style="display:none;" alt="Img 4">
+            <div class="media-slot-info" id="infoImg4"></div>
+          </div>
+
+          <!-- IMAGEN 5: Ref Seg 1 -->
+          <div class="media-slot" id="slotImg5" data-slot="5">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 5 · Ref Seg 1</span>
+              <button class="media-slot-del" id="btnDelImg5" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput5" accept="image/*">
+            <div class="ph" id="phImg5">arrastra o clic<br><span class="hint">(ref seg 1)</span></div>
+            <img id="previewSlotImg5" style="display:none;" alt="Img 5">
+            <div class="media-slot-info" id="infoImg5"></div>
+          </div>
+
+          <!-- IMAGEN 6: Ref Seg 2 -->
+          <div class="media-slot" id="slotImg6" data-slot="6">
+            <div class="media-slot-header">
+              <span class="media-slot-badge">Img 6 · Ref Seg 2</span>
+              <button class="media-slot-del" id="btnDelImg6" title="Quitar imagen">✕</button>
+            </div>
+            <input type="file" id="fileInput6" accept="image/*">
+            <div class="ph" id="phImg6">arrastra o clic<br><span class="hint">(ref seg 2)</span></div>
+            <img id="previewSlotImg6" style="display:none;" alt="Img 6">
+            <div class="media-slot-info" id="infoImg6"></div>
+          </div>
+        </div>
+
+        <!-- REFERENCIAS COMPARTIDAS + TAMAÑO -->
+        <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;">
+            <input type="checkbox" id="shareRefsToggle"> <span>Referencias compartidas <span class="hint">(comparte Img 2..6 en ambos segmentos manteniendo el mismo número &lt;Picture N&gt;)</span></span>
+          </div>
+          <label class="row" style="margin-top:8px;align-items:center;gap:6px;font-size:10px;" title="Ancla la Imagen 1 como keyframe en el frame 0 del Seg 1 (MiniMaxH3AddGuide). Desactívalo si la Imagen 1 es solo una referencia de identidad/estilo.">
+            <input type="checkbox" id="img1AnchorFirst" checked style="width:auto;margin:0;"> Imagen 1 = primer frame del Seg 1 (ancla)
+          </label>
+          <label class="row" style="margin-top:4px;align-items:center;gap:6px;font-size:10px;" title="FL2VA: ancla la Imagen 2 como keyframe en el último frame del Seg 1 (MiniMaxH3AddGuide, frame_idx -1). Déjalo desactivado si la Imagen 2 es solo una referencia de identidad.">
+            <input type="checkbox" id="img2AnchorLast" style="width:auto;margin:0;"> Imagen 2 = último frame del Seg 1 (FL2VA)
+          </label>
+          <div class="row" style="margin-top:8px;align-items:center;gap:8px;">
+            <label style="font-size:10px;margin:0;">Tamaño de referencias</label>
+            <select id="refImageSize" style="width:auto;padding:3px 6px;font-size:10px;height:24px;">
+              <option value="match" selected>match (rápido)</option>
+              <option value="max">max (máxima identidad, más lento)</option>
+            </select>
+          </div>
+          <div class="hint" id="refMappingHint" style="margin-top:6px;font-size:10px;"></div>
+        </div>
+
+        <!-- VÍDEO DE ENTRADA / REFERENCIA -->
+        <div style="margin-top:10px;">
+          <label style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Vídeo de Referencia para Seg 2 <span class="hint">(Opcional)</span></label>
+          <div class="video-slot-wrap" id="slotVid">
+            <input type="file" id="fileInputVid" accept="video/mp4,video/webm,video/quicktime">
+            <div class="ph" id="phVid">Vacío = usa automáticamente los últimos 2s generados del Seg 1.<br><span style="color:var(--accent);">Arrastra o haz clic aquí para subir un vídeo externo.</span></div>
+            <video id="previewSlotVid" controls muted loop style="display:none;"></video>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+              <span class="media-slot-info" id="infoVid"></span>
+              <button class="ghost btn-mini" id="btnDelVid" style="display:none;">✕ Quitar vídeo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PISTAS DE AUDIO -->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:6px;flex-wrap:wrap;">
+            <label style="font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0;">Pistas de Audio <span class="hint">(Guía &amp; BGM)</span></label>
+            <select id="audioMode" style="width:auto;padding:3px 6px;font-size:10px;height:24px;">
+              <option value="none" selected>Sin audio externo (IA estándar)</option>
+              <option value="guide">Guía de Ritmo IA (ref_audio)</option>
+              <option value="passthrough">Pista Directa Final (BGM limpio)</option>
+              <option value="hybrid">Híbrido (Guía Ritmo + Pista Limpia)</option>
+            </select>
+          </div>
+          <div class="hint" id="audioModeHint" style="font-size:10px;margin-bottom:8px;"></div>
+          <div class="audio-grid-2">
+            <!-- AUDIO 1 -->
+            <div class="audio-slot-wrap media-slot" id="slotAudio1" data-slot="audio1">
+              <div class="media-slot-header">
+                <span class="media-slot-badge">Audio 1 · Seg 1 / Global</span>
+                <button class="media-slot-del" id="btnDelAudio1" type="button" title="Quitar audio">✕</button>
+              </div>
+              <input type="file" id="fileInputAudio1" accept="audio/*">
+              <div class="ph" id="phAudio1">arrastra o clic audio<br><span class="hint">(WAV, MP3, FLAC)</span></div>
+              <audio id="previewAudio1" controls style="display:none;"></audio>
+              <div class="media-slot-info" id="infoAudio1"></div>
+            </div>
+
+            <!-- AUDIO 2 -->
+            <div class="audio-slot-wrap media-slot" id="slotAudio2" data-slot="audio2">
+              <div class="media-slot-header">
+                <span class="media-slot-badge">Audio 2 · Seg 2 (Opcional)</span>
+                <button class="media-slot-del" id="btnDelAudio2" type="button" title="Quitar audio">✕</button>
+              </div>
+              <input type="file" id="fileInputAudio2" accept="audio/*">
+              <div class="ph" id="phAudio2">arrastra o clic audio<br><span class="hint">(WAV, MP3, FLAC)</span></div>
+              <audio id="previewAudio2" controls style="display:none;"></audio>
+              <div class="media-slot-info" id="infoAudio2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- IMÁGENES KREA2 RECIENTES -->
+      <div class="panel">
+        <div class="collapsible-header" id="krea2RecentToggle">
+          <span class="arrow">▶</span> Imágenes Krea2 recientes
+        </div>
+        <div class="collapsible-body" id="krea2RecentBody">
+          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="gallery-grid" id="krea2RecentGrid"></div>
+          <div class="hint" style="margin-top:6px;">Clic: primer slot libre · Arrastrar: al slot que quieras.</div>
+        </div>
+      </div>
+
+      <!-- EVOLVE / TRANSMUTAR PROMPT -->
+      <div class="panel">
+        <div class="collapsible-header" id="evolveToggle">
+          <span class="arrow">▶</span> Evolve / Transmutar prompt
+        </div>
+        <div class="collapsible-body" id="evolveBody">
+          <div class="enhancer-row">
+            <label>Objetivo</label>
+            <select id="evolveTarget">
+              <option value="prompt" selected>Prompt 1 (Seg 1)</option>
+              <option value="prompt2">Prompt 2 (Seg 2)</option>
+            </select>
+          </div>
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="evolveMode">
+              <option value="words">Palabras</option>
+              <option value="internal">Palabras del prompt</option>
+              <option value="synonyms">Sinónimos cinematográficos</option>
+            </select>
+          </div>
+          <div class="enhancer-row">
+            <label>Probabilidad <span class="hint">(% de tokens cambiados)</span></label>
+            <div class="slider-row">
+              <input type="range" id="evolveStrength" min="0" max="100" step="1" value="10">
+              <div class="slider-val" id="evolveStrengthVal">10%</div>
+            </div>
+          </div>
+          <div class="enhancer-row">
+            <label>Variantes</label>
+            <input type="number" id="evolveCount" value="4" min="1" max="16" step="1">
+          </div>
+          <div class="btn-row">
+            <button id="btnEvolve" class="primary" style="flex:1">Transmutar</button>
+            <button id="btnEvolveUse" class="ghost" style="flex:1">Usar #1</button>
+          </div>
+          <div class="enhancer-row" style="margin-top:8px;">
+            <textarea class="enhancer-output" id="evolveOutput" readonly placeholder="Las variantes aparecerán aquí..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- REFINADO DE ELEMENTOS (H3 Element Refine) -->
+      <div class="panel">
+        <h2>Refinado de elementos (Face / Hand / Body Refine)</h2>
+        <div class="seed-toggle">
+          <div class="seg" id="segFaceRefineOn" data-value="true">Activo</div>
+          <div class="seg on" id="segFaceRefineOff" data-value="false">Desactivado</div>
+        </div>
+        <div id="faceRefineControls" style="display:none; margin-top:8px;">
+          <div class="row">
+            <label>Elemento a refinar</label>
+            <select id="faceRefineTarget">
+              <option value="face" selected>Rostro (Face · face_yolov8m)</option>
+              <option value="hands">Manos (Hands · hand_yolov8s)</option>
+              <option value="face_hands">Combo: Rostro + Manos (2 pasadas)</option>
+              <option value="hair">Cabello (Hair · yolov8-seg)</option>
+              <option value="skin">Piel (Skin · yolov8-seg)</option>
+              <option value="body">Cuerpo / Persona (Person · yolov8m-seg)</option>
+            </select>
+          </div>
+          <div class="row slider-row">
+            <label>Pasos DiT (Steps) <span class="hint" id="faceRefineStepsHint">(4)</span></label>
+            <input type="range" id="faceRefineStepsSlider" min="2" max="16" step="1" value="4">
+            <div class="slider-val" id="faceRefineStepsVal">4</div>
+          </div>
+          <div class="row">
+            <label>Resolución de recorte</label>
+            <select id="faceRefineCanvasMode">
+              <option value="512" selected>512x512 (Ultra rápido · 2x velocidad)</option>
+              <option value="768">768x768 (Alta resolución · nativo H3)</option>
+            </select>
+          </div>
+          <div class="row slider-row">
+            <label>Denoise base <span class="hint" id="faceRefineDenoiseHint">(0.35)</span></label>
+            <input type="range" id="faceRefineDenoiseSlider" min="0.15" max="0.55" step="0.05" value="0.35">
+            <div class="slider-val" id="faceRefineDenoiseVal">0.35</div>
+          </div>
+          <div class="row slider-row">
+            <label>Suavizado de borde (Feather) <span class="hint" id="faceRefineFeatherHint">(16 px)</span></label>
+            <input type="range" id="faceRefineFeatherSlider" min="4" max="32" step="2" value="16">
+            <div class="slider-val" id="faceRefineFeatherVal">16 px</div>
+          </div>
+          <div class="row slider-row">
+            <label title="Contexto alrededor del elemento detectado. Más bajo = el elemento ocupa más del recorte (menos reducción en caras grandes). Doble clic: valor por defecto.">Factor de recorte (Crop factor) <span class="hint" id="faceRefineCropHint">(3.0 · por defecto)</span></label>
+            <input type="range" id="faceRefineCropSlider" min="1.2" max="3.5" step="0.1" value="3.0">
+            <div class="slider-val" id="faceRefineCropVal">3.0x</div>
+          </div>
+          <div class="row">
+            <label>Modo de selección</label>
+            <select id="faceRefineSelectMode">
+              <option value="largest_face" selected>1 objetivo (Principal · más grande)</option>
+              <option value="dual_faces">2 objetivos (Dual · refina ambos)</option>
+              <option value="centre_most">1 objetivo (Más centrado)</option>
+              <option value="left_most">1 objetivo (A la izquierda)</option>
+              <option value="right_most">1 objetivo (A la derecha)</option>
+              <option value="second_face">1 objetivo (Solo segundo · index 1)</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:11px; text-transform:none;">
+              <input type="checkbox" id="faceRefinePostprocToggle">
+              <span>Re-aplicar RTX y RIFE al clip refinado</span>
+            </label>
+          </div>
+          <div class="row" style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+            <label>Caras de referencia (Identidad opcional)</label>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <!-- Slot Cara 1 -->
+              <div class="ref-face-slot" style="flex:1;background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px;text-align:center;position:relative;">
+                <input type="file" id="faceRefineImgFile1" accept="image/*" style="display:none;">
+                <div id="faceRefineSlotPlaceholder1" style="cursor:pointer;padding:8px 4px;">
+                  <div style="font-size:16px;">👤</div>
+                  <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">Ref. Cara 1</div>
+                  <div style="font-size:9.5px;color:var(--muted-2);">(clic o arrastrar)</div>
+                </div>
+                <div id="faceRefineSlotPreview1" style="display:none;position:relative;">
+                  <img id="faceRefineSlotImg1" style="max-height:80px;max-width:100%;border-radius:4px;object-fit:cover;display:block;margin:0 auto;">
+                  <button type="button" id="faceRefineSlotClear1" class="ghost btn-mini" title="Quitar referencia 1" style="position:absolute;top:2px;right:2px;padding:2px 5px;font-size:10px;background:rgba(0,0,0,0.6);">✕</button>
+                </div>
+              </div>
+              <!-- Slot Cara 2 -->
+              <div class="ref-face-slot" id="faceRefineSlotWrap2" style="flex:1;background:var(--bg);border:1px dashed var(--border);border-radius:6px;padding:6px;text-align:center;position:relative;">
+                <input type="file" id="faceRefineImgFile2" accept="image/*" style="display:none;">
+                <div id="faceRefineSlotPlaceholder2" style="cursor:pointer;padding:8px 4px;">
+                  <div style="font-size:16px;">👥</div>
+                  <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">Ref. Cara 2 (Dual)</div>
+                  <div style="font-size:9.5px;color:var(--muted-2);">(clic o arrastrar)</div>
+                </div>
+                <div id="faceRefineSlotPreview2" style="display:none;position:relative;">
+                  <img id="faceRefineSlotImg2" style="max-height:80px;max-width:100%;border-radius:4px;object-fit:cover;display:block;margin:0 auto;">
+                  <button type="button" id="faceRefineSlotClear2" class="ghost btn-mini" title="Quitar referencia 2" style="position:absolute;top:2px;right:2px;padding:2px 5px;font-size:10px;background:rgba(0,0,0,0.6);">✕</button>
+                </div>
+              </div>
+            </div>
+            <div class="hint" style="font-size:9.5px;margin-top:4px;">Inyecta fotos de retrato para fijar identidad facial exacta con InsightFace y condicionamiento DiT (&lt;Picture 1&gt;).</div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:4px;font-size:10px;">Rastrea y re-genera caras, manos, pelo o cuerpo con Denoise adaptativo por fotograma en alta escala, recomponiéndolos mediante recorte y fundido suave.</div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 2 (CENTRO): MODELOS, MUESTREO, ENLACE Y OPTIMIZACIONES -->
+    <div class="settings-col">
+      <!-- MODELOS & LORAS -->
+      <div class="panel">
+        <h2>Modelos &amp; LoRAs</h2>
+        <div class="row">
+          <label>UNet / Diffusion Model</label>
+          <select id="unetModel"><option value="">Cargando modelos...</option></select>
+        </div>
+        <div class="row">
+          <label>CLIP / Text Encoder</label>
+          <select id="clipModel"><option value="">Cargando CLIPs...</option></select>
+        </div>
+        <div class="row">
+          <label>VAE Vídeo</label>
+          <select id="vaeModel"><option value="">Cargando VAE...</option></select>
+        </div>
+
+        <!-- LoRA 1 -->
+        <div class="lora-slot" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="lora1Toggle"> <span>LoRA 1</span>
+            </label>
+          </div>
+          <select id="lora1Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
+          <div class="slider-row" style="margin-top:4px;">
+            <label style="font-size:10px;">Fuerza</label>
+            <input type="range" id="lora1Strength" min="0" max="2" step="0.05" value="1.0">
+            <div class="slider-val" id="lora1StrengthVal">1.00</div>
+          </div>
+        </div>
+
+        <!-- LoRA 2 -->
+        <div class="lora-slot" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+          <div class="lora-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="lora2Toggle"> <span>LoRA 2</span>
+            </label>
+          </div>
+          <select id="lora2Select" style="margin-top:4px;"><option value="">(ninguno)</option></select>
+          <div class="slider-row" style="margin-top:4px;">
+            <label style="font-size:10px;">Fuerza</label>
+            <input type="range" id="lora2Strength" min="0" max="2" step="0.05" value="1.0">
+            <div class="slider-val" id="lora2StrengthVal">1.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEMILLA -->
+      <div class="panel">
+        <h2>Semilla</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segRandom">Aleatoria</div>
+          <div class="seg" id="segFixed">Fija</div>
+        </div>
+        <input type="number" id="seedVal" value="12345" step="1" disabled>
+      </div>
+
+      <!-- RESOLUCIÓN & DURACIÓN -->
+      <div class="panel">
+        <h2>Resolución &amp; Duración</h2>
+        <div class="row" style="margin-bottom:6px;">
+          <label>Relación de aspecto <span class="hint" id="arDetectHint">(16:9)</span></label>
+          <select id="aspectRatioSelect">
+            <option value="auto" selected>Auto (Slot 1 si hay imagen / 16:9 si T2V)</option>
+            <option value="16:9">16:9 (Horizontal estándar · 1152×640)</option>
+            <option value="9:16">9:16 (Vertical móvil / Reels / TikTok · 640×1152)</option>
+            <option value="1:1">1:1 (Cuadrado · 832×832)</option>
+            <option value="4:3">4:3 (Horizontal TV · 960×736)</option>
+            <option value="3:4">3:4 (Vertical TV · 736×960)</option>
+            <option value="21:9">21:9 (Cinemascope · 1344×576)</option>
+          </select>
+        </div>
+        <div class="row slider-row">
+          <label>Megapíxeles</label>
+          <input type="range" id="mpSlider" min="0.3" max="2.0" step="0.05" value="0.70">
+          <div class="slider-val" id="mpVal">0.70</div>
+        </div>
+        <div class="row two-col">
+          <div><label>Ancho</label><input type="number" id="width" value="1152" step="32" min="256" class="ro" readonly></div>
+          <div><label>Alto</label><input type="number" id="height" value="640" step="32" min="256" class="ro" readonly></div>
+        </div>
+        <div class="row slider-row">
+          <label>Duración Segmento 1 <span class="hint" id="durHint1">(15.0s → 362f)</span></label>
+          <input type="range" id="durationSlider1" min="1.0" max="29.0" step="0.5" value="15.0">
+          <div class="slider-val" id="durationVal1">15.0s</div>
+        </div>
+        <div class="row slider-row">
+          <label>Duración Segmento 2 <span class="hint" id="durHint2">(15.0s → 362f)</span></label>
+          <input type="range" id="durationSlider2" min="1.0" max="29.0" step="0.5" value="15.0">
+          <div class="slider-val" id="durationVal2">15.0s</div>
+        </div>
+        <div class="hint" id="totalFramesHint" style="margin-top:2px;font-size:10.5px;color:var(--accent);">
+          Total: Seg 1 (362f) + Seg 2 (362f) = 723 frames (~30.0s a 24fps · Máx 30s)
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Batch Size (Variantes)</label>
+          <input type="number" id="batchSize" value="1" min="1" max="8">
+        </div>
+      </div>
+
+      <!-- MUESTREO (SAMPLER & STEPS) -->
+      <div class="panel">
+        <h2>Muestreo (Sampler &amp; Steps)</h2>
+        <div class="row slider-row">
+          <label>Pasos (Steps)</label>
+          <input type="range" id="stepsSlider" min="1" max="50" step="1" value="20">
+          <div class="slider-val" id="stepsVal">20</div>
+        </div>
+        <div class="row slider-row">
+          <label>Denoise Seg 2 <span class="hint">(Continuidad latente 2s)</span></label>
+          <input type="range" id="denoiseSlider2" min="0.50" max="1.00" step="0.01" value="1.00">
+          <div class="slider-val" id="denoiseVal2">1.00</div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:-4px;margin-bottom:8px;">1.00 = ruido total (regenera). 0.85-0.95 = conserva trayectoria e inercia física de los 2s inyectados.</div>
+        <div class="row two-col">
+          <div>
+            <label>Sampler</label>
+            <select id="samplerName">
+              <option value="res_multistep" selected>res_multistep (recomendado)</option>
+              <option value="res_multistep_cfg_pp">res_multistep_cfg_pp</option>
+              <option value="res_multistep_ancestral">res_multistep_ancestral</option>
+              <option value="res_multistep_ancestral_cfg_pp">res_multistep_ancestral_cfg_pp</option>
+              <option value="res_2m">res_2m</option>
+              <option value="res_2m_ode">res_2m_ode</option>
+              <option value="res_2s">res_2s</option>
+              <option value="res_2s_ode">res_2s_ode</option>
+              <option value="res_3m">res_3m</option>
+              <option value="res_3m_ode">res_3m_ode</option>
+              <option value="res_3s">res_3s</option>
+              <option value="res_3s_ode">res_3s_ode</option>
+              <option value="res_5s">res_5s</option>
+              <option value="res_5s_ode">res_5s_ode</option>
+              <option value="res_6s">res_6s</option>
+              <option value="res_6s_ode">res_6s_ode</option>
+              <option value="euler">euler</option>
+              <option value="euler_cfg_pp">euler_cfg_pp</option>
+              <option value="euler_ancestral">euler_ancestral</option>
+              <option value="euler_ancestral_cfg_pp">euler_ancestral_cfg_pp</option>
+              <option value="heun">heun</option>
+              <option value="heunpp2">heunpp2</option>
+              <option value="exp_heun_2_x0">exp_heun_2_x0</option>
+              <option value="exp_heun_2_x0_sde">exp_heun_2_x0_sde</option>
+              <option value="dpm_2">dpm_2</option>
+              <option value="dpm_2_ancestral">dpm_2_ancestral</option>
+              <option value="lms">lms</option>
+              <option value="dpm_fast">dpm_fast</option>
+              <option value="dpm_adaptive">dpm_adaptive</option>
+              <option value="dpmpp_2s_ancestral">dpmpp_2s_ancestral</option>
+              <option value="dpmpp_2s_ancestral_cfg_pp">dpmpp_2s_ancestral_cfg_pp</option>
+              <option value="dpmpp_sde">dpmpp_sde</option>
+              <option value="dpmpp_sde_gpu">dpmpp_sde_gpu</option>
+              <option value="dpmpp_2m">dpmpp_2m</option>
+              <option value="dpmpp_2m_cfg_pp">dpmpp_2m_cfg_pp</option>
+              <option value="dpmpp_2m_sde">dpmpp_2m_sde</option>
+              <option value="dpmpp_2m_sde_gpu">dpmpp_2m_sde_gpu</option>
+              <option value="dpmpp_2m_sde_heun">dpmpp_2m_sde_heun</option>
+              <option value="dpmpp_2m_sde_heun_gpu">dpmpp_2m_sde_heun_gpu</option>
+              <option value="dpmpp_3m_sde">dpmpp_3m_sde</option>
+              <option value="dpmpp_3m_sde_gpu">dpmpp_3m_sde_gpu</option>
+              <option value="ddpm">ddpm</option>
+              <option value="lcm">lcm</option>
+              <option value="ipndm">ipndm</option>
+              <option value="ipndm_v">ipndm_v</option>
+              <option value="deis">deis</option>
+              <option value="deis_2m">deis_2m</option>
+              <option value="deis_2m_ode">deis_2m_ode</option>
+              <option value="deis_3m">deis_3m</option>
+              <option value="deis_3m_ode">deis_3m_ode</option>
+              <option value="cfgpp_ud10_ab">cfgpp_ud10_ab</option>
+              <option value="gradient_estimation">gradient_estimation</option>
+              <option value="gradient_estimation_cfg_pp">gradient_estimation_cfg_pp</option>
+              <option value="er_sde">er_sde</option>
+              <option value="seeds_2">seeds_2</option>
+              <option value="seeds_3">seeds_3</option>
+              <option value="sa_solver">sa_solver</option>
+              <option value="sa_solver_pece">sa_solver_pece</option>
+              <option value="ddim">ddim</option>
+              <option value="uni_pc">uni_pc</option>
+              <option value="uni_pc_bh2">uni_pc_bh2</option>
+              <option value="legacy_rk">legacy_rk</option>
+              <option value="rk">rk</option>
+              <option value="rk_beta">rk_beta</option>
+            </select>
+          </div>
+          <div>
+            <label>Scheduler</label>
+            <select id="schedulerName">
+              <option value="simple" selected>simple (recomendado)</option>
+              <option value="sgm_uniform">sgm_uniform</option>
+              <option value="karras">karras</option>
+              <option value="exponential">exponential</option>
+              <option value="ddim_uniform">ddim_uniform</option>
+              <option value="beta">beta</option>
+              <option value="normal">normal</option>
+              <option value="linear_quadratic">linear_quadratic</option>
+              <option value="kl_optimal">kl_optimal</option>
+              <option value="capitanZiT">capitanZiT</option>
+              <option value="bong_tangent">bong_tangent</option>
+              <option value="beta57">beta57</option>
+              <option value="beta_33">beta_33</option>
+              <option value="beta_44">beta_44</option>
+              <option value="beta_53">beta_53</option>
+              <option value="beta_54">beta_54</option>
+              <option value="beta_57">beta_57</option>
+              <option value="beta_32">beta_32</option>
+              <option value="beta_43">beta_43</option>
+              <option value="beta_42">beta_42</option>
+              <option value="power_shift">power_shift</option>
+              <option value="radiance_shift">radiance_shift</option>
+              <option value="sigma_curve_from_points">sigma_curve_from_points</option>
+              <option value="sigma_curve_pchip">sigma_curve_pchip</option>
+              <option value="sigmoid_offset">sigmoid_offset</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- OPTIMIZACIONES H3 -->
+      <div class="panel">
+        <div class="collapsible-header" id="h3OptToggle">
+          <span class="arrow">▶</span> Optimizaciones H3 (Transformer &amp; Memoria)
+        </div>
+        <div class="collapsible-body" id="h3OptBody">
+          <!-- Selector de workflow base / BlockATT -->
+          <div class="row" style="margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:8px;">
+            <label>Workflow del modelo</label>
+            <select id="workflowMode" style="margin-top:4px;">
+              <option value="base" selected>Base (MMH3X2_4IMG)</option>
+              <option value="blockatt">BlockATT experimental (MMH3X2_4IMG_BLOCKATT)</option>
+            </select>
+            <div class="hint" style="margin-top:4px;font-size:10px;">El modo BlockATT permite probar H3SparseAttentionAdvanced + AIMDO. BlockSparseAttention está oculto porque falla con la arquitectura actual de MiniMax H3 en MMH3X2. Cambiar recarga la página.</div>
+          </div>
+
+          <!-- Backend denso -->
+          <div class="row">
+            <label>Backend denso</label>
+            <select id="attentionBackend" style="margin-top:4px;">
+              <option value="comfy kitchen attention" selected>comfy kitchen attention</option>
+              <option value="pytorch attention">pytorch attention</option>
+            </select>
+          </div>
+
+          <div class="row" style="margin-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
+              <input type="checkbox" id="purgeVram"> <span>Liberar VRAM al final de cada trabajo</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo si hay OOM: el siguiente trabajo tendrá que recargar el modelo.</div>
+          </div>
+
+          <!-- Optimizador sparse (solo visible en BlockATT) -->
+          <div class="row" id="rowOptimizer" style="margin-top:8px;display:none;">
+            <label>Optimizador sparse</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segAttnNone" data-value="none">Ninguno</div>
+              <div class="seg" id="segAttnH3" data-value="h3-optimizations">H3-Optimizations</div>
+            </div>
+          </div>
+
+          <!-- Subpanel H3-Optimizations (solo BlockATT) -->
+          <div id="h3OptPanel" style="display:none; margin-top:8px;">
+            <div class="row" style="margin-top:6px;">
+              <label>Backend sparse</label>
+              <select id="h3SparseBackend" style="margin-top:4px;">
+                <option value="auto" selected>Auto (H3SparseAttention)</option>
+                <option value="Kitchen INT8 64Q x 32KV (Quality)">Kitchen INT8 64Q×32KV (calidad, recomendado)</option>
+                <option value="Kitchen INT8 64Q x 64KV (Quality)">Kitchen INT8 64Q×64KV (calidad)</option>
+                <option value="Kitchen INT8 64Q x 128KV (Faster)">Kitchen INT8 64Q×128KV (rápido)</option>
+                <option value="Sparse Sage (GPU-specific geometry)">Sparse Sage</option>
+                <option value="BF16 Triton 64Q x 64KV">BF16 Triton</option>
+                <option value="FP8 FlexAttention 64Q x 64KV">FP8 FlexAttention</option>
+                <option value="FROST BF16 64Q x 64KV (SM89)">FROST BF16 (SM89)</option>
+              </select>
+            </div>
+            <div class="hint" style="margin-top:4px;font-size:10px;">
+              Sparse Sage requiere spas_sage_attn compilado para tu GPU. En RTX 5070 Ti (SM120) fallará hasta recompilar SpargeAttn con soporte 12.0.
+            </div>
+            <div class="row" style="margin-top:6px;">
+              <label>AIMDO residency limiter</label>
+              <select id="aimdoResidency" style="margin-top:4px;">
+                <option value="stock">Stock (sin límite)</option>
+                <option value="0 blocks" selected>0 blocks</option>
+                <option value="1 block">1 block</option>
+                <option value="2 blocks">2 blocks</option>
+                <option value="4 blocks">4 blocks</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row slider-row" style="margin-top:8px;">
+            <label>Video attention budget <span class="hint">(30% por defecto)</span></label>
+            <input type="range" id="h3VideoBudget" min="0.05" max="1.0" step="0.01" value="0.30">
+            <div class="slider-val" id="h3VideoBudgetVal">30%</div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Denser early ramp</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segDenserOn" data-value="true">Sí</div>
+              <div class="seg" id="segDenserOff" data-value="false">No</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Memory optimization</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segMemOptOn" data-value="true">Sí</div>
+              <div class="seg" id="segMemOptOff" data-value="false">No</div>
+            </div>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <label>Memoria de atención <span class="hint">(Menos VRAM evita OOM con 16 GB; algo más lento)</span></label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg" id="segAttnMemStd" data-value="Standard">Estándar</div>
+              <div class="seg on" id="segAttnMemLow" data-value="Lower VRAM (slower)">Menos VRAM</div>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label>H3 Sigma Shift</label>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Shift Vídeo</label>
+              <input type="range" id="h3ShiftVideo" min="1.0" max="30.0" step="0.5" value="12.0">
+              <div class="slider-val" id="h3ShiftVideoVal">12.0</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Shift Audio</label>
+              <input type="range" id="h3ShiftAudio" min="0.5" max="15.0" step="0.5" value="3.0">
+              <div class="slider-val" id="h3ShiftAudioVal">3.0</div>
+            </div>
+          </div>
+
+          <!-- Sol-H3 (SM120 Blackwell) -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label>Acelerador Sol-H3 (SM120 Blackwell)</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg" id="segSolH3On" data-value="true">Activo</div>
+              <div class="seg on" id="segSolH3Off" data-value="false">Desactivado</div>
+            </div>
+            <div id="solH3Controls" style="display:none; margin-top:8px;">
+              <div class="row" style="margin-top:6px;">
+                <label style="font-size:10px;">Fusión exacta (exact_fusion)</label>
+                <div class="seed-toggle" style="margin-top:4px;">
+                  <div class="seg on" id="segSolExactOn" data-value="true">Sí</div>
+                  <div class="seg" id="segSolExactOff" data-value="false">No</div>
+                </div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Evaluaciones densas <span class="hint" id="solDenseEvalHint">(1 = estable)</span></label>
+                <input type="range" id="solDenseEvalSlider" min="0" max="4" step="1" value="1">
+                <div class="slider-val" id="solDenseEvalVal">1</div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Capas densas (dense_layers)</label>
+                <input type="range" id="solDenseLayersSlider" min="0" max="8" step="1" value="2">
+                <div class="slider-val" id="solDenseLayersVal">2</div>
+              </div>
+              <div class="row slider-row" style="margin-top:6px;">
+                <label style="font-size:10px;">Tau (umbral)</label>
+                <input type="range" id="solTauSlider" min="0.1" max="2.0" step="0.1" value="1.0">
+                <div class="slider-val" id="solTauVal">1.0</div>
+              </div>
+              <div class="row" style="margin-top:6px;">
+                <label style="font-size:10px;">QKV por bloques (qkv_chunk_size)</label>
+                <select id="solQkvChunk" style="margin-top:4px;">
+                  <option value="0">0 (proyección QKV nativa completa)</option>
+                  <option value="2048">2048</option>
+                  <option value="4096" selected>4096 (por defecto del nodo)</option>
+                  <option value="8192">8192</option>
+                </select>
+                <div class="hint" style="margin-top:2px;font-size:10px;">Menos VRAM pico a cambio de algo más de cómputo (recalcula Q). 0 = comportamiento anterior a Sol-H3 v0.1.11.</div>
+              </div>
+            </div>
+            <div class="hint" style="margin-top:4px;font-size:10px;">Kernel Sol-Attn CuTe para SM120 (RTX 50xx). Solo actúa si es dueño de bloques y atención: como MMH3X2 siempre lleva H3 Sparse Attention, la UI lo omite (queda para futuros grafos sin H3-Optimizations).</div>
+          </div>
+
+          <!-- Spectrum (MiniMax H3) -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label>Spectrum (MiniMax H3)</label>
+            <div class="seed-toggle" style="margin-top:4px;">
+              <div class="seg on" id="segSpectrumOn" data-value="true">Activo</div>
+              <div class="seg" id="segSpectrumOff" data-value="false">Desactivado</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Blend weight <span class="hint">(peso espectral)</span></label>
+              <input type="range" id="spectrumBlend" min="0" max="1" step="0.01" value="0.5">
+              <div class="slider-val" id="spectrumBlendVal">0.50</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Flex window <span class="hint">(ajuste intervalo)</span></label>
+              <input type="range" id="spectrumFlex" min="0" max="8" step="0.05" value="0.75">
+              <div class="slider-val" id="spectrumFlexVal">0.75</div>
+            </div>
+            <div class="slider-row" style="margin-top:4px;">
+              <label style="font-size:10px;">Warmup steps <span class="hint">(pasos nativos iniciales)</span></label>
+              <input type="range" id="spectrumWarmup" min="0" max="64" step="1" value="1">
+              <div class="slider-val" id="spectrumWarmupVal">1</div>
+            </div>
+            <div class="row" style="margin-top:6px;">
+              <label style="font-size:10px;">Bootstrap primer paso <span class="hint">(pronóstico rápido paso 2)</span></label>
+              <div class="seed-toggle" style="margin-top:4px;">
+                <div class="seg on" id="segBootstrapOn" data-value="true">Sí</div>
+                <div class="seg" id="segBootstrapOff" data-value="false">No</div>
+              </div>
+            </div>
+            <div class="row" style="margin-top:6px;">
+              <label style="font-size:10px;">Historial en <span class="hint">(VRAM más rápido, más memoria)</span></label>
+              <select id="spectrumHistoryStorage" style="margin-top:4px;">
+                <option value="system_ram" selected>RAM sistema</option>
+                <option value="vram">VRAM</option>
+              </select>
+            </div>
+            <div class="hint" style="margin-top:4px;font-size:10px;">Acelerador espectral del transformer H3. Desactívalo para máxima fidelidad al muestreo nativo.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- POSTPROCESADO: RTX SUPER RESOLUTION & RIFE -->
+      <div class="panel">
+        <div class="collapsible-header open" id="postprocToggle">
+          <span class="arrow">▼</span> Postprocesado (RTX Upscaler &amp; RIFE)
+        </div>
+        <div class="collapsible-body open" id="postprocBody">
+          <!-- Latent Upscaler 3D + refinado por segmento -->
+          <div class="row" style="margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="latentRefineToggle"> <span>Latent Upscaler 3D + refinado (hires-fix por segmento)</span>
+            </label>
+            <div id="latentRefineControls" style="display:none;margin-top:6px;">
+              <div class="row">
+                <label style="font-size:10px;">Escala: <b id="latentRefineScaleVal">1.50x</b> <span class="hint" id="latentRefineResHint"></span></label>
+                <input type="range" id="latentRefineScale" min="1.0" max="2.0" step="0.05" value="1.5" style="width:100%;">
+              </div>
+              <div class="row two-col">
+                <div>
+                  <label style="font-size:10px;">Denoise refinado: <b id="latentRefineDenoiseVal">0.60</b></label>
+                  <input type="range" id="latentRefineDenoise" min="0.10" max="1.00" step="0.05" value="0.60" style="width:100%;">
+                </div>
+                <div>
+                  <label style="font-size:10px;">Pasos refinado: <b id="latentRefineStepsVal">3</b></label>
+                  <input type="range" id="latentRefineSteps" min="2" max="12" step="1" value="3" style="width:100%;">
+                </div>
+              </div>
+              <div class="row" style="margin-top:6px;">
+                <label style="font-size:10px;">UNet del refinado</label>
+                <select id="latentRefineUnet" style="width:100%;"><option value="">(mismo que el pase 1)</option></select>
+              </div>
+              <div id="latentRefineLoraRow" style="display:none;">
+                <div class="row two-col">
+                  <div>
+                    <label style="font-size:10px;">LoRA del refinado</label>
+                    <select id="latentRefineLora" style="width:100%;"><option value="">(ninguno)</option></select>
+                  </div>
+                  <div>
+                    <label style="font-size:10px;">Fuerza: <b id="latentRefineLoraStrengthVal">1.00</b></label>
+                    <input type="range" id="latentRefineLoraStrength" min="0" max="2" step="0.05" value="1.0" style="width:100%;">
+                  </div>
+                </div>
+                <div class="hint" style="font-size:10px;margin-top:2px;">Con otro UNet el refinado no hereda las LoRAs del pase 1: elige aquí su Turbo LoRA. Memory Optimization se aplica si está activa (salvo FastH3).</div>
+              </div>
+              <div class="hint" style="font-size:10px;margin-top:4px;line-height:1.35;">Cada segmento se reescala en latente y se re-muestrea con su propio prompt y referencias (mismo modelo y optimizaciones que el pase 1). El Seg 2 se re-ancla al último frame del Seg 1 refinado. Denoise 0.40–0.50 = fiel, 0.60 = equilibrio. Con esto activo, RTX Super Resolution suele sobrar.</div>
+            </div>
+          </div>
+          <!-- RTX Video Super Resolution -->
+          <div class="row">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution / Limpieza</span>
+            </label>
+            <div id="rtxControls" style="margin-top:4px;">
+              <select id="rtxQuality">
+                <optgroup label="Escalado">
+                  <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
+                  <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate equilibrado)</option>
+                  <option value="ULTRA">ULTRA (Máxima definición estándar)</option>
+                  <option value="HIGH">HIGH (Equilibrado)</option>
+                  <option value="MEDIUM">MEDIUM (Rápido)</option>
+                  <option value="LOW">LOW (Bajo consumo)</option>
+                </optgroup>
+                <optgroup label="Limpieza sin escalar (misma resolución)">
+                  <option value="DENOISE_MEDIUM">DENOISE_MEDIUM (quitar ruido)</option>
+                  <option value="DENOISE_HIGH">DENOISE_HIGH (más agresivo)</option>
+                  <option value="DENOISE_ULTRA">DENOISE_ULTRA (máximo)</option>
+                  <option value="DENOISE_LOW">DENOISE_LOW (suave)</option>
+                  <option value="DEBLUR_MEDIUM">DEBLUR_MEDIUM (enfocar)</option>
+                  <option value="DEBLUR_HIGH">DEBLUR_HIGH (más nitidez)</option>
+                  <option value="DEBLUR_ULTRA">DEBLUR_ULTRA (máximo)</option>
+                  <option value="DEBLUR_LOW">DEBLUR_LOW (suave)</option>
+                </optgroup>
+              </select>
+              <select id="rtxScale" style="margin-top:4px;">
+                <option value="1.5">1.5×</option>
+                <option value="2" selected>2×</option>
+                <option value="3">3×</option>
+                <option value="4">4×</option>
+              </select>
+            </div>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Escalado o limpieza por Tensor Cores. Los modos DENOISE/DEBLUR conservan la resolución.</div>
+          </div>
+
+          <!-- Interpolación de Frames (RIFE / RTX Frame Gen) -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="rifeToggle" checked> <span>Interpolación de Frames</span>
+            </label>
+            <div class="row" style="margin-top:4px;">
+              <label style="font-size:10px;">Motor de interpolación</label>
+              <select id="rifeEngine">
+                <option value="rife" selected>RIFE / FILM (Red neuronal IA)</option>
+                <option value="rtx">NVIDIA RTX Frame Gen (Tensor Cores)</option>
+              </select>
+            </div>
+            <div class="row two-col" style="margin-top:6px;">
+              <div>
+                <label style="font-size:10px;">Multiplicador</label>
+                <select id="rifeMultiplier">
+                  <option value="2" selected>2x (24 fps → 48 fps)</option>
+                  <option value="4">4x (24 fps → 96 fps)</option>
+                </select>
+              </div>
+              <div id="rifeModelCol">
+                <label style="font-size:10px;">Modelo RIFE</label>
+                <select id="rifeModel"><option value="rife_v4.26.safetensors">rife_v4.26</option></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suavizado de empalme temporal (Vídeo) -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="blendToggle" checked> <span>Suavizar empalme de vídeo (VideoTemporalBlend)</span>
+            </label>
+            <div id="blendControls" style="margin-top:6px;">
+              <div class="row two-col">
+                <div>
+                  <label style="font-size:10px;">Fuerza empalme: <b id="blendStrengthVal">0.35</b></label>
+                  <input type="range" id="blendStrength" min="0.05" max="1.0" step="0.05" value="0.35" style="width:100%;">
+                </div>
+                <div>
+                  <label style="font-size:10px;">Frames transición: <b id="blendFramesVal">4f</b></label>
+                  <input type="range" id="blendFrames" min="1" max="24" step="1" value="4" style="width:100%;">
+                </div>
+              </div>
+              <div class="row" style="margin-top:6px;">
+                <label style="font-size:10px;">Modo de suavizado</label>
+                <select id="blendMode" style="width:100%;">
+                  <option value="transition_only" selected>Solo empalme (Recomendado · transition_only)</option>
+                  <option value="full_video">Todo el vídeo (full_video)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Color Grading & Look Cinemático -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                <input type="checkbox" id="postFxMasterToggle"> <span>Color Grading &amp; Look Cinemático</span>
+              </label>
+            </div>
+            <div id="postFxControls" style="display:none;margin-top:6px;">
+              <!-- 3D LUT (Color Grading) -->
+              <div class="row" style="margin-bottom:6px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                  <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                    <input type="checkbox" id="postFxLutToggle" checked> <span style="font-size:11px;font-weight:600;">LUT (3D Color Grade)</span>
+                  </label>
+                  <span class="hint" id="postFxLutVal" style="font-size:10px;">80%</span>
+                </div>
+                <select id="postFxLutSelect" style="width:100%;margin-top:4px;">
+                  <option value="">-- Seleccionar LUT (.cube) --</option>
+                </select>
+                <div class="row slider-row" style="margin-top:4px;">
+                  <label style="font-size:10px;min-width:65px;">Intensidad</label>
+                  <input type="range" id="postFxLutStrength" min="0" max="1" step="0.01" value="0.8" style="flex:1;">
+                </div>
+              </div>
+
+              <!-- Viñeta y Grano dinámico en 2 columnas -->
+              <div class="row two-col" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+                <!-- Viñeta -->
+                <div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                      <input type="checkbox" id="postFxVigToggle"> <span style="font-size:10.5px;font-weight:600;">Viñeta</span>
+                    </label>
+                    <span class="hint" id="postFxVigVal" style="font-size:10px;">0.25</span>
+                  </div>
+                  <input type="range" id="postFxVigIntensity" min="0" max="0.6" step="0.02" value="0.25" style="width:100%;margin-top:4px;">
+                </div>
+                <!-- Grano dinámico -->
+                <div>
+                  <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+                      <input type="checkbox" id="postFxGrainToggle"> <span style="font-size:10.5px;font-weight:600;">Grano Dinámico</span>
+                    </label>
+                    <span class="hint" id="postFxGrainVal" style="font-size:10px;">0.15</span>
+                  </div>
+                  <input type="range" id="postFxGrainPower" min="0" max="0.4" step="0.01" value="0.15" style="width:100%;margin-top:4px;">
+                </div>
+              </div>
+              <div class="hint" style="font-size:10px;margin-top:4px;">Aplica corrección cromática por LUT (.cube) y textura óptica dinámica frame a frame.</div>
+            </div>
+          </div>
+
+          <!-- Crossfade de Audio regulable -->
+          <div class="row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="audioCrossfadeToggle" checked> <span>Crossfade de audio entre segmentos</span>
+            </label>
+            <div class="row two-col" style="margin-top:6px;">
+              <div>
+                <label style="font-size:10px;">Duración transición: <b id="audioCrossfadeVal">0.40s</b></label>
+                <input type="range" id="audioCrossfadeSlider" min="0.05" max="2.0" step="0.05" value="0.40" style="width:100%;">
+              </div>
+              <div>
+                <label style="font-size:10px;">Curva de mezcla</label>
+                <select id="audioCrossfadeCurve">
+                  <option value="equal_power" selected>Equal Power (Sin caída)</option>
+                  <option value="linear">Lineal</option>
+                  <option value="cosine">Cosénica</option>
+                  <option value="exponential">Exponencial</option>
+                </select>
+              </div>
+            </div>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Elimina saltos bruscos y clics fundiendo suavemente el final de Seg 1 con el inicio de Seg 2.</div>
+          </div>
+
+          <!-- Normalización de pista subida (solo híbrido/guía) -->
+          <div class="row" style="margin-top:8px;">
+            <label style="font-size:10px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="audioNormalizeToggle" style="margin:0;">
+              <span>Normalizar pista subida (-16 LUFS + limitador)</span>
+            </label>
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo en modo Híbrido/Guía: activa solo si la pista original es muy baja o irregular. Desactivado mantiene la música original intacta.</div>
+          </div>
+
+          <!-- Volumen pista subida en la mezcla (solo híbrido) -->
+          <div class="row" style="margin-top:8px;">
+            <label style="font-size:10px;">Volumen de tu pista en la mezcla (Híbrido): <b id="audioUserVolumeVal">-12 dB</b></label>
+            <input type="range" id="audioUserVolume" min="-30" max="0" step="1" value="-12" style="width:100%;">
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo en modo Híbrido: baja tu pista para dejar espacio al audio IA. 0 dB = pista original; -30 dB ≈ inaudible.</div>
+          </div>
+
+          <!-- Volumen IA en la mezcla (solo híbrido) -->
+          <div class="row" style="margin-top:8px;">
+            <label style="font-size:10px;">Volumen del audio IA en la mezcla (Híbrido): <b id="audioGuideVolumeVal">-6 dB</b></label>
+            <input type="range" id="audioGuideVolume" min="-30" max="12" step="1" value="-6" style="width:100%;">
+            <div class="hint" style="font-size:10px;margin-top:2px;">Solo en modo Híbrido: cuánto suena el audio generado por IA mezclado con tu pista. 0 dB = IA al nivel de tu pista; +12 dB = IA destacada; -30 dB ≈ inaudible. La IA lleva un boost interno de +6 dB.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GESTIÓN DE MEMORIA Y OFFLOAD -->
+      <div class="panel">
+        <h2>Gestión de Memoria y Offload</h2>
+        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:var(--muted);">Liberación de VRAM / RAM</span>
+          <div style="display:flex;gap:6px;">
+            <button id="btnOffloadVram" type="button" class="ghost btn-mini" title="Descarga los modelos de la GPU (VRAM) hacia la RAM del sistema sin borrarlos de memoria. Deja la VRAM libre para Ollama/llama.cpp.">Descargar VRAM a RAM</button>
+            <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descarga y purga los modelos de VRAM y de la RAM de Python por completo.">Liberar Todo</button>
+          </div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:4px;">
+          Usa <strong>Descargar VRAM a RAM</strong> para liberar la GPU (útil para que Ollama se ejecute en VRAM) manteniendo los modelos precargados en memoria. Usa <strong>Liberar Todo</strong> para vaciar completamente la memoria.
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, RESULTADOS Y REPRODUCTORES -->
+    <div class="results-col">
+      <!-- PANEL DE EJECUCIÓN Y COLAS -->
+      <div class="panel" style="margin-bottom:0;">
+        <h2>Ejecución <button type="button" id="btnCloseUI" class="ghost btn-mini" style="margin-left:auto;" title="Cerrar esta ventana de la WebUI">✕ Cerrar UI</button></h2>
+        <div class="row" style="margin-bottom:8px;">
+          <label>Prefijo de archivo <span class="hint">(ej: video/MiniMax_H3_cont)</span></label>
+          <input type="text" id="filenamePrefix" value="video/MiniMax_H3" placeholder="video/MiniMax_H3">
+        </div>
+        <div class="btn-row">
+          <button type="button" id="btnFull" class="primary" style="flex:2;">⚡ Generar Completo (Seg 1 + Seg 2 + Final)</button>
+          <button type="button" id="btnSeg1" style="flex:1;">Solo Seg 1</button>
+          <button type="button" id="btnSeg2" style="flex:1;">Solo Seg 2 + Final</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button type="button" id="btnRefineLast" style="flex:1;" disabled title="Repite la última generación sin refinado con su misma semilla y el refinado activo. ComfyUI reutiliza de caché los pases 1 y solo ejecuta upscale + refinado.">🔬 Refinar último (reutiliza los pases 1)</button>
+        </div>
+        <div class="btn-row" style="margin-top:6px;">
+          <button type="button" id="btnStopVideo" disabled>Parar actual</button>
+          <button type="button" id="btnStopAll" class="danger" disabled>Parar todo</button>
+          <button type="button" id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
+        </div>
+        <div class="queue-status-box">
+          <div class="queue-status-row">
+            <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
+            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
+          </div>
+          <div class="queue-splits">
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div>
+              <div class="queue-split-main" id="queueWebuiSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueWebuiDetail">En reposo</div>
+            </div>
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div>
+              <div class="queue-split-main" id="queueServerSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div>
+            </div>
+          </div>
+          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
+            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
+            <div class="queue-items-body" id="queueItemsList"></div>
+          </div>
+        </div>
+        <div class="log" id="log">listo.</div>
+      </div>
+
+      <!-- TABS DE VISTA DE REPRODUCTORES -->
+      <div class="vid-view-tabs" style="margin-top:12px;">
+        <div class="vid-view-tab active" data-view="all">Todos los Reproductores</div>
+        <div class="vid-view-tab" data-view="final">Solo Vídeo Final</div>
+        <div class="vid-view-tab" data-view="seg1">Solo Seg 1</div>
+        <div class="vid-view-tab" data-view="seg2">Solo Seg 2</div>
+      </div>
+
+      <!-- REPRODUCTOR FINAL (CONTINUO CON RTX + RIFE) -->
+      <div class="vidbox" id="boxFinal">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Final Continuo</em> <span style="font-size:9.5px; opacity:0.8; font-weight:normal;">(Seg 1 + Seg 2 + RTX + RIFE)</span></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">Extraer Frame</button>
+            <button class="vid-action-btn" id="btnInterpolateFinal" title="Interpolar fotogramas del vídeo final (RIFE / RTX Frame Gen)" style="display:none;" type="button">⚡ Interpolar</button>
+            <button class="vid-action-btn" id="btnRtxUpscaleFinal" title="Escalar o limpiar el vídeo final con RTX Video Super Resolution (usa calidad y escala del panel Postprocesado)" style="display:none;" type="button">🔍 RTX Upscale</button>
+            <button class="vid-action-btn" id="btnFaceRefineFinal" title="Refinar los rostros del vídeo final con H3 FaceRefine" style="display:none;" type="button">Refinar Rostro</button>
+            <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptyFinal">sin generar</div>
+        <div class="preview-wrap" id="previewWrapFinal" style="display:none;">
+          <div class="preview-step-badge" id="previewStepFinal" style="display:none;"><span class="spinner-dot"></span><span id="previewStepTextFinal">Paso 0/0 · 0%</span></div>
+          <img class="preview-img" id="previewImgFinal" style="display:none;" alt="Vista previa final">
+          <video class="preview-img" id="previewVideoFinal" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        </div>
+        <span class="video-badge" id="badgeFinal"></span>
+        <video id="videoFinal" controls allowfullscreen playsinline style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeFinal"></span>
+          <span class="res-tag" id="resFinal"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR SEGMENTO 1 -->
+      <div class="vidbox" id="boxSeg1">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Segmento 1</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadSeg1" title="Descargar segmento 1" style="display:none;" type="button">Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameSeg1" title="Extraer frame como imagen" style="display:none;" type="button">Extraer Frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaSeg1" title="Recuperar parámetros del workflow" disabled>Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptySeg1">sin generar</div>
+        <div class="preview-wrap" id="previewWrapSeg1" style="display:none;">
+          <div class="preview-step-badge" id="previewStepSeg1" style="display:none;"><span class="spinner-dot"></span><span id="previewStepTextSeg1">Seg 1: Paso 0/0 · 0%</span></div>
+          <img class="preview-img" id="previewImgSeg1" style="display:none;" alt="Vista previa Seg 1">
+          <video class="preview-img" id="previewVideoSeg1" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        </div>
+        <span class="video-badge" id="badgeSeg1"></span>
+        <video id="videoSeg1" controls allowfullscreen playsinline style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeSeg1"></span>
+          <span class="res-tag" id="resSeg1"></span>
+        </div>
+      </div>
+
+      <!-- REPRODUCTOR SEGMENTO 2 -->
+      <div class="vidbox" id="boxSeg2">
+        <div class="vid-header">
+          <h3>Vídeo <em style="color:var(--accent)">Segmento 2</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownloadSeg2" title="Descargar segmento 2" style="display:none;" type="button">Descargar</button>
+            <button class="vid-action-btn" id="btnExtractFrameSeg2" title="Extraer frame como imagen" style="display:none;" type="button">Extraer Frame</button>
+            <button class="vid-action-btn" id="btnLoadMetaSeg2" title="Recuperar parámetros del workflow" disabled>Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="emptySeg2">sin generar</div>
+        <div class="preview-wrap" id="previewWrapSeg2" style="display:none;">
+          <div class="preview-step-badge" id="previewStepSeg2" style="display:none;"><span class="spinner-dot"></span><span id="previewStepTextSeg2">Seg 2: Paso 0/0 · 0%</span></div>
+          <img class="preview-img" id="previewImgSeg2" style="display:none;" alt="Vista previa Seg 2">
+          <video class="preview-img" id="previewVideoSeg2" muted autoplay loop playsinline style="display:none;width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:6px;background:var(--panel-2);margin:0 auto;pointer-events:none;"></video>
+        </div>
+        <span class="video-badge" id="badgeSeg2"></span>
+        <video id="videoSeg2" controls allowfullscreen playsinline style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="timeSeg2"></span>
+          <span class="res-tag" id="resSeg2"></span>
+        </div>
+      </div>
+
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+
+      <!-- PROMPT FINAL ENVIADO AL BACKEND -->
+      <div class="panel">
+        <div class="collapsible-header" id="finalPromptToggle">
+          <span class="arrow">▶</span> Prompt final enviado al backend
+          <button id="btnCopyFinalPrompt" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();" title="Copiar prompt final">📋 Copiar</button>
+        </div>
+        <div class="collapsible-body" id="finalPromptBody">
+          <div class="hint" id="finalPromptHint" style="margin-bottom:6px;">Aún no se ha generado nada. El prompt que el grafo envía al backend (tras Ollama, referencias, etc.) aparecerá aquí tras cada variante.</div>
+          <label style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:2px;display:block;">Segmento 1 (Prompt final):</label>
+          <textarea id="finalPromptSeg1" class="enhancer-output" rows="6" readonly placeholder="Prompt Seg 1 (final)..." style="margin-bottom:6px;"></textarea>
+          <label id="lblFinalPromptSeg2" style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:2px;display:block;">Segmento 2 (Prompt final):</label>
+          <textarea id="finalPromptSeg2" class="enhancer-output" rows="6" readonly placeholder="Prompt Seg 2 (final)..."></textarea>
+        </div>
+      </div>
+
+      <!-- HISTORIAL DE VÍDEOS (COLAPSABLE) -->
+      <div class="vidbox" id="videoHistoryBox" style="margin-top:12px;">
+        <div class="collapsible-header" id="videoHistoryToggle">
+          <span class="arrow">▶</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;">
+            Historial de Vídeos <span id="videoHistoryStatus" style="color:var(--accent);font-size:10px;"></span>
+          </span>
+          <button class="vid-action-btn" id="btnRefreshHistory" title="Refrescar historial" style="margin-left:auto;" onclick="event.stopPropagation();">↻ Refrescar</button>
+        </div>
+        <div class="collapsible-body" id="videoHistoryBody">
+          <div class="hint" id="historyHint" style="font-size:10px;margin:8px 0 6px;">Vídeos generados recientemente en el servidor. Haz clic en una tarjeta para cargar el vídeo en el reproductor.</div>
+          <div class="variant-grid" id="videoHistoryGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>

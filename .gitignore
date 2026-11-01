@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+prompts_*.json
+*.tmp
+config.json
+bench_results.jsonl
+# HTML generados: llevan la lista local de modelos/LoRAs; los regeneran los lanzar_*.sh
+*_WebUI*.html
+# Workflows de referencia locales que no usa ningún generador
+KreaQwen.json
+MiniMaxH3_I2V.json
+video_ltx2_3_i2v_comfyui.json
+# Notas de sesión locales (rutas, modelos y resultados de esta máquina)
+ESTADO_SESION.md

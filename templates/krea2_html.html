@@ -1,0 +1,210 @@
+  <div class="grid">
+    <!-- COLUMNA 1 (IZQUIERDA): SERVIDOR, PROMPTS, MEDIOS DE REFERENCIA Y EVOLVE -->
+    <div class="controls-col">
+      __SERVER_PANEL__
+
+      __PROMPT_PANELS__
+
+      <!-- IMAGEN DE REFERENCIA (dropzone) -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3>Imagen <em style="color:var(--accent)">de referencia</em></h3>
+          <div class="img-header-actions">
+            <button id="btnResetZoomRef" title="Tamaño original">⊡</button>
+            <button id="btnFullscreenRef" title="Pantalla completa">⛶</button>
+          </div>
+        </div>
+        <div class="dropzone" id="refDropzone" style="padding:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <input type="file" id="refFileInput" accept="image/*">
+          <div class="seg" id="btnBrowseRef" style="flex:0;padding:5px 12px;font-size:10px;cursor:pointer;user-select:none;">Navegar...</div>
+          <div class="ph" id="refPlaceholder" style="flex:1;min-width:120px;font-size:10.5px;color:var(--muted-2);padding:0;text-align:left;">arrastra imagen o clic en Navegar</div>
+        </div>
+        <div class="img-wrap" id="refWrap" style="visibility:hidden;background:var(--panel-2);margin-top:10px;">
+          <img id="refImg" style="display:none;width:100%;height:auto;user-select:none;pointer-events:none;transform-origin:center center;" draggable="true">
+        </div>
+        <div class="dz-info" id="refInfo" style="font-family:var(--mono);font-size:10.5px;color:var(--muted);text-align:center;margin-top:6px;"></div>
+        <div class="ref-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+          <button id="btnCaption" class="ghost" style="flex:1;min-width:140px;">Caption (imagen referencia)</button>
+          <button id="btnSendRefLtxv" class="ghost" style="flex:1;min-width:140px;">→ LTXV</button>
+          <button id="btnSendRefH3" class="ghost" style="flex:1;min-width:140px;">→ MiniMax H3</button>
+          <button id="btnSendRefX2" class="ghost" style="flex:1;min-width:140px;">→ MMH3X2</button>
+          <button id="btnLoadMeta" class="ghost" style="flex:1;min-width:140px;">Cargar metadatos</button>
+        </div>
+      </div>
+
+      <!-- EVOLVE / TRANSMUTAR PROMPT -->
+      <div class="panel">
+        <div class="collapsible-header" id="evolveToggle">
+          <span class="arrow">▶</span> Evolve / Transmutar prompt
+        </div>
+        <div class="collapsible-body" id="evolveBody">
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="evolveMode"><option value="words">Palabras</option><option value="internal">Palabras del prompt</option><option value="synonyms">Sinónimos cinematográficos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Probabilidad <span class="hint">(% de tokens cambiados)</span></label>
+            <div class="slider-row"><input type="range" id="evolveStrength" min="0" max="100" step="1" value="10"><div class="slider-val" id="evolveStrengthVal">10%</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Variantes</label>
+            <input type="number" id="evolveCount" value="4" min="1" max="16" step="1">
+          </div>
+          <div class="btn-row">
+            <button id="btnEvolve" class="primary" style="flex:1">Transmutar</button>
+            <button id="btnEvolveUse" class="ghost" style="flex:1">Usar #1</button>
+          </div>
+          <div class="enhancer-row">
+            <textarea class="enhancer-output" id="evolveOutput" readonly placeholder="Las variantes aparecerán aquí..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 2 (CENTRO): MODELOS, RESOLUCIÓN, AJUSTES, SAMPLER -->
+    <div class="settings-col">
+      <div class="panel">
+        <h2>Modelo y Aceleración</h2>
+        <div class="row">
+          <label>Modelo</label>
+          <select id="modelSelect"></select>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <label>Backend de atención (Comfy Kitchen)</label>
+          <select id="attentionBackend" style="margin-top:4px;">
+            <option value="comfy kitchen attention" selected>Comfy Kitchen Attention (INT8)</option>
+            <option value="pytorch attention">PyTorch Attention</option>
+            <option value="none">Sin parche (Nativo)</option>
+          </select>
+          <div class="hint" style="font-size:10px;margin-top:2px;">
+            Comfy Kitchen cuantiza la atención en INT8 en GPUs Nvidia, acelerando la inferencia y reduciendo VRAM en Flux2/Krea2.
+          </div>
+        </div>
+        <div class="row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+          <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;">
+            <input type="checkbox" id="keepModelInRam" checked>
+            <span>Mantener modelo en RAM (offload rápido)</span>
+          </label>
+          <div style="display:flex;gap:6px;">
+            <button id="btnOffloadVram" type="button" class="ghost btn-mini" title="Descarga los modelos de la GPU (VRAM) hacia la RAM del sistema sin borrarlos de memoria. Deja la VRAM libre para Ollama/llama.cpp.">Descargar VRAM a RAM</button>
+            <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Descarga y purga los modelos de VRAM y de la RAM de Python por completo.">Liberar Todo</button>
+          </div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:2px;">
+          Evita recargar el modelo desde disco en cada variante. Usa <strong>Descargar VRAM a RAM</strong> antes de usar Ollama para que el LLM vuele sin tener que volver a leer los 21 GB del SSD externo.
+        </div>
+      </div>
+
+      <div class="panel"><h2>Resolución</h2><div class="row slider-row"><label>Megapíxeles</label><input type="range" id="mpSlider" min="0.1" max="4.0" step="0.1" value="1.0"><div class="slider-val" id="mpVal">1.00</div></div><div class="row"><label>Aspect Ratio</label><select id="aspectRatio"><option value="1:1 (Square)">1:1 (Square)</option><option value="2:3 (Portrait Photo)">2:3 (Portrait Photo)</option><option value="3:2 (Photo)">3:2 (Photo)</option><option value="3:4 (Portrait Standard)">3:4 (Portrait Standard)</option><option value="4:3 (Standard)">4:3 (Standard)</option><option value="9:16 (Portrait Widescreen)">9:16 (Portrait Widescreen)</option><option value="16:9 (Widescreen)" selected>16:9 (Widescreen)</option><option value="21:9 (Ultrawide)">21:9 (Ultrawide)</option></select></div></div>
+
+      <div class="panel"><h2>Krea2 Enhancer</h2>
+        <div class="row"><label>Projector Delta — Preset</label><select id="projectorPreset"><option value="none" selected>none</option><option value="FB2">FB2</option><option value="FB3">FB3</option><option value="FEDOR">FEDOR</option><option value="SKC3VO">SKC3VO</option></select></div>
+        <div class="row slider-row"><label>Projector Delta — Strength</label><input type="range" id="projectorStrength" min="0" max="2" step="0.05" value="1"><div class="slider-val" id="projectorStrengthVal">1.00</div></div>
+        <div class="row" style="display:flex;align-items:center;gap:16px;flex-wrap:nowrap;"><label style="margin:0;flex-shrink:0;font-size:11px;">T-Enhancer</label><div class="switch" id="enhancerEnabled"><i></i></div><span id="enhancerEnabledLabel" style="font-family:var(--mono);font-size:11px;color:var(--muted-2);flex-shrink:0;">desactivado</span></div>
+        <div class="row slider-row"><label>T-Enhancer — Strength</label><input type="range" id="enhancerStrength" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerStrengthVal">0.50</div></div>
+        <div class="row slider-row" id="textScaleRow" style="display:none;"><label>T-Enhancer — Text Scale</label><input type="range" id="enhancerTextScale" min="0" max="2" step="0.05" value="0.5"><div class="slider-val" id="enhancerTextScaleVal">0.50</div></div>
+        <div class="row" style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;margin-top:-6px;"><input type="checkbox" id="enhancerLinkTextScale" checked style="margin:0;"><label for="enhancerLinkTextScale" style="margin:0;font-size:11px;color:var(--muted-2);">Vincular text_scale</label></div>
+      </div>
+
+      <div class="panel"><h2>RBG Smart Seed Variance</h2>
+        <div class="row"><label>Variance Preset</label><select id="variancePreset"><option value="❌ Disabled" selected>❌ Disabled</option><option value="🌱 Subtle">🌱 Subtle</option><option value="🌿 Balanced">🌿 Balanced</option><option value="🪴 Creative">🪴 Creative</option><option value="🌳 Bold">🌳 Bold</option><option value="🌴 Wild">🌴 Wild</option><option value="⚙️ Custom">⚙️ Custom</option></select></div>
+        <div class="row"><label>Protect Mode</label><select id="protectMode"><option value="🚫 None">🚫 None</option><option value="First Quarter">First Quarter</option><option value="First Half">First Half</option><option value="Last Quarter">Last Quarter</option><option value="Last Half" selected>Last Half</option><option value="⚙️ Custom Regions">⚙️ Custom Regions</option><option value="🎲 Random Regions">🎲 Random Regions</option></select></div>
+        <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segVarianceRandom">Aleatoria</div><div class="seg" id="segVarianceFixed">Fija</div></div><input type="number" id="varianceSeed" value="315489554057974" step="1" disabled></div>
+      </div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="loraToggle">
+          <span class="arrow">▶</span> LoRAs
+        </div>
+        <div class="collapsible-body" id="loraBody">
+          <div id="loraList"></div>
+        </div>
+      </div>
+
+      <div class="panel"><h2>Sampler</h2>
+        <div class="row"><label>Sampler</label><select id="samplerName" style="margin-top:4px;"><option value="none">none</option><optgroup label="multistep/"><option value="multistep/res_2m">multistep/res_2m</option><option value="multistep/res_3m">multistep/res_3m</option><option value="multistep/dpmpp_2m">multistep/dpmpp_2m</option><option value="multistep/dpmpp_3m">multistep/dpmpp_3m</option><option value="multistep/abnorsett_2m">multistep/abnorsett_2m</option><option value="multistep/abnorsett_3m">multistep/abnorsett_3m</option><option value="multistep/abnorsett_4m">multistep/abnorsett_4m</option><option value="multistep/deis_2m">multistep/deis_2m</option><option value="multistep/deis_3m">multistep/deis_3m</option><option value="multistep/deis_4m">multistep/deis_4m</option></optgroup><optgroup label="exponential/"><option value="exponential/res_2s_rkmk2e">exponential/res_2s_rkmk2e</option><option value="exponential/res_2s">exponential/res_2s</option><option value="exponential/res_2s_stable">exponential/res_2s_stable</option><option value="exponential/res_3s">exponential/res_3s</option><option value="exponential/res_3s_non-monotonic">exponential/res_3s_non-monotonic</option><option value="exponential/res_3s_alt">exponential/res_3s_alt</option><option value="exponential/res_3s_cox_matthews">exponential/res_3s_cox_matthews</option><option value="exponential/res_3s_lie">exponential/res_3s_lie</option><option value="exponential/res_3s_sunstar">exponential/res_3s_sunstar</option><option value="exponential/res_3s_strehmel_weiner">exponential/res_3s_strehmel_weiner</option><option value="exponential/res_4s_krogstad">exponential/res_4s_krogstad</option><option value="exponential/res_4s_krogstad_alt">exponential/res_4s_krogstad_alt</option><option value="exponential/res_4s_strehmel_weiner">exponential/res_4s_strehmel_weiner</option><option value="exponential/res_4s_strehmel_weiner_alt">exponential/res_4s_strehmel_weiner_alt</option><option value="exponential/res_4s_cox_matthews">exponential/res_4s_cox_matthews</option><option value="exponential/res_4s_cfree4">exponential/res_4s_cfree4</option><option value="exponential/res_4s_friedli">exponential/res_4s_friedli</option><option value="exponential/res_4s_minchev">exponential/res_4s_minchev</option><option value="exponential/res_4s_munthe-kaas">exponential/res_4s_munthe-kaas</option><option value="exponential/res_5s">exponential/res_5s</option><option value="exponential/res_5s_hochbruck-ostermann">exponential/res_5s_hochbruck-ostermann</option><option value="exponential/res_6s">exponential/res_6s</option><option value="exponential/res_8s">exponential/res_8s</option><option value="exponential/res_8s_alt">exponential/res_8s_alt</option><option value="exponential/res_10s">exponential/res_10s</option><option value="exponential/res_15s">exponential/res_15s</option><option value="exponential/res_16s">exponential/res_16s</option><option value="exponential/etdrk2_2s">exponential/etdrk2_2s</option><option value="exponential/etdrk3_a_3s">exponential/etdrk3_a_3s</option><option value="exponential/etdrk3_b_3s">exponential/etdrk3_b_3s</option><option value="exponential/etdrk4_4s">exponential/etdrk4_4s</option><option value="exponential/etdrk4_4s_alt">exponential/etdrk4_4s_alt</option><option value="exponential/dpmpp_2s">exponential/dpmpp_2s</option><option value="exponential/dpmpp_sde_2s">exponential/dpmpp_sde_2s</option><option value="exponential/dpmpp_3s">exponential/dpmpp_3s</option><option value="exponential/lawson2a_2s">exponential/lawson2a_2s</option><option value="exponential/lawson2b_2s">exponential/lawson2b_2s</option><option value="exponential/lawson4_4s">exponential/lawson4_4s</option><option value="exponential/lawson41-gen_4s">exponential/lawson41-gen_4s</option><option value="exponential/lawson41-gen-mod_4s">exponential/lawson41-gen-mod_4s</option><option value="exponential/ddim" selected>exponential/ddim</option></optgroup><optgroup label="hybrid/"><option value="hybrid/pec423_2h2s">hybrid/pec423_2h2s</option><option value="hybrid/pec433_2h3s">hybrid/pec433_2h3s</option><option value="hybrid/abnorsett2_1h2s">hybrid/abnorsett2_1h2s</option><option value="hybrid/abnorsett3_2h2s">hybrid/abnorsett3_2h2s</option><option value="hybrid/abnorsett4_3h2s">hybrid/abnorsett4_3h2s</option><option value="hybrid/lawson42-gen-mod_1h4s">hybrid/lawson42-gen-mod_1h4s</option><option value="hybrid/lawson43-gen-mod_2h4s">hybrid/lawson43-gen-mod_2h4s</option><option value="hybrid/lawson44-gen-mod_3h4s">hybrid/lawson44-gen-mod_3h4s</option><option value="hybrid/lawson45-gen-mod_4h4s">hybrid/lawson45-gen-mod_4h4s</option></optgroup><optgroup label="linear/"><option value="linear/ralston_2s">linear/ralston_2s</option><option value="linear/ralston_3s">linear/ralston_3s</option><option value="linear/ralston_4s">linear/ralston_4s</option><option value="linear/midpoint_2s">linear/midpoint_2s</option><option value="linear/heun_2s">linear/heun_2s</option><option value="linear/heun_3s">linear/heun_3s</option><option value="linear/houwen-wray_3s">linear/houwen-wray_3s</option><option value="linear/kutta_3s">linear/kutta_3s</option><option value="linear/ssprk3_3s">linear/ssprk3_3s</option><option value="linear/ssprk4_4s">linear/ssprk4_4s</option><option value="linear/rk38_4s">linear/rk38_4s</option><option value="linear/rk4_4s">linear/rk4_4s</option><option value="linear/rk5_7s">linear/rk5_7s</option><option value="linear/rk6_7s">linear/rk6_7s</option><option value="linear/bogacki-shampine_4s">linear/bogacki-shampine_4s</option><option value="linear/bogacki-shampine_7s">linear/bogacki-shampine_7s</option><option value="linear/dormand-prince_6s">linear/dormand-prince_6s</option><option value="linear/dormand-prince_13s">linear/dormand-prince_13s</option><option value="linear/tsi_7s">linear/tsi_7s</option><option value="linear/euler">linear/euler</option></optgroup><optgroup label="diag_implicit/"><option value="diag_implicit/irk_exp_diag_2s">diag_implicit/irk_exp_diag_2s</option><option value="diag_implicit/kraaijevanger_spijker_2s">diag_implicit/kraaijevanger_spijker_2s</option><option value="diag_implicit/qin_zhang_2s">diag_implicit/qin_zhang_2s</option><option value="diag_implicit/pareschi_russo_2s">diag_implicit/pareschi_russo_2s</option><option value="diag_implicit/pareschi_russo_alt_2s">diag_implicit/pareschi_russo_alt_2s</option><option value="diag_implicit/crouzeix_2s">diag_implicit/crouzeix_2s</option><option value="diag_implicit/crouzeix_3s">diag_implicit/crouzeix_3s</option><option value="diag_implicit/crouzeix_3s_alt">diag_implicit/crouzeix_3s_alt</option></optgroup><optgroup label="fully_implicit/"><option value="fully_implicit/gauss-legendre_2s">fully_implicit/gauss-legendre_2s</option><option value="fully_implicit/gauss-legendre_3s">fully_implicit/gauss-legendre_3s</option><option value="fully_implicit/gauss-legendre_4s">fully_implicit/gauss-legendre_4s</option><option value="fully_implicit/gauss-legendre_4s_alternating_a">fully_implicit/gauss-legendre_4s_alternating_a</option><option value="fully_implicit/gauss-legendre_4s_ascending_a">fully_implicit/gauss-legendre_4s_ascending_a</option><option value="fully_implicit/gauss-legendre_4s_alt">fully_implicit/gauss-legendre_4s_alt</option><option value="fully_implicit/gauss-legendre_5s">fully_implicit/gauss-legendre_5s</option><option value="fully_implicit/gauss-legendre_5s_ascending">fully_implicit/gauss-legendre_5s_ascending</option><option value="fully_implicit/radau_ia_2s">fully_implicit/radau_ia_2s</option><option value="fully_implicit/radau_ia_3s">fully_implicit/radau_ia_3s</option><option value="fully_implicit/radau_iia_2s">fully_implicit/radau_iia_2s</option><option value="fully_implicit/radau_iia_3s">fully_implicit/radau_iia_3s</option><option value="fully_implicit/radau_iia_3s_alt">fully_implicit/radau_iia_3s_alt</option><option value="fully_implicit/radau_iia_5s">fully_implicit/radau_iia_5s</option><option value="fully_implicit/radau_iia_7s">fully_implicit/radau_iia_7s</option><option value="fully_implicit/radau_iia_9s">fully_implicit/radau_iia_9s</option><option value="fully_implicit/radau_iia_11s">fully_implicit/radau_iia_11s</option><option value="fully_implicit/lobatto_iiia_2s">fully_implicit/lobatto_iiia_2s</option><option value="fully_implicit/lobatto_iiia_3s">fully_implicit/lobatto_iiia_3s</option><option value="fully_implicit/lobatto_iiia_4s">fully_implicit/lobatto_iiia_4s</option><option value="fully_implicit/lobatto_iiib_2s">fully_implicit/lobatto_iiib_2s</option><option value="fully_implicit/lobatto_iiib_3s">fully_implicit/lobatto_iiib_3s</option><option value="fully_implicit/lobatto_iiib_4s">fully_implicit/lobatto_iiib_4s</option><option value="fully_implicit/lobatto_iiic_2s">fully_implicit/lobatto_iiic_2s</option><option value="fully_implicit/lobatto_iiic_3s">fully_implicit/lobatto_iiic_3s</option><option value="fully_implicit/lobatto_iiic_4s">fully_implicit/lobatto_iiic_4s</option><option value="fully_implicit/lobatto_iiic_star_2s">fully_implicit/lobatto_iiic_star_2s</option><option value="fully_implicit/lobatto_iiic_star_3s">fully_implicit/lobatto_iiic_star_3s</option><option value="fully_implicit/lobatto_iiid_2s">fully_implicit/lobatto_iiid_2s</option><option value="fully_implicit/lobatto_iiid_3s">fully_implicit/lobatto_iiid_3s</option></optgroup></select></div>
+        <div class="row"><label>Scheduler</label><select id="schedulerName" style="margin-top:4px;"><option value="simple">simple</option><option value="sgm_uniform">sgm_uniform</option><option value="karras">karras</option><option value="exponential">exponential</option><option value="ddim_uniform">ddim_uniform</option><option value="beta">beta</option><option value="normal">normal</option><option value="linear_quadratic">linear_quadratic</option><option value="kl_optimal">kl_optimal</option><option value="capitanZiT">capitanZiT</option><option value="bong_tangent">bong_tangent</option><option value="beta57" selected>beta57</option><option value="beta_33">beta_33</option><option value="beta_44">beta_44</option><option value="beta_53">beta_53</option><option value="beta_54">beta_54</option><option value="beta_57">beta_57</option><option value="beta_32">beta_32</option><option value="beta_43">beta_43</option><option value="beta_42">beta_42</option><option value="power_shift">power_shift</option><option value="radiance_shift">radiance_shift</option><option value="sigma_curve_from_points">sigma_curve_from_points</option><option value="sigma_curve_pchip">sigma_curve_pchip</option><option value="sigmoid_offset">sigmoid_offset</option></select></div>
+        <div class="row slider-row"><label>Eta</label><input type="range" id="etaSlider" min="0" max="2" step="0.01" value="0.5"><div class="slider-val" id="etaVal">0.50</div></div>
+        <div class="row"><label>Steps</label><input type="number" id="steps" value="8" step="1" min="1" max="10000"></div>
+        <div class="row"><label>Semilla</label><div class="seed-toggle"><div class="seg on" id="segSamplerRandom">Aleatoria</div><div class="seg" id="segSamplerFixed">Fija</div></div><input type="number" id="samplerSeed" value="1062442950133633" step="1" disabled></div>
+        <div class="row"><label>Batch Size (Variantes) <span class="hint">(Genera N semillas distintas)</span></label><input type="number" id="batchSize" value="1" step="1" min="1" max="16"></div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 3 (DERECHA): EJECUCIÓN, VISOR Y RESULTADOS -->
+    <div class="results-col">
+      <!-- PANEL DE EJECUCIÓN Y COLAS -->
+      <div class="panel" style="margin-bottom:0;">
+        <h2>Ejecución</h2>
+        <div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo <span class="hint">(ej: krea2/imagen)</span></label><input type="text" id="filenamePrefix" value="krea2/imagen" placeholder="krea2/imagen"></div>
+        <div class="btn-row"><button id="btnGenerate" class="primary">Generar</button></div>
+        <div class="btn-row" style="margin-top:6px">
+          <button id="btnStopVideo" disabled>Parar imagen</button>
+          <button id="btnStopAll" class="danger" disabled>Parar todo</button>
+          <button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
+        </div>
+        <div class="queue-status-box">
+          <div class="queue-status-row">
+            <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
+            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
+          </div>
+          <div class="queue-splits">
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖥️</span> <span>Esta WebUI</span></div>
+              <div class="queue-split-main" id="queueWebuiSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueWebuiDetail">En reposo</div>
+            </div>
+            <div class="queue-split-card">
+              <div class="queue-split-header"><span>🖧</span> <span>Servidor ComfyUI</span></div>
+              <div class="queue-split-main" id="queueServerSummary">0 en espera</div>
+              <div class="queue-split-sub" id="queueServerDetail">0 en GPU · 0 en cola</div>
+            </div>
+          </div>
+          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
+            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
+            <div class="queue-items-body" id="queueItemsList"></div>
+          </div>
+        </div>
+        <div class="log" id="log">listo.</div>
+      </div>
+
+      <!-- REPRODUCTOR IMAGEN FINAL -->
+      <div class="imgbox">
+        <div class="img-header">
+          <h3>Imagen <em style="color:var(--accent)">final</em></h3>
+          <div class="img-header-actions">
+            <button id="btnResetZoom" title="Tamaño original">⊡</button>
+            <button id="btnFullscreenImg" title="Pantalla completa">⛶</button>
+            <button id="btnSendLtxv" title="Enviar a LTXV">→ LTXV</button>
+            <button id="btnSendH3" title="Enviar a MiniMax H3">→ H3</button>
+            <button id="btnSendX2" title="Enviar a MMH3X2">→ X2</button>
+          </div>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <div class="img-wrap" id="imgWrap">
+          <img class="output" id="outputImg" style="display:none" draggable="true">
+        </div>
+        <div class="img-footer">
+          <span class="time-tag" id="time1"></span>
+          <span class="hint" id="imgInfo" style="font-size:10.5px;font-family:var(--mono);color:var(--muted-2);"></span>
+          <a class="dl" id="dl1" style="display:none" download onclick="event.stopPropagation();">⬇ Descargar</a>
+        </div>
+      </div>
+
+      <!-- GALERÍA DE VARIANTES -->
+      <div class="imgbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de Variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+
+      <!-- HISTORIAL DE IMÁGENES -->
+      <div class="imgbox">
+        <div class="collapsible-header" id="galleryToggle">
+          <span class="arrow">▶</span> Historial de Imágenes <button id="btnClearGallery" class="ghost btn-mini" style="margin-left:auto;" onclick="event.stopPropagation();">Vaciar</button>
+        </div>
+        <div class="collapsible-body" id="galleryBody">
+          <div class="gallery-grid" id="galleryGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>

@@ -1,0 +1,75 @@
+      <div class="panel"><h2>Servidor</h2><div class="server-row"><input type="text" id="serverUrl" value="" placeholder="Vacío = proxy automático (:7821)" spellcheck="false"><button id="btnTest" class="ghost">Probar</button></div><div class="statusbar"><span class="dot" id="connDot"></span><span id="connText">sin comprobar</span></div><div class="row" style="margin-top:8px;margin-bottom:0;"><label>Vista previa en vivo</label><select id="previewMethod"><option value="latent2rgb" selected>🎨 Latent2RGB (proyección RGB · universal)</option><option value="taesd">⚡ TAE VAE / TAESD (alta velocidad)</option><option value="auto">🔄 Auto</option><option value="none">🚫 Desactivado</option></select></div><div class="hint" id="serverHint" style="font-size:10.5px;margin-top:4px;"></div></div>
+
+      <div class="panel">
+        <div class="collapsible-header" id="promptLibToggle">
+          <span class="arrow">▶</span> Biblioteca de Prompts
+        </div>
+        <div class="collapsible-body" id="promptLibBody">
+          <div id="promptTree" class="prompt-tree"></div>
+          <div class="prompt-actions"><button id="btnSavePrompt">Guardar Actual</button><button id="btnMovePrompt" class="ghost">Mover</button><button id="btnDeletePrompt" class="ghost">Eliminar</button></div>
+          <div class="prompt-actions"><button id="btnExportPrompts" class="ghost">Exportar</button><button id="btnImportPrompts" class="ghost">Importar</button></div>
+          <div class="hint" style="font-size:10px;margin-top:4px;">Usa <code style="color:var(--accent)">/</code> para clasificar: <code>casa/pasillo/noche</code> (los dos primeros son carpetas)</div>
+        </div>
+      </div>
+
+      <div class="panel"><h2>Prompt</h2><div class="row"><textarea id="prompt" placeholder="Describe la escena..."></textarea></div></div>
+
+      <!-- ENHANCER PANEL -->
+      <div class="panel">
+        <div class="collapsible-header" id="enhancerToggle">
+          <span class="arrow">▶</span> __ENHANCER_TITLE__
+        </div>
+        <div class="collapsible-body" id="enhancerBody">
+          <div class="enhancer-row">
+            <label>Modelo</label>
+            <select id="enhancerModel"><option value="">Cargando modelos...</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="enhancerMode"><option value="text">Texto</option><option value="vision">Visión</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Estilo</label>
+            <select id="enhancerStyle"></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Cadena de mejora</label>
+            <select id="enhancerChainMode"><option value="off">Desactivado</option><option value="ollama">LLM (Ollama / llama.cpp)</option><option value="ltx2">LTX2 Prompt</option><option value="both">Ambos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Temperatura LTX2 <span class="hint">(Generate LTX2 Prompt)</span></label>
+            <div class="slider-row"><input type="range" id="ltx2Temperature" min="0" max="1.5" step="0.05" value="0.7"><div class="slider-val" id="ltx2TemperatureVal">0.70</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Seed LTX2</label>
+            <input type="number" id="ltx2Seed" value="2" step="1">
+          </div>
+          <div class="enhancer-row">
+            <button id="btnEnhance" class="primary" style="width:100%">Mejorar prompt</button>
+          </div>
+          <div class="enhancer-row">
+            <label>Cadena LLM + LTX2 <span class="hint">(comparativa)</span></label>
+            <textarea class="enhancer-output" id="ltx2PreviewText" readonly placeholder="La comparativa entre el prompt del LLM y el de LTX2 aparecerá aquí tras pulsar Mejorar prompt en modo Ambos..."></textarea>
+          </div>
+          <div class="enhancer-row">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label style="margin-bottom:0;">Resultado LLM</label>
+              <span id="enhancerMetaInfo" style="font-size:10px; color:var(--accent);"></span>
+            </div>
+            <textarea class="enhancer-output" id="enhancerOutput" placeholder="El resultado del LLM aparecerá aquí (editable: puedes pegar o retocar texto)..."></textarea>
+          </div>
+          <div class="enhancer-row">
+            <label>Cambios a aplicar <span class="hint">(pulido sobre el resultado; Ctrl+Enter)</span></label>
+            <textarea class="enhancer-output" id="enhancerRefineInput" placeholder="p. ej.: que sea de noche, quita el sombrero, plano más cerrado..."></textarea>
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <button id="btnRefinePrompt" class="primary" style="flex:1;" title="Pule el texto de Resultado LLM (o el prompt si está vacío)">Aplicar al resultado</button>
+              <button id="btnRefineFromPrompt" class="primary" style="flex:1;" title="Pule el prompt actual (p. ej. el restaurado al cargar un vídeo); el resultado va a Resultado LLM">Aplicar al prompt</button>
+            </div>
+          </div>
+          <div class="enhancer-actions">
+            <button id="btnUseAsPrompt" class="primary">Usar como prompt</button>
+            <button id="btnSaveEnhanced">Guardar en biblioteca</button>
+            <button id="btnEditSysPrompts" class="ghost">Editar system prompts...</button>
+          </div>
+        </div>
+      </div>
