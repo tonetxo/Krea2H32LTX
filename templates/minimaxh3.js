@@ -184,7 +184,7 @@ const MINIMAXH3_SETTINGS_KEY = "minimaxh3_ui_settings_v1";
 const MINIMAXH3_DB_NAME = "minimaxh3_media_db";
 const MINIMAXH3_STORE_NAME = "slots";
 let currentMode = "i2v"; // "i2v" | "flf2v" | "r2v"
-let arMode = "auto"; // "auto" | "16:9"
+let arMode = "auto"; // "auto" | "16:9" | "manual"
 let imageNativeAspectRatio = 16 / 9;
 let rawInputImageWidth = 0;
 let rawInputImageHeight = 0;
@@ -401,6 +401,7 @@ $("segFixed")?.addEventListener("click", () => { seedMode = "fixed"; $("seedVal"
 $("seedVal")?.addEventListener("input", () => scheduleSaveH3Settings());
 $("segArAuto")?.addEventListener("click", () => { arMode = "auto"; saveArMode(arMode); scheduleSaveH3Settings(); recalcResolution(); });
 $("segAr169")?.addEventListener("click", () => { arMode = "16:9"; saveArMode(arMode); scheduleSaveH3Settings(); recalcResolution(); });
+$("segArManual")?.addEventListener("click", () => { arMode = "manual"; saveArMode(arMode); scheduleSaveH3Settings(); recalcResolution(); });
 $("prompt")?.addEventListener("input", () => scheduleSaveH3Settings());
 $("segAttnNone")?.addEventListener("click", () => { setAttentionOptimizerUI("none"); saveAttentionOptimizer({mode:"none"}); scheduleSaveH3Settings(); });
 $("segAttnH3")?.addEventListener("click", () => { setAttentionOptimizerUI("h3-optimizations"); saveAttentionOptimizer({mode:"h3-optimizations"}); scheduleSaveH3Settings(); });
@@ -1587,7 +1588,7 @@ function setModeUI(mode){
       rawInputImageWidth = firstImg.naturalWidth;
       rawInputImageHeight = firstImg.naturalHeight;
       imageNativeAspectRatio = firstImg.naturalWidth / firstImg.naturalHeight;
-      if(arMode !== "16:9") setArModeUI("auto");
+      if(arMode === "auto") setArModeUI("auto");
       else recalcResolution();
     }
   }
@@ -2022,7 +2023,8 @@ function updateArLabel(w, h){
     auto.textContent = (w && h) ? `Auto (${currentRatio})` : "Auto (Imagen)";
   }
   if(hint){
-    hint.textContent = (arMode === "16:9") ? `(Forzado 16:9 · Original: ${currentRatio})` : `(${currentRatio}${w && h ? ` · ${w}×${h}` : ''})`;
+    if(arMode === "manual") hint.textContent = "(Manual)";
+    else hint.textContent = (arMode === "16:9") ? `(Forzado 16:9 · Original: ${currentRatio})` : `(${currentRatio}${w && h ? ` · ${w}×${h}` : ''})`;
   }
 }
 
@@ -2035,10 +2037,10 @@ function saveArMode(m){
 function setArModeUI(mode){
   arMode = mode;
   const auto = $("segArAuto"), f169 = $("segAr169");
-  if(mode === "16:9"){
-    f169?.classList.add("on"); auto?.classList.remove("on");
-  } else {
-    auto?.classList.add("on"); f169?.classList.remove("on");
+  $("segArManual")?.classList.toggle("on", mode === "manual");
+  f169?.classList.toggle("on", mode === "16:9");
+  auto?.classList.toggle("on", mode === "auto");
+  if(mode === "auto"){
     const firstImg = $("inputImg");
     if(firstImg && firstImg.naturalWidth && firstImg.naturalHeight && firstImg.style.display !== "none"){
       rawInputImageWidth = firstImg.naturalWidth;
@@ -2052,6 +2054,7 @@ function setArModeUI(mode){
 setArModeUI(loadArMode());
 $("segArAuto")?.addEventListener("click", () => setArModeUI("auto"));
 $("segAr169")?.addEventListener("click", () => setArModeUI("16:9"));
+$("segArManual")?.addEventListener("click", () => setArModeUI("manual"));
 
 // --- CALLBACKS FOR common.js ---
 CONFIG.findMedia = function(nodeOutput){
@@ -2101,7 +2104,7 @@ CONFIG.variantMeta = function(seedValue, timeText){
     rows.push(["Resolución Vídeo", `${w*2}×${he*2} (RTX 2x ${rtx.quality})`]);
   }
 
-  rows.push(["Aspect Ratio", arMode === "16:9" ? "Forzar 16:9" : "Auto (Imagen)"]);
+  rows.push(["Aspect Ratio", arMode === "manual" ? "Manual" : (arMode === "16:9" ? "Forzar 16:9" : "Auto (Imagen)")]);
   rows.push(["Duración", `${$("duration")?.value || ""}s`]);
   rows.push(["Modo", currentMode]);
 
@@ -2378,19 +2381,26 @@ function displayVariantMedia(media, slot, promptId, timeText, { allowShow = true
 
 // --- RESOLUCIÓN ---
 function nearest32(v){ return Math.round(v / 32) * 32; }
+const MANUAL_RES_TITLE = "MiniMax H3 Reference To Video (resolución manual)";
 
 function recalcResolution(){
   const mp = parseFloat($("mpSlider").value) || 0.7;
   const totalPx = mp * 1024 * 1024;
+  const manual = arMode === "manual";
   const targetAspect = (arMode === "16:9") ? (16 / 9) : (imageNativeAspectRatio || (16 / 9));
-  currentAspectRatio = targetAspect;
-  let w = nearest32(Math.sqrt(totalPx * targetAspect));
-  let h = nearest32(Math.sqrt(totalPx / targetAspect));
+  let w = nearest32(manual ? parseInt($("width").value, 10) || 1024 : Math.sqrt(totalPx * targetAspect));
+  let h = nearest32(manual ? parseInt($("height").value, 10) || 576 : Math.sqrt(totalPx / targetAspect));
   if(h < 256) h = 256;
   if(w < 256) w = 256;
+  currentAspectRatio = manual ? w / h : targetAspect;
+  for(const el of [$("width"), $("height")]){
+    el.readOnly = !manual;
+    el.classList.toggle("ro", !manual);
+  }
+  $("mpSlider").disabled = manual;
   $("width").value = w;
   $("height").value = h;
-  $("mpVal").textContent = mp.toFixed(2);
+  $("mpVal").textContent = manual ? (w * h / (1024 * 1024)).toFixed(2) : mp.toFixed(2);
 
   const latentState = (typeof getLatentUpscaleState === "function") ? getLatentUpscaleState() : { enabled: false, scale: 1.5 };
   const latentScale = latentState.enabled ? latentState.scale : 1.0;
@@ -2550,6 +2560,7 @@ function snapshotJob(){
     seedValue: parseInt($("seedVal").value || "12345", 10),
     width: parseInt($("width").value, 10),
     height: parseInt($("height").value, 10),
+    manualRes: arMode === "manual",
     duration: parseFloat($("duration").value || "10"),
     mp: $("mpSlider").value,
     unet: $("unetSelect")?.value,
@@ -3231,6 +3242,14 @@ async function applyWorkflow(workflow, opts={}){
     setApplied("megapixels");
   } else { setMissing("megapixels"); }
 
+  const resNode = workflow[N.REF2V];
+  if(resNode?._meta?.title === MANUAL_RES_TITLE && typeof resNode.inputs?.width === "number"){
+    $("width").value = resNode.inputs.width;
+    $("height").value = resNode.inputs.height;
+    setArModeUI("manual");
+    setApplied(`resolución manual (${resNode.inputs.width}×${resNode.inputs.height})`);
+  }
+
   // Duración
   const loadImages = findAllByClass("LoadImage");
   if(loadImages.length){
@@ -3417,7 +3436,7 @@ function updateDzInfo(w, h, infoEl){
     rawInputImageWidth = w;
     rawInputImageHeight = h;
     imageNativeAspectRatio = w / h;
-    if(arMode !== "16:9"){
+    if(arMode === "auto"){
       setArModeUI("auto");
     } else {
       recalcResolution();
@@ -3429,6 +3448,9 @@ $("segRandom").addEventListener("click",()=>{seedMode="random";$("segRandom").cl
 $("segFixed").addEventListener("click",()=>{seedMode="fixed";$("segFixed").classList.add("on");$("segRandom").classList.remove("on");$("seedVal").disabled=false;});
 $("stepsSlider")?.addEventListener("input",(e)=>{$("stepsVal").textContent=e.target.value;});
 $("mpSlider").addEventListener("input",()=>{recalcResolution();});
+for(const id of ["width", "height"]){
+  $(id).addEventListener("change", () => { if(arMode === "manual"){ recalcResolution(); scheduleSaveH3Settings(); } });
+}
 $("duration").addEventListener("input",updateDurationHints);
 
 // El prefijo se guarda/lee como parte de la sesión v1.
@@ -4097,6 +4119,8 @@ function buildGraph(job){
   if(g[N.REF2V] && g[N.REF2V].inputs){
     g[N.REF2V].inputs.width = w;
     g[N.REF2V].inputs.height = h;
+    // El grafo lleva siempre números: esta marca distingue Manual al restaurar los metadatos.
+    if(j ? j.manualRes : arMode === "manual") g[N.REF2V]._meta = { ...g[N.REF2V]._meta, title: MANUAL_RES_TITLE };
   }
 
   // Duración (segundos) → nodo PrimitiveFloat 132

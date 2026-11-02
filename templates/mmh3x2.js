@@ -2114,6 +2114,12 @@ function applyWorkflow(workflow){
   // 4. Megapíxeles
   if(workflow["77"]?.inputs?.megapixels && $("mpSlider")){
     $("mpSlider").value = workflow["77"].inputs.megapixels;
+    if($("aspectRatioSelect")?.value === "manual") $("aspectRatioSelect").value = "auto";
+  } else if(typeof workflow[N.REF2V_SEG1]?.inputs?.width === "number" && $("aspectRatioSelect")){
+    // Sin nodo 77 el grafo lleva la resolución exacta (Manual, AR forzado o T2V).
+    $("aspectRatioSelect").value = "manual";
+    $("width").value = workflow[N.REF2V_SEG1].inputs.width;
+    $("height").value = workflow[N.REF2V_SEG1].inputs.height;
   }
   recalcResolution(); // recalcula si Slot 1 ya cargó; si no, el onload lo hará
 
@@ -2774,6 +2780,8 @@ function saveSettings(){
     duration2: $("durationSlider2")?.value || "15.0",
     megapixels: $("mpSlider")?.value || "0.70",
     aspectRatio: $("aspectRatioSelect")?.value || "auto",
+    width: $("width")?.value || "1152",
+    height: $("height")?.value || "640",
     batchSize: $("batchSize")?.value || "1",
     filenamePrefix: $("filenamePrefix")?.value || "video/MiniMax_H3",
     steps: $("stepsSlider")?.value || "20",
@@ -2883,6 +2891,8 @@ function restoreSettings(){
     if(s.aspectRatio !== undefined && $("aspectRatioSelect")){
       $("aspectRatioSelect").value = s.aspectRatio;
     }
+    if(s.width !== undefined && $("width")) $("width").value = s.width;
+    if(s.height !== undefined && $("height")) $("height").value = s.height;
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
     if(s.filenamePrefix !== undefined && $("filenamePrefix")) $("filenamePrefix").value = s.filenamePrefix;
 
@@ -3541,13 +3551,21 @@ function updateCalculatedResolution(origW, origH){
   // Igual que ResolutionSelector / ImageScaleToTotalPixels de ComfyUI (y MiniMaxH3):
   // 1 MP = 1024², cada lado redondeado a 32 por separado.
   const targetPixels = mp * 1024 * 1024;
-  let h = Math.round(Math.sqrt(targetPixels / ar) / 32) * 32;
-  let w = Math.round(Math.sqrt(targetPixels * ar) / 32) * 32;
+  const manual = arSelect === "manual";
+  let h = Math.round((manual ? parseInt($("height").value, 10) || 576 : Math.sqrt(targetPixels / ar)) / 32) * 32;
+  let w = Math.round((manual ? parseInt($("width").value, 10) || 1024 : Math.sqrt(targetPixels * ar)) / 32) * 32;
   w = Math.max(256, w);
   h = Math.max(256, h);
+  if(manual) ar = w / h;
 
   if($("width")) $("width").value = w;
   if($("height")) $("height").value = h;
+  for(const el of [$("width"), $("height")]){
+    el.readOnly = !manual;
+    el.classList.toggle("ro", !manual);
+  }
+  $("mpSlider").disabled = manual;
+  $("mpVal").textContent = (manual ? w * h / (1024 * 1024) : mp).toFixed(2);
   if($("arDetectHint")){
     const label = arSelect === "auto" ? (origW && origH ? "Auto " : "16:9 ") : `${arSelect} `;
     $("arDetectHint").textContent = `(${label}${ar.toFixed(2)}:1 · ${w}x${h})`;
@@ -6595,6 +6613,14 @@ window.addEventListener("DOMContentLoaded", () => {
       const img1 = $("previewSlotImg1");
       const hasImg1 = !!(img1 && img1.complete && img1.naturalWidth && img1.style.display !== "none");
       updateCalculatedResolution(hasImg1 ? img1.naturalWidth : 1280, hasImg1 ? img1.naturalHeight : 720);
+      scheduleSaveSettings();
+    });
+  }
+
+  for(const id of ["width", "height"]){
+    $(id)?.addEventListener("change", () => {
+      if($("aspectRatioSelect")?.value !== "manual") return;
+      updateCalculatedResolution(...lastResOrig);
       scheduleSaveSettings();
     });
   }
