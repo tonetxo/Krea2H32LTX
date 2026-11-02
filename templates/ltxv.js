@@ -10,7 +10,7 @@ const CONFIG = {
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
   DEFAULT_VAE: "ltx-2.5-video-vae-conv-bf16",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",CLEAN_GPU:"918",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",CLEAN_GPU:"918",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740",IMG2VIDEO_1:"772",LAST_IMAGE:"1090",LAST_RESIZE_1:"1091",LAST_PREPROCESS_1:"1092",LAST_RESIZE_2:"1093",LAST_PREPROCESS_2:"1094"},
   loras: [
     {on:true, lora:"", strength:1},
     {on:false, lora:"", strength:0.15},
@@ -21,10 +21,32 @@ const CONFIG = {
     text: {
       A: { name: "Estilo A (cinematográfico)", prompt: "You are an expert in prompts for LTXV video generation. Transform the user's idea into a detailed cinematic prompt. Include: shot type, lighting, camera movement, atmosphere, colors, and visual style. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt, no explanations or prefaces." },
       B: { name: "Estilo B (narrativo)", prompt: "You are a creative assistant specialized in visual storytelling. Take the user's idea and turn it into an evocative prompt that captures the essence of the scene. Use descriptive, poetic language. Focus on atmosphere, emotions, and the story the image tells. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      FL: { name: "First-Last (1er + último frame)", prompt: `You are an expert prompt writer for LTX-2.5 first-last-frame video generation. The model already receives the opening and closing frames as images, and your prompt must describe how the video travels from one to the other. The user describes both frames and the intended action; follow their intent.
+
+RULES:
+- Write one continuous single take with no cuts, in present tense and chronological order: a brief opening state, then the observable motion path, then the exact closing state, which must be fully reached in the last moments of the clip.
+- Spend most of the words on the transition: what moves, in which direction, how poses, objects, camera and lighting change. Do not write two separate static descriptions.
+- Connect the two states through a physically plausible action or camera move. Only use a morph or magical transformation if the user asks for it.
+- Keep identities, clothing and setting consistent unless the closing state clearly changes them. Pace the action to fill the given duration, without a long static hold at either end.
+- End with one short sentence describing the ambient sound in positive terms (wind, footsteps, music). Never write "no dialogue" or similar phrases. Include spoken words only if the user supplies them, quoted verbatim.
+- Use 4 to 8 flowing sentences, under 200 words, without headings, lists or timestamps.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final prompt, no explanations or prefaces.` },
     },
     vision: {
       A: { name: "Estilo A (descriptivo)", prompt: "You are an expert at describing images for video generation. Analyze the provided image and generate a detailed prompt describing: composition, subjects, background, lighting, colors, motion, and atmosphere. The prompt must be suitable for a text-to-video model. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
       B: { name: "Estilo B (cinematográfico)", prompt: "You are a digital cinematographer. Look at the image and turn it into a cinematic description. Describe how the camera would move, how lighting would evolve, what action would unfold, and how the scene would change over time. Think in terms of footage, not a still photo. The user may write in any language; you must ALWAYS respond in English with ONLY the enhanced prompt." },
+      FL: { name: "First-Last (1er + último frame)", prompt: `You are an expert prompt writer for LTX-2.5 first-last-frame video generation. You receive TWO images: the FIRST is the opening frame and the SECOND is the closing frame of the same clip. Compare them, identify what changes, and describe how the video travels from one to the other. If the user gives a text hint, it defines the intended action and takes priority.
+
+RULES:
+- Write one continuous single take with no cuts, in present tense and chronological order: a brief opening state, then the observable motion path, then the exact closing state, which must be fully reached in the last moments of the clip.
+- Spend most of the words on the transition: what moves, in which direction, how poses, objects, camera and lighting change. Do not write two separate static descriptions.
+- Connect the two states through a physically plausible action or camera move. Only use a morph or magical transformation if the user asks for it.
+- Keep identities, clothing and setting consistent unless the closing state clearly changes them. Pace the action to fill the given duration, without a long static hold at either end.
+- End with one short sentence describing the ambient sound in positive terms (wind, footsteps, music). Never write "no dialogue" or similar phrases. Include spoken words only if the user supplies them, quoted verbatim.
+- Use 4 to 8 flowing sentences, under 200 words, without headings, lists or timestamps.
+
+The user may write in any language; you must ALWAYS respond in English with ONLY the final prompt, no explanations or prefaces.` },
     },
   },
 };
@@ -33,6 +55,7 @@ const N = CONFIG.N;
 initCommon();
 
 let uploadedImage=null, localFile=null, seedMode="random";
+let uploadedLastImage=null, localLastFile=null, videoMode="i2v"; // "i2v" | "flf"
 let currentAspectRatio = 16/9;
 let currentMedia = {};
 let generationStep = 0;
@@ -373,6 +396,7 @@ CONFIG.renderVariantMedia = function(card, url, media){
     ["Interpolación", r.enabled ? ((r.engine === "rtx") ? `RTX Frame Gen · ${r.multiplier}x (${24*r.multiplier} fps)` : `RIFE · ${r.multiplier}x (${24*r.multiplier} fps) · ${(r.model||"").split('/').pop()}`) : "off"],
     ["RTX Super Resolution", (typeof getRtxState === "function" && getRtxState().enabled) ? `on (2x ${getRtxState().quality})` : "off"],
     ["Refinado", (() => { const fr = getFaceRefineState(); return fr.enabled ? `${fr.target} · ${fr.canvas}px · ${fr.steps} pasos · denoise ${Number(fr.denoise).toFixed(2)}` : "off"; })()],
+    ["Modo", videoMode === "flf" ? "First-Last" : "i2v"],
     ["Cadena", $("enhancerChainMode")?.value || "off"],
     ["Resolución", (w && h) ? `${w}×${h}` : `${$("width")?.value || ""}×${$("height")?.value || ""}`],
     ["A/R", getFriendlyRatio(w, h)],
@@ -793,7 +817,7 @@ function updateQueueUI(){
       const pEsc = escapeHtml((job.prompt || "sin prompt").trim());
       const pText = pEsc;
       const pShort = pText.length > 35 ? pText.slice(0, 35) + "…" : pText;
-      const typeLabel = job.firstPassOnly ? "1er pase" : "completo";
+      const typeLabel = (job.firstPassOnly ? "1er pase" : "completo") + (job.videoMode === "flf" ? " · First-Last" : "");
       row.innerHTML = `
         <div class="queue-item-left" title="${pText}">
           <span class="queue-item-id">#${job.id}</span>
@@ -1244,6 +1268,9 @@ function snapshotJob(firstPassOnly){
     batchSize: parseInt($("batchSize")?.value || "1", 10),
     uploadedImage: uploadedImage ? {...uploadedImage} : null,
     localFile: localFile,
+    videoMode,
+    uploadedLastImage: uploadedLastImage ? {...uploadedLastImage} : null,
+    localLastFile: localLastFile,
     aspectRatio: currentAspectRatio,
     createdAt: Date.now(),
   };
@@ -1921,6 +1948,34 @@ async function applyWorkflow(workflow, opts={}){
     if(!hasLocal) setMissing("imagen de entrada");
   }
 
+  // Modo First-Last: solo lo llevan los workflows con el LoadImage del último
+  // frame; los vídeos i2v (incluidos los antiguos) vuelven a modo i2v.
+  const lastImgSpec = workflow[N.LAST_IMAGE]?.inputs?.image;
+  if(typeof lastImgSpec === "string" && lastImgSpec.trim()){
+    setVideoModeUI("flf");
+    const spec = lastImgSpec.trim().replace(/\\/g, "/");
+    const slashIdx = spec.indexOf("/");
+    const subfolder = slashIdx > 0 ? spec.slice(0, slashIdx) : "";
+    const fname = slashIdx > 0 ? spec.slice(slashIdx + 1) : spec;
+    const viewUrl = `${server()}${mediaViewUrl({ filename: fname, subfolder, type: "input" }, { anchor: "" })}`;
+    try {
+      const probe = await fetch(viewUrl, { method: "HEAD" });
+      if(probe.ok){
+        uploadedLastImage = { name: fname, filename: fname, subfolder, type: "input" };
+        localLastFile = null;
+        showLastFrameImage(viewUrl);
+        setApplied("último frame (" + fname + ")");
+      } else {
+        setMissing("último frame (fichero borrado del backend)");
+      }
+    } catch(e){
+      setMissing("último frame (no verificable)");
+    }
+  } else {
+    setVideoModeUI("i2v");
+  }
+  scheduleSaveLtxvSettings();
+
   if(opts.silent) return { applied, missing };
   if(appliedMsg) log(appliedMsg, "l-ok");
   if(missingMsg) log(missingMsg, "l-warn");
@@ -2045,6 +2100,7 @@ function saveLtxvSettings(){
     fidelity: $("fidelitySlider")?.value || "0.25",
     firstPassSteps: $("firstPassSteps")?.value || "8",
     motion: $("motionSlider")?.value || "1.0",
+    videoMode,
     dialogueMode: getDialogueMode(),
     postfx: getPostFxState(),
     rife: getRifeState(),
@@ -2134,6 +2190,7 @@ function restoreLtxvSettings(){
     }
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
 
+    if(s.videoMode) setVideoModeUI(s.videoMode);
     if(s.dialogueMode) setDialogueModeUI(s.dialogueMode);
     if(s.postfx) setPostFxUI(s.postfx);
     if(s.fidelity !== undefined && $("fidelitySlider")){
@@ -2367,6 +2424,89 @@ function showInputImage(src){
   if(dz) dz.style.display = "none";
 }
 
+// --- MODO i2v / FIRST-LAST ---
+function setVideoModeUI(mode){
+  videoMode = mode === "flf" ? "flf" : "i2v";
+  const flf = videoMode === "flf";
+  $("segModeFLF")?.classList.toggle("on", flf);
+  $("segModeI2V")?.classList.toggle("on", !flf);
+  if($("lastFramePanel")) $("lastFramePanel").style.display = flf ? "" : "none";
+  if($("inputImageTitle")) $("inputImageTitle").textContent = flf ? "Primer frame" : "Imagen entrada";
+  if($("videoModeHint")) $("videoModeHint").textContent = flf
+    ? "1er frame + último frame → vídeo. El último frame se recorta al encuadre del primero."
+    : "Imagen de inicio → vídeo.";
+}
+$("segModeI2V")?.addEventListener("click", () => { setVideoModeUI("i2v"); scheduleSaveLtxvSettings(); });
+// Al elegir el modo a mano, el enhancer pasa al estilo que le envía las dos imágenes.
+function selectEnhancerFirstLast(on){
+  const style = $("enhancerStyle");
+  if(on){
+    $("enhancerMode").value = "vision";
+    populateStyleSelect(loadSysPrompts(), "vision");
+    style.value = "FL";
+  } else if(style.value === "FL"){
+    style.value = "A";
+  }
+}
+$("segModeI2V")?.addEventListener("click", () => selectEnhancerFirstLast(false));
+$("segModeFLF")?.addEventListener("click", () => { setVideoModeUI("flf"); selectEnhancerFirstLast(true); scheduleSaveLtxvSettings(); });
+
+const lastFrameZoom = setupZoomPan("lastFrameWrap", "lastFrameImg", "btnResetZoomLast", "btnFullscreenLast");
+const lfDz = $("lastFrameDropzone"), lfFileInput = $("lastFrameFileInput");
+
+function handleLastFrameFile(f){
+  uploadedLastImage = null;
+  // El prefijo "last_" sobrevive a la subida: si ambas imágenes se llaman igual
+  // (image.png pegada dos veces), overwrite=true no pisa el primer frame.
+  localLastFile = new File([f], `temp_${Date.now()}_last_${f.name}`, {type: f.type});
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    showLastFrameImage(e.target.result);
+    log(`🖼️ Último frame cargado: ${f.name}`, "l-ok");
+  };
+  reader.readAsDataURL(f);
+}
+function showLastFrameImage(src){
+  const wrap = $("lastFrameWrap"), img = $("lastFrameImg");
+  // A diferencia del primer frame, no toca el aspect ratio ni la resolución.
+  img.onload = () => {
+    $("lastFrameDzInfo").textContent = `${img.naturalWidth}×${img.naturalHeight} · ${getFriendlyRatio(img.naturalWidth, img.naturalHeight)}`;
+    lastFrameZoom.resetZoom();
+  };
+  img.src = src;
+  img.style.display = "block";
+  wrap.style.visibility = "visible";
+  $("lastFrameActions").style.display = "flex";
+  lfDz.style.display = "none";
+}
+function clearLastFrame(){
+  uploadedLastImage = null;
+  localLastFile = null;
+  const img = $("lastFrameImg");
+  img.removeAttribute("src");
+  img.style.display = "none";
+  $("lastFrameWrap").style.visibility = "hidden";
+  $("lastFrameActions").style.display = "none";
+  $("lastFrameDzInfo").textContent = "";
+  lfDz.style.display = "";
+  lfFileInput.value = "";
+  lastFrameZoom.resetZoom();
+  log("Último frame eliminado.", "l-info");
+}
+$("btnClearLast").addEventListener("click", clearLastFrame);
+lfDz.addEventListener("click", () => lfFileInput.click());
+lfFileInput.addEventListener("change", e => { if(e.target.files[0]) handleLastFrameFile(e.target.files[0]); });
+$("lastFrameWrap").addEventListener("click", (e) => {
+  if(lastFrameZoom.isFullscreen()) return;
+  if(lastFrameZoom.wasPan && lastFrameZoom.wasPan()) return;
+  lfFileInput.click();
+});
+for(const el of [lfDz, $("lastFrameWrap")]){
+  ["dragenter","dragover"].forEach(ev => el.addEventListener(ev, e => { e.preventDefault(); lfDz.classList.add("drag"); }));
+  ["dragleave","drop"].forEach(ev => el.addEventListener(ev, e => { e.preventDefault(); lfDz.classList.remove("drag"); }));
+  el.addEventListener("drop", e => { if(e.dataTransfer.files[0]) handleLastFrameFile(e.dataTransfer.files[0]); });
+}
+
 let currentVideoFile = null;
 
 function handleVideoFile(file, shouldSaveToGallery = true){
@@ -2480,16 +2620,7 @@ function handleVideoFile(file, shouldSaveToGallery = true){
   vid.src = videoUrl;
 }
 
-async function ensureJobImageUploaded(job){
-  if(job.uploadedImage) return;
-  const f = job.localFile || localFile;
-  if(!f){
-    if(uploadedImage){
-      job.uploadedImage = {...uploadedImage};
-      return;
-    }
-    throw new Error("No hay imagen seleccionada. Arrastra una imagen a la zona de entrada.");
-  }
+async function uploadInputFile(f){
   setRun("busy","subiendo imagen...");
   const fd=new FormData();
   fd.append("image", f, f.name.replace(/^temp_\d+_/, ''));
@@ -2497,9 +2628,59 @@ async function ensureJobImageUploaded(job){
   const r=await fetch(server()+"/upload/image",{method:"POST",body:fd});
   if(!r.ok) throw new Error("Fallo al subir la imagen al servidor");
   const data=await r.json();
-  job.uploadedImage={name:data.name, subfolder:data.subfolder||"", type:data.type||"input"};
-  uploadedImage = {...job.uploadedImage};
-  log("Imagen subida al servidor: "+job.uploadedImage.name,"l-ok");
+  log("Imagen subida al servidor: "+data.name,"l-ok");
+  return {name:data.name, subfolder:data.subfolder||"", type:data.type||"input"};
+}
+
+async function ensureJobImageUploaded(job){
+  if(job.videoMode === "flf" && !job.uploadedLastImage && !job.localLastFile){
+    throw new Error("Modo First-Last sin último frame. Añade la imagen final o vuelve a i2v.");
+  }
+  if(!job.uploadedImage){
+    const f = job.localFile || localFile;
+    if(f){
+      job.uploadedImage = await uploadInputFile(f);
+      uploadedImage = {...job.uploadedImage};
+    } else if(uploadedImage){
+      job.uploadedImage = {...uploadedImage};
+    } else {
+      throw new Error("No hay imagen seleccionada. Arrastra una imagen a la zona de entrada.");
+    }
+  }
+  if(job.videoMode === "flf" && !job.uploadedLastImage){
+    job.uploadedLastImage = await uploadInputFile(job.localLastFile);
+    // Un job en cola no debe pisar un último frame cambiado mientras esperaba.
+    if(localLastFile === job.localLastFile) uploadedLastImage = {...job.uploadedLastImage};
+  }
+}
+
+// First-Last: segunda imagen (índice -1 = último frame) en los LTXVImgToVideoInplaceKJ
+// de ambos pases. Replica la cadena del primer frame con el mismo tamaño final de cada
+// pase; el nodo KJ fija la latente final con el valor de Fidelidad / 1.0 igual que la inicial.
+function appendLastFrame(g, mode, lastImg){
+  const spec = (lastImg.subfolder ? lastImg.subfolder + "/" : "") + lastImg.name;
+  g[N.LAST_IMAGE] = { class_type: "LoadImage", inputs: { image: spec }, _meta: { title: "Load Image (último frame)" } };
+  const addPass = (resizeId, preprocessId, width, height, preprocessTpl, i2vId) => {
+    g[resizeId] = {
+      class_type: "ImageResizeKJv2",
+      inputs: { ...g["898"].inputs, width, height, image: [N.LAST_IMAGE, 0] },
+      _meta: { title: "Resize Image v2 (último frame)" }
+    };
+    g[preprocessId] = {
+      class_type: "LTXVPreprocess",
+      inputs: { ...g[preprocessTpl].inputs, image: [resizeId, 0] },
+      _meta: { title: "LTXV Preprocess (último frame)" }
+    };
+    const i2v = g[i2vId].inputs;
+    i2v.num_images = "2";
+    i2v["num_images.image_2"] = [preprocessId, 0];
+    i2v["num_images.index_2"] = -1;
+    i2v["num_images.strength_2"] = i2v["num_images.strength_1"];
+  };
+  addPass(N.LAST_RESIZE_1, N.LAST_PREPROCESS_1, ["893", 1], ["893", 2], "900", N.IMG2VIDEO_1);
+  if(mode !== "first"){
+    addPass(N.LAST_RESIZE_2, N.LAST_PREPROCESS_2, ["899", 0], ["899", 1], "905", N.IMG2VIDEO_2);
+  }
 }
 
 function buildPostProcessGraph(j){
@@ -2629,6 +2810,7 @@ function buildGraph(mode, job){
   } else if(imgObj){
     log("⚠️ Imagen de entrada sin nombre válido; se mantiene la del grafo base.", "l-warn");
   }
+  if(j?.videoMode === "flf" && j.uploadedLastImage) appendLastFrame(g, mode, j.uploadedLastImage);
   const promptText = (j ? j.prompt : $("prompt").value) || "";
   if(promptText.trim()) g[N.PROMPT].inputs.text = promptText.trim();
   const sMode = j ? j.seedMode : seedMode;
@@ -3624,7 +3806,22 @@ $("btnEnhance").addEventListener("click", async () => {
   if(mode !== "vision" && !userPrompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }
 
   const payload = { model, system, prompt: userPrompt || "Describe this image.", options: { num_ctx: 4096 } };
-  if(mode === "vision"){
+  if(mode === "vision" && styleKey === "FL"){
+    // Se lee del visor (.src): también cubre imágenes restauradas desde metadatos, sin File local.
+    const firstSrc = $("inputImg").getAttribute("src"), lastSrc = $("lastFrameImg").getAttribute("src");
+    if(videoMode !== "flf" || !firstSrc || !lastSrc){
+      log("El estilo First-Last necesita el modo First-Last con primer y último frame.", "l-err");
+      return;
+    }
+    try {
+      payload.images = [await imageToResizedBase64(firstSrc, 768), await imageToResizedBase64(lastSrc, 768)];
+    } catch(e) {
+      log("No se pudieron leer las imágenes: "+(e.message || e), "l-err");
+      return;
+    }
+    const secs = (parseInt($("frames").value, 10) / 24).toFixed(1);
+    payload.prompt = `FIRST IMAGE: opening frame. SECOND IMAGE: closing frame. Clip duration: ${secs} seconds.` + (userPrompt ? ` User hint: ${userPrompt}` : "");
+  } else if(mode === "vision"){
     if(!localFile){ log("No hay imagen de entrada para modo vision", "l-err"); return; }
     try {
       const b64 = await resizeFileToBase64(localFile, 768);
