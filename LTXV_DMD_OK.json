@@ -510,19 +510,19 @@
         "type": "PowerLoraLoaderHeaderWidget"
       },
       "lora_1": {
-        "on": true,
-        "lora": "ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors",
+        "on": false,
+        "lora": "",
         "strength": 1
       },
       "lora_2": {
         "on": false,
-        "lora": "ltxv/LTX2-i2v-SexThrust.safetensors",
-        "strength": 0.15
+        "lora": "",
+        "strength": 1
       },
       "lora_3": {
         "on": false,
-        "lora": "ltxv/anal-insertion-i2v.safetensors",
-        "strength": 0.65
+        "lora": "",
+        "strength": 1
       },
       "➕ Add Lora": "",
       "model": [
@@ -920,7 +920,7 @@
   },
   "917": {
     "inputs": {
-      "image": "pasted/image (3).png"
+      "image": "example.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -962,7 +962,7 @@
   },
   "920": {
     "inputs": {
-      "filename_prefix": "templo/mensaje_botella",
+      "filename_prefix": "ltxv_ui",
       "format": "auto",
       "codec": "auto",
       "video": [
@@ -1013,7 +1013,7 @@
   },
   "923": {
     "inputs": {
-      "filename_prefix": "templo/mensaje_botella_prev",
+      "filename_prefix": "ltxv_ui_prev",
       "format": "auto",
       "codec": "auto",
       "video": [
