@@ -62,7 +62,6 @@ def main():
         'interp_dir': INTERP_DIR,
         'interp_fallback': 'rife_v4.26.safetensors',
         'lora_dir': LORAS_DIR,
-        'lora_fallback': 'ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors',
         'header_title': 'LTXV',
         'header_sub': 'grafo: LTXV_DMD_OK',
         'model_count_label': '',  # LTXV only reports LoRAs

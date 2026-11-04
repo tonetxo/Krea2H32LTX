@@ -2712,7 +2712,7 @@ function buildPostProcessGraph(j){
   const srcFps = ["901_comp", 2];
   let images = ["901_comp", 0];
   let fps = srcFps;
-  const prefix = (j.filenamePrefix || $("filenamePrefix")?.value || "templo/mensaje_botella").trim();
+  const prefix = (j.filenamePrefix || $("filenamePrefix")?.value || "ltxv_ui").trim();
 
   if(j.isInterpolateOnly){
     const rife = j.rife || getRifeState();
@@ -3032,7 +3032,7 @@ function buildGraph(mode, job){
   }
 
   // Prefijo de archivo configurable (validado: sin "..", solo caracteres seguros)
-  let prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "templo/mensaje_botella";
+  let prefix = (j ? j.filenamePrefix : $("filenamePrefix")?.value)?.trim() || "ltxv_ui";
   prefix = prefix.replace(/\\/g, "/").split("/").filter(seg => seg && seg !== "." && seg !== "..").join("/");
   if(!prefix || !/^[A-Za-z0-9_\-\/]+$/.test(prefix)){
     log(`⚠️ filename_prefix inválido ("${prefix || "vacío"}"); usando "ltxv_ui".`, "l-warn");

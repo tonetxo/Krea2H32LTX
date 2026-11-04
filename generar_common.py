@@ -48,7 +48,7 @@ def get_file_list(directory, ext='.safetensors', fallback=None):
     return files if files else ([fallback] if fallback else [])
 
 
-def get_lora_list(directory, fallback="ltxv/Ltx2.3-Licon-VBVR-I2V-390K-R32.safetensors"):
+def get_lora_list(directory, fallback=None):
     """Legacy path: used when the caller passes a single `lora_dir` string.
 
     New callers should prefer `lora_dirs` (list of (dir, prefix) tuples) and
