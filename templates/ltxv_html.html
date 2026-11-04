@@ -75,6 +75,7 @@
         </div>
       </div>
       <div class="panel"><h2>Steps 1er pase</h2><div class="row slider-row"><input type="range" id="firstPassSteps" min="4" max="12" step="1" value="8"><div class="slider-val" id="firstPassStepsVal">8</div></div><div class="row" style="margin-top:6px;"><label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;margin:0;"><input type="checkbox" id="savePreview" checked> <span>Guardar vídeo del 1er pase (preview)</span></label><div class="hint" style="font-size:10px;margin-top:2px;">Desactivado ahorra ~5 s por trabajo (decode + guardado del preview).</div></div></div>
+      <div class="panel"><h2>Sampler</h2><div class="row"><select id="ltxvSampler"><option value="default" selected>euler_ancestral (recomendado)</option><option value="res_2s">res_2s (más lento)</option><option value="res_2s_ode">res_2s_ode (más lento, audio más bajo)</option></select></div><div class="hint" style="font-size:10px;margin-top:2px;">Experimental: los res_* requieren RES4LYF y usan la misma curva de sigmas del modelo destilado.</div></div>
       <div class="panel"><h2>Movimiento</h2><div class="row slider-row"><input type="range" id="motionSlider" min="0" max="30" step="0.5" value="10"><div class="slider-val" id="motionVal">10.0</div></div></div>
       <div class="panel">
         <div class="collapsible-header" id="loraToggle">

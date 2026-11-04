@@ -10,7 +10,7 @@ const CONFIG = {
   UI_TYPE: "ltxv",
   DEFAULT_MODEL: "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
   DEFAULT_VAE: "ltx-2.5-video-vae-conv-bf16",
-  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",CLEAN_GPU:"918",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740",IMG2VIDEO_1:"772",LAST_IMAGE:"1090",LAST_RESIZE_1:"1091",LAST_PREPROCESS_1:"1092",LAST_RESIZE_2:"1093",LAST_PREPROCESS_2:"1094"},
+  N: {IMAGE:"917",PROMPT:"536",SEED:"524",WIDTH:"791",HEIGHT:"792",FRAMES:"796",FIDELITY:"797",MOTION:"915",LORA:"853",FINAL_SAVE:"920",PURGE_VRAM:"925",CLEAN_GPU:"918",FIRST_SAVE:"923",CHECKPOINT:"646",CUSTOM_VAE:"1005",CREATE_VIDEO_1:"922",CREATE_VIDEO_2:"919",SAMPLER_1:"888",SAMPLER_2:"891",SAMPLER_SELECT_1:"910",SAMPLER_SELECT_2:"911",LATENT_UPSAMPLER:"744",IMG2VIDEO_2:"770",RTX_SR:"921",REFERENCE_1:"860",REFERENCE_2:"870",SAGE_PATCH:"1001",RAW_PROMPT:"1002",LTX2_PROMPT:"1003",LTX2_PREVIEW:"1004",FIRST_SIGMAS:"914",LTXAV_TEXT_ENCODER:"616",RIFE_LOADER:"1080",RIFE_INTERP:"1081",DECODE_VIDEO_2:"740",IMG2VIDEO_1:"772",LAST_IMAGE:"1090",LAST_RESIZE_1:"1091",LAST_PREPROCESS_1:"1092",LAST_RESIZE_2:"1093",LAST_PREPROCESS_2:"1094"},
   loras: [
     {on:true, lora:"", strength:1},
     {on:false, lora:"", strength:0.15},
@@ -1249,6 +1249,7 @@ function snapshotJob(firstPassOnly){
     dialogueMode: getDialogueMode(),
     postfx: getPostFxState(),
     firstPassSteps: $("firstPassSteps")?.value || "8",
+    sampler: $("ltxvSampler")?.value || "default",
     model: $("modelSelect")?.value,
     textEncoder: $("textEncoderSelect")?.value,
     vae: $("vaeSelect")?.value,
@@ -1888,6 +1889,15 @@ async function applyWorkflow(workflow, opts={}){
     }
   }
 
+  // Los vídeos anteriores al selector traen euler_ancestral: se restauran como "default".
+  const samplerSelect = $("ltxvSampler");
+  if(samplerSelect){
+    const name = workflow[CONFIG.N.SAMPLER_SELECT_1]?.inputs?.sampler_name;
+    const known = [...samplerSelect.options].some(o => o.value === name);
+    samplerSelect.value = known ? name : "default";
+    scheduleSaveLtxvSettings();
+  }
+
   // Restaurar RTX Video Super Resolution
   const rtxNode = findByClass("RTXVideoSuperResolution");
   if(rtxNode && rtxNode.inputs){
@@ -2099,6 +2109,7 @@ function saveLtxvSettings(){
     batchSize: $("batchSize")?.value || "1",
     fidelity: $("fidelitySlider")?.value || "0.25",
     firstPassSteps: $("firstPassSteps")?.value || "8",
+    sampler: $("ltxvSampler")?.value || "default",
     motion: $("motionSlider")?.value || "1.0",
     videoMode,
     dialogueMode: getDialogueMode(),
@@ -2201,6 +2212,7 @@ function restoreLtxvSettings(){
       $("firstPassSteps").value = s.firstPassSteps;
       if($("firstPassStepsVal")) $("firstPassStepsVal").textContent = s.firstPassSteps;
     }
+    if(s.sampler !== undefined && $("ltxvSampler")) $("ltxvSampler").value = s.sampler;
     if(s.motion !== undefined && $("motionSlider")){
       $("motionSlider").value = s.motion;
       if($("motionVal")) $("motionVal").textContent = parseFloat(s.motion).toFixed(1);
@@ -2279,6 +2291,7 @@ $("frames")?.addEventListener("input", () => { updateDuration(); scheduleSaveLtx
 $("batchSize")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("fidelitySlider")?.addEventListener("input", (e) => { if($("fidelityVal")) $("fidelityVal").textContent = parseFloat(e.target.value).toFixed(2); scheduleSaveLtxvSettings(); });
 $("firstPassSteps")?.addEventListener("input", (e) => { if($("firstPassStepsVal")) $("firstPassStepsVal").textContent = e.target.value; scheduleSaveLtxvSettings(); });
+$("ltxvSampler")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("motionSlider")?.addEventListener("input", (e) => { if($("motionVal")) $("motionVal").textContent = parseFloat(e.target.value).toFixed(1); scheduleSaveLtxvSettings(); });
 $("sageAttentionType")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("purgeVram")?.addEventListener("change", scheduleSaveLtxvSettings);
@@ -2967,6 +2980,12 @@ function buildGraph(mode, job){
   const firstSteps = parseInt((j ? j.firstPassSteps : $("firstPassSteps")?.value) || 8, 10);
   if(g[N.FIRST_SIGMAS] && g[N.FIRST_SIGMAS].inputs){
     g[N.FIRST_SIGMAS].inputs.sigmas = buildFirstPassSigmas(firstSteps);
+  }
+  // "default" conserva los samplers del workflow (cada pase usa el suyo).
+  const samplerChoice = (j ? j.sampler : $("ltxvSampler")?.value) || "default";
+  if(samplerChoice !== "default"){
+    g[N.SAMPLER_SELECT_1].inputs.sampler_name = samplerChoice;
+    g[N.SAMPLER_SELECT_2].inputs.sampler_name = samplerChoice;
   }
   // Diálogo / audio nativo: negativo dinámico + volumen de la salida (551/598).
   applyDialogueMode(g, j ? j.dialogueMode : getDialogueMode());
