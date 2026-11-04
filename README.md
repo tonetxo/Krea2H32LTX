@@ -123,6 +123,7 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | Custom Node Package | Recommended Repository | Primary Node Classes | Used By |
 |---|---|---|---|
 | **ComfyMath** | [ComfyMath](https://github.com/evanspearman/ComfyMath) | `ComfyMathExpression` | MMH3X2, MiniMaxH3, LTXV |
+| **RES4LYF** | [RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF) | `ClownsharKSampler_Beta` | Krea2 (also provides the `res_*` samplers and `beta57` scheduler offered in MiniMaxH3, MMH3X2, KreaQwen and LTXV) |
 | **comfyui-ollama** | [comfyui-ollama](https://github.com/stavsap/comfyui-ollama) | `OllamaConnectivityV2`, `OllamaChat` | MMH3X2 (Assisted Mode) |
 | **ComfyUI-KJNodes** | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `GetImageSize`, `ImageResizeKJv2` | MMH3X2, MiniMaxH3, LTXV |
 | **VideoHelperSuite (VHS)** | [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite) | `VHS_LoadVideo` | MMH3X2 (Video reference), LTXV |

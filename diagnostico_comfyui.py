@@ -18,6 +18,13 @@ import config_loader
 # Mapeo de paquetes de nodos custom requeridos por los workflows
 REQUIRED_PACKAGES = [
     {
+        "name": "RES4LYF",
+        "repo": "https://github.com/ClownsharkBatwing/RES4LYF",
+        "nodes": ["ClownsharKSampler_Beta"],
+        "critical": True,
+        "workflows": ["Krea2", "MiniMaxH3 (samplers res_*)", "MMH3X2 (samplers res_*)", "KreaQwen (samplers res_*)", "LTXV (samplers res_*)"],
+    },
+    {
         "name": "ComfyMath",
         "repo": "https://github.com/evanspearman/ComfyMath",
         "nodes": ["ComfyMathExpression"],
