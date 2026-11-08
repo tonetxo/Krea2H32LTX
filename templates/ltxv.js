@@ -1813,9 +1813,6 @@ async function applyWorkflow(workflow, opts={}){
     }
   }
 
-  const appliedMsg = applied.length ? "✅ Usados: " + applied.join(", ") : "";
-  const missingMsg = missing.length ? "⚠️ Sin coincidencia: " + missing.join(", ") : "";
-
   // Profundidad de color
   let bitDepthSet = false;
   const createVideos = findAllByClass("CreateVideo");
@@ -1953,6 +1950,15 @@ async function applyWorkflow(workflow, opts={}){
     } catch(e){
       setMissing("imagen de entrada (no verificable)");
     }
+  } else if(findByClass("SwarmLoadImageB64")?.inputs?.image_base64){
+    // Vídeos de SwarmUI (p. ej. RTX_upscaled / RTX_interpolated): la imagen de
+    // entrada va incrustada en base64. Se usa como fichero local y se sube al generar.
+    const dataUrl = "data:image/png;base64," + findByClass("SwarmLoadImageB64").inputs.image_base64;
+    const blob = await (await fetch(dataUrl)).blob();
+    uploadedImage = null;
+    localFile = new File([blob], `temp_${Date.now()}_swarm_input.png`, { type: "image/png" });
+    showInputImage(dataUrl);
+    setApplied("imagen de entrada (incrustada por SwarmUI)");
   } else {
     const hasLocal = uploadedImage || localFile;
     if(!hasLocal) setMissing("imagen de entrada");
@@ -1987,8 +1993,8 @@ async function applyWorkflow(workflow, opts={}){
   scheduleSaveLtxvSettings();
 
   if(opts.silent) return { applied, missing };
-  if(appliedMsg) log(appliedMsg, "l-ok");
-  if(missingMsg) log(missingMsg, "l-warn");
+  if(applied.length) log("✅ Usados: " + applied.join(", "), "l-ok");
+  if(missing.length) log("⚠️ Sin coincidencia: " + missing.join(", "), "l-warn");
   if(applied.length) log("📋 Parámetros restaurados desde metadatos.", "l-ok");
   else log("ℹ️ No se encontraron parámetros aplicables en los metadatos.", "l-warn");
 
