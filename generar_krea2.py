@@ -32,7 +32,7 @@ def main():
         'json_file': JSON_FILE,
         'output_html': OUTPUT_HTML,
         'title': 'Krea2 · Panel Pro',
-        'enhancer_title': 'MEJORAR PROMPT CON IA / CAPTION',
+        'enhancer_title': 'Mejorar prompt con IA / Caption',
         'ui_html': 'krea2_html.html',
         'ui_css': 'krea2.css',
         'ui_js': 'krea2.js',

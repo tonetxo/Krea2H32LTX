@@ -5,13 +5,14 @@
 /* Estructura imgbox (contenedor de imagen con zoom/pan) */
 .imgbox{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;flex-direction:column;contain:layout style;}
 .img-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
-.img-header h3{font-family:var(--mono);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0;display:flex;align-items:center;gap:8px;}
+.img-header h3{font-family:var(--sans);font-size:13.5px;font-weight:600;color:var(--text);margin:0;display:flex;align-items:center;gap:8px;}
+.img-header h3 em{font-style:normal;color:var(--muted)!important;font-weight:400;}
 .img-header-actions{display:flex;gap:4px;}
-.img-header-actions button{font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;border:1px solid var(--border);background:var(--panel-2);color:var(--muted);padding:4px 8px;cursor:pointer;min-width:auto;flex:none;transition:all .15s;}
+.img-header-actions button{font-family:var(--sans);font-size:12px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);padding:4px 8px;cursor:pointer;min-width:auto;flex:none;transition:all .15s;}
 .img-header-actions button:hover{color:var(--text);border-color:var(--accent);}
 
 /* img-wrap (visor de imagen con zoom/pan) */
-.img-wrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:#000;min-height:120px;max-height:48vh;display:flex;align-items:center;justify-content:center;touch-action:pan-y pinch-zoom;}
+.img-wrap{position:relative;overflow:hidden;cursor:grab;border-radius:5px;background:var(--mat);min-height:120px;max-height:48vh;display:flex;align-items:center;justify-content:center;touch-action:pan-y pinch-zoom;}
 .img-wrap:active{cursor:grabbing;}
 .img-wrap img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;user-select:none;-webkit-user-drag:none;pointer-events:none;transform-origin:center center;}
 .img-wrap img[draggable="true"]{-webkit-user-drag:element;pointer-events:auto;cursor:grab;}
@@ -50,10 +51,10 @@
 .img-footer{margin-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11px;min-height:24px;}
 
 /* Imagen de salida principal */
-img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:1;max-height:48vh;object-fit:contain;}
+img.output{width:100%;border-radius:5px;background:var(--mat);display:block;flex-grow:1;max-height:48vh;object-fit:contain;}
 
 /* Variantes (imagen) */
-.variant-card img{width:100%;height:auto;max-height:240px;object-fit:contain;background:#000;display:block;}
+.variant-card img{width:100%;height:auto;max-height:240px;object-fit:contain;background:var(--mat);display:block;}
 
 /* Dropzone */
 .dropzone{border:1.5px dashed var(--border);border-radius:7px;padding:10px;background:var(--panel-2);transition:border-color .15s,background .15s;}
@@ -62,9 +63,9 @@ img.output{width:100%;border-radius:5px;background:#000;display:block;flex-grow:
 .dropzone input{display:none;}
 
 /* Tabs para alternar entre imagen final refinada e imagen base */
-.vid-view-tabs{display:flex;gap:4px;margin-bottom:8px;background:var(--panel-2);padding:3px;border-radius:6px;border:1px solid var(--border);}
-.vid-view-tab{flex:1;text-align:center;padding:5px 8px;font-family:var(--mono);font-size:10.5px;color:var(--muted);border-radius:4px;cursor:pointer;transition:all .15s;}
-.vid-view-tab.active{background:var(--panel);color:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.3);}
+.vid-view-tabs{display:flex;margin-bottom:8px;border-bottom:1px solid var(--border);}
+.vid-view-tab{flex:1;text-align:center;padding:8px 12px;margin-bottom:-1px;border-bottom:2px solid transparent;font-size:13px;color:var(--muted);cursor:pointer;transition:color .15s,border-color .15s;}
+.vid-view-tab.active{color:var(--text);border-bottom-color:var(--accent);}
 
 /* Acciones de la imagen de referencia */
 .ref-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
