@@ -1238,6 +1238,9 @@ function snapshotJob(firstPassOnly){
     id: ++jobCounter,
     firstPassOnly: !!firstPassOnly,
     prompt: $("prompt").value,
+    evolve: $("evolveAuto")?.checked
+      ? { mode: $("evolveMode")?.value || "words", strength: parseInt($("evolveStrength")?.value || "10", 10) }
+      : null,
     seedMode,
     seedValue: parseInt($("seedVal").value || "12345", 10),
     width: parseInt($("width").value, 10),
@@ -2101,6 +2104,7 @@ function scheduleSaveLtxvSettings(){
 function saveLtxvSettings(){
   const s = {
     prompt: $("prompt")?.value || "",
+    evolveAuto: !!$("evolveAuto")?.checked,
     filenamePrefix: $("filenamePrefix")?.value?.trim() || "video/LTX_2.5",
     model: $("modelSelect")?.value || "",
     textEncoder: $("textEncoderSelect")?.value || "",
@@ -2206,6 +2210,7 @@ function restoreLtxvSettings(){
       updateDuration();
     }
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
+    if(s.evolveAuto !== undefined && $("evolveAuto")) $("evolveAuto").checked = !!s.evolveAuto;
 
     if(s.videoMode) setVideoModeUI(s.videoMode);
     if(s.dialogueMode) setDialogueModeUI(s.dialogueMode);
@@ -2295,6 +2300,7 @@ $("width")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("height")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("frames")?.addEventListener("input", () => { updateDuration(); scheduleSaveLtxvSettings(); });
 $("batchSize")?.addEventListener("change", scheduleSaveLtxvSettings);
+$("evolveAuto")?.addEventListener("change", scheduleSaveLtxvSettings);
 $("fidelitySlider")?.addEventListener("input", (e) => { if($("fidelityVal")) $("fidelityVal").textContent = parseFloat(e.target.value).toFixed(2); scheduleSaveLtxvSettings(); });
 $("firstPassSteps")?.addEventListener("input", (e) => { if($("firstPassStepsVal")) $("firstPassStepsVal").textContent = e.target.value; scheduleSaveLtxvSettings(); });
 $("ltxvSampler")?.addEventListener("change", scheduleSaveLtxvSettings);
@@ -3651,7 +3657,15 @@ async function runSingleGeneration(index) {
     if(!activeJob) return; // guard: stop/error puede dejar la cola vacía entre el setTimeout y la ejecución
     try {
         const mode = activeJob ? (activeJob.firstPassOnly ? "first" : "full") : "full";
-        const graph = buildGraph(mode, activeJob);
+        // Evolve automático: cada variante recibe su propia transmutación; activeJob.prompt
+        // queda intacto para las siguientes variantes.
+        let variantJob = activeJob;
+        if(activeJob.evolve && (activeJob.prompt || "").trim()){
+          const evolved = generateEvolved(activeJob.prompt.trim(), activeJob.evolve.mode, activeJob.evolve.strength, 1)[0];
+          variantJob = { ...activeJob, prompt: evolved };
+          log(`🧬 Variante ${index + 1}: ${evolved}`, "l-info");
+        }
+        const graph = buildGraph(mode, variantJob);
         const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
         const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
         const seedUsed = (jobSeedMode === "random") ? randomSeed() : jobSeedValue;
@@ -3773,6 +3787,7 @@ async function enqueuePostProcess(kind){
   const job = snapshotJob();
   job.sourceMedia = { ...media };
   job.batchSize = 1;
+  job.evolve = null; // post-proceso de un clip existente: sin transmutar el prompt
   job.firstPassOnly = false;
   if(kind === "interp"){
     job.isInterpolateOnly = true;

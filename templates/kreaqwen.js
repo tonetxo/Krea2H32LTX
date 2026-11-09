@@ -1343,6 +1343,9 @@ function snapshotJob(isBaseOnly = false){
     spectrumLam: parseFloat($("spectrumLam")?.value || "0.1"),
     keepModelInRam: $("keepModelInRam")?.checked,
     batchSize: parseInt($("batchSize")?.value || "1", 10),
+    evolve: $("evolveAuto")?.checked
+      ? { mode: $("evolveMode")?.value || "words", strength: parseInt($("evolveStrength")?.value || "10", 10) }
+      : null,
     filenamePrefix: $("filenamePrefix")?.value || "kreaqwen/imagen",
     // Refinado facial (recorte + re-muestreo + recomposición sobre la imagen final)
     faceRefine: getFaceRefineState(),
@@ -1458,6 +1461,7 @@ function saveKreaQwenSettings(){
 
     evolveMode: $("evolveMode")?.value,
     evolveStrength: $("evolveStrength")?.value,
+    evolveAuto: $("evolveAuto")?.checked,
 
     // Color Grading & Look Cinemático
     postfx: getPostFxState(),
@@ -1648,6 +1652,7 @@ function restoreKreaQwenSettings(){
       $("evolveStrength").value = s.evolveStrength;
       if($("evolveStrengthVal")) $("evolveStrengthVal").textContent = `${s.evolveStrength}%`;
     }
+    if(s.evolveAuto !== undefined && $("evolveAuto")) $("evolveAuto").checked = !!s.evolveAuto;
 
     // Post-fx
     // Color Grading & Look Cinemático
@@ -3696,7 +3701,15 @@ async function runSingleGeneration(index){
     if(job.varianceSeedMode === "random") job.varianceSeedValue = randomSeed();
     log(`⏳ Preparando grafo para variante ${index + 1}/${totalBatchSize}...`, "l-info");
     await resolveQwenEditRefs(job);
-    const graph = applyAlignYourSteps(buildGraph(job));
+    // Evolve automático: cada variante recibe su propia transmutación; job.prompt
+    // queda intacto para las siguientes variantes.
+    let variantJob = job;
+    if(job.evolve && (job.prompt || "").trim()){
+      const evolved = generateEvolved(job.prompt.trim(), job.evolve.mode, job.evolve.strength, 1)[0];
+      variantJob = { ...job, prompt: evolved };
+      log(`🧬 Variante ${index + 1}: ${evolved}`, "l-info");
+    }
+    const graph = applyAlignYourSteps(buildGraph(variantJob));
 
     log(`🚀 Enviando variante ${index + 1}/${totalBatchSize} a ComfyUI...`, "l-info");
     const srv = getServerUrl();
@@ -3959,6 +3972,7 @@ $("btnCaption")?.addEventListener("click", async () => {
 $("evolveStrength")?.addEventListener("input", (e) => {
   if($("evolveStrengthVal")) $("evolveStrengthVal").textContent = e.target.value + "%";
 });
+$("evolveAuto")?.addEventListener("change", () => scheduleSaveKreaQwenSettings());
 $("btnEvolve")?.addEventListener("click", () => {
   const prompt = $("prompt").value.trim();
   if(!prompt){ log("⚠️ Escribe un prompt primero", "l-err"); return; }

@@ -392,6 +392,7 @@ $("filenamePrefix")?.addEventListener("input", () => scheduleSaveH3Settings());
 $("refImageSize")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("r2vAnchorFirst")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("batchSize")?.addEventListener("input", () => scheduleSaveH3Settings());
+$("evolveAuto")?.addEventListener("change", () => scheduleSaveH3Settings());
 $("duration")?.addEventListener("input", () => { updateDurationHints(); scheduleSaveH3Settings(); });
 $("frames")?.addEventListener("input", () => scheduleSaveH3Settings());
 $("mpSlider")?.addEventListener("input", (e) => { if($("mpVal")) $("mpVal").textContent = parseFloat(e.target.value).toFixed(2); scheduleSaveH3Settings(); });
@@ -515,6 +516,7 @@ function scheduleSaveH3Settings(){
 function saveH3Settings(){
   const s = {
     prompt: $("prompt")?.value || "",
+    evolveAuto: !!$("evolveAuto")?.checked,
     seedMode,
     seedValue: seedMode === "random" ? -1 : parseInt($("seedVal")?.value || "12345", 10),
     width: $("width")?.value || "1152",
@@ -591,6 +593,7 @@ function restoreH3Settings(){
     if(s.refImageSize && $("refImageSize")) $("refImageSize").value = s.refImageSize;
     if(typeof s.r2vAnchorFirst === "boolean" && $("r2vAnchorFirst")) $("r2vAnchorFirst").checked = s.r2vAnchorFirst;
     if(s.batchSize !== undefined && $("batchSize")) $("batchSize").value = s.batchSize;
+    if(s.evolveAuto !== undefined && $("evolveAuto")) $("evolveAuto").checked = !!s.evolveAuto;
     if(s.arMode){ arMode = s.arMode; saveArMode(arMode); }
     if(s.aspectRatio) currentAspectRatio = s.aspectRatio;
     if(Array.isArray(s.loras) && s.loras.length){
@@ -2556,6 +2559,9 @@ function snapshotJob(){
   return {
     id: ++jobCounter,
     prompt: $("prompt").value,
+    evolve: $("evolveAuto")?.checked
+      ? { mode: $("evolveMode")?.value || "words", strength: parseInt($("evolveStrength")?.value || "10", 10) }
+      : null,
     seedMode,
     seedValue: parseInt($("seedVal").value || "12345", 10),
     width: parseInt($("width").value, 10),
@@ -6383,6 +6389,7 @@ async function enqueueFaceRefineCurrent(){
   job.isFaceRefineOnly = true;
   job.sourceMedia = { ...media };
   job.batchSize = 1;
+  job.evolve = null; // post-proceso de un clip existente: sin transmutar el prompt
   log(`Añadido refinado facial para ${media.filename} a la cola.`, "l-info");
   if(activeJob){
     jobQueue.push(job);
@@ -6411,6 +6418,7 @@ async function enqueueInterpolateCurrent(){
   job.sourceMedia = { ...media };
   job.rife = rifeState;
   job.batchSize = 1;
+  job.evolve = null; // post-proceso de un clip existente: sin transmutar el prompt
   log(`⚡ Añadida interpolación (${rifeState.engine.toUpperCase()} ${rifeState.multiplier}x) para ${media.filename} a la cola.`, "l-info");
   if(activeJob){
     jobQueue.push(job);
@@ -6441,6 +6449,7 @@ async function enqueueRtxUpscaleCurrent(){
   job.sourceMedia = { ...media };
   job.rtx = { quality: rtx.quality, scale: rtx.scale };
   job.batchSize = 1;
+  job.evolve = null; // post-proceso de un clip existente: sin transmutar el prompt
   const desc = /^(DENOISE|DEBLUR)_/.test(rtx.quality) ? `limpieza ${rtx.quality}` : `escalado ${rtx.scale}x`;
   log(`🔍 Añadido RTX VSR (${desc}) para ${media.filename} a la cola.`, "l-info");
   if(activeJob){
@@ -6481,6 +6490,7 @@ async function enqueueLatentUpscaleForVariant(card, seedValue){
   job.seedMode = "fixed";
   job.seedValue = seed;
   job.batchSize = 1;
+  job.evolve = null; // post-proceso de un clip existente: sin transmutar el prompt
   job.latentUpscale = {
     ...getLatentUpscaleState(),
     enabled: true,
@@ -6817,7 +6827,15 @@ async function loadVideoHistory(){
 async function runSingleGeneration(index) {
     if(!activeJob) return; // guard: stop/error puede dejar la cola vacía entre el setTimeout y la ejecución
     try {
-        const graph = buildGraph(activeJob);
+        // Evolve automático: cada variante recibe su propia transmutación; activeJob.prompt
+        // queda intacto para las siguientes variantes.
+        let variantJob = activeJob;
+        if(activeJob.evolve && (activeJob.prompt || "").trim()){
+          const evolved = generateEvolved(activeJob.prompt.trim(), activeJob.evolve.mode, activeJob.evolve.strength, 1)[0];
+          variantJob = { ...activeJob, prompt: evolved };
+          log(`🧬 Variante ${index + 1}: ${evolved}`, "l-info");
+        }
+        const graph = buildGraph(variantJob);
         const jobSeedMode = activeJob ? activeJob.seedMode : seedMode;
         const jobSeedValue = activeJob ? activeJob.seedValue : parseInt($("seedVal").value || "12345", 10);
         const seedUsed = (jobSeedMode === "random") ? randomSeed() : (jobSeedMode === "evolve" ? activeJob.seedValue + index : jobSeedValue);
