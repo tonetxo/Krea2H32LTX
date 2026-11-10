@@ -135,7 +135,7 @@ REQUIRED_PACKAGES = [
         "repo": "https://github.com/Zironic/H3-Optimizations",
         "nodes": ["H3VSAAttention", "H3MemoryOptimization", "H3SparseAttention", "H3AIMDOResidencyLimiter"],
         "critical": False,
-        "workflows": ["MiniMaxH3 (VSA Attention, AIMDO)", "LTXH3 (sparse VSA / H3 Sparse)"],
+        "workflows": ["MiniMaxH3 (VSA Attention, AIMDO)", "LTXH3 (sparse VSA / H3 Sparse / Memory Optimization)"],
     },
 ]
 

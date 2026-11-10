@@ -147,6 +147,8 @@
           </select>
         </div>
         <div id="sparseParams"></div>
+        <label class="row" style="align-items:center;gap:6px;font-size:11px;margin-bottom:4px;" title="Trocea la MLP y QKV de H3: menos VRAM a cambio de más tiempo. Útil para subir resolución o frames en LTX → H3."><input type="checkbox" id="h3MemOpt" style="width:auto;margin:0;"> H3 Memory Optimization (más resolución o frames, más lento)</label>
+        <div class="row" id="h3MemModeRow" style="display:none;"><label>Modo de memoria</label><select id="h3MemMode"><option value="Lower VRAM (slower)">Lower VRAM (más lento)</option><option value="Standard">Standard</option></select></div>
         <div class="hint" id="sparseHint" style="font-size:10px;"></div>
       </div>
 

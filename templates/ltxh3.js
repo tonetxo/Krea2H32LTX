@@ -113,6 +113,8 @@ function samplingFromGraph(dir, model){
       start: sp.start_percent ?? 0.0,
       end: sp.end_percent ?? 1.0,
       minTokens: sp.min_tokens ?? 12288,
+      memOpt: false,
+      memMode: "Lower VRAM (slower)",
     };
   }
   return s;
@@ -438,11 +440,20 @@ function renderSparse(){
     saveState();
   }));
   const keep = fastH3TrainedKeep(state.models.h3.unet);
-  $("sparseHint").textContent = keep != null
-    ? `Checkpoint FastH3: entrenado con VSA al ${keep}% (otros modos degradan el resultado).`
-    : (sp.mode === "vsa" ? "VSA solo tiene sentido con checkpoints FastH3." : "");
+  $("h3MemOpt").checked = sp.memOpt;
+  $("h3MemMode").value = sp.memMode;
+  $("h3MemModeRow").style.display = sp.memOpt ? "" : "none";
+  const memSkipped = sp.memOpt && !memOptApplies(sp, state.models.h3.unet);
+  $("sparseHint").textContent = [
+    keep != null ? `Checkpoint FastH3: entrenado con VSA al ${keep}% (otros modos degradan el resultado).` : (sp.mode === "vsa" ? "VSA solo tiene sentido con checkpoints FastH3." : ""),
+    memSkipped ? "⚠️ Memory Optimization se omite: requiere H3 Sparse o atención densa, y no vale para FastH3." : "",
+  ].filter(Boolean).join(" ");
 }
+// No probada con Block Sparse ni con VSA; con FastH3 rompe el sampler.
+function memOptApplies(sp, unet){ return sp.memOpt && (sp.mode === "h3sparse" || sp.mode === "none") && fastH3TrainedKeep(unet) == null; }
 $("h3Sparse").addEventListener("change", (e) => { h3Sparse().mode = e.target.value; renderSparse(); saveState(); });
+$("h3MemOpt").addEventListener("change", (e) => { h3Sparse().memOpt = e.target.checked; renderSparse(); saveState(); });
+$("h3MemMode").addEventListener("change", (e) => { h3Sparse().memMode = e.target.value; saveState(); });
 // FastH3 se entrenó con VSA: al elegirlo se fija VSA con su keep_percent en ambos papeles.
 function applyFastH3Rule(){
   const keep = fastH3TrainedKeep(state.models.h3.unet);
@@ -746,16 +757,19 @@ let inputLoadSeq = 0; // al navegar rápido, solo cuenta la última imagen pedid
   const ref = new URLSearchParams(window.location.search).get("ref");
   if(!ref) return;
   const parts = ref.split("/");
-  loadOutputAsInput({ filename: parts.pop(), subfolder: parts.join("/"), type: "output" });
+  loadMediaAsInput({ filename: parts.pop(), subfolder: parts.join("/"), type: "output" });
 })();
-async function loadOutputAsInput(media){
+// restored: viene de los metadatos de un vídeo; no recalcula la resolución ni los estilos ya restaurados.
+async function loadMediaAsInput(media, opts = {}){
   const seq = ++inputLoadSeq;
   try {
     const r = await fetch(mediaViewUrl(media));
     if(!r.ok) throw new Error("HTTP " + r.status);
     const blob = await r.blob();
     if(seq !== inputLoadSeq) return;
-    handleImageFile(new File([blob], media.filename, { type: blob.type || "image/png" }));
+    const file = new File([blob], media.filename, { type: blob.type || "image/png" });
+    handleImageFile(file, opts);
+    if(opts.restored) storeInputImage(file);
     log(`🖼️ Imagen recibida: ${media.filename}`, "l-ok");
   } catch(e){ log("⚠️ No se pudo cargar la imagen: " + e.message, "l-warn"); }
 }
@@ -778,7 +792,7 @@ async function loadKrea2Recent(){
       const div = document.createElement("div");
       div.className = "gallery-item";
       div.innerHTML = `<img src="${mediaViewUrl(it)}&t=${it.mtime}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${escapeHtml(new Date(it.mtime * 1000).toLocaleString())} · ${Math.round(it.size / 1024)}KB</div>`;
-      div.addEventListener("click", () => { krea2RecentIndex = i; loadOutputAsInput(it); });
+      div.addEventListener("click", () => { krea2RecentIndex = i; loadMediaAsInput(it); });
       grid.appendChild(div);
     });
     grid.dataset.loaded = "1";
@@ -790,7 +804,7 @@ async function navigateKrea2Recent(dir){
   if(!n) return;
   const cur = krea2RecentIndex >= 0 ? krea2RecentIndex : krea2Recent.findIndex(it => it.filename === inputImage?.file.name);
   krea2RecentIndex = cur < 0 ? (dir > 0 ? 0 : n - 1) : (cur + dir + n) % n;
-  loadOutputAsInput(krea2Recent[krea2RecentIndex]);
+  loadMediaAsInput(krea2Recent[krea2RecentIndex]);
 }
 const inputIsFullscreen = () => document.fullscreenElement === $("inputWrap") || document.webkitFullscreenElement === $("inputWrap");
 document.addEventListener("keydown", e => {
@@ -838,7 +852,7 @@ function applyModels(g, m, models){
 function applySparse(g, m, sp){
   const base = [m.SHIFT, 0];
   const sink = g[m.SPARSE_SINK[0]].inputs;
-  if(sp.mode === "none"){ delete g[m.SPARSE]; sink[m.SPARSE_SINK[1]] = base; return; }
+  if(sp.mode === "none") delete g[m.SPARSE];
   const prev = g[m.SPARSE]?.inputs || {};
   if(sp.mode === "sol-attn" || sp.mode === "sla"){
     g[m.SPARSE] = { class_type: "BlockSparseAttention", inputs: {
@@ -856,7 +870,15 @@ function applySparse(g, m, sp){
   } else if(sp.mode === "h3sparse"){
     g[m.SPARSE] = { class_type: "H3SparseAttention", inputs: { model: base, video_budget: sp.budget, denser_early_late_steps: true }, _meta: { title: "H3 Sparse Attention" } };
   }
-  sink[m.SPARSE_SINK[1]] = [m.SPARSE, 0];
+  let out = sp.mode === "none" ? base : [m.SPARSE, 0];
+  if(memOptApplies(sp, g[m.UNET].inputs.unet_name)){
+    g.h3_memopt = { class_type: "H3MemoryOptimization", inputs: {
+      model: out, fused_qkv: "auto", mlp_memory: "auto", chunk_rows: 4096, preserve_precision: true,
+      precision_mode: "Auto", qkv_streaming_mode: "Auto", embedding_memory_mode: "Auto", kitchen_v_memory_mode: sp.memMode,
+    }, _meta: { title: "H3 Memory Optimization" } };
+    out = ["h3_memopt", 0];
+  }
+  sink[m.SPARSE_SINK[1]] = out;
 }
 
 function applySampling(g, m, model, s){
@@ -1107,11 +1129,16 @@ function stateFromGraph(wf){
 }
 async function applyWorkflow(wf){
   const own = Object.values(wf).find(n => n && n._meta && n._meta.ltxh3_state);
-  if(own){ applyUiState(own._meta.ltxh3_state); return true; }
-  const s = stateFromGraph(wf);
-  if(s){ applyUiState(s); log("ℹ️ Vídeo sin estado LTXH3: restaurados modelos, LoRAs, sigmas, resolución, frames, seed e idea.", "l-info"); return true; }
-  log("⚠️ Este vídeo no es de un workflow LTX⇄H3.", "l-warn");
-  return false;
+  const s = own ? null : stateFromGraph(wf);
+  if(!own && !s){ log("⚠️ Este vídeo no es de un workflow LTX⇄H3.", "l-warn"); return false; }
+  if(own) applyUiState(own._meta.ltxh3_state);
+  else { applyUiState(s); log("ℹ️ Vídeo sin estado LTXH3: restaurados modelos, LoRAs, sigmas, resolución, frames, seed e idea.", "l-info"); }
+  const image = Object.values(wf).find(n => n?.class_type === "LoadImage")?.inputs?.image;
+  if(typeof image === "string" && image){
+    const parts = image.replace(/\\/g, "/").split("/");
+    await loadMediaAsInput({ filename: parts.pop(), subfolder: parts.join("/"), type: "input" }, { restored: true });
+  }
+  return true;
 }
 
 // Mismo criterio que el resto de UIs: el JSON "prompt" incrustado en el MP4. Se
