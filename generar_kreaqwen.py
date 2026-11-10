@@ -32,6 +32,7 @@ LTXV_UI_PORT = config_loader.get_port("ltxv", 8000)
 MINIMAXH3_UI_PORT = config_loader.get_port("minimaxh3", 8002)
 MMH3X2_UI_PORT = config_loader.get_port("mmh3x2", 8003)
 KREAQWEN_UI_PORT = config_loader.get_port("kreaqwen", 8004)
+LTXH3_UI_PORT = config_loader.get_port("ltxh3", 8005)
 # -----------------------------------------
 
 def main():
@@ -69,6 +70,7 @@ def main():
         'minimaxh3_ui_port': MINIMAXH3_UI_PORT,
         'mmh3x2_ui_port': MMH3X2_UI_PORT,
         'kreaqwen_ui_port': KREAQWEN_UI_PORT,
+        'extra_consts': {'LTXH3_UI_PORT': LTXH3_UI_PORT},
     })
 
 if __name__ == '__main__':

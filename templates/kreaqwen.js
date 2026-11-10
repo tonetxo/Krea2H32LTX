@@ -4532,6 +4532,7 @@ function initKreaQwenUI() {
     const port = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
     sendOutputToExternalUI(port, "MMH3X2_WebUI.html", "MMH3X2");
   });
+  $("btnSendLtxh3")?.addEventListener("click", () => sendOutputToExternalUI(LTXH3_UI_PORT, "LTXH3_WebUI.html", "LTXH3"));
 
   $("btnSendRefLtxv")?.addEventListener("click", () => {
     const port = (typeof LTXV_UI_PORT !== "undefined" && LTXV_UI_PORT) ? LTXV_UI_PORT : "8000";
@@ -4545,6 +4546,7 @@ function initKreaQwenUI() {
     const port = (typeof MMH3X2_UI_PORT !== "undefined" && MMH3X2_UI_PORT) ? MMH3X2_UI_PORT : "8003";
     sendRefToExternalUI(port, "MMH3X2_WebUI.html", "MMH3X2");
   });
+  $("btnSendRefLtxh3")?.addEventListener("click", () => sendRefToExternalUI(LTXH3_UI_PORT, "LTXH3_WebUI.html", "LTXH3"));
 
   // --- Drag & Drop saliente y recepción entre UIs ---
   makeDragSource($("outputImg"), () => {
