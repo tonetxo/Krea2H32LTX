@@ -212,15 +212,17 @@ WS_PREFIX = "/ws"
 # Únicos ficheiros estáticos que se sirven: las páginas generadas
 # (LTXV_WebUI.html, MMH3X2_WebUI_BlockATT.html, ...). El resto del repo
 # (.git/, config.json, prompts_*.json, notas) no debe quedar expuesto en la LAN.
-STATIC_PAGE_RE = re.compile(r"^/[A-Za-z0-9]+_WebUI(?:_[A-Za-z0-9]+)?\.html$")
+STATIC_PAGE_RE = re.compile(r"^/[A-Za-z0-9]+_WebUI(?:_[A-Za-z0-9]+)?\.html$", re.IGNORECASE)
 
 # Puertos de las WebUIs de este equipo: un Origin con el mismo hostname y uno
 # de estos puertos se considera propio (envío cruzado entre UIs).
-UI_PORTS = {str(PORT)} | {
-    str(config_loader.get_port(name, default))
-    for name, default in (("ltxv", 8000), ("krea2", 8001), ("minimaxh3", 8002),
-                          ("mmh3x2", 8003), ("kreaqwen", 8004), ("ltxh3", 8005))
-}
+UI_PAGES = (("ltxv", 8000, "LTXV_WebUI.html"), ("krea2", 8001, "Krea2_WebUI.html"),
+            ("minimaxh3", 8002, "MiniMaxH3_WebUI.html"), ("mmh3x2", 8003, "MMH3X2_WebUI.html"),
+            ("kreaqwen", 8004, "KreaQwen_WebUI.html"), ("ltxh3", 8005, "LTXH3_WebUI.html"))
+UI_PORTS = {str(PORT)} | {str(config_loader.get_port(name, default)) for name, default, _ in UI_PAGES}
+# La raíz redirige a la UI de este puerto (LTXV si el puerto no es de ninguna).
+ROOT_PAGE = next((page for name, default, page in UI_PAGES
+                  if config_loader.get_port(name, default) == str(PORT)), "LTXV_WebUI.html")
 
 
 class ProxyHandler(http.server.SimpleHTTPRequestHandler):
@@ -467,6 +469,17 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         if not STATIC_PAGE_RE.match(path):
             self.send_error(404, "Not Found")
             return
+        if not os.path.isfile(path[1:]):
+            # En el móvil el teclado cambia mayúsculas: redirigimos al nombre real.
+            real = next((f for f in os.listdir(".") if f.lower() == path[1:].lower()), None)
+            if real is None:
+                self.send_error(404, "Not Found")
+                return
+            self.send_response(302)
+            self.send_header("Location", "/" + real)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if method == "HEAD":
             super().do_HEAD()
         else:
@@ -528,7 +541,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         if method in ("GET", "HEAD") and self._is_page_route():
             if path in ("/", "/index.html"):
                 self.send_response(302)
-                self.send_header("Location", "/LTXV_WebUI.html")
+                self.send_header("Location", "/" + ROOT_PAGE)
                 # Sin cuerpo: Content-Length explícito para no dejar colgado un
                 # cliente HTTP/1.1 keep-alive esperando el body.
                 self.send_header("Content-Length", "0")
