@@ -19,6 +19,7 @@ The project provides four standalone, zero-dependency web applications designed 
 | **MiniMaxH3** | `MiniMaxH3_WebUI.html` | `:8002` | **MiniMax H3** | **Single-segment video generation**: **i2v** (image-to-video), **flf2v** (first-and-last frame), and **r2v** (multi-reference: up to 6 images, 3 videos, 3 audio tracks). Includes **Multi-Target Element Refine** (Face/Hands/Hair/Skin/Body via YOLOv8 with single or dual targets), **Cinematic Color Grading & Post-FX** (3D LUTs, dynamic film grain, vignette), **Sol-H3 SM120 Blackwell Attention**, **3D Latent Upscaler**, and on-demand player frame interpolation (RIFE / RTX). |
 | **LTXV** | `LTXV_WebUI.html` | `:8000` | **LTX-Video / LTX-2.5** | **Ultra-fast video generation**: **i2v** and **first-last frame** modes, First Pass & Full Pass pipelines with SageAttention, 4-slot concurrent LoRA stack, custom VAE selectors, high-speed distilled transformers, and full local settings persistence. |
 | **KreaQwen** | `KreaQwen_WebUI.html` | `:8004` | **Qwen 2.1 Image + Krea2 / Flux2 + MOSS-Image** | **Dual-model fusion & guided editing**: Base + Refiner stages with dynamic model inversion, MOSS-Image (native ComfyUI: `diffusion_models/moss/`, `qwen3.5_9b_w4a8_gptq` text encoder with CLIP type `moss_image`, `flux2-vae_small` VAE, Skip Layer Guidance and Ollama caption/layout enhancer presets from the official MOSS skill), native Qwen Edit mode (img2img / faceswap with multi-reference images), integrated Post-FX suite (LUTs, 35mm grain, vignette, radial blur), RGB smart seed variance, and FaceRefine. |
+| **LTXH3** | `LTXH3_WebUI.html` | `:8005` | **LTX-2.5 ⇄ MiniMax H3** | **Hybrid two-pass video**: one model generates the base clip and the other refines it at 2x through a latent bridge (VAE re-encode + latent upscaler), with a one-click direction swap. In-graph Ollama/llama.cpp writes a prompt per model from one idea (editable system prompt presets, or manual prompts), optional start image (I2V in both passes), per-pass manual sigmas or scheduler + steps, H3 sparse attention (Block Sparse, VSA for FastH3, H3 Sparse), RTX Frame Gen / RIFE and RTX Video Super Resolution inline or on demand. |
 | **Krea2** | `Krea2_WebUI.html` | `:8001` | **Krea2 / Flux2** | **First-frame generation**: High-fidelity text-to-image pipeline for Flux2 / Krea2 with RGB variance control and a direct "Send to Video" handoff button. |
 
 ---
@@ -90,7 +91,7 @@ The project provides four standalone, zero-dependency web applications designed 
 The build system utilizes lightweight Python generators that compile self-contained HTML files from modular template components:
 
 ```text
-generar_mmh3x2.py / generar_minimaxh3.py / generar_krea2.py / generar_kreaqwen.py / generar_ltxv.py
+generar_mmh3x2.py / generar_minimaxh3.py / generar_krea2.py / generar_kreaqwen.py / generar_ltxv.py / generar_ltxh3.py
         ↓ (reads config via config_loader.py & scans model directories)
 generar_common.py (Shared template assembly logic)
         ↓
@@ -122,12 +123,12 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 
 | Custom Node Package | Recommended Repository | Primary Node Classes | Used By |
 |---|---|---|---|
-| **ComfyMath** | [ComfyMath](https://github.com/evanspearman/ComfyMath) | `ComfyMathExpression` | MMH3X2, MiniMaxH3, LTXV |
+| **ComfyMath** | [ComfyMath](https://github.com/evanspearman/ComfyMath) | `ComfyMathExpression` | MMH3X2, MiniMaxH3, LTXV, LTXH3 (on-demand interpolation) |
 | **RES4LYF** | [RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF) | `ClownsharKSampler_Beta` | Krea2 (also provides the `res_*` samplers and `beta57` scheduler offered in MiniMaxH3, MMH3X2, KreaQwen and LTXV) |
-| **comfyui-ollama** | [comfyui-ollama](https://github.com/stavsap/comfyui-ollama) | `OllamaConnectivityV2`, `OllamaChat` | MMH3X2 (Assisted Mode) |
+| **comfyui-ollama** | [comfyui-ollama](https://github.com/stavsap/comfyui-ollama) | `OllamaConnectivityV2`, `OllamaChat`, `OllamaGenerateV2`, `OllamaOptionsV2` | MMH3X2 (Assisted Mode), LTXH3 (per-model prompts) |
 | **ComfyUI-KJNodes** | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `GetImageSize`, `ImageResizeKJv2` | MMH3X2, MiniMaxH3, LTXV |
 | **VideoHelperSuite (VHS)** | [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite) | `VHS_LoadVideo` | MMH3X2 (Video reference), LTXV |
-| **Frame-Interpolation** | [ComfyUI-Frame-Interpolation](https://github.com/Fannovel16/ComfyUI-Frame-Interpolation) | `FrameInterpolate`, `FrameInterpolationModelLoader` | MMH3X2 (RIFE), MiniMaxH3, LTXV |
+| **Frame-Interpolation** | [ComfyUI-Frame-Interpolation](https://github.com/Fannovel16/ComfyUI-Frame-Interpolation) | `FrameInterpolate`, `FrameInterpolationModelLoader` | MMH3X2 (RIFE), MiniMaxH3, LTXV, LTXH3 |
 | **ComfyUI-H3-FaceRefine** *(optional)* | [ComfyUI-H3-FaceRefine](https://github.com/Carasibana/ComfyUI-H3-FaceRefine.git) | `H3FaceTrackCrop`, `H3FaceStitch`, `H3PerFrameDenoise`, `H3InjectVideoLatent` | MiniMaxH3 (Dual-mode face refine: inline toggle & on-demand player button), LTXV (inline element refine: track/stitch only, resampled with LTXV) |
 | **ComfyUI-Sol-H3** *(optional)* | [ComfyUI-Sol-H3](https://github.com/xmarre/ComfyUI-Sol-H3.git) | `SolH3Experimental` | MiniMaxH3 (SM120 Blackwell fast attention acceleration with mutual exclusion fail-safe) |
 | **Spectrum** *(optional)* | [ComfyUI-Spectrum](https://github.com/MinusZoneAI/ComfyUI-Spectrum) | `SpectrumApplyMiniMaxH3` | MMH3X2 (Spectrum), MiniMaxH3 |
@@ -136,7 +137,7 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | **ComfyUI-ProPost** *(optional)* | [ComfyUI-ProPost](https://github.com/digitaljohn/comfyui-propost) | `ProPostApplyLUT`, `ProPostFilmGrain`, `ProPostRadialBlur`, `ProPostVignette` | KreaQwen (Post-FX Suite) |
 | **ComfyUI_LayerStyle** *(optional)* | [ComfyUI_LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle) | `LayerColor: LUT Apply`, `LayerFilter: FilmV2` | MiniMaxH3, MMH3X2 (Color Grading & Post-FX) |
 | **ComfyUI-RBG-SmartSeedVariance** *(optional)* | [ComfyUI-RBG-SmartSeedVariance](https://github.com/RamonGuthrie/ComfyUI-RBG-SmartSeedVariance.git) | `RBG_Smart_Seed_Variance` | Krea2, KreaQwen (Smart Seed Variance) |
-| **H3-Optimizations** *(optional)* | [H3-Optimizations](https://github.com/Zironic/H3-Optimizations) | `H3VSAAttention`, `H3MemoryOptimization`, `H3SparseAttention`, `H3AIMDOResidencyLimiter` | MiniMaxH3 (VSA Attention, AIMDO) |
+| **H3-Optimizations** *(optional)* | [H3-Optimizations](https://github.com/Zironic/H3-Optimizations) | `H3VSAAttention`, `H3MemoryOptimization`, `H3SparseAttention`, `H3AIMDOResidencyLimiter` | MiniMaxH3 (VSA Attention, AIMDO), LTXH3 (VSA / H3 Sparse) |
 
 The MiniMaxH3 and MMH3X2 3D Latent Upscaler uses the native ComfyUI nodes `LatentUpscaleModelLoader` + `MiniMaxH3LatentUpscaleWithModel` (ComfyUI commit `35060f0` or newer, model `minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors` in `models/latent_upscale_models/`).
 
@@ -201,7 +202,8 @@ Example `config.json`:
     "krea2": 8001,
     "minimaxh3": 8002,
     "mmh3x2": 8003,
-    "kreaqwen": 8004
+    "kreaqwen": 8004,
+    "ltxh3": 8005
   }
 }
 ```
@@ -210,13 +212,16 @@ Example `config.json`:
 The `*_WebUI*.html` files are not versioned (they embed your local model and LoRA lists). The `lanzar_*.sh` scripts and the UI launcher regenerate them on every start; to build them by hand:
 ```bash
 # Build all interfaces at once:
-python3 generar_mmh3x2.py && python3 generar_minimaxh3.py && python3 generar_krea2.py && python3 generar_kreaqwen.py && python3 generar_ltxv.py
+python3 generar_mmh3x2.py && python3 generar_minimaxh3.py && python3 generar_krea2.py && python3 generar_kreaqwen.py && python3 generar_ltxv.py && python3 generar_ltxh3.py
 ```
 
 ### 5. Launch the Web Servers
 Launch whichever interface you want to use:
 
 ```bash
+# LTXH3 (LTX-2.5 ⇄ MiniMax H3 hybrid base + 2x refine) - Port 8005
+./lanzar_ltxh3.sh
+
 # KreaQwen (Qwen 2.1 + Krea2/Flux2 image generation & guided editing) - Port 8004
 ./lanzar_kreaqwen.sh
 

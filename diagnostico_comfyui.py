@@ -29,14 +29,14 @@ REQUIRED_PACKAGES = [
         "repo": "https://github.com/evanspearman/ComfyMath",
         "nodes": ["ComfyMathExpression"],
         "critical": True,
-        "workflows": ["MMH3X2", "MiniMaxH3", "LTXV"],
+        "workflows": ["MMH3X2", "MiniMaxH3", "LTXV", "LTXH3 (interpolar clip)"],
     },
     {
         "name": "comfyui-ollama",
         "repo": "https://github.com/stavsap/comfyui-ollama",
-        "nodes": ["OllamaConnectivityV2", "OllamaChat"],
+        "nodes": ["OllamaConnectivityV2", "OllamaChat", "OllamaGenerateV2", "OllamaOptionsV2"],
         "critical": True,
-        "workflows": ["MMH3X2 (modo asistido)"],
+        "workflows": ["MMH3X2 (modo asistido)", "LTXH3 (prompts por modelo)"],
     },
     {
         "name": "ComfyUI-KJNodes",
@@ -57,7 +57,7 @@ REQUIRED_PACKAGES = [
         "repo": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation",
         "nodes": ["FrameInterpolate", "FrameInterpolationModelLoader"],
         "critical": False,
-        "workflows": ["MMH3X2 (RIFE)", "MiniMaxH3", "LTXV"],
+        "workflows": ["MMH3X2 (RIFE)", "MiniMaxH3", "LTXV", "LTXH3"],
     },
     {
         "name": "Spectrum",
@@ -71,7 +71,7 @@ REQUIRED_PACKAGES = [
         "repo": "https://github.com/Comfy-Org/Nvidia_RTX_Nodes_ComfyUI",
         "nodes": ["RTXVideoSuperResolution", "RTXVideoFrameGeneration", "RTXTrueHDR"],
         "critical": False,
-        "workflows": ["MiniMaxH3 (RTX SR)", "LTXV (RTX SR)"],
+        "workflows": ["MiniMaxH3 (RTX SR)", "LTXV (RTX SR)", "LTXH3 (RTX SR / Frame Gen)"],
     },
     {
         "name": "rgthree-comfy",
@@ -135,7 +135,7 @@ REQUIRED_PACKAGES = [
         "repo": "https://github.com/Zironic/H3-Optimizations",
         "nodes": ["H3VSAAttention", "H3MemoryOptimization", "H3SparseAttention", "H3AIMDOResidencyLimiter"],
         "critical": False,
-        "workflows": ["MiniMaxH3 (VSA Attention, AIMDO)"],
+        "workflows": ["MiniMaxH3 (VSA Attention, AIMDO)", "LTXH3 (sparse VSA / H3 Sparse)"],
     },
 ]
 
@@ -261,8 +261,9 @@ def main():
 
     print("\n" + "=" * 65)
     print("🚀 Para compilar las UIs web:")
-    print("   python3 generar_mmh3x2.py && python3 generar_minimaxh3.py && python3 generar_krea2.py && python3 generar_kreaqwen.py && python3 generar_ltxv.py")
+    print("   python3 generar_mmh3x2.py && python3 generar_minimaxh3.py && python3 generar_krea2.py && python3 generar_kreaqwen.py && python3 generar_ltxv.py && python3 generar_ltxh3.py")
     print("\n🌐 Para iniciar los servidores:")
+    print("   python3 serve.py 8005  # LTXH3 Panel Pro (LTX-2.5 ⇄ MiniMax H3)")
     print("   python3 serve.py 8004  # KreaQwen Panel Pro (Qwen 2.1 + Krea2 / Flux2)")
     print("   python3 serve.py 8003  # MMH3X2 Panel Pro")
     print("   python3 serve.py 8002  # MiniMaxH3 Panel Pro")

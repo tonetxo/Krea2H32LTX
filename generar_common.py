@@ -125,6 +125,8 @@ def generate_html(config):
         model_count_label: "modelos" or "" (for the success message)
         ltxv_ui_port:    port where the LTXV UI is served (for the "send to LTXV"
                         button in both UIs). Default "8000".
+        extra_consts:    optional {NAME: value} emitted as `const NAME = <json>;`
+                         before common.js.
     """
     # --- Read workflow JSON ---
     if not os.path.exists(config['json_file']):
@@ -223,6 +225,12 @@ def generate_html(config):
     #         then UI-specific JS (defines CONFIG, N, calls initCommon(), UI functions).
     ui_js = _read_template(config['ui_js'])
     common_js = _read_template('common.js')
+    # Constantes propias de una UI (p.ej. un segundo grafo embebido), con "</"
+    # escapado igual que BASE_GRAPH.
+    extra_js = "".join(
+        "const %s = %s;\n" % (name, json.dumps(value, ensure_ascii=False).replace('</', '<\\/'))
+        for name, value in config.get('extra_consts', {}).items()
+    )
 
     js_block = (
         "const BASE_GRAPH = __GRAPH_JSON__;\n"
@@ -238,6 +246,7 @@ def generate_html(config):
         "const MINIMAXH3_UI_PORT = __MINIMAXH3_UI_PORT__;\n"
         "const MMH3X2_UI_PORT = __MMH3X2_UI_PORT__;\n"
         "const KREAQWEN_UI_PORT = __KREAQWEN_UI_PORT__;\n"
+        + extra_js
         + common_js + "\n"
         + ui_js
     )

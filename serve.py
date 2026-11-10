@@ -96,6 +96,7 @@ MEDIA_LISTS = {
     # MMH3X2 guarda en output/video/ con prefijos variados (plano1_cont, ...):
     # se listan todos los MP4 de ahí, no solo los "MiniMax_H3_*".
     "mmh3x2": {"subdir": "video", "patterns": ("**/*.mp4",), "limit": 100, "exclude": ()},
+    "ltxh3": {"subdir": "video", "patterns": ("**/LTXH3*.mp4",), "limit": 100, "exclude": ()},
 }
 
 
@@ -218,7 +219,7 @@ STATIC_PAGE_RE = re.compile(r"^/[A-Za-z0-9]+_WebUI(?:_[A-Za-z0-9]+)?\.html$")
 UI_PORTS = {str(PORT)} | {
     str(config_loader.get_port(name, default))
     for name, default in (("ltxv", 8000), ("krea2", 8001), ("minimaxh3", 8002),
-                          ("mmh3x2", 8003), ("kreaqwen", 8004))
+                          ("mmh3x2", 8003), ("kreaqwen", 8004), ("ltxh3", 8005))
 }
 
 
@@ -505,6 +506,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         "/api/ltxv_list":        {"GET": ("_do_media_list", ("videos",))},
         "/api/minimaxh3_list":   {"GET": ("_do_media_list", ("videos",))},
         "/api/mmh3x2_list":      {"GET": ("_do_media_list", ("mmh3x2",))},
+        "/api/ltxh3_list":       {"GET": ("_do_media_list", ("ltxh3",))},
         "/api/prompts":          {"GET": ("_do_prompts_get", ()), "POST": ("_do_prompts_post", ())},
         "/api/ui_launch":        {"GET": ("_do_ui_launch", ())},
         "/api/file_delete":      {"POST": ("_do_file_delete", ())},
@@ -896,6 +898,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
             "minimaxh3": config_loader.get_port("minimaxh3", 8002),
             "mmh3x2": config_loader.get_port("mmh3x2", 8003),
             "kreaqwen": config_loader.get_port("kreaqwen", 8004),
+            "ltxh3": config_loader.get_port("ltxh3", 8005),
         }
     UI_PAGES = {
         "ltxv": "LTXV_WebUI.html",
@@ -903,6 +906,7 @@ class ProxyHandler(http.server.SimpleHTTPRequestHandler):
         "minimaxh3": "MiniMaxH3_WebUI.html",
         "mmh3x2": "MMH3X2_WebUI.html",
         "kreaqwen": "KreaQwen_WebUI.html",
+        "ltxh3": "LTXH3_WebUI.html",
     }
     def _port_usable(self, port, host="127.0.0.1", timeout=1.0):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

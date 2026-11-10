@@ -1,0 +1,749 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Pass 1: LTX-2.5 22B Distilled UNET"
+    }
+  },
+  "2": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "lora_name": "ltxv/LTX-2.5-Licon-MSR-V2.safetensors",
+      "strength_model": 0.8
+    },
+    "_meta": {
+      "title": "Pass 1: LTXV LoRA #1 (LTX-2.5-Licon-MSR-V2)"
+    }
+  },
+  "3": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "2",
+        0
+      ],
+      "lora_name": "ltxv/LTX2.3_Crisp_Enhance.safetensors",
+      "strength_model": 0.7
+    },
+    "_meta": {
+      "title": "Pass 1: LTXV LoRA #2 (LTX2.3_Crisp_Enhance)"
+    }
+  },
+  "4": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot-v2.safetensors",
+      "type": "ltxv",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Pass 1: Gemma4-12B LTX-2.5 Text Encoder"
+    }
+  },
+  "5": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "LTX-2/ltx-2.5-video-vae-bf16.safetensors"
+    },
+    "_meta": {
+      "title": "Pass 1: LTX-2.5 Video VAE"
+    }
+  },
+  "6": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "LTX-2/ltx-2.5-audio-vae-bf16.safetensors"
+    },
+    "_meta": {
+      "title": "Pass 1: LTX-2.5 Audio VAE"
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "4",
+        0
+      ],
+      "text": [
+        "52",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 1: Positive Prompt (LTX-2.5)"
+    }
+  },
+  "8": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "clip": [
+        "4",
+        0
+      ],
+      "text": "pc game, console game, video game, cartoon, childish, ugly, blurry, deformed, watermark, text, oversaturated"
+    },
+    "_meta": {
+      "title": "Pass 1: Negative Prompt (LTX-2.5)"
+    }
+  },
+  "9": {
+    "class_type": "LTXVConditioning",
+    "inputs": {
+      "positive": [
+        "7",
+        0
+      ],
+      "negative": [
+        "8",
+        0
+      ],
+      "frame_rate": 24.0
+    },
+    "_meta": {
+      "title": "Pass 1: LTXV Conditioning (24 FPS)"
+    }
+  },
+  "10": {
+    "class_type": "EmptyLTXVLatentVideo",
+    "inputs": {
+      "width": 768,
+      "height": 448,
+      "length": [
+        "55",
+        0
+      ],
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "Pass 1: Empty LTXV Video Latent (768x448, 73f = 8*9+1 = 17*4+5)"
+    }
+  },
+  "11": {
+    "class_type": "LTXVEmptyLatentAudio",
+    "inputs": {
+      "audio_vae": [
+        "6",
+        0
+      ],
+      "frames_number": [
+        "55",
+        0
+      ],
+      "frame_rate": 24,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "Pass 1: Empty LTXV Audio Latent (73f @ 24fps)"
+    }
+  },
+  "12": {
+    "class_type": "LTXVConcatAVLatent",
+    "inputs": {
+      "video_latent": [
+        "10",
+        0
+      ],
+      "audio_latent": [
+        "11",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 1: Concat LTXV AV Latent"
+    }
+  },
+  "13": {
+    "class_type": "LTXVDualCFGGuider",
+    "inputs": {
+      "model": [
+        "3",
+        0
+      ],
+      "positive": [
+        "9",
+        0
+      ],
+      "negative": [
+        "9",
+        1
+      ],
+      "video_cfg": 1.0,
+      "audio_cfg": 1.0
+    },
+    "_meta": {
+      "title": "Pass 1: LTXV Dual CFG Guider (Distilled CFG 1.0)"
+    }
+  },
+  "14": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler_ancestral"
+    },
+    "_meta": {
+      "title": "Pass 1: Sampler (euler_ancestral)"
+    }
+  },
+  "15": {
+    "class_type": "ManualSigmas",
+    "inputs": {
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    },
+    "_meta": {
+      "title": "Pass 1: LTX-2.5 Distilled 8-Step Sigmas"
+    }
+  },
+  "16": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 42
+    },
+    "_meta": {
+      "title": "Pass 1: Noise Seed"
+    }
+  },
+  "17": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "16",
+        0
+      ],
+      "guider": [
+        "13",
+        0
+      ],
+      "sampler": [
+        "14",
+        0
+      ],
+      "sigmas": [
+        "15",
+        0
+      ],
+      "latent_image": [
+        "12",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 1: LTX-2.5 Base Sampler"
+    }
+  },
+  "18": {
+    "class_type": "LTXVSeparateAVLatent",
+    "inputs": {
+      "av_latent": [
+        "17",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 1: Separate LTXV AV Latent"
+    }
+  },
+  "19": {
+    "class_type": "VAEDecodeTiled",
+    "inputs": {
+      "samples": [
+        "18",
+        0
+      ],
+      "vae": [
+        "5",
+        0
+      ],
+      "tile_size": 512,
+      "overlap": 64,
+      "temporal_size": 64,
+      "temporal_overlap": 16
+    },
+    "_meta": {
+      "title": "Bridge: Decode LTX-2.5 Video at Low-Res (768x448)"
+    }
+  },
+  "20": {
+    "class_type": "LTXVAudioVAEDecode",
+    "inputs": {
+      "samples": [
+        "18",
+        1
+      ],
+      "audio_vae": [
+        "6",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Bridge: Decode LTX-2.5 Audio"
+    }
+  },
+  "21": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "MiniMaxH3/minimax_h3_video_vae_int8_convrot.safetensors"
+    },
+    "_meta": {
+      "title": "Pass 2: MiniMax H3 Video VAE (INT8 ConvRot)"
+    }
+  },
+  "22": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "MiniMaxH3/minimax_h3_audio_vae_fp32.safetensors"
+    },
+    "_meta": {
+      "title": "Pass 2: MiniMax H3 Audio VAE (FP32)"
+    }
+  },
+  "23": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "19",
+        0
+      ],
+      "vae": [
+        "21",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Bridge: Encode Low-Res Video into H3 24ch Latent (768x448)"
+    }
+  },
+  "24": {
+    "class_type": "VAEEncodeAudio",
+    "inputs": {
+      "audio": [
+        "20",
+        0
+      ],
+      "vae": [
+        "22",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Bridge: Encode Audio into H3 32ch Audio Latent"
+    }
+  },
+  "25": {
+    "class_type": "LTXVConcatAVLatent",
+    "inputs": {
+      "video_latent": [
+        "23",
+        0
+      ],
+      "audio_latent": [
+        "24",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Bridge: Pack H3 Low-Res Video + Audio Latent"
+    }
+  },
+  "26": {
+    "class_type": "LatentUpscaleModelLoader",
+    "inputs": {
+      "model_name": "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors"
+    },
+    "_meta": {
+      "title": "Upscale: Load MiniMax H3 3D Conv Latent Upscaler"
+    }
+  },
+  "27": {
+    "class_type": "MiniMaxH3LatentUpscaleWithModel",
+    "inputs": {
+      "model": [
+        "26",
+        0
+      ],
+      "samples": [
+        "25",
+        0
+      ],
+      "width": 1536,
+      "height": 896
+    },
+    "_meta": {
+      "title": "Upscale: MiniMax H3 2x Latent Upscale (768x448 -> 1536x896)"
+    }
+  },
+  "28": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimaxh3/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "_meta": {
+      "title": "Pass 2: MiniMax H3 FL2VA UNET (INT8 ConvRot)"
+    }
+  },
+  "29": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "28",
+        0
+      ],
+      "lora_name": "h3/minimax_h3_fl2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors",
+      "strength_model": 1.0
+    },
+    "_meta": {
+      "title": "Pass 2: MiniMax H3 8-Step Turbo LoRA"
+    }
+  },
+  "30": {
+    "class_type": "MiniMaxH3SigmaShift",
+    "inputs": {
+      "model": [
+        "29",
+        0
+      ],
+      "shift_video": 12.0,
+      "shift_audio": 3.0
+    },
+    "_meta": {
+      "title": "Pass 2: MiniMax H3 Sigma Shift (Video 12.0 / Audio 3.0)"
+    }
+  },
+  "31": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "type": "minimax",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "Pass 2: Qwen3-VL 32B MiniMax H3 Text Encoder"
+    }
+  },
+  "32": {
+    "class_type": "MiniMaxH3ImageToVideo",
+    "inputs": {
+      "clip": [
+        "31",
+        0
+      ],
+      "vae": [
+        "21",
+        0
+      ],
+      "prompt": [
+        "51",
+        0
+      ],
+      "width": 1536,
+      "height": 896,
+      "length": [
+        "55",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 2: MiniMax H3 Conditioning (1536x896, 73f)"
+    }
+  },
+  "33": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "42",
+        0
+      ],
+      "conditioning": [
+        "32",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 2: H3 Basic Guider (CFG 1.0)"
+    }
+  },
+  "34": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "_meta": {
+      "title": "Pass 2: Sampler (euler)"
+    }
+  },
+  "35": {
+    "class_type": "ManualSigmas",
+    "inputs": {
+      "sigmas": "0.9035, 0.8000, 0.6316, 0.3158, 0.0000"
+    },
+    "_meta": {
+      "title": "Pass 2: H3 4-Step Partial Denoise Refinement Sigmas"
+    }
+  },
+  "36": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 43
+    },
+    "_meta": {
+      "title": "Pass 2: Refinement Noise Seed"
+    }
+  },
+  "37": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "36",
+        0
+      ],
+      "guider": [
+        "33",
+        0
+      ],
+      "sampler": [
+        "34",
+        0
+      ],
+      "sigmas": [
+        "35",
+        0
+      ],
+      "latent_image": [
+        "27",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 2: MiniMax H3 High-Res Refinement Sampler"
+    }
+  },
+  "38": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "37",
+        0
+      ],
+      "vae": [
+        "21",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 2: Decode Refined Video (1536x896)"
+    }
+  },
+  "39": {
+    "class_type": "VAEDecodeAudio",
+    "inputs": {
+      "samples": [
+        "37",
+        0
+      ],
+      "vae": [
+        "22",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Pass 2: Decode Refined Audio"
+    }
+  },
+  "40": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "38",
+        0
+      ],
+      "audio": [
+        "39",
+        0
+      ],
+      "fps": 24.0
+    },
+    "_meta": {
+      "title": "Output: Create Video (24 FPS)"
+    }
+  },
+  "41": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "40",
+        0
+      ],
+      "filename_prefix": "video/LTX25_2LoRA_to_MiniMaxH3_Refine",
+      "format": "auto",
+      "format.codec": "auto",
+      "codec": "auto"
+    },
+    "_meta": {
+      "title": "Output: Save Video (Embeds Full Workflow Metadata)"
+    }
+  },
+  "42": {
+    "class_type": "BlockSparseAttention",
+    "inputs": {
+      "model": [
+        "30",
+        0
+      ],
+      "selection": "sol-attn",
+      "selection.tau": 1.3,
+      "start_percent": 0.0,
+      "end_percent": 1.0,
+      "dense_blocks": "",
+      "min_tokens": 12288,
+      "extra_tokens": 256,
+      "sink_conditioning": "exact_kv_and_rows",
+      "verbose": true
+    },
+    "_meta": {
+      "title": "Pass 2: Model Sparse Attention (Sol-Attn Chunked)"
+    }
+  },
+  "48": {
+    "class_type": "PrimitiveStringMultiline",
+    "inputs": {
+      "value": ""
+    },
+    "_meta": {
+      "title": "Prompt Inicial (Idea del Usuario)"
+    }
+  },
+  "49": {
+    "class_type": "OllamaConnectivityV2",
+    "inputs": {
+      "url": "http://127.0.0.1:8080",
+      "model": "",
+      "keep_alive": 0,
+      "keep_alive_unit": "minutes"
+    },
+    "_meta": {
+      "title": "Ollama Connectivity (llama.cpp :8080, keep_alive=0)"
+    }
+  },
+  "50": {
+    "class_type": "OllamaOptionsV2",
+    "inputs": {
+      "enable_mirostat": false,
+      "mirostat": 0,
+      "enable_mirostat_eta": false,
+      "mirostat_eta": 0.1,
+      "enable_mirostat_tau": false,
+      "mirostat_tau": 5.0,
+      "enable_num_ctx": true,
+      "num_ctx": 8192,
+      "enable_repeat_last_n": false,
+      "repeat_last_n": 64,
+      "enable_repeat_penalty": false,
+      "repeat_penalty": 1.1,
+      "enable_temperature": true,
+      "temperature": 0.4,
+      "enable_seed": false,
+      "seed": 42,
+      "enable_stop": false,
+      "stop": "",
+      "enable_tfs_z": false,
+      "tfs_z": 1.0,
+      "enable_num_predict": false,
+      "num_predict": -1,
+      "enable_top_k": false,
+      "top_k": 40,
+      "enable_top_p": false,
+      "top_p": 0.9,
+      "enable_min_p": false,
+      "min_p": 0.0,
+      "debug": false
+    },
+    "_meta": {
+      "title": "Ollama Options (temp=0.4, ctx=8192)"
+    }
+  },
+  "51": {
+    "class_type": "OllamaGenerateV2",
+    "inputs": {
+      "system": "You are an expert video prompt director for MiniMax H3 Text-to-Video with Audio (T2VA).\nYou receive the user's scene instructions (which may be in Spanish or English).\nTranslate and expand the user's instructions into a production-ready English prompt strictly following the official MiniMax H3 T2VA format.\n\nYour output MUST follow this exact structure and section order, with no markdown fences, no commentary, and no extra text:\n\nintegrated_multimodal_description: [Shot 1] <Visual style, e.g. Live-action, cinematic / 3D CG, cinematic>, <shot framing> frames <describe the subjects, wardrobe/materials, and environment>. <Camera movement using official grammar: e.g. The camera tracks forward at slow speed / The camera holds a static shot> as <describe the chronological physical actions, movements, interactions, and environmental dynamics>.\n\noverall_soundscape: <1 to 3 English sentences summarizing continuous ambient sound, physical foley, and movement sounds across the video>.\n\nnon_diegetic_music: <1 to 2 English sentences describing background score instrumentation, tempo, and dynamics, or N/A>.\n\nRULES:\n- Always write the descriptive sections in English.\n- Describe concrete, observable physical movements; never use abstract psychological fillers.\n- Output ONLY the final prompt text starting with \"integrated_multimodal_description: [Shot 1]...\".",
+      "prompt": [
+        "48",
+        0
+      ],
+      "think": false,
+      "keep_context": false,
+      "format": "text",
+      "connectivity": [
+        "49",
+        0
+      ],
+      "options": [
+        "50",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Ollama Generate: Prompt MiniMax H3"
+    }
+  },
+  "52": {
+    "class_type": "OllamaGenerateV2",
+    "inputs": {
+      "system": "You are an expert Video Prompt Engineer and Cinematographer for the LTX-2.5 Audio-Video model (Text-to-Video mode).\nYou receive the user's scene concept (in Spanish or English).\nWrite a single, cohesive, dense paragraph in English that directs the complete audiovisual scene.\n\nFollow these strict rules for LTX-2.5:\n1. Open with the shot type, visual style, lighting, atmosphere, and detailed appearance of the main subject(s) and environment.\n2. Describe the chronological physical action and motion clearly: who moves, how they move, and the dynamic environmental elements (sparks, rain, smoke, light reflections).\n3. Specify camera movement in natural cinematographic language (e.g., medium tracking shot, slow dolly in).\n4. Include rich diegetic audio, ambient soundscape, and foley cues at the end of the paragraph so LTX-2.5 synthesizes synchronized audio.\n5. Output ONLY a single paragraph in plain English. Do NOT include titles, bullet points, section headers, timestamps, markdown, or introductory remarks.",
+      "prompt": [
+        "48",
+        0
+      ],
+      "think": false,
+      "keep_context": false,
+      "format": "text",
+      "meta": [
+        "51",
+        3
+      ]
+    },
+    "_meta": {
+      "title": "Ollama Generate: Prompt LTX-2.5"
+    }
+  },
+  "53": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "51",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Preview Prompt MiniMax H3"
+    }
+  },
+  "54": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "52",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Preview Prompt LTX-2.5"
+    }
+  },
+  "55": {
+    "class_type": "PrimitiveInt",
+    "inputs": {
+      "value": 73
+    },
+    "_meta": {
+      "title": "🔢 Fotogramas (Frames) — Ej: 73, 121, 209"
+    }
+  }
+}

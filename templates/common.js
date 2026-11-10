@@ -3032,6 +3032,7 @@ function externalWebUINameFor(page){
     "MMH3X2_WebUI.html": "mmh3x2",
     "MMH3X2_WebUI_BlockATT.html": "mmh3x2",
     "KreaQwen_WebUI.html": "kreaqwen",
+    "LTXH3_WebUI.html": "ltxh3",
   })[page] || null;
 }
 async function externalWebUIBaseUrl(targetPort, targetPage){

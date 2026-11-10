@@ -1,0 +1,231 @@
+  <div class="chain" id="chain">
+    <div class="node" data-n="llm">ollama</div><div class="arrow">→</div>
+    <div class="node" data-n="p1" id="chainP1">LTX · pase 1</div><div class="arrow">→</div>
+    <div class="node" data-n="bridge">puente + latent 2x</div><div class="arrow">→</div>
+    <div class="node" data-n="p2" id="chainP2">H3 · refinado</div><div class="arrow">→</div>
+    <div class="node" data-n="out">final</div>
+  </div>
+  <div class="grid">
+    <!-- COLUMNA 1: DIRECCIÓN, ENTRADA Y PROMPTS -->
+    <div class="controls-col">
+      __SERVER_PANEL__
+
+      <div class="panel"><h2>Dirección</h2>
+        <div class="seed-toggle" style="align-items:stretch;">
+          <div class="seg on" id="segDirL2H" data-value="ltx_h3">LTX → H3</div>
+          <div class="seg" id="segDirH2L" data-value="h3_ltx">H3 → LTX</div>
+          <button id="btnSwapDir" class="ghost btn-mini" title="Invertir orden (los modelos y LoRAs viajan con su familia; el muestreo se adapta al papel de cada pase)" style="flex:0 0 auto;">⇄</button>
+        </div>
+        <div class="hint" id="dirHint" style="font-size:10px;">LTX-2.5 genera la base; MiniMax H3 la refina a 2x.</div>
+      </div>
+
+      <div class="panel" id="startImagePanel"><h2>Imagen de inicio <span class="hint">(I2V · sin imagen = texto a vídeo)</span></h2>
+        <div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*"><div class="ph" id="dzPlaceholder">arrastra una imagen o clic (vacío = texto a vídeo)</div></div>
+        <div class="dz-info" id="dzInfo"></div>
+        <div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕ Quitar</button></div>
+        <div class="img-wrap" id="inputWrap" style="display:none;"><img id="inputImg" alt="Imagen de inicio"></div>
+        <div id="i2vControls" style="display:none;margin-top:8px;">
+          <div class="row slider-row"><label>Fuerza LTX (imagen en el latente)</label><input type="range" id="i2vStrength" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="i2vStrengthVal">1.00</div></div>
+          <label class="row" style="align-items:center;gap:6px;font-size:11px;margin-bottom:4px;"><input type="checkbox" id="i2vFitRes" checked style="width:auto;margin:0;"> Ajustar resolución al aspecto de la imagen</label>
+          <label class="row" style="align-items:center;gap:6px;font-size:11px;margin-bottom:4px;"><input type="checkbox" id="i2vToLlm" style="width:auto;margin:0;"> Enviar la imagen a los dos LLM (modelo con visión)</label>
+          <div class="hint" style="font-size:10px;">H3 la usa como first_frame en su pase; LTX la ancla en el latente (LTXVImgToVideoInplace) en el suyo. Elige estilos I2V en los system prompts.</div>
+        </div>
+      </div>
+
+      __PROMPT_PANELS__
+
+      <!-- PROMPTS POR MODELO (Ollama dentro del grafo) -->
+      <div class="panel"><h2>Prompts por modelo</h2>
+        <div class="seed-toggle">
+          <div class="seg on" id="segPromptOllama" data-value="ollama">Ollama genera (desde la idea)</div>
+          <div class="seg" id="segPromptManual" data-value="manual">Manual (textos de abajo)</div>
+        </div>
+        <div id="llmControls">
+          <div class="row"><label>Modelo LLM</label><select id="llmModel"><option value="">Cargando modelos...</option></select></div>
+          <div class="row"><label>URL vista desde ComfyUI <span class="hint">(vacío = según el modelo)</span></label><input type="text" id="llmUrl" placeholder="http://127.0.0.1:8080" spellcheck="false"></div>
+          <div class="row slider-row"><label>Temperatura</label><input type="range" id="llmTemp" min="0" max="1.5" step="0.05" value="0.4"><div class="slider-val" id="llmTempVal">0.40</div></div>
+          <div class="row"><label>Contexto (num_ctx)</label><input type="number" id="llmCtx" value="8192" min="1024" step="1024"></div>
+          <div class="row"><label>keep_alive (min) <span class="hint">0 = descargar al acabar (libera VRAM)</span></label><input type="number" id="llmKeepAlive" value="0" min="-1" max="120" step="1"></div>
+        </div>
+        <div class="sysprompt-block" data-model="ltx">
+          <label>System prompt LTX-2.5</label>
+          <div class="sp-row"><select id="spLtxSelect"></select><button class="ghost btn-mini" data-sp-action="new" data-model="ltx" title="Nuevo estilo (copia del actual)">＋</button><button class="ghost btn-mini" data-sp-action="reset" data-model="ltx" title="Restaurar el texto por defecto">↺</button><button class="ghost btn-mini" data-sp-action="delete" data-model="ltx" title="Eliminar estilo propio">🗑</button></div>
+          <textarea id="spLtxText" class="sp-text" spellcheck="false"></textarea>
+        </div>
+        <div class="sysprompt-block" data-model="h3">
+          <label>System prompt MiniMax H3</label>
+          <div class="sp-row"><select id="spH3Select"></select><button class="ghost btn-mini" data-sp-action="new" data-model="h3" title="Nuevo estilo (copia del actual)">＋</button><button class="ghost btn-mini" data-sp-action="reset" data-model="h3" title="Restaurar el texto por defecto">↺</button><button class="ghost btn-mini" data-sp-action="delete" data-model="h3" title="Eliminar estilo propio">🗑</button></div>
+          <textarea id="spH3Text" class="sp-text" spellcheck="false"></textarea>
+        </div>
+        <div class="row"><label>Prompt LTX-2.5 <span class="hint" id="promptLtxHint">(lo rellena Ollama al generar)</span></label><textarea id="promptLtx" class="model-prompt" placeholder="Texto que recibe el encoder de LTX-2.5..."></textarea></div>
+        <div class="row"><label>Prompt MiniMax H3 <span class="hint" id="promptH3Hint">(lo rellena Ollama al generar)</span></label><textarea id="promptH3" class="model-prompt" placeholder="integrated_multimodal_description: [Shot 1] ..."></textarea></div>
+        <div class="row"><label>Negativo LTX-2.5</label><textarea id="negLtx" class="model-prompt" style="min-height:48px;"></textarea></div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 2: MODELOS, MUESTREO Y POST -->
+    <div class="settings-col">
+      <div class="panel"><h2>Resolución y duración</h2>
+        <div class="res-presets" id="resPresets">
+          <button class="ghost btn-mini" data-w="768" data-h="448">768×448</button>
+          <button class="ghost btn-mini" data-w="448" data-h="768">448×768</button>
+          <button class="ghost btn-mini" data-w="640" data-h="640">640×640</button>
+          <button class="ghost btn-mini" data-w="832" data-h="480">832×480</button>
+          <button class="ghost btn-mini" data-w="960" data-h="544">960×544</button>
+        </div>
+        <div class="two-col"><div class="row"><label>Ancho base</label><input type="number" id="width" value="768" min="256" step="32"></div><div class="row"><label>Alto base</label><input type="number" id="height" value="448" min="256" step="32"></div></div>
+        <div class="hint" id="resHint" style="font-size:10.5px;margin-bottom:8px;"></div>
+        <div class="two-col"><div class="row"><label>Fotogramas <span class="hint">(8n+1)</span></label><input type="number" id="frames" value="73" min="9" step="8"></div><div class="row"><label>Variantes (batch)</label><input type="number" id="batchSize" value="1" min="1" max="32" step="1"></div></div>
+        <div class="hint" id="framesHint" style="font-size:10.5px;"></div>
+      </div>
+
+      <div class="panel"><h2>Semilla</h2><div class="seed-toggle"><div class="seg on" id="segRandom">Aleatoria</div><div class="seg" id="segFixed">Fija</div></div><input type="number" id="seedVal" value="42" step="1" disabled><div class="hint" style="font-size:10px;margin-top:4px;">El refinado usa semilla + 1.</div></div>
+
+      <div class="panel model-panel" id="panelLtx"><h2>LTX-2.5 <span class="role-badge" id="roleLtx">pase 1</span></h2>
+        <div class="row"><label>UNet</label><select id="ltxUnet"></select></div>
+        <div class="row"><label>Text encoder</label><select id="ltxClip"></select></div>
+        <div class="two-col"><div class="row"><label>VAE vídeo</label><select id="ltxVaeV"></select></div><div class="row"><label>VAE audio</label><select id="ltxVaeA"></select></div></div>
+        <div class="lora-block"><div class="lora-head"><span>LoRAs</span><button class="ghost btn-mini" data-lora-add="ltx">＋ LoRA</button></div><div id="ltxLoras"></div></div>
+        <div class="sampling-block" data-model="ltx"></div>
+      </div>
+
+      <div class="panel model-panel" id="panelH3"><h2>MiniMax H3 <span class="role-badge" id="roleH3">refinado</span></h2>
+        <div class="row"><label>UNet</label><select id="h3Unet"></select></div>
+        <div class="row"><label>Text encoder</label><select id="h3Clip"></select></div>
+        <div class="two-col"><div class="row"><label>VAE vídeo</label><select id="h3VaeV"></select></div><div class="row"><label>VAE audio</label><select id="h3VaeA"></select></div></div>
+        <div class="lora-block"><div class="lora-head"><span>LoRAs</span><button class="ghost btn-mini" data-lora-add="h3">＋ LoRA</button></div><div id="h3Loras"></div></div>
+        <div class="sampling-block" data-model="h3"></div>
+        <div class="row"><label>Atención dispersa (sparse)</label>
+          <select id="h3Sparse">
+            <option value="sol-attn">Block Sparse · Sol-Attn (tau adaptativo)</option>
+            <option value="sla">Block Sparse · top-k (SLA)</option>
+            <option value="vsa">VSA (FastH3 · H3VSAAttention)</option>
+            <option value="h3sparse">H3 Sparse (H3-Optimizations)</option>
+            <option value="none">Ninguna (densa)</option>
+          </select>
+        </div>
+        <div id="sparseParams"></div>
+        <div class="hint" id="sparseHint" style="font-size:10px;"></div>
+      </div>
+
+      <div class="panel"><h2>Puente · upscaler latente 2x</h2>
+        <div class="row"><label id="upscalerLabel">Upscaler (H3)</label><select id="latentUpscaler"></select></div>
+        <label class="row" style="align-items:center;gap:6px;font-size:11px;margin-bottom:4px;"><input type="checkbox" id="savePass1" style="width:auto;margin:0;"> Guardar también el vídeo del pase 1</label>
+        <label class="row" style="align-items:center;gap:6px;font-size:11px;margin-bottom:0;"><input type="checkbox" id="pass1Only" style="width:auto;margin:0;"> Solo pase 1 (sin puente ni refinado · iterar rápido)</label>
+      </div>
+
+      <div class="panel">
+        <h2>Interpolación de frames</h2>
+        <div class="seed-toggle"><div class="seg" id="segRifeOn">Activo</div><div class="seg on" id="segRifeOff">Desactivado</div></div>
+        <div id="rifeControls" style="display:none;margin-top:8px;">
+          <div class="row"><label>Motor</label><select id="rifeEngine"><option value="rtx">NVIDIA RTX Frame Gen</option><option value="rife">RIFE / FILM</option></select></div>
+          <div class="row"><label>Multiplicador FPS</label><select id="rifeMultiplier"><option value="2" selected>2x (48 fps)</option><option value="3">3x (72 fps)</option><option value="4">4x (96 fps)</option></select></div>
+          <div class="row" id="rifeModelRow"><label>Modelo RIFE / FILM</label><select id="rifeModel"></select></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>RTX Video Super Resolution</h2>
+        <div class="seed-toggle"><div class="seg" id="segRtxOn">Activo</div><div class="seg on" id="segRtxOff">Desactivado</div></div>
+        <div id="rtxControls" style="display:none;margin-top:8px;">
+          <div class="row"><label>Calidad RTX</label>
+            <select id="rtxQuality">
+              <optgroup label="Escalado">
+                <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (alta fidelidad)</option>
+                <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH</option>
+                <option value="ULTRA">ULTRA</option>
+                <option value="HIGH">HIGH</option>
+                <option value="MEDIUM">MEDIUM</option>
+                <option value="LOW">LOW</option>
+              </optgroup>
+              <optgroup label="Limpieza (misma resolución)">
+                <option value="DENOISE_LOW">DENOISE_LOW</option>
+                <option value="DENOISE_MEDIUM">DENOISE_MEDIUM</option>
+                <option value="DENOISE_HIGH">DENOISE_HIGH</option>
+                <option value="DENOISE_ULTRA">DENOISE_ULTRA</option>
+                <option value="DEBLUR_LOW">DEBLUR_LOW</option>
+                <option value="DEBLUR_MEDIUM">DEBLUR_MEDIUM</option>
+                <option value="DEBLUR_HIGH">DEBLUR_HIGH</option>
+                <option value="DEBLUR_ULTRA">DEBLUR_ULTRA</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="row"><label>Factor de escala</label><select id="rtxScale"><option value="1.5">1.5×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select></div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:4px;">Se aplican tras el refinado (interpolación primero). Los botones ⚡ / 🔍 del reproductor los aplican a un clip ya generado.</div>
+      </div>
+
+      <div class="panel">
+        <h2>Gestión de memoria</h2>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button id="btnOffloadVram" type="button" class="ghost btn-mini" title="Descarga los modelos de la VRAM a la RAM sin borrarlos">Descargar VRAM a RAM</button>
+          <button id="btnFreeMemory" type="button" class="ghost btn-mini" title="Purga los modelos de VRAM y RAM">Liberar todo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUMNA 3: EJECUCIÓN Y RESULTADOS -->
+    <div class="results-col">
+      <div class="panel" style="margin-bottom:0;">
+        <h2>Ejecución <button type="button" id="btnCloseUI" class="ghost btn-mini" style="margin-left:auto;" title="Cerrar esta ventana de la WebUI">✕ Cerrar UI</button></h2>
+        <div class="row" style="margin-bottom:8px;"><label>Prefijo de archivo</label><input type="text" id="filenamePrefix" value="video/LTXH3" placeholder="video/LTXH3"></div>
+        <div class="btn-row"><button id="btnGenerate" class="primary">Generar vídeo</button></div>
+        <div class="btn-row" style="margin-top:6px">
+          <button id="btnStopVideo" disabled>Parar vídeo</button>
+          <button id="btnStopAll" class="danger" disabled>Parar todo</button>
+          <button id="btnClearQueue" class="ghost" disabled>Vaciar cola</button>
+        </div>
+        <div class="queue-status-box">
+          <div class="queue-status-row">
+            <div class="queue-indicator"><span class="dot" id="runDot"></span><span id="runText">en reposo</span></div>
+            <div class="queue-total-badge" id="queueTotalBadge"><span class="queue-total-num" id="queueTotalNum">0</span> pendientes</div>
+          </div>
+          <div class="queue-items-accordion" id="queueItemsAccordion" style="display:none;">
+            <div class="queue-items-header" id="queueItemsToggle"><span class="arrow">▶</span> <span id="queueItemsTitle">Ver trabajos en cola (0)</span></div>
+            <div class="queue-items-body" id="queueItemsList"></div>
+          </div>
+        </div>
+        <div class="log" id="log">listo.</div>
+      </div>
+
+      <div class="vidbox">
+        <div class="vid-header">
+          <h3>Vídeo <em id="vidStage">final</em></h3>
+          <div class="vid-actions">
+            <button class="vid-action-btn" id="btnDownload1" title="Descargar vídeo" style="display:none;" type="button">⬇ Descargar</button>
+            <button class="vid-action-btn" id="btnSaveFrame1" title="Usar el frame actual como imagen de inicio" style="display:none;" type="button">📸 Frame → inicio</button>
+            <button class="vid-action-btn" id="btnInterpolate1" title="Interpolar este clip (motor y multiplicador del panel)" style="display:none;" type="button">⚡ Interpolar</button>
+            <button class="vid-action-btn" id="btnRtxUpscale1" title="RTX Video Super Resolution de este clip (calidad y escala del panel)" style="display:none;" type="button">🔍 RTX Upscale</button>
+            <button class="vid-action-btn" id="btnLoadMeta1" title="Recuperar parámetros del workflow de este vídeo" disabled type="button">📋 Workflow</button>
+          </div>
+        </div>
+        <div class="empty" id="empty1">sin generar</div>
+        <div class="preview-wrap" id="previewWrap1" style="display:none;">
+          <div class="preview-step-badge" id="previewStep1" style="display:none;"><span class="spinner-dot"></span><span id="previewStepText1">Paso 0/0 · 0%</span></div>
+          <img class="preview-img" id="previewImg1" style="display:none;" alt="Vista previa">
+          <video class="preview-img" id="previewVideo1" muted autoplay loop playsinline style="display:none;"></video>
+        </div>
+        <span class="video-badge" id="badge1"></span>
+        <video id="video1" controls allowfullscreen playsinline crossorigin="anonymous" style="display:none" draggable="true"></video>
+        <div class="vid-footer">
+          <span class="time-tag" id="time1"></span>
+          <span class="res-tag" id="res1"></span>
+        </div>
+      </div>
+
+      <div class="vidbox variant-gallery" id="variantGalleryBox" style="display:none;">
+        <h3>Galería de variantes <span id="variantCount" style="color:var(--accent)"></span></h3>
+        <div class="variant-grid" id="variantGrid"></div>
+      </div>
+
+      <div class="vidbox">
+        <div class="collapsible-header" id="videoHistoryToggle">
+          <span class="arrow">▶</span> Historial de vídeos <button id="btnRefreshVideoHistory" class="ghost btn-mini" style="margin-left:auto;" type="button">↻</button>
+        </div>
+        <div class="collapsible-body" id="videoHistoryBody">
+          <div class="hint" id="videoHistoryStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="variant-grid" id="videoHistoryGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
