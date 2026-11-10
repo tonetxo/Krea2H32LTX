@@ -126,7 +126,7 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | **ComfyMath** | [ComfyMath](https://github.com/evanspearman/ComfyMath) | `ComfyMathExpression` | MMH3X2, MiniMaxH3, LTXV, LTXH3 (on-demand interpolation) |
 | **RES4LYF** | [RES4LYF](https://github.com/ClownsharkBatwing/RES4LYF) | `ClownsharKSampler_Beta` | Krea2 (also provides the `res_*` samplers and `beta57` scheduler offered in MiniMaxH3, MMH3X2, KreaQwen and LTXV) |
 | **comfyui-ollama** | [comfyui-ollama](https://github.com/stavsap/comfyui-ollama) | `OllamaConnectivityV2`, `OllamaChat`, `OllamaGenerateV2`, `OllamaOptionsV2` | MMH3X2 (Assisted Mode), LTXH3 (per-model prompts) |
-| **ComfyUI-KJNodes** | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `GetImageSize`, `ImageResizeKJv2` | MMH3X2, MiniMaxH3, LTXV |
+| **ComfyUI-KJNodes** | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `GetImageSize`, `ImageResizeKJv2`, `ModelPreviewOverrideKJ` | MMH3X2, MiniMaxH3, LTXV, LTXH3 |
 | **VideoHelperSuite (VHS)** | [ComfyUI-VideoHelperSuite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite) | `VHS_LoadVideo` | MMH3X2 (Video reference), LTXV |
 | **Frame-Interpolation** | [ComfyUI-Frame-Interpolation](https://github.com/Fannovel16/ComfyUI-Frame-Interpolation) | `FrameInterpolate`, `FrameInterpolationModelLoader` | MMH3X2 (RIFE), MiniMaxH3, LTXV, LTXH3 |
 | **ComfyUI-H3-FaceRefine** *(optional)* | [ComfyUI-H3-FaceRefine](https://github.com/Carasibana/ComfyUI-H3-FaceRefine.git) | `H3FaceTrackCrop`, `H3FaceStitch`, `H3PerFrameDenoise`, `H3InjectVideoLatent` | MiniMaxH3 (Dual-mode face refine: inline toggle & on-demand player button), LTXV (inline element refine: track/stitch only, resampled with LTXV) |

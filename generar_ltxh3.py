@@ -15,6 +15,7 @@ VAE_DIR = os.environ.get("LTXH3_VAE_DIR", config_loader.get_model_subdirs("vae")
 LORAS_DIR = os.environ.get("LTXH3_LORAS_DIR", config_loader.get_model_subdirs("loras"))
 INTERP_DIR = os.environ.get("LTXH3_INTERP_DIR", config_loader.get_model_subdirs("frame_interpolation"))
 LATENT_UPSCALE_DIR = os.environ.get("LTXH3_LATENT_UPSCALE_DIR", config_loader.get_model_subdirs("latent_upscale_models"))
+VAE_APPROX_DIR = os.environ.get("LTXH3_VAE_APPROX_DIR", config_loader.get_model_subdirs("vae_approx"))
 LTXH3_UI_PORT = config_loader.get_port("ltxh3", 8005)
 # -----------------------------------------
 
@@ -23,6 +24,7 @@ def main():
     with open(JSON_H3_LTX, 'r', encoding='utf-8') as f:
         graph_h3_ltx = json.load(f)
     latent_upscalers = filter_names(get_file_list(LATENT_UPSCALE_DIR), include=('ltx', 'minimax', 'h3'))
+    taeh3 = filter_names(get_file_list(VAE_APPROX_DIR), include=('taeh3',))
 
     generate_html({
         'json_file': JSON_LTX_H3,
@@ -58,6 +60,7 @@ def main():
         'extra_consts': {
             'BASE_GRAPH_H3_LTX': graph_h3_ltx,
             'AVAILABLE_LATENT_UPSCALERS': latent_upscalers,
+            'AVAILABLE_TAEH3': taeh3,
             # URLs vistas desde ComfyUI: las usa el nodo OllamaConnectivityV2 del grafo.
             'LLM_OLLAMA_URL': config_loader.get_ollama_url(),
             'LLM_LLAMACPP_URL': config_loader.get_llamacpp_url(),

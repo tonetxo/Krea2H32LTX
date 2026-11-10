@@ -21,10 +21,10 @@ const CONFIG = {
   loras: [],
   ENHANCER_DEFAULT_PROMPTS: {
     text: {
-      A: { name: "Idea → escena (breve)", prompt: "You help a user describe a short video scene for an audio-video model. Rewrite the user's idea as 2-4 vivid sentences: subjects, setting, the main action in chronological order, camera feel and the sounds of the scene. Keep it in the user's language. Output ONLY the rewritten idea." },
+      A: { name: "Idea → escena (breve)", prompt: "You help a user describe a short video scene for an audio-video model. Rewrite the user's idea as 2-4 vivid sentences: subjects, setting, the main action in chronological order, camera feel and the sounds of the scene. Always write in English, translating the idea if needed. Output ONLY the rewritten idea." },
     },
     vision: {
-      A: { name: "Imagen → idea de escena", prompt: "Look at the image: it will be the first frame of a short video. Describe in 2-4 sentences what is visible and propose a natural continuation: the main action, camera movement and the sounds of the scene. Keep it in the user's language. Output ONLY the description." },
+      A: { name: "Imagen → idea de escena", prompt: "Look at the image: it will be the first frame of a short video. Describe in 2-4 sentences what is visible and propose a natural continuation: the main action, camera movement and the sounds of the scene. Always write in English, translating the user's hint if needed. Output ONLY the description." },
     },
   },
 };
@@ -845,6 +845,21 @@ function buildGraph(job){
   applyModels(g, H, job.models.h3);
   applySparse(g, H, job.sampling.h3[roleOf(job.dir, "h3")].sparse);
   for(const model of ["ltx", "h3"]) applySampling(g, d[model], model, job.sampling[model][roleOf(job.dir, model)]);
+  // Preview animado (KJNodes) en ambos pases: sin él ComfyUI manda un frame
+  // estático. H3 usa el TAE 2D de kijai (RGB real, frame a frame) si está en
+  // vae_approx; LTX se queda en L2RGB. No usar preview_method="taesd": crashea
+  // con taeh3.
+  if(getPreviewMethod() !== "none"){
+    const taeH3 = AVAILABLE_TAEH3.find(n => /2d/i.test(n)) || AVAILABLE_TAEH3[0] || "none";
+    for(const model of [p1, ...(pass1Only ? [] : [p2])]){
+      const guider = g[d[model].GUIDER].inputs, id = `preview_${model}`;
+      g[id] = { class_type: "ModelPreviewOverrideKJ", inputs: {
+        model: guider.model, max_resolution: 768, jpeg_quality: 80, suppress_default_preview: true,
+        preview_frames: 32, preview_fps: 6, tiny_vae: model === "h3" ? taeH3 : "none",
+      }, _meta: { title: `Preview animado ${MODEL_LABEL[model]}` } };
+      guider.model = [id, 0];
+    }
+  }
 
   g[NC.FRAMES].inputs.value = job.frames;
   if(job.dir === "ltx_h3"){
@@ -1211,6 +1226,49 @@ async function runSingleGeneration(index){
   }
 }
 $("btnGenerate").addEventListener("click", () => enqueueJob(snapshotJob()));
+
+// --- MEJORAR PROMPT (idea previa; solo Ollama/llama.cpp, sin LTX2) ---
+(function initEnhancerUI(){
+  const chain = $("enhancerChainMode");
+  chain.innerHTML = `<option value="off">Desactivado</option><option value="ollama">Ollama</option>`;
+  chain.value = "ollama";
+  for(const id of ["ltx2Temperature", "ltx2Seed", "ltx2PreviewText"]){
+    const row = $(id)?.closest(".enhancer-row");
+    if(row) row.style.display = "none";
+  }
+})();
+$("btnEnhance").addEventListener("click", async () => {
+  if($("enhancerChainMode").value === "off"){ log("⚠️ Cadena de mejora desactivada.", "l-warn"); return; }
+  const model = $("enhancerModel").value;
+  if(!model){ log("⚠️ Selecciona un modelo de LLM (Ollama / llama.cpp)", "l-err"); return; }
+  const mode = $("enhancerMode").value, styleKey = $("enhancerStyle").value;
+  const system = getCurrentSysPrompt(loadSysPrompts(), mode, styleKey);
+  const idea = $("prompt").value.trim();
+  if(mode !== "vision" && !idea){ log("⚠️ Escribe la idea en el panel Prompt.", "l-err"); return; }
+  const payload = { model, system, prompt: idea || "Describe this image.", stream: false, options: { num_ctx: 8192 } };
+  if(mode === "vision"){
+    if(!inputImage){ log("⚠️ Modo visión: carga una imagen de inicio.", "l-err"); return; }
+    try { payload.images = [await resizeFileToBase64(inputImage.file, 768)]; }
+    catch(e){ log("❌ No se pudo leer la imagen: " + (e.message || e), "l-err"); return; }
+  }
+  const btn = $("btnEnhance");
+  btn.disabled = true; btn.textContent = "Mejorando...";
+  $("enhancerOutput").value = ""; $("enhancerMetaInfo").textContent = "";
+  try {
+    const { text, elapsedMs } = await streamOllamaGenerate(payload, $("enhancerOutput"));
+    const t = fmtMs(elapsedMs);
+    $("enhancerOutput").value = text;
+    $("enhancerMetaInfo").textContent = `${model} · ${mode} · ${styleKey} · ${t}`;
+    log(`Idea mejorada en ${t} (${model}). Pulsa 'Usar como prompt' para aplicarla.`, "l-ok");
+  } catch(e){
+    log("❌ Error al mejorar: " + e.message, "l-err");
+    $("enhancerOutput").value = "Error: " + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = "Mejorar prompt";
+  }
+});
+// common.js cambia #prompt sin evento "input": guardar la idea aplicada.
+$("btnUseAsPrompt").addEventListener("click", saveState);
 
 function enqueueOnDemand(kind){
   const media = currentMedia[1];

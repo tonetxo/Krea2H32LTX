@@ -41,9 +41,9 @@ REQUIRED_PACKAGES = [
     {
         "name": "ComfyUI-KJNodes",
         "repo": "https://github.com/kijai/ComfyUI-KJNodes",
-        "nodes": ["GetImageSize", "ImageResizeKJv2"],
+        "nodes": ["GetImageSize", "ImageResizeKJv2", "ModelPreviewOverrideKJ"],
         "critical": True,
-        "workflows": ["MMH3X2", "MiniMaxH3", "LTXV"],
+        "workflows": ["MMH3X2", "MiniMaxH3", "LTXV", "LTXH3"],
     },
     {
         "name": "ComfyUI-VideoHelperSuite (VHS)",
