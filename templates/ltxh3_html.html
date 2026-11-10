@@ -1,7 +1,7 @@
   <div class="chain" id="chain">
     <div class="node" data-n="llm">ollama</div><div class="arrow">→</div>
     <div class="node" data-n="p1" id="chainP1">LTX · pase 1</div><div class="arrow">→</div>
-    <div class="node" data-n="bridge">puente + latent 2x</div><div class="arrow">→</div>
+    <div class="node" data-n="bridge">puente + latent</div><div class="arrow">→</div>
     <div class="node" data-n="p2" id="chainP2">H3 · refinado</div><div class="arrow">→</div>
     <div class="node" data-n="out">final</div>
   </div>
@@ -22,8 +22,8 @@
       <div class="panel" id="startImagePanel"><h2>Imagen de inicio <span class="hint">(I2V · sin imagen = texto a vídeo)</span></h2>
         <div class="dropzone" id="dropzone"><input type="file" id="fileInput" accept="image/*"><div class="ph" id="dzPlaceholder">arrastra una imagen o clic (vacío = texto a vídeo)</div></div>
         <div class="dz-info" id="dzInfo"></div>
-        <div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕ Quitar</button></div>
-        <div class="img-wrap" id="inputWrap" style="display:none;"><img id="inputImg" alt="Imagen de inicio"></div>
+        <div class="img-input-actions" id="imgInputActions" style="display:none;gap:8px;margin-top:6px;"><button id="btnResetZoomInput" class="ghost btn-mini" title="Tamaño original">⊡</button><button id="btnFullscreenInput" class="ghost btn-mini" title="Pantalla completa (← → cambian de imagen Krea2)">⛶</button><button id="btnClearInput" class="ghost btn-mini" title="Quitar imagen">✕ Quitar</button></div>
+        <div class="img-wrap" id="inputWrap" style="display:none;"><img id="inputImg" alt="Imagen de inicio" style="user-select:none;pointer-events:none;transform-origin:center center;"></div>
         <div id="i2vControls" style="display:none;margin-top:8px;">
           <div class="row slider-row"><label>Fuerza LTX (imagen en el latente)</label><input type="range" id="i2vStrength" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="i2vStrengthVal">1.00</div></div>
           <label class="row" style="align-items:center;gap:6px;font-size:11px;margin-bottom:4px;"><input type="checkbox" id="i2vFitRes" checked style="width:auto;margin:0;"> Ajustar resolución al aspecto de la imagen</label>
@@ -32,7 +32,49 @@
         </div>
       </div>
 
+      <div class="panel">
+        <div class="collapsible-header" id="krea2RecentToggle">
+          <span class="arrow">▶</span> Imágenes Krea2 recientes
+        </div>
+        <div class="collapsible-body" id="krea2RecentBody">
+          <div class="hint" id="krea2RecentStatus" style="margin-bottom:8px;">Cargando...</div>
+          <div class="gallery-grid" id="krea2RecentGrid"></div>
+        </div>
+      </div>
+
       __PROMPT_PANELS__
+
+      <div class="panel">
+        <div class="collapsible-header" id="evolveToggle">
+          <span class="arrow">▶</span> Evolve / Transmutar prompt
+        </div>
+        <div class="collapsible-body" id="evolveBody">
+          <div class="hint" style="font-size:10px;margin-bottom:8px;">Con Ollama transmuta la idea; en manual, los prompts de cada modelo. No toca los tokens &lt;Picture N&gt; ni [Shot N].</div>
+          <div class="enhancer-row">
+            <label>Modo</label>
+            <select id="evolveMode"><option value="words">Palabras</option><option value="internal">Palabras del prompt</option><option value="synonyms">Sinónimos cinematográficos</option></select>
+          </div>
+          <div class="enhancer-row">
+            <label>Probabilidad <span class="hint">(% de tokens cambiados)</span></label>
+            <div class="slider-row"><input type="range" id="evolveStrength" min="0" max="100" step="1" value="10"><div class="slider-val" id="evolveStrengthVal">10%</div></div>
+          </div>
+          <div class="enhancer-row">
+            <label>Variantes</label>
+            <input type="number" id="evolveCount" value="4" min="1" max="16" step="1">
+          </div>
+          <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <input type="checkbox" id="evolveAuto" style="margin:0;">
+            <label for="evolveAuto" style="margin:0;font-size:11px;cursor:pointer;">Aplicar automáticamente a cada variante del batch (el prompt original no se toca)</label>
+          </div>
+          <div class="btn-row">
+            <button id="btnEvolve" class="primary" style="flex:1">Transmutar</button>
+            <button id="btnEvolveUse" class="ghost" style="flex:1">Usar #1</button>
+          </div>
+          <div class="enhancer-row">
+            <textarea class="enhancer-output" id="evolveOutput" readonly placeholder="Las variantes aparecerán aquí..."></textarea>
+          </div>
+        </div>
+      </div>
 
       <!-- PROMPTS POR MODELO (Ollama dentro del grafo) -->
       <div class="panel"><h2>Prompts por modelo</h2>
@@ -108,8 +150,9 @@
         <div class="hint" id="sparseHint" style="font-size:10px;"></div>
       </div>
 
-      <div class="panel"><h2>Puente · upscaler latente 2x</h2>
+      <div class="panel"><h2>Puente · upscaler latente</h2>
         <div class="row"><label id="upscalerLabel">Upscaler (H3)</label><select id="latentUpscaler"></select></div>
+        <div class="row slider-row"><label>Escala</label><input type="range" id="upscaleBy" min="1" max="2" step="0.05" value="2"><div class="slider-val" id="upscaleByVal">2.00x</div></div>
         <label class="row" style="align-items:center;gap:6px;font-size:11px;margin-bottom:4px;"><input type="checkbox" id="savePass1" style="width:auto;margin:0;"> Guardar también el vídeo del pase 1</label>
         <label class="row" style="align-items:center;gap:6px;font-size:11px;margin-bottom:0;"><input type="checkbox" id="pass1Only" style="width:auto;margin:0;"> Solo pase 1 (sin puente ni refinado · iterar rápido)</label>
       </div>
@@ -153,6 +196,38 @@
           <div class="row"><label>Factor de escala</label><select id="rtxScale"><option value="1.5">1.5×</option><option value="2" selected>2×</option><option value="3">3×</option><option value="4">4×</option></select></div>
         </div>
         <div class="hint" style="font-size:10px;margin-top:4px;">Se aplican tras el refinado (interpolación primero). Los botones ⚡ / 🔍 del reproductor los aplican a un clip ya generado.</div>
+      </div>
+
+      <div class="panel">
+        <h2>Color Grading & Look Cinemático</h2>
+        <div class="seed-toggle"><div class="seg" id="segPostFxOn">Activo</div><div class="seg on" id="segPostFxOff">Desactivado</div></div>
+        <div id="postFxControls" style="display:none;margin-top:8px;">
+          <div class="row" style="margin-bottom:6px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+              <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;"><input type="checkbox" id="postFxLutToggle" checked> <span style="font-size:11px;font-weight:600;">LUT (3D Color Grade)</span></label>
+              <span class="hint" id="postFxLutVal" style="font-size:10px;">80%</span>
+            </div>
+            <select id="postFxLutSelect" style="width:100%;margin-top:4px;"></select>
+            <div class="row slider-row" style="margin-top:4px;"><label style="font-size:10px;min-width:65px;">Intensidad</label><input type="range" id="postFxLutStrength" min="0" max="1" step="0.01" value="0.8" style="flex:1;"></div>
+          </div>
+          <div class="row two-col" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;"><input type="checkbox" id="postFxVigToggle"> <span style="font-size:10.5px;font-weight:600;">Viñeta</span></label>
+                <span class="hint" id="postFxVigVal" style="font-size:10px;">0.25</span>
+              </div>
+              <input type="range" id="postFxVigIntensity" min="0" max="0.6" step="0.02" value="0.25" style="width:100%;margin-top:4px;">
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;"><input type="checkbox" id="postFxGrainToggle"> <span style="font-size:10.5px;font-weight:600;">Grano Dinámico</span></label>
+                <span class="hint" id="postFxGrainVal" style="font-size:10px;">0.15</span>
+              </div>
+              <input type="range" id="postFxGrainPower" min="0" max="0.4" step="0.01" value="0.15" style="width:100%;margin-top:4px;">
+            </div>
+          </div>
+          <div class="hint" style="font-size:10px;margin-top:6px;">Se aplica al vídeo final, tras interpolación y RTX (grano nítido a la resolución final).</div>
+        </div>
       </div>
 
       <div class="panel">

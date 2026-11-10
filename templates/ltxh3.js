@@ -1,4 +1,4 @@
-// ltxh3.js — LTXH3: pipeline híbrido LTX-2.5 ⇄ MiniMax H3 (base + refinado latente 2x).
+// ltxh3.js — LTXH3: pipeline híbrido LTX-2.5 ⇄ MiniMax H3 (base + refinado latente).
 // Injected AFTER common.js. CONFIG must be defined before initCommon().
 //
 // Dos grafos embebidos (BASE_GRAPH = LTX→H3, BASE_GRAPH_H3_LTX = H3→LTX). Cada
@@ -24,7 +24,7 @@ const CONFIG = {
       A: { name: "Idea → escena (breve)", prompt: "You help a user describe a short video scene for an audio-video model. Rewrite the user's idea as 2-4 vivid sentences: subjects, setting, the main action in chronological order, camera feel and the sounds of the scene. Always write in English, translating the idea if needed. Output ONLY the rewritten idea." },
     },
     vision: {
-      A: { name: "Imagen → idea de escena", prompt: "Look at the image: it will be the first frame of a short video. Describe in 2-4 sentences what is visible and propose a natural continuation: the main action, camera movement and the sounds of the scene. Always write in English, translating the user's hint if needed. Output ONLY the description." },
+      A: { name: "Imagen + idea → escena", prompt: "The image will be the first frame of a short video. If the user gives an idea, it is the main instruction: write the scene that idea describes, starting from this image (keep its subjects, setting and look; only change what the idea asks for). Without an idea, propose a natural continuation. Write 2-4 vivid sentences: the main action in chronological order, camera movement and the sounds of the scene. Always write in English, translating the idea if needed. Output ONLY the scene." },
     },
   },
 };
@@ -150,10 +150,13 @@ function defaultState(){
       ltx_h3: g[DIRS.ltx_h3.UPS_LOADER].inputs.model_name,
       h3_ltx: BASE_GRAPH_H3_LTX[DIRS.h3_ltx.UPS_LOADER].inputs.model_name,
     },
+    upscaleBy: 2,
+    evolveAuto: false,
     savePass1: false, pass1Only: false,
     i2v: { strength: 1.0, fitRes: true, llmImage: true },
     rife: { enabled: false, engine: "rtx", multiplier: 2, model: "rife_v4.26.safetensors" },
     rtx: { enabled: false, quality: "HIGHBITRATE_ULTRA", scale: 2 },
+    postfx: { enabled: false, lut: { enabled: true, name: "", strength: 0.8 }, vignette: { enabled: false, intensity: 0.25 }, grain: { enabled: false, power: 0.15 } },
     prefix: "video/LTXH3",
   };
 }
@@ -462,7 +465,7 @@ function renderDirection(){
   $("roleH3").textContent = roleOf(state.dir, "h3") === "p1" ? "pase 1 · base" : "pase 2 · refinado";
   $("chainP1").textContent = `${MODEL_LABEL[d.p1]} · pase 1`;
   $("chainP2").textContent = `${MODEL_LABEL[d.p2]} · refinado`;
-  $("dirHint").textContent = `${MODEL_LABEL[d.p1]} genera la base; ${MODEL_LABEL[d.p2]} la refina a 2x (upscaler latente ${d.p2 === "h3" ? "H3 3D conv" : "LTX espacial"}).`;
+  $("dirHint").textContent = `${MODEL_LABEL[d.p1]} genera la base; ${MODEL_LABEL[d.p2]} la refina (upscaler latente ${d.p2 === "h3" ? "H3 3D conv" : "LTX espacial"}).`;
   // Paneles en el orden del pipeline.
   const col = $("panelLtx").parentNode;
   if(d.p1 === "h3") col.insertBefore($("panelH3"), $("panelLtx"));
@@ -483,6 +486,7 @@ $("segDirL2H").addEventListener("click", () => setDirection("ltx_h3"));
 $("segDirH2L").addEventListener("click", () => setDirection("h3_ltx"));
 $("btnSwapDir").addEventListener("click", () => setDirection(state.dir === "ltx_h3" ? "h3_ltx" : "ltx_h3"));
 $("latentUpscaler").addEventListener("change", e => { state.upscaler[state.dir] = e.target.value; saveState(); });
+$("upscaleBy").addEventListener("input", () => { state.upscaleBy = parseFloat($("upscaleBy").value); $("upscaleByVal").textContent = state.upscaleBy.toFixed(2) + "x"; updateResHint(); saveState(); });
 
 // --- UI: RESOLUCIÓN, FRAMES, SEMILLA ---
 const nearest32 = v => Math.max(256, Math.round(v / 32) * 32);
@@ -490,9 +494,10 @@ function isLtxFrames(n){ return n >= 9 && (n - 1) % 8 === 0; }
 function isH3Frames(n){ return n >= 5 && (n - 5) % 17 === 0; }
 function updateResHint(){
   const w = state.width, h = state.height;
-  let final = `${w * 2}×${h * 2}`;
+  const w2 = nearest32(w * state.upscaleBy), h2 = nearest32(h * state.upscaleBy);
+  let final = `${w2}×${h2}`;
   if(state.rtx.enabled && !/^(DENOISE|DEBLUR)_/.test(state.rtx.quality)){
-    final += ` → RTX ${state.rtx.scale}x ≈ ${Math.round(w * 2 * state.rtx.scale)}×${Math.round(h * 2 * state.rtx.scale)}`;
+    final += ` → RTX ${state.rtx.scale}x ≈ ${Math.round(w2 * state.rtx.scale)}×${Math.round(h2 * state.rtx.scale)}`;
   }
   $("resHint").textContent = state.pass1Only
     ? `Solo pase 1: ${w}×${h} px (${getFriendlyRatio(w, h)})`
@@ -585,7 +590,9 @@ function llmTarget(llm){
   return { url, model: model || llm.model };
 }
 
-// --- UI: POST (INTERPOLACIÓN / RTX) ---
+// --- UI: POST (INTERPOLACIÓN / RTX / COLOR GRADING) ---
+$("postFxLutSelect").innerHTML = `<option value="">${AVAILABLE_LUTS.length ? "-- Seleccionar LUT (.cube) --" : "-- Sin LUTs (.cube) disponibles --"}</option>`
+  + AVAILABLE_LUTS.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n.replace(/\.cube$/i, ""))}</option>`).join("");
 function renderPost(){
   $("segRifeOn").classList.toggle("on", state.rife.enabled);
   $("segRifeOff").classList.toggle("on", !state.rife.enabled);
@@ -599,6 +606,20 @@ function renderPost(){
   $("rtxControls").style.display = state.rtx.enabled ? "block" : "none";
   $("rtxQuality").value = state.rtx.quality;
   $("rtxScale").value = String(state.rtx.scale);
+  const fx = state.postfx;
+  $("segPostFxOn").classList.toggle("on", fx.enabled);
+  $("segPostFxOff").classList.toggle("on", !fx.enabled);
+  $("postFxControls").style.display = fx.enabled ? "block" : "none";
+  $("postFxLutSelect").value = AVAILABLE_LUTS.includes(fx.lut.name) ? fx.lut.name : "";
+  $("postFxLutToggle").checked = fx.lut.enabled;
+  $("postFxLutStrength").value = fx.lut.strength;
+  $("postFxLutVal").textContent = Math.round(fx.lut.strength * 100) + "%";
+  $("postFxVigToggle").checked = fx.vignette.enabled;
+  $("postFxVigIntensity").value = fx.vignette.intensity;
+  $("postFxVigVal").textContent = fx.vignette.intensity.toFixed(2);
+  $("postFxGrainToggle").checked = fx.grain.enabled;
+  $("postFxGrainPower").value = fx.grain.power;
+  $("postFxGrainVal").textContent = fx.grain.power.toFixed(2);
   updateResHint();
 }
 const postSet = (fn) => () => { fn(); renderPost(); saveState(); };
@@ -611,6 +632,15 @@ $("rifeMultiplier").addEventListener("change", postSet(() => state.rife.multipli
 $("rifeModel").addEventListener("change", postSet(() => state.rife.model = $("rifeModel").value));
 $("rtxQuality").addEventListener("change", postSet(() => state.rtx.quality = $("rtxQuality").value));
 $("rtxScale").addEventListener("change", postSet(() => state.rtx.scale = parseFloat($("rtxScale").value)));
+$("segPostFxOn").addEventListener("click", postSet(() => state.postfx.enabled = true));
+$("segPostFxOff").addEventListener("click", postSet(() => state.postfx.enabled = false));
+$("postFxLutSelect").addEventListener("change", postSet(() => state.postfx.lut.name = $("postFxLutSelect").value));
+$("postFxLutToggle").addEventListener("change", postSet(() => state.postfx.lut.enabled = $("postFxLutToggle").checked));
+$("postFxLutStrength").addEventListener("input", postSet(() => state.postfx.lut.strength = parseFloat($("postFxLutStrength").value)));
+$("postFxVigToggle").addEventListener("change", postSet(() => state.postfx.vignette.enabled = $("postFxVigToggle").checked));
+$("postFxVigIntensity").addEventListener("input", postSet(() => state.postfx.vignette.intensity = parseFloat($("postFxVigIntensity").value)));
+$("postFxGrainToggle").addEventListener("change", postSet(() => state.postfx.grain.enabled = $("postFxGrainToggle").checked));
+$("postFxGrainPower").addEventListener("input", postSet(() => state.postfx.grain.power = parseFloat($("postFxGrainPower").value)));
 $("savePass1").addEventListener("change", () => { state.savePass1 = $("savePass1").checked; saveState(); });
 $("pass1Only").addEventListener("change", () => { state.pass1Only = $("pass1Only").checked; updateResHint(); saveState(); });
 $("filenamePrefix").addEventListener("change", () => { state.prefix = $("filenamePrefix").value.trim() || "video/LTXH3"; saveState(); });
@@ -639,8 +669,10 @@ function handleImageFile(file, opts = {}){
   };
   reader.readAsDataURL(file);
 }
+const inputZoom = setupZoomPan("inputWrap", "inputImg", "btnResetZoomInput", "btnFullscreenInput");
 function showInputImage(){
   const has = !!inputImage;
+  inputZoom.resetZoom();
   $("inputWrap").style.display = has ? "flex" : "none";
   $("imgInputActions").style.display = has ? "flex" : "none";
   $("i2vControls").style.display = has ? "block" : "none";
@@ -708,20 +740,67 @@ async function uploadInputImage(img){
   return img.uploaded;
 }
 
+let inputLoadSeq = 0; // al navegar rápido, solo cuenta la última imagen pedida
 // Abierta desde otra WebUI con ?ref=<subcarpeta/archivo> de output: imagen de inicio.
 (async function loadRefFromUrl(){
   const ref = new URLSearchParams(window.location.search).get("ref");
   if(!ref) return;
   const parts = ref.split("/");
-  const media = { filename: parts.pop(), subfolder: parts.join("/"), type: "output" };
+  loadOutputAsInput({ filename: parts.pop(), subfolder: parts.join("/"), type: "output" });
+})();
+async function loadOutputAsInput(media){
+  const seq = ++inputLoadSeq;
   try {
     const r = await fetch(mediaViewUrl(media));
     if(!r.ok) throw new Error("HTTP " + r.status);
     const blob = await r.blob();
+    if(seq !== inputLoadSeq) return;
     handleImageFile(new File([blob], media.filename, { type: blob.type || "image/png" }));
     log(`🖼️ Imagen recibida: ${media.filename}`, "l-ok");
-  } catch(e){ log("⚠️ No se pudo cargar la imagen enviada: " + e.message, "l-warn"); }
-})();
+  } catch(e){ log("⚠️ No se pudo cargar la imagen: " + e.message, "l-warn"); }
+}
+
+// --- IMÁGENES KREA2 RECIENTES ---
+makeCollapsible("krea2RecentToggle", "krea2RecentBody", () => { if(!$("krea2RecentGrid").dataset.loaded) loadKrea2Recent(); });
+let krea2Recent = [], krea2RecentIndex = -1, krea2NavTimer = null;
+async function loadKrea2Recent(){
+  const grid = $("krea2RecentGrid"), status = $("krea2RecentStatus");
+  status.textContent = "Cargando...";
+  try {
+    const r = await fetch("/api/krea2_list");
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const data = await r.json();
+    const items = krea2Recent = data.items || [];
+    grid.innerHTML = "";
+    if(!items.length){ status.textContent = `Sin imágenes en ${data.dir}. Genera alguna en Krea2 primero.`; return; }
+    status.textContent = `${items.length} imagen(es) (${data.dir}):`;
+    items.forEach((it, i) => {
+      const div = document.createElement("div");
+      div.className = "gallery-item";
+      div.innerHTML = `<img src="${mediaViewUrl(it)}&t=${it.mtime}" loading="lazy" referrerpolicy="no-referrer"><div class="info-tag">${escapeHtml(new Date(it.mtime * 1000).toLocaleString())} · ${Math.round(it.size / 1024)}KB</div>`;
+      div.addEventListener("click", () => { krea2RecentIndex = i; loadOutputAsInput(it); });
+      grid.appendChild(div);
+    });
+    grid.dataset.loaded = "1";
+  } catch(e){ status.textContent = "Error cargando: " + e.message; }
+}
+async function navigateKrea2Recent(dir){
+  if(!$("krea2RecentGrid").dataset.loaded) await loadKrea2Recent();
+  const n = krea2Recent.length;
+  if(!n) return;
+  const cur = krea2RecentIndex >= 0 ? krea2RecentIndex : krea2Recent.findIndex(it => it.filename === inputImage?.file.name);
+  krea2RecentIndex = cur < 0 ? (dir > 0 ? 0 : n - 1) : (cur + dir + n) % n;
+  loadOutputAsInput(krea2Recent[krea2RecentIndex]);
+}
+const inputIsFullscreen = () => document.fullscreenElement === $("inputWrap") || document.webkitFullscreenElement === $("inputWrap");
+document.addEventListener("keydown", e => {
+  if(!inputIsFullscreen() || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+  e.preventDefault();
+  if(krea2NavTimer) return;
+  navigateKrea2Recent(e.key === "ArrowRight" ? 1 : -1);
+  krea2NavTimer = setTimeout(() => { krea2NavTimer = null; }, 250);
+});
+inputZoom.onSwipe(dir => { if(inputIsFullscreen()) navigateKrea2Recent(dir); });
 
 // --- CONSTRUCCIÓN DEL GRAFO ---
 // Conserva solo los nodos alcanzables desde las salidas: así lo que se desactiva
@@ -804,7 +883,7 @@ function applySampling(g, m, model, s){
 }
 
 // Post-proceso común: interpolación (RTX Frame Gen / RIFE) y luego RTX VSR.
-function appendPost(g, images, rife, rtx, prefixId){
+function appendPost(g, images, rife, rtx, prefixId, fx, seed){
   let ref = images;
   if(rife && rife.enabled){
     if(rife.engine === "rtx"){
@@ -826,6 +905,20 @@ function appendPost(g, images, rife, rtx, prefixId){
     }, _meta: { title: sameRes ? `RTX ${rtx.quality}` : `RTX VSR ${rtx.scale}x` } };
     ref = [`${prefixId}_rtx`, 0];
   }
+  // LUT + viñeta + grano (nodo propio LTXWebVideoFX: vectorizado y por chunks).
+  if(fx && fx.enabled){
+    const lut = fx.lut.enabled && fx.lut.name ? fx.lut.name : "";
+    // Slider de viñeta 0–0.6 ×4, como en LTXV/MiniMaxH3 (el nodo recorta la opacidad).
+    const vignette = fx.vignette.enabled ? Math.min(2, fx.vignette.intensity * 4) : 0;
+    const grain = fx.grain.enabled ? fx.grain.power : 0;
+    if(lut || vignette > 0 || grain > 0){
+      g[`${prefixId}_fx`] = { class_type: "LTXWebVideoFX", inputs: {
+        image: ref, lut_name: lut, lut_strength: fx.lut.strength, vignette, vignette_cx: 0.5, vignette_cy: 0.5,
+        grain, grain_size: 1.0, grain_seed: 1 + (Math.abs(seed | 0) % 1000), grain_mono: true, chunk_mb: 1024,
+      }, _meta: { title: "LTXWeb Video FX (LUT/Viñeta/Grano)" } };
+      ref = [`${prefixId}_fx`, 0];
+    }
+  }
   return ref;
 }
 
@@ -839,6 +932,7 @@ function buildGraph(job){
   const g = JSON.parse(JSON.stringify(d.graph));
   const L = d.ltx, H = d.h3, p1 = d.p1, p2 = d.p2;
   const W = job.width, Hh = job.height;
+  const W2 = nearest32(W * job.upscaleBy), H2 = nearest32(Hh * job.upscaleBy);
   const pass1Only = job.pass1Only;
 
   applyModels(g, L, job.models.ltx);
@@ -864,10 +958,18 @@ function buildGraph(job){
   g[NC.FRAMES].inputs.value = job.frames;
   if(job.dir === "ltx_h3"){
     Object.assign(g["10"].inputs, { width: W, height: Hh });
-    Object.assign(g[d.UPS].inputs, { width: W * 2, height: Hh * 2 });
-    Object.assign(g["32"].inputs, { width: W * 2, height: Hh * 2 });
+    Object.assign(g[d.UPS].inputs, { width: W2, height: H2 });
+    Object.assign(g["32"].inputs, { width: W2, height: H2 });
   } else {
     Object.assign(g["8"].inputs, { width: W, height: Hh });
+    // El upsampler LTX es x2 fijo: a 1x se omite y las escalas intermedias reducen su salida.
+    if(W2 === W && H2 === Hh){
+      g["22"].inputs.video_latent = g[d.UPS].inputs.samples;
+    } else if(W2 !== W * 2 || H2 !== Hh * 2){
+      // LatentUpscale divide entre 8 y el latente LTX es 1/32: se le pasa el tamaño final / 4.
+      g.ups_resize = { class_type: "LatentUpscale", inputs: { samples: [d.UPS, 0], upscale_method: "bilinear", width: W2 / 4, height: H2 / 4, crop: "disabled" }, _meta: { title: "Latente LTX → escala final" } };
+      g["22"].inputs.video_latent = ["ups_resize", 0];
+    }
   }
   g[d.UPS_LOADER].inputs.model_name = job.upscaler;
   g[d[p1].NOISE].inputs.noise_seed = job.seed;
@@ -900,11 +1002,11 @@ function buildGraph(job){
   if(job.image){
     g.img_load = { class_type: "LoadImage", inputs: { image: job.image }, _meta: { title: "Imagen de inicio" } };
     // Mismo encuadre (crop center) que LTX; MiniMaxH3ImageToVideo solo estira al lienzo.
-    const h3Scale = roleOf(job.dir, "h3") === "p1" ? 1 : 2;
-    g.img_h3_scale = { class_type: "ImageScale", inputs: { image: ["img_load", 0], upscale_method: "lanczos", width: W * h3Scale, height: Hh * h3Scale, crop: "center" }, _meta: { title: "Imagen → resolución H3" } };
+    const h3P1 = roleOf(job.dir, "h3") === "p1";
+    g.img_h3_scale = { class_type: "ImageScale", inputs: { image: ["img_load", 0], upscale_method: "lanczos", width: h3P1 ? W : W2, height: h3P1 ? Hh : H2, crop: "center" }, _meta: { title: "Imagen → resolución H3" } };
     g[H.COND].inputs.first_frame = ["img_h3_scale", 0];
-    const scale = roleOf(job.dir, "ltx") === "p1" ? 1 : 2;
-    g.img_ltx_scale = { class_type: "ImageScale", inputs: { image: ["img_load", 0], upscale_method: "lanczos", width: W * scale, height: Hh * scale, crop: "center" }, _meta: { title: "Imagen → resolución LTX" } };
+    const ltxP1 = roleOf(job.dir, "ltx") === "p1";
+    g.img_ltx_scale = { class_type: "ImageScale", inputs: { image: ["img_load", 0], upscale_method: "lanczos", width: ltxP1 ? W : W2, height: ltxP1 ? Hh : H2, crop: "center" }, _meta: { title: "Imagen → resolución LTX" } };
     g.img_ltx_pre = { class_type: "LTXVPreprocess", inputs: { image: ["img_ltx_scale", 0], img_compression: 33 }, _meta: { title: "LTXV Preprocess" } };
     const [sinkId, sinkField] = L.IMG_LATENT;
     g.img_ltx_inplace = { class_type: "LTXVImgToVideoInplace", inputs: {
@@ -922,12 +1024,14 @@ function buildGraph(job){
   const tag = job.dir === "ltx_h3" ? "L2H" : "H2L";
   const prefix = `${job.prefix}_${tag}`;
   if(job.savePass1 || pass1Only){
-    g.p1_create = { class_type: "CreateVideo", inputs: { images: [d.P1_DEC_V, 0], audio: [d.P1_DEC_A, 0], fps: FPS }, _meta: { title: "Vídeo pase 1" } };
+    // Con "solo pase 1" el pase 1 es el vídeo final: lleva el grading.
+    const p1Images = pass1Only ? appendPost(g, [d.P1_DEC_V, 0], null, null, "p1post", job.postfx, job.seed) : [d.P1_DEC_V, 0];
+    g.p1_create = { class_type: "CreateVideo", inputs: { images: p1Images, audio: [d.P1_DEC_A, 0], fps: FPS }, _meta: { title: "Vídeo pase 1" } };
     g[N.FIRST_SAVE] = saveNode(`${prefix}_p1`, ["p1_create", 0], "Guardar pase 1");
     outputs.push(N.FIRST_SAVE);
   }
   if(!pass1Only){
-    g[d.CREATE].inputs.images = appendPost(g, [d.DEC_V, 0], job.rife, job.rtx, "post");
+    g[d.CREATE].inputs.images = appendPost(g, [d.DEC_V, 0], job.rife, job.rtx, "post", job.postfx, job.seed);
     g[d.CREATE].inputs.fps = job.rife.enabled ? FPS * job.rife.multiplier : FPS;
     g[N.FINAL_SAVE] = saveNode(prefix, [d.CREATE, 0], "Guardar vídeo final");
     outputs.push(N.FINAL_SAVE);
@@ -994,6 +1098,7 @@ function stateFromGraph(wf){
   }
   const latent = dir === "ltx_h3" ? wf["10"] : wf["8"];
   if(latent?.inputs){ s.width = latent.inputs.width; s.height = latent.inputs.height; }
+  s.upscaleBy = 2;
   if(typeof wf[NC.FRAMES]?.inputs?.value === "number") s.frames = wf[NC.FRAMES].inputs.value;
   if(typeof wf[NC.IDEA]?.inputs?.value === "string"){ s.idea = wf[NC.IDEA].inputs.value; s.promptMode = "ollama"; }
   const seed = wf[d[d.p1].NOISE]?.inputs?.noise_seed;
@@ -1076,6 +1181,8 @@ function renderAll(){
   renderModels("ltx"); renderModels("h3");
   $("i2vStrength").value = state.i2v.strength; $("i2vStrengthVal").textContent = Number(state.i2v.strength).toFixed(2);
   $("i2vFitRes").checked = state.i2v.fitRes; $("i2vToLlm").checked = state.i2v.llmImage;
+  $("upscaleBy").value = state.upscaleBy; $("upscaleByVal").textContent = Number(state.upscaleBy).toFixed(2) + "x";
+  $("evolveAuto").checked = state.evolveAuto;
   $("savePass1").checked = state.savePass1; $("pass1Only").checked = state.pass1Only;
   $("filenamePrefix").value = state.prefix;
   renderPost();
@@ -1100,6 +1207,7 @@ function snapshotJob(){
     spLtx: spText("ltx", s.sp.ltx),
     spH3: spText("h3", s.sp.h3),
     upscaler: s.upscaler[s.dir],
+    evolve: s.evolveAuto ? evolveParams() : null,
     inputImage,
     i2vStrength: s.i2v.strength,
     i2vToLlm: s.i2v.llmImage,
@@ -1201,7 +1309,14 @@ async function runSingleGeneration(index){
   const job = activeJob;
   try {
     const seed = job.seedMode === "random" ? randomSeed() : job.seed + index;
-    const graph = buildGraph({ ...job, seed });
+    let variant = job;
+    if(job.evolve){
+      // Cada variante lleva su transmutación, también en los metadatos (restauración exacta).
+      const evolved = evolvedPrompts(job, job.evolve);
+      variant = { ...job, ...evolved, uiState: { ...job.uiState, ...evolved, evolveAuto: false } };
+      log(`🧬 Variante ${index + 1}: ${Object.values(evolved).join(" · ")}`, "l-info");
+    }
+    const graph = buildGraph({ ...variant, seed });
     variantCounter++;
     const varIndex = variantCounter;
     log(job.onDemand ? `Encolando ${job.onDemand === "interp" ? "interpolación" : "RTX VSR"} de ${job.sourceMedia.filename}...`
@@ -1245,11 +1360,12 @@ $("btnEnhance").addEventListener("click", async () => {
   const system = getCurrentSysPrompt(loadSysPrompts(), mode, styleKey);
   const idea = $("prompt").value.trim();
   if(mode !== "vision" && !idea){ log("⚠️ Escribe la idea en el panel Prompt.", "l-err"); return; }
-  const payload = { model, system, prompt: idea || "Describe this image.", stream: false, options: { num_ctx: 8192 } };
+  const payload = { model, system, prompt: idea, stream: false, options: { num_ctx: 8192 } };
   if(mode === "vision"){
     if(!inputImage){ log("⚠️ Modo visión: carga una imagen de inicio.", "l-err"); return; }
     try { payload.images = [await resizeFileToBase64(inputImage.file, 768)]; }
     catch(e){ log("❌ No se pudo leer la imagen: " + (e.message || e), "l-err"); return; }
+    payload.prompt = idea ? `FIRST FRAME: the image above.\nUSER IDEA (follow it): ${idea}` : "FIRST FRAME: the image above. No user idea: propose a natural continuation.";
   }
   const btn = $("btnEnhance");
   btn.disabled = true; btn.textContent = "Mejorando...";
@@ -1280,6 +1396,45 @@ function enqueueOnDemand(kind){
 }
 $("btnInterpolate1").addEventListener("click", () => enqueueOnDemand("interp"));
 $("btnRtxUpscale1").addEventListener("click", () => enqueueOnDemand("rtx"));
+
+// --- EVOLVE / TRANSMUTAR PROMPT ---
+// generateEvolved() está en common.js. Los tokens <Picture N> y [Shot N] de H3 no se transmutan.
+const EVOLVE_FIELDS = { idea: ["prompt", ""], promptLtx: ["promptLtx", "LTX-2.5: "], promptH3: ["promptH3", "H3: "] };
+const evolveParams = () => ({ mode: $("evolveMode").value, strength: parseInt($("evolveStrength").value, 10) });
+function evolveText(text, evolve){
+  return text.split(/(<[^>]*>|\[[^\]]*\])/)
+    .map((part, i) => i % 2 ? part : part.replace(/\S(?:[\s\S]*\S)?/, m => generateEvolved(m, evolve.mode, evolve.strength, 1)[0]))
+    .join("");
+}
+function evolvedPrompts(src, evolve){
+  const keys = src.promptMode === "manual" ? ["promptLtx", "promptH3"] : ["idea"];
+  return Object.fromEntries(keys.filter(k => src[k].trim()).map(k => [k, evolveText(src[k], evolve)]));
+}
+let evolveVariants = [];
+makeCollapsible("evolveToggle", "evolveBody");
+$("evolveStrength").addEventListener("input", e => { $("evolveStrengthVal").textContent = e.target.value + "%"; });
+$("evolveAuto").addEventListener("change", e => { state.evolveAuto = e.target.checked; saveState(); });
+$("btnEvolve").addEventListener("click", () => {
+  const src = { promptMode: state.promptMode, idea: $("prompt").value, promptLtx: state.promptLtx, promptH3: state.promptH3 };
+  const evolve = evolveParams(), count = parseInt($("evolveCount").value, 10) || 4;
+  evolveVariants = Array.from({ length: count }, () => evolvedPrompts(src, evolve));
+  if(!Object.keys(evolveVariants[0]).length){
+    evolveVariants = [];
+    log(state.promptMode === "manual" ? "⚠️ Escribe los prompts de cada modelo primero." : "⚠️ Escribe la idea en el panel Prompt primero.", "l-err");
+    return;
+  }
+  $("evolveOutput").value = evolveVariants.map((v, i) => `--- Variant ${i + 1} ---\n` + Object.entries(v).map(([k, t]) => EVOLVE_FIELDS[k][1] + t).join("\n\n")).join("\n\n");
+  log(`🧬 ${count} variantes generadas (${evolve.mode}, ${evolve.strength}%)`, "l-ok");
+});
+$("btnEvolveUse").addEventListener("click", () => {
+  if(!evolveVariants.length){ log("⚠️ Genera variantes primero", "l-err"); return; }
+  for(const [k, t] of Object.entries(evolveVariants[0])){
+    const el = $(EVOLVE_FIELDS[k][0]);
+    el.value = t;
+    el.dispatchEvent(new Event("input"));
+  }
+  log("✏️ Prompt actualizado con la variante #1", "l-ok");
+});
 
 // --- CALLBACKS PARA common.js ---
 CONFIG.findMedia = function(out){

@@ -107,7 +107,7 @@ REQUIRED_PACKAGES = [
         "bundled": True,
         "nodes": ["LTXWebVideoFX"],
         "critical": False,
-        "workflows": ["LTXV / KreaQwen / MiniMaxH3 (Post-FX: LUT/Viñeta/Grano)"],
+        "workflows": ["LTXV / KreaQwen / MiniMaxH3 / LTXH3 (Post-FX: LUT/Viñeta/Grano)"],
     },
     {
         "name": "ComfyUI-ProPost",
