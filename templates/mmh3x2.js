@@ -1218,7 +1218,7 @@ CONFIG.variantMeta = function(seedValue, timeText){
     ["Memory opt", $("segMemOptOn")?.classList.contains("on") ? "Sí" : "No"],
     (() => { const s = getSpectrumState(); return ["Spectrum", s.enabled ? `on · bw ${s.blend.toFixed(2)} · fw ${s.flex.toFixed(2)} · wu ${s.warmup}${s.bootstrapFirstForecast ? ' · boot' : ''} · ${s.historyStorage}` : "off"]; })(),
     IS_BLOCKATT ? ["Optimizador", getAttentionOptimizerState().mode] : null,
-    (() => { const s = getLatentRefineState(); return ["Refinado latente", s.enabled ? `${s.scale.toFixed(2)}x · denoise ${s.denoise.toFixed(2)} · ${s.steps} pasos${s.unet ? ` · ${s.unet.split("/").pop()}${s.lora ? ` + ${s.lora.split("/").pop()} (${s.loraStrength.toFixed(2)})` : ""}` : ""}` : "desactivado"]; })(),
+    (() => { const s = getLatentRefineState(); return ["Refinado latente", s.enabled ? `${s.scale.toFixed(2)}x ${s.net === "2d" ? `2D nitidez ${s.sharpness}` : "3D"} · denoise ${s.denoise.toFixed(2)} · ${s.steps} pasos${s.unet ? ` · ${s.unet.split("/").pop()}${s.lora ? ` + ${s.lora.split("/").pop()} (${s.loraStrength.toFixed(2)})` : ""}` : ""}` : "desactivado"]; })(),
     ["Empalme vídeo", $("blendToggle")?.checked ? `${$("blendFrames")?.value || 4}f · fuerza ${$("blendStrength")?.value || 0.35} · ${$("blendMode")?.value || "transition_only"}` : "desactivado"],
     (() => {
       const rifeOn = $("rifeToggle")?.checked;
@@ -2274,10 +2274,13 @@ function applyWorkflow(workflow){
   if(typeof updateBlendControlsVisibility === "function") updateBlendControlsVisibility();
 
   // Refinado latente: la escala sale de la expresión del ancho (o del ancho absoluto / ancho base)
-  const lrUp = findByClass("MiniMaxH3LatentUpscaleWithModel");
+  const lrUp = findByClass("MiniMaxH3LatentUpscaleWithModel") || findByClass("MinimaxH3LatentUpscalerNode2D");
   const lrState = { ...getLatentRefineState(), enabled: !!lrUp };
   if(lrUp?.inputs){
-    const wIn = lrUp.inputs.width;
+    const lr2D = lrUp.class_type === "MinimaxH3LatentUpscalerNode2D";
+    lrState.net = lr2D ? "2d" : "3d";
+    if(lr2D && typeof lrUp.inputs.sharpness === "number") lrState.sharpness = lrUp.inputs.sharpness;
+    const wIn = lr2D ? lrUp.inputs["mode.width"] : lrUp.inputs.width;
     const m = Array.isArray(wIn) && String(workflow[wIn[0]]?.inputs?.expression || "").match(/a \* ([\d.]+)/);
     const baseW = workflow[N.REF2V_SEG2]?.inputs?.width ?? workflow[N.REF2V_SEG1]?.inputs?.width;
     if(m) lrState.scale = parseFloat(m[1]);
@@ -2734,6 +2737,8 @@ function getLatentRefineState(){
   return {
     enabled: !!$("latentRefineToggle")?.checked,
     scale: parseFloat($("latentRefineScale")?.value || "1.5"),
+    net: $("latentRefineNet")?.value || "3d",
+    sharpness: parseInt($("latentRefineSharpness")?.value || "1", 10),
     denoise: parseFloat($("latentRefineDenoise")?.value || "0.60"),
     steps: parseInt($("latentRefineSteps")?.value || "3", 10),
     unet: $("latentRefineUnet")?.value || "",
@@ -2748,6 +2753,12 @@ function setLatentRefineUI(s){
     $("latentRefineScale").value = s.scale;
     if($("latentRefineScaleVal")) $("latentRefineScaleVal").textContent = s.scale.toFixed(2) + "x";
   }
+  if((s.net === "2d" || s.net === "3d") && $("latentRefineNet")) $("latentRefineNet").value = s.net;
+  if(typeof s.sharpness === "number" && $("latentRefineSharpness")){
+    $("latentRefineSharpness").value = s.sharpness;
+    if($("latentRefineSharpnessVal")) $("latentRefineSharpnessVal").textContent = String(s.sharpness);
+  }
+  if($("latentRefineSharpnessRow")) $("latentRefineSharpnessRow").style.display = $("latentRefineNet")?.value === "2d" ? "block" : "none";
   if(typeof s.denoise === "number" && $("latentRefineDenoise")){
     $("latentRefineDenoise").value = s.denoise;
     if($("latentRefineDenoiseVal")) $("latentRefineDenoiseVal").textContent = s.denoise.toFixed(2);
@@ -3056,7 +3067,7 @@ function attachAutoSaveListeners(){
     "postFxMasterToggle", "postFxLutToggle", "postFxLutSelect", "postFxLutStrength", "postFxVigToggle", "postFxVigIntensity", "postFxGrainToggle", "postFxGrainPower",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
     "audioGuideVolume", "audioUserVolume", "audioNormalizeToggle", "shareRefsToggle", "refImageSize", "img1AnchorFirst", "img2AnchorLast",
-    "latentRefineToggle", "latentRefineScale", "latentRefineDenoise", "latentRefineSteps",
+    "latentRefineToggle", "latentRefineScale", "latentRefineNet", "latentRefineSharpness", "latentRefineDenoise", "latentRefineSteps",
     "latentRefineUnet", "latentRefineLora", "latentRefineLoraStrength",
     "enhancerModel", "enhancerMode", "enhancerStyle", "enhancerChainMode", "purgeVram"
   ];
@@ -3097,7 +3108,7 @@ function attachAutoSaveListeners(){
     if($("blendFramesVal")) $("blendFramesVal").textContent = `${e.target.value}f`;
   });
 
-  ["latentRefineToggle", "latentRefineScale", "latentRefineDenoise", "latentRefineSteps", "latentRefineUnet", "latentRefineLora", "latentRefineLoraStrength"].forEach(id => {
+  ["latentRefineToggle", "latentRefineScale", "latentRefineNet", "latentRefineSharpness", "latentRefineDenoise", "latentRefineSteps", "latentRefineUnet", "latentRefineLora", "latentRefineLoraStrength"].forEach(id => {
     $(id)?.addEventListener("input", () => {
       setLatentRefineUI(getLatentRefineState());
       updateCalculatedResolution(...lastResOrig);
@@ -5199,11 +5210,14 @@ function buildGraph(j){
     };
     const upW = scaledSize(sizeSrc.width, N.LR_W, "Ancho refinado");
     const upH = scaledSize(sizeSrc.height, N.LR_H, "Alto refinado");
-    g[N.LR_LOADER] = {
-      class_type: "LatentUpscaleModelLoader",
-      inputs: { model_name: "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors" },
-      _meta: { title: "Latent Upscale Model Loader (MiniMax H3)" }
-    };
+    const lr2D = lrState.net === "2d";
+    if(!lr2D){
+      g[N.LR_LOADER] = {
+        class_type: "LatentUpscaleModelLoader",
+        inputs: { model_name: H3_LATENT_UP_3D },
+        _meta: { title: "Latent Upscale Model Loader (MiniMax H3)" }
+      };
+    }
 
     // Re-ancla los keyframes (AddGuide) sobre el latente reescalado: el guide debe
     // codificarse a la resolución del refinado, no a la del pase 1.
@@ -5248,11 +5262,13 @@ function buildGraph(j){
 
     const refineSeg = (seg, src, ids, swap) => {
       const model = refineModel ? [refineModel, 0] : g[src.guider].inputs.model;
-      g[ids.up] = {
-        class_type: "MiniMaxH3LatentUpscaleWithModel",
-        inputs: { model: [N.LR_LOADER, 0], samples: [src.sample, 0], width: upW, height: upH },
-        _meta: { title: `Latent Upscale Seg ${seg}` }
-      };
+      g[ids.up] = lr2D
+        ? h3LatentUpscale2D(H3_LATENT_UP_2D, [src.sample, 0], upW, upH, lrState.sharpness, `Latent Upscale 2D Seg ${seg}`)
+        : {
+          class_type: "MiniMaxH3LatentUpscaleWithModel",
+          inputs: { model: [N.LR_LOADER, 0], samples: [src.sample, 0], width: upW, height: upH },
+          _meta: { title: `Latent Upscale Seg ${seg}` }
+        };
       g[ids.sched] = {
         class_type: "BasicScheduler",
         inputs: { model, scheduler: g[src.scheduler].inputs.scheduler, steps: lrState.steps, denoise: lrState.denoise },

@@ -140,7 +140,7 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | **ComfyUI-LTXVideo** | [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | `LTXVTiledVAEDecode` | LTXH3 (H3 → LTX final decode) |
 | **H3-Optimizations** *(optional)* | [H3-Optimizations](https://github.com/Zironic/H3-Optimizations) | `H3VSAAttention`, `H3MemoryOptimization`, `H3SparseAttention`, `H3AIMDOResidencyLimiter` | MiniMaxH3 (VSA Attention, AIMDO), LTXH3 (VSA / H3 Sparse / Memory Optimization) |
 
-The MiniMaxH3 and MMH3X2 3D Latent Upscaler uses the native ComfyUI nodes `LatentUpscaleModelLoader` + `MiniMaxH3LatentUpscaleWithModel` (ComfyUI commit `35060f0` or newer, model `minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors` in `models/latent_upscale_models/`).
+The MiniMaxH3 and MMH3X2 3D Latent Upscaler uses the native ComfyUI nodes `LatentUpscaleModelLoader` + `MiniMaxH3LatentUpscaleWithModel` (ComfyUI commit `35060f0` or newer, model `minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors` in `models/latent_upscale_models/`). The optional 2D network (selectable in MiniMaxH3, MMH3X2 and LTXH3, with a 1–6 sharpness setting) uses `MinimaxH3LatentUpscalerNode2D` from [Comfyui_Minimax_h3_latent_Upscaler](https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler) with `minimax_h3_latent_upscaler_2d_conv_v1_fp16.safetensors` from [LBH-123-AI/Minimax_h3_latent_Upscaler](https://huggingface.co/LBH-123-AI/Minimax_h3_latent_Upscaler).
 
 > [!TIP]
 > You can run `python3 diagnostico_comfyui.py` at any time to automatically check which nodes are installed on your backend.

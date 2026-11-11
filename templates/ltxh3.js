@@ -153,6 +153,7 @@ function defaultState(){
       h3_ltx: BASE_GRAPH_H3_LTX[DIRS.h3_ltx.UPS_LOADER].inputs.model_name,
     },
     upscaleBy: 2,
+    upscaleSharpness: 1,
     evolveAuto: false,
     audio: { mode: "none", guide: null, music: null, musicDb: -12 },
     savePass1: false, pass1Only: false,
@@ -477,13 +478,14 @@ function renderDirection(){
   $("roleH3").textContent = roleOf(state.dir, "h3") === "p1" ? "pase 1 · base" : "pase 2 · refinado";
   $("chainP1").textContent = `${MODEL_LABEL[d.p1]} · pase 1`;
   $("chainP2").textContent = `${MODEL_LABEL[d.p2]} · refinado`;
-  $("dirHint").textContent = `${MODEL_LABEL[d.p1]} genera la base; ${MODEL_LABEL[d.p2]} la refina (upscaler latente ${d.p2 === "h3" ? "H3 3D conv" : "LTX espacial"}).`;
+  $("dirHint").textContent = `${MODEL_LABEL[d.p1]} genera la base; ${MODEL_LABEL[d.p2]} la refina (upscaler latente ${d.p2 === "h3" ? "H3 3D o 2D" : "LTX espacial"}).`;
   // Paneles en el orden del pipeline.
   const col = $("panelLtx").parentNode;
   if(d.p1 === "h3") col.insertBefore($("panelH3"), $("panelLtx"));
   else col.insertBefore($("panelLtx"), $("panelH3"));
   $("upscalerLabel").textContent = `Upscaler (${MODEL_LABEL[d.p2]})`;
   fillSelect($("latentUpscaler"), MODEL_LISTS.upscaler(d.p2), state.upscaler[state.dir]);
+  renderUpscaleSharpness();
   renderSampling("ltx"); renderSampling("h3");
   updateResHint();
 }
@@ -497,7 +499,13 @@ function setDirection(dir){
 $("segDirL2H").addEventListener("click", () => setDirection("ltx_h3"));
 $("segDirH2L").addEventListener("click", () => setDirection("h3_ltx"));
 $("btnSwapDir").addEventListener("click", () => setDirection(state.dir === "ltx_h3" ? "h3_ltx" : "ltx_h3"));
-$("latentUpscaler").addEventListener("change", e => { state.upscaler[state.dir] = e.target.value; saveState(); });
+// La nitidez solo existe en el upscaler H3 2D.
+function renderUpscaleSharpness(){
+  $("upscaleSharpRow").style.display = isH3LatentUp2D($("latentUpscaler").value) ? "" : "none";
+  $("upscaleSharp").value = state.upscaleSharpness; $("upscaleSharpVal").textContent = state.upscaleSharpness;
+}
+$("latentUpscaler").addEventListener("change", e => { state.upscaler[state.dir] = e.target.value; renderUpscaleSharpness(); saveState(); });
+$("upscaleSharp").addEventListener("input", e => { state.upscaleSharpness = parseInt(e.target.value, 10); $("upscaleSharpVal").textContent = state.upscaleSharpness; saveState(); });
 $("upscaleBy").addEventListener("input", () => { state.upscaleBy = parseFloat($("upscaleBy").value); $("upscaleByVal").textContent = state.upscaleBy.toFixed(2) + "x"; updateResHint(); saveState(); });
 
 // --- UI: RESOLUCIÓN, FRAMES, SEMILLA ---
@@ -1045,6 +1053,10 @@ function buildGraph(job){
     }
   }
   g[d.UPS_LOADER].inputs.model_name = job.upscaler;
+  if(job.dir === "ltx_h3" && isH3LatentUp2D(job.upscaler)){
+    g[d.UPS] = h3LatentUpscale2D(job.upscaler, g[d.UPS].inputs.samples, W2, H2, job.upscaleSharpness, "MiniMax H3 Latent Upscaler (2D)");
+    delete g[d.UPS_LOADER];
+  }
   g[d[p1].NOISE].inputs.noise_seed = job.seed;
   g[d[p2].NOISE].inputs.noise_seed = job.seed + 1;
   g[L.NEG].inputs.text = job.negLtx;

@@ -160,6 +160,25 @@ async function postComfyBackend(endpoint, body){
   return r;
 }
 
+// Upscaler latente MiniMax H3 2D (custom node Comfyui_Minimax_h3_latent_Upscaler). Misma salida
+// en px que el nativo 3D (alineada a 32), acepta el latente AV y añade nitidez 1–6.
+const H3_LATENT_UP_3D = "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors";
+const H3_LATENT_UP_2D = "minimax_h3_latent_upscaler_2d_conv_v1_fp16.safetensors";
+const isH3LatentUp2D = name => /2d_conv/i.test(name || "");
+function h3LatentUpscale2D(modelName, samples, width, height, sharpness, title){
+  return {
+    class_type: "MinimaxH3LatentUpscalerNode2D",
+    inputs: {
+      latent: samples, model_name: modelName,
+      mode: "target dimensions", "mode.width": width, "mode.height": height,
+      sharpness: sharpness || 1, align: 32,
+      temporal_chunking: "chunked", "temporal_chunking.chunk_frames": 32,
+      force_unload: true, device: "cuda", precision: "fp16"
+    },
+    _meta: { title }
+  };
+}
+
 function getFriendlyRatio(w, h){
   if(!w || !h) return "16:9";
   const r = w / h;

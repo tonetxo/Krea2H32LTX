@@ -821,6 +821,8 @@ const LATENT_UPSCALE_KEY = "minimaxh3_latent_upscale_state";
 const LATENT_UPSCALE_DEFAULTS = {
   enabled: false,
   scale: 1.5,
+  net: "3d", // "3d" = nodo nativo, "2d" = custom node con nitidez
+  sharpness: 1,
   pass2: true,
   pass2Unet: "", // "" = "mismo que pase 1"
   pass2Lora: "h3/taomate_h3_3step_comfy.safetensors",
@@ -838,6 +840,8 @@ function getLatentUpscaleState(){
   return {
     enabled: $("segLatentUpscaleOn")?.classList.contains("on") ?? false,
     scale: parseFloat($("latentScaleSlider")?.value || "1.5"),
+    net: $("segLatentNet2D")?.classList.contains("on") ? "2d" : "3d",
+    sharpness: parseInt($("latentSharpness")?.value || "1", 10),
     pass2: $("segLatentPass2On")?.classList.contains("on") ?? true,
     pass2Unet: $("latentPass2Unet")?.value || "",
     pass2Lora: $("latentPass2Lora")?.value || "",
@@ -875,6 +879,15 @@ function setLatentUpscaleUI(s){
     $("latentScaleSlider").value = sc;
     if($("latentScaleVal")) $("latentScaleVal").textContent = sc.toFixed(2) + "x";
     if($("latentScaleHint")) $("latentScaleHint").textContent = `(${sc.toFixed(2)}x)`;
+  }
+  const is2D = s.net === "2d";
+  $("segLatentNet2D")?.classList.toggle("on", is2D);
+  $("segLatentNet3D")?.classList.toggle("on", !is2D);
+  if($("latentSharpnessRow")) $("latentSharpnessRow").style.display = is2D ? "" : "none";
+  if($("latentSharpness")){
+    const sh = parseInt(s.sharpness || 1, 10);
+    $("latentSharpness").value = sh;
+    if($("latentSharpnessVal")) $("latentSharpnessVal").textContent = sh;
   }
 
   // Pase 2
@@ -933,6 +946,18 @@ $("latentScaleSlider")?.addEventListener("input", (e) => {
   s.scale = sc;
   saveLatentUpscale(s);
   if(typeof recalcResolution === "function") recalcResolution();
+  scheduleSaveH3Settings();
+});
+["segLatentNet3D", "segLatentNet2D"].forEach(id => $(id)?.addEventListener("click", () => {
+  const s = getLatentUpscaleState();
+  s.net = id === "segLatentNet2D" ? "2d" : "3d";
+  setLatentUpscaleUI(s);
+  saveLatentUpscale(s);
+  scheduleSaveH3Settings();
+}));
+$("latentSharpness")?.addEventListener("input", (e) => {
+  if($("latentSharpnessVal")) $("latentSharpnessVal").textContent = e.target.value;
+  saveLatentUpscale(getLatentUpscaleState());
   scheduleSaveH3Settings();
 });
 $("segLatentPass2On")?.addEventListener("click", () => {
@@ -2100,7 +2125,7 @@ CONFIG.variantMeta = function(seedValue, timeText){
   ];
 
   if(lu.enabled){
-    rows.push(["Latent Upscale", `${lu.scale.toFixed(2)}x${lu.pass2 ? ` (Pase 2 denoise ${lu.pass2Denoise || 0.60})` : ''}`]);
+    rows.push(["Latent Upscale", `${lu.scale.toFixed(2)}x ${lu.net === "2d" ? `2D nitidez ${lu.sharpness}` : "3D"}${lu.pass2 ? ` (Pase 2 denoise ${lu.pass2Denoise || 0.60})` : ''}`]);
   }
   const rtx = getRtxState ? getRtxState() : null;
   if(rtx && rtx.enabled){
@@ -2815,6 +2840,7 @@ async function applyWorkflow(workflow, opts={}){
     }
     return null;
   }
+  const findByTitle = title => Object.values(workflow).find(n => n?._meta?.title === title) || null;
   function findAllByClass(gt){
     const out = [];
     for(const k of Object.keys(workflow)){
@@ -3302,13 +3328,15 @@ async function applyWorkflow(workflow, opts={}){
 
   // Latent Upscaler 3D
   // Nodo nativo (ancho/alto en px) o, en vídeos antiguos, el custom node MinimaxH3LatentUpscaler3D (multiplicador)
-  const latentUpNode = findByClass("MiniMaxH3LatentUpscaleWithModel") || findByClass("MinimaxH3LatentUpscaler3D");
+  const latentUpNode = findByClass("MiniMaxH3LatentUpscaleWithModel") || findByClass("MinimaxH3LatentUpscalerNode2D") || findByClass("MinimaxH3LatentUpscaler3D");
   if(latentUpNode && latentUpNode.inputs){
     let sc = 1.5;
     const r2vNode = findByClass("MiniMaxH3ReferenceToVideo");
-    if(latentUpNode.class_type === "MiniMaxH3LatentUpscaleWithModel"){
-      if(typeof latentUpNode.inputs.width === "number" && r2vNode && typeof r2vNode.inputs?.width === "number"){
-        sc = Math.round(latentUpNode.inputs.width / r2vNode.inputs.width / 0.05) * 0.05;
+    const upNet = latentUpNode.class_type === "MinimaxH3LatentUpscalerNode2D" ? "2d" : "3d";
+    const upWidth = upNet === "2d" ? latentUpNode.inputs["mode.width"] : latentUpNode.inputs.width;
+    if(latentUpNode.class_type !== "MinimaxH3LatentUpscaler3D"){
+      if(typeof upWidth === "number" && r2vNode && typeof r2vNode.inputs?.width === "number"){
+        sc = Math.round(upWidth / r2vNode.inputs.width / 0.05) * 0.05;
       }
     }
     else if(typeof latentUpNode.inputs.scale === "number") sc = latentUpNode.inputs.scale;
@@ -3316,10 +3344,10 @@ async function applyWorkflow(workflow, opts={}){
     else if(latentUpNode.inputs.mode && typeof latentUpNode.inputs.mode === "object" && typeof latentUpNode.inputs.mode.scale === "number") sc = latentUpNode.inputs.mode.scale;
 
     // Detectar si el workflow incluye el segundo pase de muestreo (nodo 409 o SamplerCustomAdvanced adicional)
-    const hasSampler2 = !!wfNodes[N.SAMPLER2] || !!findByTitle("Sampler Pase 2 (Refinado Hires-Fix)");
-    const sigmas2Node = wfNodes[N.SIGMAS2] || findByTitle("Scheduler Pase 2 (Denoise)") || findByTitle("Manual Sigmas Pase 2");
-    const unet2Node = wfNodes[N.UNET2] || findByTitle("UNet Loader Pase 2");
-    const turbo2Node = wfNodes[N.LORA_TURBO2] || findByTitle("Turbo LoRA Pase 2");
+    const hasSampler2 = !!workflow[N.SAMPLER2] || !!findByTitle("Sampler Pase 2 (Refinado Hires-Fix)");
+    const sigmas2Node = workflow[N.SIGMAS2] || findByTitle("Scheduler Pase 2 (Denoise)") || findByTitle("Manual Sigmas Pase 2");
+    const unet2Node = workflow[N.UNET2] || findByTitle("UNet Loader Pase 2");
+    const turbo2Node = workflow[N.LORA_TURBO2] || findByTitle("Turbo LoRA Pase 2");
 
     let p2Denoise = 0.60;
     if(sigmas2Node && sigmas2Node.inputs && typeof sigmas2Node.inputs.denoise === "number"){
@@ -3339,6 +3367,8 @@ async function applyWorkflow(workflow, opts={}){
     const lu = {
       enabled: true,
       scale: sc,
+      net: upNet,
+      sharpness: typeof latentUpNode.inputs.sharpness === "number" ? latentUpNode.inputs.sharpness : 1,
       pass2: hasSampler2,
       pass2Unet: p2Unet,
       pass2Lora: p2Lora,
@@ -3347,7 +3377,7 @@ async function applyWorkflow(workflow, opts={}){
     };
     setLatentUpscaleUI(lu);
     saveLatentUpscale(lu);
-    setApplied(`latent upscaler 3D (${sc.toFixed(2)}x${hasSampler2 ? " + pase 2 refinado" : ""})`);
+    setApplied(`latent upscaler ${upNet.toUpperCase()} (${sc.toFixed(2)}x${hasSampler2 ? " + pase 2 refinado" : ""})`);
   } else if(latentUpNode === null){
     const lu = { ...LATENT_UPSCALE_DEFAULTS, enabled: false, scale: 1.5 };
     setLatentUpscaleUI(lu);
@@ -5264,22 +5294,23 @@ function buildGraph(job){
   const pass2Enabled = latentUpscaleEnabled && (latentState.pass2 !== false);
 
   if(latentUpscaleEnabled){
-    // 1. Latent Upscaler nativo de ComfyUI: escala el vídeo del latente AV y deja pasar el audio
-    g[N.LATENT_UPSCALE_LOADER] = {
-      class_type: "LatentUpscaleModelLoader",
-      inputs: { model_name: "minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors" },
-      _meta: { title: "Latent Upscale Model Loader (MiniMax H3)" }
-    };
-    g[N.LATENT_UPSCALE] = {
-      class_type: "MiniMaxH3LatentUpscaleWithModel",
-      inputs: {
-        model: [N.LATENT_UPSCALE_LOADER, 0],
-        samples: [N.SAMPLER, 0],
-        width: nearest32(w * latentScale),
-        height: nearest32(h * latentScale)
-      },
-      _meta: { title: "MiniMax H3 Latent Upscale With Model" }
-    };
+    // 1. Latent Upscaler: 3D nativo o 2D custom; ambos escalan el vídeo del latente AV y dejan pasar el audio
+    const upW = nearest32(w * latentScale), upH = nearest32(h * latentScale);
+    if(latentState.net === "2d"){
+      delete g[N.LATENT_UPSCALE_LOADER];
+      g[N.LATENT_UPSCALE] = h3LatentUpscale2D(H3_LATENT_UP_2D, [N.SAMPLER, 0], upW, upH, latentState.sharpness, "MiniMax H3 Latent Upscaler (2D)");
+    } else {
+      g[N.LATENT_UPSCALE_LOADER] = {
+        class_type: "LatentUpscaleModelLoader",
+        inputs: { model_name: H3_LATENT_UP_3D },
+        _meta: { title: "Latent Upscale Model Loader (MiniMax H3)" }
+      };
+      g[N.LATENT_UPSCALE] = {
+        class_type: "MiniMaxH3LatentUpscaleWithModel",
+        inputs: { model: [N.LATENT_UPSCALE_LOADER, 0], samples: [N.SAMPLER, 0], width: upW, height: upH },
+        _meta: { title: "MiniMax H3 Latent Upscale With Model" }
+      };
+    }
 
     if(pass2Enabled){
       // 4. Cadena de Modelo del Pase 2:

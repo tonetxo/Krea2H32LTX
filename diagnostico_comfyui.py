@@ -95,6 +95,13 @@ REQUIRED_PACKAGES = [
         "workflows": ["MiniMaxH3 (Sol-H3 SM120 Blackwell)"],
     },
     {
+        "name": "Comfyui_Minimax_h3_latent_Upscaler",
+        "repo": "https://github.com/LBH-123-AI/Comfyui_Minimax_h3_latent_Upscaler",
+        "nodes": ["MinimaxH3LatentUpscalerNode2D"],
+        "critical": False,
+        "workflows": ["MiniMaxH3 / MMH3X2 / LTXH3 (Latent Upscaler 2D)"],
+    },
+    {
         "name": "ComfyUI-H3PromptStudio",
         "repo": "https://github.com/tonetxo/ComfyUI-H3PromptStudio",
         "nodes": ["MiniMaxH3ReferenceToVideo", "MiniMaxH3SigmaShift", "ModelAttentionBackend"],
