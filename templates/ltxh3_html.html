@@ -42,6 +42,19 @@
         </div>
       </div>
 
+      <div class="panel"><h2>Audio externo</h2>
+        <div class="row"><label>Modo</label><select id="audioMode">
+          <option value="none">Sin audio externo (lo genera el modelo)</option>
+          <option value="final">Pista final (sustituye el audio, sin sincronía)</option>
+          <option value="lock">Bloqueo (el vídeo se genera oyendo la guía)</option>
+        </select></div>
+        <div id="audioControls" style="display:none;">
+          <div id="audioSlots"></div>
+          <div class="row slider-row"><label>Volumen música</label><input type="range" id="audioMusicDb" min="-40" max="6" step="1" value="-12"><div class="slider-val" id="audioMusicDbVal">-12 dB</div></div>
+          <div class="hint" id="audioHint" style="font-size:10px;"></div>
+        </div>
+      </div>
+
       __PROMPT_PANELS__
 
       <div class="panel">

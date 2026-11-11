@@ -131,6 +131,13 @@ REQUIRED_PACKAGES = [
         "workflows": ["Krea2", "KreaQwen (Varianza RBG)"],
     },
     {
+        "name": "ComfyUI-LTXVideo",
+        "repo": "https://github.com/Lightricks/ComfyUI-LTXVideo",
+        "nodes": ["LTXVTiledVAEDecode"],
+        "critical": False,
+        "workflows": ["LTXH3 (H3 → LTX: decode final sin uniones temporales)"],
+    },
+    {
         "name": "H3-Optimizations",
         "repo": "https://github.com/Zironic/H3-Optimizations",
         "nodes": ["H3VSAAttention", "H3MemoryOptimization", "H3SparseAttention", "H3AIMDOResidencyLimiter"],

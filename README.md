@@ -137,6 +137,7 @@ The web interfaces utilize specialized nodes for math expressions, attention bac
 | **ComfyUI-ProPost** *(optional)* | [ComfyUI-ProPost](https://github.com/digitaljohn/comfyui-propost) | `ProPostApplyLUT`, `ProPostFilmGrain`, `ProPostRadialBlur`, `ProPostVignette` | KreaQwen (Post-FX Suite) |
 | **ComfyUI_LayerStyle** *(optional)* | [ComfyUI_LayerStyle](https://github.com/chflame163/ComfyUI_LayerStyle) | `LayerColor: LUT Apply`, `LayerFilter: FilmV2` | MiniMaxH3, MMH3X2 (Color Grading & Post-FX) |
 | **ComfyUI-RBG-SmartSeedVariance** *(optional)* | [ComfyUI-RBG-SmartSeedVariance](https://github.com/RamonGuthrie/ComfyUI-RBG-SmartSeedVariance.git) | `RBG_Smart_Seed_Variance` | Krea2, KreaQwen (Smart Seed Variance) |
+| **ComfyUI-LTXVideo** | [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | `LTXVTiledVAEDecode` | LTXH3 (H3 → LTX final decode) |
 | **H3-Optimizations** *(optional)* | [H3-Optimizations](https://github.com/Zironic/H3-Optimizations) | `H3VSAAttention`, `H3MemoryOptimization`, `H3SparseAttention`, `H3AIMDOResidencyLimiter` | MiniMaxH3 (VSA Attention, AIMDO), LTXH3 (VSA / H3 Sparse / Memory Optimization) |
 
 The MiniMaxH3 and MMH3X2 3D Latent Upscaler uses the native ComfyUI nodes `LatentUpscaleModelLoader` + `MiniMaxH3LatentUpscaleWithModel` (ComfyUI commit `35060f0` or newer, model `minimax_h3_latent_upscaler_3d_conv_v1_bf16.safetensors` in `models/latent_upscale_models/`).

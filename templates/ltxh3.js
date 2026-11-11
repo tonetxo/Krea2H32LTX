@@ -154,6 +154,7 @@ function defaultState(){
     },
     upscaleBy: 2,
     evolveAuto: false,
+    audio: { mode: "none", guide: null, music: null, musicDb: -12 },
     savePass1: false, pass1Only: false,
     i2v: { strength: 1.0, fitRes: true, llmImage: true },
     rife: { enabled: false, engine: "rtx", multiplier: 2, model: "rife_v4.26.safetensors" },
@@ -881,6 +882,54 @@ function applySparse(g, m, sp){
   sink[m.SPARSE_SINK[1]] = out;
 }
 
+// VAEDecodeTiled trocea en el tiempo y deja un salto en cada unión; LTXVTiledVAEDecode solo
+// trocea en el espacio. Baldosas según la estimación de ComfyUI: 1700 × 512 × 2 B por celda latente.
+function fullTemporalDecode(g, id, w, h, frames){
+  const cells = Math.floor((frames - 1) / 8) + 1, overlap = 2;
+  const side = (n, tiles) => Math.floor((n / 32 + (tiles - 1) * overlap) / tiles);
+  let ht = 1, vt = 1;
+  while(1700 * 1024 * cells * side(w, ht) * side(h, vt) > 12e9 && (ht < 6 || vt < 6)){
+    if(vt >= 6 || (ht < 6 && side(w, ht) >= side(h, vt))) ht++; else vt++;
+  }
+  const { vae, samples } = g[id].inputs;
+  g[id] = { class_type: "LTXVTiledVAEDecode", inputs: { vae, latents: samples, horizontal_tiles: ht, vertical_tiles: vt, overlap, last_frame_fix: false, working_device: "auto", working_dtype: "auto" }, _meta: { title: `LTXV Tiled VAE Decode (${ht}×${vt})` } };
+}
+
+// Sustituye la pista del latente AV por la guía con máscara 0: el modelo la oye pero no la
+// modifica. LTXVConcatAVLatent recorta o rellena; lo que falte de audio lo genera el modelo.
+function lockAudioStream(g, m, model, audio){
+  const id = `aud_lock_${model}`;
+  g[`${id}_enc`] = model === "ltx"
+    ? { class_type: "LTXVAudioVAEEncode", inputs: { audio, audio_vae: [m.VAE_A, 0] }, _meta: { title: "Guía → latente LTX" } }
+    : { class_type: "VAEEncodeAudio", inputs: { audio, vae: [m.VAE_A, 0] }, _meta: { title: "Guía → latente H3" } };
+  g[`${id}_zero`] = { class_type: "SolidMask", inputs: { value: 0, width: 64, height: 64 }, _meta: { title: "Máscara audio fijo" } };
+  g[`${id}_mask`] = { class_type: "SetLatentNoiseMask", inputs: { samples: [`${id}_enc`, 0], mask: [`${id}_zero`, 0] }, _meta: { title: "Audio guía fijo" } };
+  g[id] = { class_type: "LTXVConcatAVLatent", inputs: { video_latent: g[m.SAMPLER].inputs.latent_image, audio_latent: [`${id}_mask`, 0] }, _meta: { title: `Bloqueo de audio ${MODEL_LABEL[model]}` } };
+  g[m.SAMPLER].inputs.latent_image = [id, 0];
+}
+// Devuelve la pista final, o null si el audio del vídeo es el que genera el modelo.
+function applyExternalAudio(g, d, job){
+  const a = job.audio;
+  if(a.mode === "none") return null;
+  const load = slot => {
+    if(!a[slot]) return null;
+    g[`aud_${slot}_load`] = { class_type: "LoadAudio", inputs: { audio: a[slot].name }, _meta: { title: `Audio externo (${slot})` } };
+    const start = a[slot].start || 0, videoDur = job.frames / FPS;
+    g[`aud_${slot}`] = { class_type: "TrimAudioDuration", inputs: { audio: [`aud_${slot}_load`, 0], start_index: start, duration: a[slot].end ? Math.min(a[slot].end - start, videoDur) : videoDur }, _meta: { title: `Recorte de audio (${slot})` } };
+    return [`aud_${slot}`, 0];
+  };
+  const guide = load("guide");
+  let music = load("music");
+  if(a.mode === "lock") for(const model of ["ltx", "h3"]) lockAudioStream(g, d[model], model, guide);
+  if(music && a.musicDb !== 0){
+    g.aud_music_vol = { class_type: "AudioAdjustVolume", inputs: { audio: music, volume: a.musicDb }, _meta: { title: "Volumen música" } };
+    music = ["aud_music_vol", 0];
+  }
+  if(!guide || !music) return guide || music;
+  g.aud_mix = { class_type: "AudioMerge", inputs: { audio1: guide, audio2: music, merge_method: "add" }, _meta: { title: "Mezcla final" } };
+  return ["aud_mix", 0];
+}
+
 function applySampling(g, m, model, s){
   g[m.SAMPLER_SEL].inputs.sampler_name = s.sampler;
   if(s.mode === "manual"){
@@ -961,6 +1010,8 @@ function buildGraph(job){
   applyModels(g, H, job.models.h3);
   applySparse(g, H, job.sampling.h3[roleOf(job.dir, "h3")].sparse);
   for(const model of ["ltx", "h3"]) applySampling(g, d[model], model, job.sampling[model][roleOf(job.dir, model)]);
+  const audioOut = applyExternalAudio(g, d, job);
+  if(job.dir === "h3_ltx") fullTemporalDecode(g, d.DEC_V, W2, H2, job.frames);
   // Preview animado (KJNodes) en ambos pases: sin él ComfyUI manda un frame
   // estático. H3 usa el TAE 2D de kijai (RGB real, frame a frame) si está en
   // vae_approx; LTX se queda en L2RGB. No usar preview_method="taesd": crashea
@@ -1048,12 +1099,13 @@ function buildGraph(job){
   if(job.savePass1 || pass1Only){
     // Con "solo pase 1" el pase 1 es el vídeo final: lleva el grading.
     const p1Images = pass1Only ? appendPost(g, [d.P1_DEC_V, 0], null, null, "p1post", job.postfx, job.seed) : [d.P1_DEC_V, 0];
-    g.p1_create = { class_type: "CreateVideo", inputs: { images: p1Images, audio: [d.P1_DEC_A, 0], fps: FPS }, _meta: { title: "Vídeo pase 1" } };
+    g.p1_create = { class_type: "CreateVideo", inputs: { images: p1Images, audio: audioOut || [d.P1_DEC_A, 0], fps: FPS }, _meta: { title: "Vídeo pase 1" } };
     g[N.FIRST_SAVE] = saveNode(`${prefix}_p1`, ["p1_create", 0], "Guardar pase 1");
     outputs.push(N.FIRST_SAVE);
   }
   if(!pass1Only){
     g[d.CREATE].inputs.images = appendPost(g, [d.DEC_V, 0], job.rife, job.rtx, "post", job.postfx, job.seed);
+    if(audioOut) g[d.CREATE].inputs.audio = audioOut;
     g[d.CREATE].inputs.fps = job.rife.enabled ? FPS * job.rife.multiplier : FPS;
     g[N.FINAL_SAVE] = saveNode(prefix, [d.CREATE, 0], "Guardar vídeo final");
     outputs.push(N.FINAL_SAVE);
@@ -1121,6 +1173,7 @@ function stateFromGraph(wf){
   const latent = dir === "ltx_h3" ? wf["10"] : wf["8"];
   if(latent?.inputs){ s.width = latent.inputs.width; s.height = latent.inputs.height; }
   s.upscaleBy = 2;
+  s.audio.mode = "none";
   if(typeof wf[NC.FRAMES]?.inputs?.value === "number") s.frames = wf[NC.FRAMES].inputs.value;
   if(typeof wf[NC.IDEA]?.inputs?.value === "string"){ s.idea = wf[NC.IDEA].inputs.value; s.promptMode = "ollama"; }
   const seed = wf[d[d.p1].NOISE]?.inputs?.noise_seed;
@@ -1210,6 +1263,7 @@ function renderAll(){
   $("i2vFitRes").checked = state.i2v.fitRes; $("i2vToLlm").checked = state.i2v.llmImage;
   $("upscaleBy").value = state.upscaleBy; $("upscaleByVal").textContent = Number(state.upscaleBy).toFixed(2) + "x";
   $("evolveAuto").checked = state.evolveAuto;
+  renderAudio();
   $("savePass1").checked = state.savePass1; $("pass1Only").checked = state.pass1Only;
   $("filenamePrefix").value = state.prefix;
   renderPost();
@@ -1244,6 +1298,9 @@ function snapshotJob(){
 }
 function validateJob(job){
   if(job.onDemand) return true;
+  if(job.audio.mode === "lock" && !job.audio.guide){ log("⚠️ El bloqueo de audio necesita una pista guía.", "l-err"); return false; }
+  if(job.audio.mode === "final" && !job.audio.guide && !job.audio.music){ log("⚠️ Carga una pista de audio o desactiva el audio externo.", "l-err"); return false; }
+  if(job.audio.mode !== "none" && [job.audio.guide, job.audio.music].some(t => t && t.end && t.end <= (t.start || 0))){ log("⚠️ En el audio, el fin debe ser mayor que el inicio.", "l-err"); return false; }
   // Sin "<Picture 1>" en el texto, H3 trata el pase como texto a vídeo e ignora el primer frame.
   if(job.inputImage && job.promptMode === "manual" && !job.promptH3.includes("<Picture 1>")){
     log("⚠️ Hay imagen de inicio pero el prompt de H3 no menciona <Picture 1>: H3 la ignorará. Empieza con \"For the target video, at 0.00 seconds into the target video, <Picture 1> (from [Shot 1]) is fully referenced.\"", "l-warn");
@@ -1424,6 +1481,60 @@ function enqueueOnDemand(kind){
 $("btnInterpolate1").addEventListener("click", () => enqueueOnDemand("interp"));
 $("btnRtxUpscale1").addEventListener("click", () => enqueueOnDemand("rtx"));
 
+// --- AUDIO EXTERNO ---
+const AUDIO_SLOTS = { guide: "Guía (voz o ritmo)", music: "Música (solo en la mezcla final)" };
+const AUDIO_HINTS = {
+  final: "Sustituye el audio al guardar; los modelos no lo oyen. Con las dos pistas, se mezclan. Fin vacío = lo que dure el vídeo.",
+  lock: "LTX y H3 generan el vídeo oyendo la guía, sin modificarla. El vídeo final lleva la guía original y, si hay, la música. Fin vacío = lo que dure el vídeo; si el tramo es más corto, el modelo genera el resto.",
+};
+$("audioSlots").innerHTML = Object.entries(AUDIO_SLOTS).map(([slot, label]) => `<div class="row"><label>${label}</label>
+  <div class="dropzone" data-audio-dz="${slot}"><input type="file" accept="audio/*"><div class="ph" data-audio-ph="${slot}"></div></div>
+  <div data-audio-box="${slot}" style="display:none;align-items:center;gap:6px;margin-top:6px;"><audio data-audio-player="${slot}" controls style="flex:1;min-width:0;height:32px;"></audio><button type="button" class="ghost btn-mini" data-audio-del="${slot}" title="Quitar audio">✕</button></div>
+  <div class="two-col" data-audio-trim="${slot}" style="display:none;margin-top:6px;"><div><label>Inicio (s)</label><input type="number" min="0" step="0.1" data-audio-start="${slot}"></div><div><label>Fin (s)</label><input type="number" min="0" step="0.1" placeholder="vacío" data-audio-end="${slot}"></div></div></div>`).join("");
+function renderAudio(){
+  const a = state.audio;
+  $("audioMode").value = a.mode;
+  $("audioControls").style.display = a.mode === "none" ? "none" : "block";
+  $("audioMusicDb").value = a.musicDb;
+  $("audioMusicDbVal").textContent = `${a.musicDb} dB`;
+  $("audioHint").textContent = AUDIO_HINTS[a.mode] || "";
+  for(const slot of Object.keys(AUDIO_SLOTS)){
+    const cur = a[slot], player = document.querySelector(`[data-audio-player="${slot}"]`);
+    document.querySelector(`[data-audio-ph="${slot}"]`).textContent = cur ? cur.label : "arrastra un audio o clic (WAV, MP3, FLAC)";
+    document.querySelector(`[data-audio-box="${slot}"]`).style.display = cur ? "flex" : "none";
+    document.querySelector(`[data-audio-trim="${slot}"]`).style.display = cur ? "grid" : "none";
+    document.querySelector(`[data-audio-start="${slot}"]`).value = cur?.start || 0;
+    document.querySelector(`[data-audio-end="${slot}"]`).value = cur?.end || "";
+    if(cur && player.dataset.name !== cur.name){ player.src = mediaViewUrl({ filename: cur.name, subfolder: "", type: "input" }); player.dataset.name = cur.name; }
+    if(!cur && player.dataset.name){ player.removeAttribute("src"); delete player.dataset.name; }
+  }
+}
+async function uploadAudioFile(slot, file){
+  if(file.type && !/^audio\//.test(file.type)){ log("⚠️ Solo se admiten archivos de audio.", "l-warn"); return; }
+  const ext = (file.name.match(/\.([a-z0-9]+)$/i)?.[1] || "wav").toLowerCase();
+  const fd = new FormData();
+  fd.append("image", file, `ltxh3_${slot}_${Date.now()}.${ext}`);
+  try {
+    const r = await fetch(server() + "/upload/image", { method: "POST", body: fd, signal: AbortSignal.timeout(120000) });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    state.audio[slot] = { name: (await r.json()).name, label: file.name, start: 0, end: null };
+    renderAudio(); saveState();
+    log(`🎵 Audio cargado: ${file.name}`, "l-ok");
+  } catch(e){ log("❌ No se pudo subir el audio: " + e.message, "l-err"); }
+}
+$("audioMode").addEventListener("change", e => { state.audio.mode = e.target.value; renderAudio(); saveState(); });
+$("audioMusicDb").addEventListener("input", e => { state.audio.musicDb = parseInt(e.target.value, 10); $("audioMusicDbVal").textContent = `${state.audio.musicDb} dB`; saveState(); });
+for(const slot of Object.keys(AUDIO_SLOTS)){
+  const dz = document.querySelector(`[data-audio-dz="${slot}"]`), input = dz.querySelector("input");
+  dz.addEventListener("click", () => input.click());
+  input.addEventListener("change", e => { if(e.target.files[0]) uploadAudioFile(slot, e.target.files[0]); e.target.value = ""; });
+  dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("drag"); });
+  dz.addEventListener("dragleave", () => dz.classList.remove("drag"));
+  dz.addEventListener("drop", e => { e.preventDefault(); dz.classList.remove("drag"); if(e.dataTransfer.files[0]) uploadAudioFile(slot, e.dataTransfer.files[0]); });
+  document.querySelector(`[data-audio-del="${slot}"]`).addEventListener("click", () => { state.audio[slot] = null; renderAudio(); saveState(); });
+  for(const field of ["start", "end"]) document.querySelector(`[data-audio-${field}="${slot}"]`).addEventListener("change", e => { state.audio[slot][field] = parseFloat(e.target.value) || (field === "start" ? 0 : null); saveState(); });
+}
+
 // --- EVOLVE / TRANSMUTAR PROMPT ---
 // generateEvolved() está en common.js. Los tokens <Picture N> y [Shot N] de H3 no se transmutan.
 const EVOLVE_FIELDS = { idea: ["prompt", ""], promptLtx: ["promptLtx", "LTX-2.5: "], promptH3: ["promptH3", "H3: "] };
@@ -1553,6 +1664,7 @@ CONFIG.variantMeta = function(seed, timeText, job){
   ];
   if(timeText) rows.push(["Tiempo", timeText]);
   if(job.image) rows.push(["I2V", job.image]);
+  if(job.audio.mode !== "none") rows.push(["Audio", job.audio.mode === "lock" ? "bloqueo" : "pista final"]);
   const loras = [...job.models.ltx.loras, ...job.models.h3.loras].filter(l => l.on && l.lora).map(l => `${l.lora.split("/").pop()} (${l.strength})`);
   return { title: "Parámetros LTXH3", rows, loras };
 };
