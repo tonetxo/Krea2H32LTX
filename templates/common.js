@@ -2352,6 +2352,11 @@ async function refineEnhancedPrompt(fromPrompt = false){
   }
 }
 
+// Resalta en la cadena superior (#chain) la etapa en curso; null las apaga todas.
+function setChainStage(stage){
+  document.querySelectorAll("#chain .node").forEach(n => n.classList.toggle("active", n.dataset.n === stage));
+}
+
 function initCommon(){
   loras = CONFIG.loras;
   DEFAULT_BACKEND_PORT = CONFIG.DEFAULT_BACKEND_PORT;

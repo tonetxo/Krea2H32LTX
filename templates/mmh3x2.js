@@ -1445,10 +1445,22 @@ CONFIG.onProgress = function(value, max, prompt_id, node){
   }
 };
 
+// Etapas de la cadena superior según el nodo en ejecución.
+const CHAIN_IMG = [N.IMG1, N.IMG2, N.IMG3, N.IMG4, N.IMG5, N.IMG6];
+const CHAIN_SEG1 = [N.REF2V_SEG1, N.GUIDER_1, N.SAMPLE_1, N.LR_UP_1, N.LR_SAMPLE_1];
+const CHAIN_SEG2 = [N.OLLAMA_CONN, N.OLLAMA_CHAT_2, "59", N.REF2V_SEG2, N.INJECT_LATENT, N.ADD_GUIDE, N.GUIDER_2, N.SAMPLE_2, N.LR_UP_2, N.LR_SAMPLE_2];
 CONFIG.onNodeExecuting = function(data){
   if(!data) return;
   const node = typeof data === "object" ? String(data.node || "") : String(data);
-  if(!node) return;
+  if(!node){ setChainStage(null); return; }
+  const stage = CHAIN_IMG.includes(node) ? "img"
+    : CHAIN_SEG1.includes(node) ? "seg1"
+    : CHAIN_SEG2.includes(node) ? "seg2"
+    : node === N.BLEND || node === N.IMAGE_BATCH || node === N.AUDIO_CONCAT ? "blend"
+    : node === N.RTX ? "rtx"
+    : node === N.RIFE || node === N.RIFE_LOADER ? "rife"
+    : node === N.CREATE_VID_FINAL || node === N.SAVE_VID_FINAL || node.startsWith("post_") ? "out" : null;
+  if(stage) setChainStage(stage);
 
   if(node === String(N.SAMPLE_1) || node === "19"){
     currentActiveSamplerSlot = 1;
@@ -1599,6 +1611,7 @@ CONFIG.onPreview = function(url, meta){
 };
 
 CONFIG.onClearPreview = function(){
+  setChainStage(null);
   ["Final", "Seg1", "Seg2"].forEach(slot => {
     const p = $("previewImg" + slot);
     const pv = $("previewVideo" + slot);

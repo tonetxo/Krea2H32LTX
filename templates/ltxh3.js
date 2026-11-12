@@ -1598,15 +1598,15 @@ CONFIG.onSeedUpdate = function(seed){
 // Etapa del pipeline según el nodo en ejecución (resalta la cadena superior).
 CONFIG.onNodeExecuting = function(data){
   const node = data && data.node;
-  document.querySelectorAll("#chain .node").forEach(n => n.classList.remove("active"));
-  if(!node || !activeJob || activeJob.onDemand) return;
+  if(!node){ setChainStage(null); return; }
+  if(!activeJob || activeJob.onDemand) return;
   const d = DIRS[activeJob.dir];
   const stage = ["48", "49", "50", "51", "52", "53", "54"].includes(node) ? "llm"
     : node === d[d.p1].SAMPLER ? "p1"
     : node === d.UPS_LOADER || node === d.UPS ? "bridge"
     : node === d[d.p2].SAMPLER ? "p2"
     : (node === N.FINAL_SAVE || node.startsWith("post_")) ? "out" : null;
-  if(stage) document.querySelector(`#chain .node[data-n="${stage}"]`)?.classList.add("active");
+  if(stage) setChainStage(stage);
 };
 CONFIG.onNodeExecuted = function(data){
   if(!data || !data.output || !(data.prompt_id in pendingSeeds)) return;
@@ -1650,7 +1650,7 @@ CONFIG.onClearPreview = function(){
   p.style.display = "none"; p.removeAttribute("src");
   pv.pause(); pv.style.display = "none"; pv.removeAttribute("src");
   $("previewWrap1").style.display = "none"; $("previewStep1").style.display = "none";
-  document.querySelectorAll("#chain .node").forEach(n => n.classList.remove("active"));
+  setChainStage(null);
   if(!currentMedia[1]) $("empty1").style.display = "";
 };
 CONFIG.onPromptError = function(pid){ delete promptVariantMap[pid]; };

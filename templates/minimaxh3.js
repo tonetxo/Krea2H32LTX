@@ -2268,7 +2268,25 @@ CONFIG.onPreview = function(url, meta){
   }
 };
 
+// Etapa del pipeline según el nodo en ejecución (resalta la cadena superior).
+const CHAIN_IMG = [N.IMAGE_FIRST, N.AUDIO_FIRST, N.AUDIO_VOL, N.FACE_REF_IMG_1, N.FACE_REF_IMG_2];
+const CHAIN_COND = [N.REF2V, N.R2V_ANCHOR, N.R2V_ANCHOR2, N.GUIDER, "156", "157", "160"];
+const CHAIN_UP = [N.LATENT_UPSCALE_LOADER, N.LATENT_UPSCALE, N.GUIDER2, N.SAMPLER2];
+const CHAIN_OUT = [N.DECODE_VIDEO, N.DECODE_AUDIO, N.RTX_SR, N.RIFE_INTERP, N.FACE_SAMPLER, N.FACE_SAMPLER_2, N.CREATE_VIDEO, N.SAVE];
+CONFIG.onNodeExecuting = function(data){
+  const node = data && data.node;
+  if(!node){ setChainStage(null); return; }
+  if(!(data.prompt_id in pendingSeeds)) return;
+  const stage = CHAIN_IMG.includes(node) ? "img"
+    : CHAIN_COND.includes(node) ? "cond"
+    : node === N.SAMPLER ? "sampler"
+    : CHAIN_UP.includes(node) ? "up"
+    : CHAIN_OUT.includes(node) || node.startsWith("post_") || /^10\d_/.test(node) ? "out" : null;
+  if(stage) setChainStage(stage);
+};
+
 CONFIG.onClearPreview = function(){
+  setChainStage(null);
   const p1 = $("previewImg1"), pv1 = $("previewVideo1"), w = $("previewWrap1"), b = $("previewStep1");
   if(p1){ p1.style.display = "none"; p1.removeAttribute("src"); }
   if(pv1){ pv1.pause(); pv1.style.display = "none"; pv1.removeAttribute("src"); pv1.load(); }
