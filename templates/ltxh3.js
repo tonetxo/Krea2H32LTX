@@ -519,7 +519,7 @@ function updateResHint(){
   if(state.rtx.enabled && !/^(DENOISE|DEBLUR)_/.test(state.rtx.quality)){
     final += ` → RTX ${state.rtx.scale}x ≈ ${Math.round(w2 * state.rtx.scale)}×${Math.round(h2 * state.rtx.scale)}`;
   }
-  $("resHint").textContent = state.pass1Only
+  $("resHint").textContent = $("upscaleResHint").textContent = state.pass1Only
     ? `Solo pase 1: ${w}×${h} px (${getFriendlyRatio(w, h)})`
     : `Pase 1: ${w}×${h} · refinado: ${final} px (${getFriendlyRatio(w, h)})`;
   const f = state.frames, fps = state.rife.enabled ? FPS * state.rife.multiplier : FPS;
