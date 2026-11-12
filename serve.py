@@ -96,7 +96,8 @@ MEDIA_LISTS = {
     # MMH3X2 guarda en output/video/ con prefijos variados (plano1_cont, ...):
     # se listan todos los MP4 de ahí, no solo los "MiniMax_H3_*".
     "mmh3x2": {"subdir": "video", "patterns": ("**/*.mp4",), "limit": 100, "exclude": ()},
-    "ltxh3": {"subdir": "video", "patterns": ("**/LTXH3*.mp4",), "limit": 100, "exclude": ()},
+    # LTXH3 añade la dirección (_L2H / _H2L) a cualquier prefijo de archivo.
+    "ltxh3": {"subdir": "video", "patterns": ("**/*_L2H_*.mp4", "**/*_H2L_*.mp4"), "limit": 100, "exclude": ()},
 }
 
 
