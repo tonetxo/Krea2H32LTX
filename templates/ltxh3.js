@@ -746,10 +746,20 @@ async function restoreInputImage(){
   } catch(e){ console.warn("No se pudo recuperar la imagen de inicio:", e); }
 }
 
+// Hash de 64 bits (cyrb53 sobre los bytes): crypto.subtle no existe en http:// de la LAN.
+function contentHash(bytes){
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for(let i = 0; i < bytes.length; i++){ h1 = Math.imul(h1 ^ bytes[i], 2654435761); h2 = Math.imul(h2 ^ bytes[i], 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, "0") + (h1 >>> 0).toString(16).padStart(8, "0");
+}
+// Nombre según el contenido: la misma imagen tras recargar o restaurar conserva el
+// nombre, y ComfyUI reaprovecha la caché del pase 1 en vez de repetirlo.
 async function uploadInputImage(img){
   if(img.uploaded) return img.uploaded;
   const ext = (img.file.type || "image/png").split("/")[1].replace("jpeg", "jpg");
-  const name = `ltxh3_${Date.now()}.${ext}`;
+  const name = `ltxh3_${contentHash(new Uint8Array(await img.file.arrayBuffer()))}.${ext}`;
   const fd = new FormData();
   fd.append("image", img.file, name);
   fd.append("overwrite", "true");
