@@ -19,21 +19,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+import comfy.memory_management
+import comfy.system_memory
 import folder_paths
 
 log = logging.getLogger("LTXWebVideoFX")
-
-
-def _mem_available_bytes():
-    """RAM disponible del sistema (Linux /proc/meminfo). None si no se puede."""
-    try:
-        with open("/proc/meminfo", "r") as fh:
-            for line in fh:
-                if line.startswith("MemAvailable:"):
-                    return int(line.split()[1]) * 1024
-    except Exception:
-        pass
-    return None
 
 
 # ---------------------------------------------------------------------------
@@ -332,17 +322,23 @@ class LTXWebVideoFX:
         # reutilizado. Mutarlo corrompería el caché (al reejecutar con otro LUT
         # el FX se aplicaría sobre frames ya procesados). Asignamos una salida
         # nueva y volcamos ahí cada chunk. Pico ≈ 2× batch, pero sin churn.
+        # La RAM libre se mide como ComfyUI (respeta el límite del cgroup, p. ej.
+        # systemd-run MemoryMax). Si la salida no cabe con el margen de la caché,
+        # se le pide a la caché RAM_PRESSURE que suelte entradas antes de reservar.
         nbytes = int(image.numel()) * image.element_size()
-        avail = _mem_available_bytes()
         gb = nbytes / (1024 ** 3)
-        if avail and nbytes > avail * 0.9:
-            log.warning(
-                "LTXWebVideoFX: RAM ajustada. Salida nueva ≈ %.1f GB y libre ≈ %.1f GB. "
-                "Si hay riesgo de OOM, reduce frames/resolución o sube chunk_mb no ayuda "
-                "(el buffer de salida es del tamaño del batch).", gb, avail / (1024 ** 3))
-        else:
-            log.info("LTXWebVideoFX: %d frames %dx%d, chunk=%d, buffer salida ≈ %.1f GB.",
-                     n, w, h, chunk, gb)
+        if src_device.type == "cpu":
+            need = nbytes + comfy.memory_management.RAM_CACHE_HEADROOM
+            avail = comfy.system_memory.virtual_memory_available()
+            if avail < need:
+                comfy.memory_management.extra_ram_release(need, free_active=True)
+                freed = comfy.system_memory.virtual_memory_available() - avail
+                avail += freed
+                log.info("LTXWebVideoFX: liberados %.1f GB de la caché para la salida.", max(0, freed) / (1024 ** 3))
+            if avail < nbytes:
+                log.warning("LTXWebVideoFX: la salida (≈ %.1f GB) no cabe en la RAM libre (≈ %.1f GB): "
+                            "riesgo de OOM. Reduce frames o resolución.", gb, avail / (1024 ** 3))
+        log.info("LTXWebVideoFX: %d frames %dx%d, chunk=%d, buffer salida ≈ %.1f GB.", n, w, h, chunk, gb)
 
         out = torch.empty_like(image)
         for s in range(0, n, chunk):
