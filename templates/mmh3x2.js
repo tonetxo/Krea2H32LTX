@@ -5882,6 +5882,23 @@ function buildGraph(j){
     if(g["26"]?.inputs) g["26"].inputs.images = seg1Images;
     if(g["61"]?.inputs) g["61"].inputs.images = seg1Images;
 
+    // El Seg 1 cargado puede ser un _hr refinado o venir de otros megapíxeles; H3InjectVideoLatent
+    // exige el tamaño del latente AV del Seg 2, así que se reescala solo para la inyección.
+    if(g[N.INJECT_LATENT]?.inputs && g[N.REF2V_SEG2]?.inputs){
+      g["102_seg1_to_base"] = {
+        class_type: "ImageScale",
+        inputs: {
+          image: g[N.INJECT_LATENT].inputs.images,
+          upscale_method: "lanczos",
+          width: g[N.REF2V_SEG2].inputs.width,
+          height: g[N.REF2V_SEG2].inputs.height,
+          crop: "center"
+        },
+        _meta: { title: "Seg 1 cargado → tamaño base Seg 2" }
+      };
+      g[N.INJECT_LATENT].inputs.images = ["102_seg1_to_base", 0];
+    }
+
     if(g[N.REF2V_SEG2]?.inputs) g[N.REF2V_SEG2].inputs["ref_video_audios.ref_video_audio_0"] = seg1Audio;
     if(g[N.AUDIO_CONCAT]?.inputs) g[N.AUDIO_CONCAT].inputs.audio1 = seg1Audio;
     if(g["65"]?.inputs) g["65"].inputs.audio = seg1Audio;
