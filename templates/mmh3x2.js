@@ -3622,7 +3622,7 @@ function updateDurationFrames(){
   if($("durHint2")) $("durHint2").textContent = `(${dur2.toFixed(1)}s → ${frames2}f)`;
   if($("durationVal2")) $("durationVal2").textContent = `${dur2.toFixed(1)}s`;
   if($("totalFramesHint")){
-    $("totalFramesHint").textContent = `Total: Seg 1 (${frames1}f) + Seg 2 (${frames2}f) = ${totalFrames} frames (~${totalSecs}s a 24fps · Máx 30s)`;
+    $("totalFramesHint").textContent = `Total: Seg 1 (${frames1}f) + Seg 2 (${frames2}f) = ${totalFrames} frames (~${totalSecs}s a 24fps)`;
   }
 }
 
@@ -6681,26 +6681,14 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   if($("durationSlider1")){
-    $("durationSlider1").addEventListener("input", (e) => {
-      let dur1 = parseFloat(e.target.value);
-      let dur2 = parseFloat($("durationSlider2")?.value || "15.0");
-      if(dur1 + dur2 > 30.0){
-        dur2 = Math.max(1.0, Math.round((30.0 - dur1) * 2) / 2);
-        if($("durationSlider2")) $("durationSlider2").value = dur2.toFixed(1);
-      }
+    $("durationSlider1").addEventListener("input", () => {
       updateDurationFrames();
       scheduleSaveSettings();
     });
   }
 
   if($("durationSlider2")){
-    $("durationSlider2").addEventListener("input", (e) => {
-      let dur2 = parseFloat(e.target.value);
-      let dur1 = parseFloat($("durationSlider1")?.value || "15.0");
-      if(dur1 + dur2 > 30.0){
-        dur1 = Math.max(1.0, Math.round((30.0 - dur2) * 2) / 2);
-        if($("durationSlider1")) $("durationSlider1").value = dur1.toFixed(1);
-      }
+    $("durationSlider2").addEventListener("input", () => {
       updateDurationFrames();
       scheduleSaveSettings();
     });
