@@ -3688,6 +3688,57 @@ function applyKreaQwenWorkflow(workflow){
   log(`📋 Parámetros restaurados de metadatos (${applied.join(", ")}).`, "l-ok");
 }
 
+// Último grafo enviado (el batch va de uno en uno): lo reenvía retryFailedPrompt.
+let lastSubmitted = null;
+
+async function submitGraph(graph, seedUsed){
+  const r = await fetch(`${getServerUrl()}/prompt`, {
+    signal: AbortSignal.timeout(60000), // colgado → activeJob fantasma
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      prompt: graph,
+      client_id: CLIENT_ID,
+      extra_data: {
+        extra_pnginfo: { workflow: graph, prompt: graph },
+        preview_method: getPreviewMethod()
+      }
+    })
+  });
+  if(!r.ok){
+    const t = await r.text().catch(() => "");
+    throw new Error(`HTTP ${r.status}: ${t.slice(0, 300)}`);
+  }
+  const data = await r.json();
+  if(data.error) throw new Error(JSON.stringify(data.error));
+
+  log(`📡 Recibido por ComfyUI (Prompt: ${data.prompt_id.slice(0, 8)}...). Procesando...`, "l-ok");
+  lastSubmitted = { promptId: data.prompt_id, graph, seed: seedUsed };
+  pendingSeeds[data.prompt_id] = seedUsed;
+  currentPromptId = data.prompt_id;
+  startTimer(data.prompt_id, 1);
+  pollFallback(data.prompt_id);
+}
+
+// Sin rostro detectado, H3FaceTrackCrop aborta todo el prompt y se pierde la
+// imagen. Se reenvía el mismo grafo saltando ese recorte (y su H3FaceStitch):
+// el resto sale de la caché de ComfyUI.
+CONFIG.retryFailedPrompt = function(pid, error){
+  const sent = lastSubmitted;
+  if(!sent || sent.promptId !== pid || !activeJob) return null;
+  const crop = sent.graph[error.node_id];
+  if(!crop || crop.class_type !== "H3FaceTrackCrop") return null;
+  const g = JSON.parse(JSON.stringify(sent.graph));
+  const stitches = Object.keys(g).filter(id => g[id].class_type === "H3FaceStitch" && g[id].inputs.transform?.[0] === error.node_id);
+  for(const node of Object.values(g)){
+    for(const [k, v] of Object.entries(node.inputs)){
+      if(Array.isArray(v) && stitches.includes(v[0])) node.inputs[k] = crop.inputs.images;
+    }
+  }
+  log(`⚠️ Sin rostro detectado (${crop._meta?.title || "H3FaceTrackCrop"}): se reenvía la variante sin ese paso.`, "l-warn");
+  return submitGraph(g, sent.seed);
+};
+
 // Generación individual
 async function runSingleGeneration(index){
   if(!activeJob) return; // guard: stop puede dejar la cola vacía entre el setTimeout y la ejecución
@@ -3712,32 +3763,7 @@ async function runSingleGeneration(index){
     const graph = applyAlignYourSteps(buildGraph(variantJob));
 
     log(`🚀 Enviando variante ${index + 1}/${totalBatchSize} a ComfyUI...`, "l-info");
-    const srv = getServerUrl();
-    const r = await fetch(`${srv}/prompt`, {
-      signal: AbortSignal.timeout(60000), // colgado → activeJob fantasma
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: graph,
-        client_id: CLIENT_ID,
-        extra_data: {
-          extra_pnginfo: { workflow: graph, prompt: graph },
-          preview_method: getPreviewMethod()
-        }
-      })
-    });
-    if(!r.ok){
-      const t = await r.text().catch(() => "");
-      throw new Error(`HTTP ${r.status}: ${t.slice(0, 300)}`);
-    }
-    const data = await r.json();
-    if(data.error) throw new Error(JSON.stringify(data.error));
-
-    log(`📡 Recibido por ComfyUI (Prompt: ${data.prompt_id.slice(0, 8)}...). Procesando...`, "l-ok");
-    pendingSeeds[data.prompt_id] = seedUsed;
-    currentPromptId = data.prompt_id;
-    startTimer(data.prompt_id, 1);
-    pollFallback(data.prompt_id);
+    await submitGraph(graph, seedUsed);
   } catch(err){
     log(`Error en variante ${index + 1}: ${err.message}`, "l-err");
     finishCurrentJob();

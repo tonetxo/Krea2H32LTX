@@ -18,6 +18,8 @@
 //       so pollFallback keeps retrying.
 //     - otherwise (false/undefined): standard finalize.
 //   onPromptError(pid), startNextVariant(index), onBatchComplete(),
+//   retryFailedPrompt(pid, error): Promise si reenvía la variante (el batch no
+//     avanza hasta que llegue su resultado), o falsy para el fallo normal,
 //   onStopCurrent(pid), onStopAll()
 
 const CLIENT_ID = crypto.randomUUID ? crypto.randomUUID() : "wc-" + Math.random().toString(36).slice(2);
@@ -598,6 +600,7 @@ function connectSocket() {
                 handledPrompts.add(pid);
                 delete pendingSeeds[pid];
                 discardTimer(pid);
+                if(_retryFailedPrompt(pid, msg.data)){ processingPrompts.delete(pid); return; }
                 if(CONFIG.onPromptError) CONFIG.onPromptError(pid);
               }
               clearPreview();
@@ -699,7 +702,8 @@ async function handlePromptDone(promptId) {
         const errMsg = entry.status.exception_message || (entry.status.messages || []).filter(m => m[0] === "execution_error").map(m => m[1] && m[1].exception_message).filter(Boolean)[0] || "error desconocido del backend";
         log(`❌ Error en backend: ${errMsg}`, "l-err");
         if(entry.status.exception_type) log(`   Tipo: ${entry.status.exception_type}`, "l-err");
-        _failPrompt(promptId);
+        const errData = (entry.status.messages || []).find(m => m[0] === "execution_error");
+        _failPrompt(promptId, errData && errData[1]);
         return;
     }
 
@@ -778,14 +782,29 @@ async function handlePromptDone(promptId) {
 }
 
 // Da un prompt por fallido y avanza el batch (mismo efecto que un error del backend).
-function _failPrompt(promptId){
+function _failPrompt(promptId, error){
     handledPrompts.add(promptId);
     processingPrompts.delete(promptId);
     delete pendingSeeds[promptId];
     discardTimer(promptId);
+    if(_retryFailedPrompt(promptId, error)) return;
     if(CONFIG.onPromptError) CONFIG.onPromptError(promptId);
     currentBatchIndex++;
     processNextBatch();
+}
+
+// Si la UI reenvía la variante fallida, el batch espera a ese reenvío; si el
+// reenvío no llega a la cola, se avanza como en un fallo normal.
+function _retryFailedPrompt(promptId, error){
+    const retry = error && CONFIG.retryFailedPrompt && CONFIG.retryFailedPrompt(promptId, error);
+    if(!retry) return false;
+    retry.catch(err => {
+        log(`Error reenviando la variante: ${err.message}`, "l-err");
+        if(CONFIG.onPromptError) CONFIG.onPromptError(promptId);
+        currentBatchIndex++;
+        processNextBatch();
+    });
+    return true;
 }
 
 // true/false según ComfyUI tenga el prompt en cola o ejecutándose; null si no se sabe.
