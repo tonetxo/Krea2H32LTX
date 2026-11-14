@@ -680,13 +680,9 @@
       "think": false,
       "keep_context": false,
       "format": "text",
-      "connectivity": [
-        "49",
-        0
-      ],
-      "options": [
-        "50",
-        0
+      "meta": [
+        "52",
+        3
       ]
     },
     "_meta": {
@@ -704,9 +700,13 @@
       "think": false,
       "keep_context": false,
       "format": "text",
-      "meta": [
-        "51",
-        3
+      "connectivity": [
+        "49",
+        0
+      ],
+      "options": [
+        "50",
+        0
       ]
     },
     "_meta": {

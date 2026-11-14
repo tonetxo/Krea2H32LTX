@@ -44,7 +44,6 @@ const DIRS = {
     h3:  { UNET: "28", LORAS: ["29"], LORA_SINK: ["30", "model"], SHIFT: "30", SPARSE: "42", SPARSE_SINK: ["33", "model"],
            CLIP: "31", VAE_V: "21", VAE_A: "22", COND: "32", GUIDER: "33", SAMPLER_SEL: "34", SIGMAS: "35", NOISE: "36", SAMPLER: "37" },
     UPS_LOADER: "26", UPS: "27", P1_DEC_V: "19", P1_DEC_A: "20", DEC_V: "38", CREATE: "40", SAVE: "41",
-    LLM_FIRST: "51", LLM_SECOND: "52",
   },
   h3_ltx: {
     graph: BASE_GRAPH_H3_LTX,
@@ -55,7 +54,6 @@ const DIRS = {
            POS: "27", NEG: "28", GUIDER: "30", SAMPLER_SEL: "31", SIGMAS: "32", NOISE: "33", SAMPLER: "34",
            IMG_LATENT: ["22", "video_latent"] },
     UPS_LOADER: "19", UPS: "20", P1_DEC_V: "14", P1_DEC_A: "15", DEC_V: "36", CREATE: "38", SAVE: "39",
-    LLM_FIRST: "52", LLM_SECOND: "51",
   },
 };
 // Comunes a ambos grafos.
@@ -1083,12 +1081,6 @@ function buildGraph(job){
     Object.assign(g[NC.OPTS].inputs, { temperature: job.llm.temp, num_ctx: job.llm.ctx });
     g[NC.LLM_LTX].inputs.system = job.spLtx;
     g[NC.LLM_H3].inputs.system = job.spH3;
-    const p1Gen = p1 === "ltx" ? NC.LLM_LTX : NC.LLM_H3;
-    if(pass1Only && p1Gen === d.LLM_SECOND){
-      // Solo pase 1: el generador del pase 1 se conecta directo (sin depender del otro).
-      Object.assign(g[p1Gen].inputs, { connectivity: [NC.CONN, 0], options: [NC.OPTS, 0] });
-      delete g[p1Gen].inputs.meta;
-    }
     outputs.push(p1 === "ltx" ? NC.PREV_LTX : NC.PREV_H3);
     if(!pass1Only) outputs.push(p2 === "ltx" ? NC.PREV_LTX : NC.PREV_H3);
   }
