@@ -1,6 +1,6 @@
 import os
 import config_loader
-from generar_common import generate_html
+from generar_common import generate_html, get_file_list, filter_names
 
 # --- CONFIGURACIÓN DINÁMICA Y PORTABLE ---
 JSON_FILE = os.environ.get("MMH3X2_JSON", "MMH3X2_4IMG.json")
@@ -14,6 +14,7 @@ LORAS_DIR = os.environ.get("MINIMAXH3_LORAS_DIR", _loras_h3 if os.path.isdir(_lo
 LORAS_PREFIX = os.environ.get("MINIMAXH3_LORAS_PREFIX", "h3" if os.path.isdir(_loras_h3) else "")
 INTERP_DIR = os.environ.get("MINIMAXH3_INTERP_DIR", config_loader.get_model_subdirs("frame_interpolation"))
 VAE_DIR = os.environ.get("MINIMAXH3_VAE_DIR", config_loader.get_model_subdirs("vae"))
+VAE_APPROX_DIR = os.environ.get("MINIMAXH3_VAE_APPROX_DIR", config_loader.get_model_subdirs("vae_approx"))
 MMH3X2_UI_PORT = config_loader.get_port("mmh3x2", 8003)
 LTXV_UI_PORT = config_loader.get_port("ltxv", 8000)
 # -----------------------------------------
@@ -56,6 +57,7 @@ def build_config(json_file, output_html, header_sub):
         'model_count_label': '',
         'mmh3x2_ui_port': MMH3X2_UI_PORT,
         'ltxv_ui_port': LTXV_UI_PORT,
+        'extra_consts': {'AVAILABLE_TAEH3': filter_names(get_file_list(VAE_APPROX_DIR), include=('taeh3',))},
     }
 
 def main():

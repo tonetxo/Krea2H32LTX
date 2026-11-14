@@ -1029,11 +1029,10 @@ function buildGraph(job){
   const audioOut = applyExternalAudio(g, d, job);
   if(job.dir === "h3_ltx") fullTemporalDecode(g, d.DEC_V, W2, H2, job.frames);
   // Preview animado (KJNodes) en ambos pases: sin él ComfyUI manda un frame
-  // estático. H3 usa el TAE 2D de kijai (RGB real, frame a frame) si está en
-  // vae_approx; LTX se queda en L2RGB. No usar preview_method="taesd": crashea
-  // con taeh3.
+  // estático. H3 usa el TAE 2D de kijai con "TAESD"/"Auto"; LTX siempre L2RGB.
+  // No usar preview_method="taesd": crashea con taeh3.
   if(getPreviewMethod() !== "none"){
-    const taeH3 = AVAILABLE_TAEH3.find(n => /2d/i.test(n)) || AVAILABLE_TAEH3[0] || "none";
+    const taeH3 = h3PreviewTinyVae();
     for(const model of [p1, ...(pass1Only ? [] : [p2])]){
       const guider = g[d[model].GUIDER].inputs, id = `preview_${model}`;
       g[id] = { class_type: "ModelPreviewOverrideKJ", inputs: {

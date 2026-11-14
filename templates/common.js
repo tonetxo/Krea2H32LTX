@@ -446,6 +446,12 @@ function getPreviewMethod(){
   const sel = $("previewMethod");
   return sel ? sel.value : "latent2rgb";
 }
+// TAE de H3 para ModelPreviewOverrideKJ (solo UIs con AVAILABLE_TAEH3): el 2D de
+// kijai con "TAESD"/"Auto"; con Latent2RGB, "none" (proyección L2RGB de KJNodes).
+function h3PreviewTinyVae(){
+  if(!["taesd", "auto"].includes(getPreviewMethod())) return "none";
+  return AVAILABLE_TAEH3.find(n => /2d/i.test(n)) || AVAILABLE_TAEH3[0] || "none";
+}
 
 let currentPreviewUrl = null;
 

@@ -4495,11 +4495,9 @@ function buildGraph(job){
     currentModelNode = N.SPECTRUM;
   }
 
-  // 6. Model Preview Override (preview animado, sin taeh3).
-  // tiny_vae="none" fuerza el fallback `_decode_video_frames_l2rgb` de KJNodes:
-  // lee los latent_rgb_factors de MiniMaxH3Video, decodifica 16 frames del latente
-  // y los anima via WS. NO usar "taesd" como preview_method (crashea con taeh3:
-  // first_stage_model=None). Con suppress_default_preview=true evitamos doble preview.
+  // 6. Model Preview Override (preview animado): TAE 2D de H3 con "TAESD"/"Auto";
+  // con tiny_vae="none" KJNodes usa los latent_rgb_factors de MiniMaxH3Video (L2RGB).
+  // NO usar "taesd" como preview_method (crashea con taeh3: first_stage_model=None). Con suppress_default_preview=true evitamos doble preview.
   const prevMethod = getPreviewMethod();
   if(prevMethod !== "none"){
     const previewOverrideKey = "170";
@@ -4512,9 +4510,9 @@ function buildGraph(job){
         suppress_default_preview: true,
         preview_frames: 32,
         preview_fps: 6,
-        tiny_vae: "none"
+        tiny_vae: h3PreviewTinyVae()
       },
-      _meta: { title: "Model Preview Override (animado L2RGB)" }
+      _meta: { title: "Model Preview Override (animado)" }
     };
     currentModelNode = previewOverrideKey;
   }

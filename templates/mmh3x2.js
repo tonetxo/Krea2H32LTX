@@ -4143,9 +4143,9 @@ function buildGraph(j){
         suppress_default_preview: true,
         preview_frames: 32,
         preview_fps: 6,
-        tiny_vae: "none"
+        tiny_vae: h3PreviewTinyVae()
       },
-      _meta: { title: "Model Preview Override (animado L2RGB)" }
+      _meta: { title: "Model Preview Override (animado)" }
     };
     currentModelNode = previewOverrideKey;
   }
