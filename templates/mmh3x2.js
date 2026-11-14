@@ -1160,7 +1160,8 @@ CONFIG.variantMeta = function(seedValue, timeText){
   const dur2 = parseFloat($("durationSlider2")?.value || "15.0");
   const f1 = calcFramesForDuration(dur1);
   const f2 = calcFramesForDuration(dur2);
-  const fTotal = (f1 - 1) + f2;
+  const tail1 = getSeg1TrimTail(f1);
+  const fTotal = (f1 - 1 - tail1) + f2;
   const mp = $("mpSlider")?.value || "0.70";
   const steps = $("stepsSlider")?.value || "20";
   const sampler = $("samplerName")?.value || "res_multistep";
@@ -1202,7 +1203,7 @@ CONFIG.variantMeta = function(seedValue, timeText){
     ["Refs compartidas", $("shareRefsToggle")?.checked ? "sí (Img 2/3/4 en ambos)" : "no"],
     ["Ref size", $("refImageSize")?.value || "match"],
     ["Crossfade Audio", audioCfOn ? `${audioCfSec}s (${$("audioCrossfadeCurve")?.value || 'equal_power'})` : "desactivado"],
-    ["Duración Seg 1", `${dur1.toFixed(1)}s (${f1}f)`],
+    ["Duración Seg 1", `${dur1.toFixed(1)}s (${f1}f${tail1 ? `, −${tail1}f final` : ""})`],
     ["Duración Seg 2", `${dur2.toFixed(1)}s (${f2}f)`],
     ["Duración Total", `${(fTotal / 24).toFixed(1)}s (${fTotal}f)`],
     ["Resolución", `${w}×${h} (${mp} MP)`],
@@ -2122,6 +2123,12 @@ function applyWorkflow(workflow){
   } else if(workflow["12"]?.inputs?.value && $("durationSlider2")){
     $("durationSlider2").value = workflow["12"].inputs.value;
   }
+  if($("seg1TrimTail")){
+    const lastIdx = parseInt(workflow[N.LAST_FRAME]?.inputs?.indexes ?? "-1", 10);
+    const tail = Number.isFinite(lastIdx) && lastIdx < 0 ? -1 - lastIdx : 0;
+    $("seg1TrimTail").value = tail;
+    if($("seg1TrimTailVal")) $("seg1TrimTailVal").textContent = `${tail}f`;
+  }
   updateDurationFrames();
 
   // 4. Megapíxeles
@@ -2810,6 +2817,7 @@ function saveSettings(){
     filenamePrefix: $("filenamePrefix")?.value || "video/MiniMax_H3",
     steps: $("stepsSlider")?.value || "20",
     denoise2: $("denoiseSlider2")?.value || "1.00",
+    seg1TrimTail: $("seg1TrimTail")?.value || "0",
     sampler: $("samplerName")?.value || "res_multistep",
     scheduler: $("schedulerName")?.value || "simple",
     unetModel: $("unetModel")?.value || "",
@@ -2927,6 +2935,10 @@ function restoreSettings(){
     if(s.denoise2 !== undefined && $("denoiseSlider2")){
       $("denoiseSlider2").value = s.denoise2;
       if($("denoiseVal2")) $("denoiseVal2").textContent = parseFloat(s.denoise2).toFixed(2);
+    }
+    if(s.seg1TrimTail !== undefined && $("seg1TrimTail")){
+      $("seg1TrimTail").value = s.seg1TrimTail;
+      if($("seg1TrimTailVal")) $("seg1TrimTailVal").textContent = `${s.seg1TrimTail}f`;
     }
     if(s.sampler !== undefined && $("samplerName")) $("samplerName").value = s.sampler;
     if(s.scheduler !== undefined && $("schedulerName")) $("schedulerName").value = s.scheduler;
@@ -3071,7 +3083,7 @@ async function restoreSavedMedia(){
 
 function attachAutoSaveListeners(){
   const baseIds = [
-    "prompt", "prompt2", "seg2EnhanceStyle", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "aspectRatioSelect", "mpSlider", "stepsSlider", "denoiseSlider2",
+    "prompt", "prompt2", "seg2EnhanceStyle", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "aspectRatioSelect", "mpSlider", "stepsSlider", "denoiseSlider2", "seg1TrimTail",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
     "unetModel", "clipModel", "vaeModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
     "lora1Toggle", "lora1Select",
@@ -3609,12 +3621,20 @@ function calcFramesForDuration(dur){
   return f;
 }
 
+// Frames finales del Seg 1 que se descartan (la frenada de H3 al acabar el clip).
+// Se deja al menos la mitad del Seg 1 para no quedarse sin vídeo con duraciones cortas.
+function getSeg1TrimTail(framesSeg1, j){
+  const raw = parseInt((j ? j.seg1TrimTail : $("seg1TrimTail")?.value) || "0", 10) || 0;
+  return Math.max(0, Math.min(raw, Math.floor(framesSeg1 / 2)));
+}
+
 function updateDurationFrames(){
   const dur1 = parseFloat($("durationSlider1")?.value || "15.0");
   const dur2 = parseFloat($("durationSlider2")?.value || "15.0");
   const frames1 = calcFramesForDuration(dur1);
   const frames2 = calcFramesForDuration(dur2);
-  const totalFrames = (frames1 - 1) + frames2;
+  const tail = getSeg1TrimTail(frames1);
+  const totalFrames = (frames1 - 1 - tail) + frames2;
   const totalSecs = (totalFrames / 24).toFixed(1);
 
   if($("durHint1")) $("durHint1").textContent = `(${dur1.toFixed(1)}s → ${frames1}f)`;
@@ -3622,7 +3642,8 @@ function updateDurationFrames(){
   if($("durHint2")) $("durHint2").textContent = `(${dur2.toFixed(1)}s → ${frames2}f)`;
   if($("durationVal2")) $("durationVal2").textContent = `${dur2.toFixed(1)}s`;
   if($("totalFramesHint")){
-    $("totalFramesHint").textContent = `Total: Seg 1 (${frames1}f) + Seg 2 (${frames2}f) = ${totalFrames} frames (~${totalSecs}s a 24fps)`;
+    const cut = tail ? ` − ${tail}f recortados` : "";
+    $("totalFramesHint").textContent = `Total: Seg 1 (${frames1}f${cut}) + Seg 2 (${frames2}f) = ${totalFrames} frames (~${totalSecs}s a 24fps)`;
   }
 }
 
@@ -3831,13 +3852,21 @@ function buildGraph(j){
 
   // Cálculo dinámico exacto de frames para corte y empalme
   const framesSeg1 = calcFramesForDuration(dur1);
+  // Con recorte, el "último frame" del Seg 1 (guide, frame 0 del Seg 2 y empalme) pasa a ser
+  // el frame -1-tail, y los 2s inyectados/ref terminan en él.
+  const seg1Tail = getSeg1TrimTail(framesSeg1, j);
+  const seg1Cut = framesSeg1 - seg1Tail;
   if(g["61"]?.inputs){
-    g["61"].inputs.indexes = Array.from({ length: framesSeg1 - 1 }, (_, i) => i).join(", ");
+    g["61"].inputs.indexes = Array.from({ length: seg1Cut - 1 }, (_, i) => i).join(", ");
   }
   if(g["65"]?.inputs){
     g["65"].inputs.start_index = 0.0;
-    g["65"].inputs.duration = parseFloat(((framesSeg1 - 1) / 24).toFixed(4));
+    g["65"].inputs.duration = parseFloat(((seg1Cut - 1) / 24).toFixed(4));
   }
+  if(g["25"]?.inputs){
+    g["25"].inputs.indexes = Array.from({ length: 48 }, (_, i) => i - 48 - seg1Tail).join(", ");
+  }
+  if(g[N.LAST_FRAME]?.inputs) g[N.LAST_FRAME].inputs.indexes = String(-1 - seg1Tail);
 
   const mp = parseFloat((j ? j.megapixels : $("mpSlider")?.value) || "0.70");
   if(g[N.MEGAPIXELS]?.inputs) g[N.MEGAPIXELS].inputs.megapixels = mp;
@@ -4904,7 +4933,7 @@ function buildGraph(j){
 
   // Ajuste en el corte de Seg 1 y fundido de audio generado por IA (nodos 65, 37 y 41)
   if(g["65"]?.inputs){
-    const seg1BaseDur = parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
+    const seg1BaseDur = parseFloat(((seg1Cut - 1) / 24).toFixed(4));
     g["65"].inputs.start_index = 0.0;
     if(audioCrossfadeOn && cfSec > 0){
       g["65"].inputs.duration = parseFloat((seg1BaseDur + cfIaSec).toFixed(4));
@@ -4952,7 +4981,7 @@ function buildGraph(j){
   };
   const a1 = audioPath(aSlots[1]);
   const a2 = audioPath(aSlots[2]);
-  const totalDurExact = parseFloat((((calcFramesForDuration(dur1) - 1) + calcFramesForDuration(dur2)) / 24).toFixed(4));
+  const totalDurExact = parseFloat((((seg1Cut - 1) + calcFramesForDuration(dur2)) / 24).toFixed(4));
 
   if(audioMode !== "none" && (a1 || a2)){
     if(a1){
@@ -5052,7 +5081,7 @@ function buildGraph(j){
           _meta: { title: "Híbrido: IA Seg 2 recortada" }
         };
         // Seg 2 usa Audio 2 desde el inicio o, si no hay, la continuación de Audio 1 en la línea de tiempo global.
-        const seg2Start = a2 ? 0.0 : parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
+        const seg2Start = a2 ? 0.0 : parseFloat(((seg1Cut - 1) / 24).toFixed(4));
         g[N.CREATE_VID_2].inputs.audio = mixUser("199_seg2", "199_ia_trim_seg2", a2 ? "191_load_audio2" : "190_load_audio1", seg2Start, seg2Dur, "Seg 2");
       }
       // Final: concat IA (41, ya con crossfade IA) + pista usuario global (192)
@@ -5124,7 +5153,7 @@ function buildGraph(j){
         };
         if(audioMode === "passthrough" && g[N.CREATE_VID_FINAL]?.inputs) g[N.CREATE_VID_FINAL].inputs.audio = ["192_trim_final_audio", 0];
       } else if(a1 && a2){
-        const seg1Dur = parseFloat(((calcFramesForDuration(dur1) - 1) / 24).toFixed(4));
+        const seg1Dur = parseFloat(((seg1Cut - 1) / 24).toFixed(4));
         const seg1Trim = (audioCrossfadeOn && cfSec > 0) ? parseFloat((seg1Dur + cfSec).toFixed(4)) : seg1Dur;
         g["193_trim_audio1"] = {
           inputs: {
@@ -5307,7 +5336,7 @@ function buildGraph(j){
         { up: N.LR_UP_1, sched: N.LR_SCHED_1, guider: N.LR_GUIDER_1, sample: N.LR_SAMPLE_1, decode: N.LR_DECODE_1 });
       g[N.LR_LAST_1] = {
         class_type: "GetImagesFromBatchIndexed",
-        inputs: { indexes: "-1", images: [N.LR_DECODE_1, 0] },
+        inputs: { indexes: String(-1 - seg1Tail), images: [N.LR_DECODE_1, 0] },
         _meta: { title: "Último frame Seg 1 refinado" }
       };
       lrIds[1].push(N.LR_LAST_1);
@@ -5928,7 +5957,7 @@ function buildGraph(j){
       };
       g[N.LR_LAST_1] = {
         class_type: "GetImagesFromBatchIndexed",
-        inputs: { indexes: "-1", images: [N.LR_SEG1_MATCH, 0] },
+        inputs: { indexes: String(-1 - seg1Tail), images: [N.LR_SEG1_MATCH, 0] },
         _meta: { title: "Último frame Seg 1 (refinado)" }
       };
       if(g["61"]?.inputs) g["61"].inputs.images = [N.LR_SEG1_MATCH, 0];
@@ -5998,6 +6027,7 @@ async function queueJob(runMode){
     aspectRatio: $("aspectRatioSelect")?.value || "auto",
     steps: parseInt($("stepsSlider")?.value || "20", 10),
     denoise2: parseFloat($("denoiseSlider2")?.value || "1.00"),
+    seg1TrimTail: parseInt($("seg1TrimTail")?.value || "0", 10),
     sampler: $("samplerName")?.value || "res_multistep",
     scheduler: $("schedulerName")?.value || "simple",
     audioMode: $("audioMode")?.value || "none",
@@ -6703,6 +6733,14 @@ window.addEventListener("DOMContentLoaded", () => {
   if($("denoiseSlider2")){
     $("denoiseSlider2").addEventListener("input", (e) => {
       if($("denoiseVal2")) $("denoiseVal2").textContent = parseFloat(e.target.value).toFixed(2);
+    });
+  }
+
+  if($("seg1TrimTail")){
+    $("seg1TrimTail").addEventListener("input", (e) => {
+      if($("seg1TrimTailVal")) $("seg1TrimTailVal").textContent = `${e.target.value}f`;
+      updateDurationFrames();
+      scheduleSaveSettings();
     });
   }
 

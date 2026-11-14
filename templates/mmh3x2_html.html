@@ -481,6 +481,12 @@
           <div class="slider-val" id="denoiseVal2">1.00</div>
         </div>
         <div class="hint" style="font-size:10px;margin-top:-4px;margin-bottom:8px;">1.00 = ruido total (regenera). 0.85-0.95 = conserva trayectoria e inercia física de los 2s inyectados.</div>
+        <div class="row slider-row">
+          <label>Recortar final Seg 1 <span class="hint">(frames a 24fps)</span></label>
+          <input type="range" id="seg1TrimTail" min="0" max="24" step="1" value="0">
+          <div class="slider-val" id="seg1TrimTailVal">0f</div>
+        </div>
+        <div class="hint" style="font-size:10px;margin-top:-4px;margin-bottom:8px;">Descarta la frenada final del Seg 1: el Seg 2 continúa desde ese frame y el final los omite.</div>
         <div class="row two-col">
           <div>
             <label>Sampler</label>
