@@ -3980,7 +3980,8 @@ function buildGraph(j){
         late_kv: 0.6833,
         backend: backend,
         early_schedule: "Ramp",
-        video_token_order: "1x8x8"
+        video_token_order: "1x8x8",
+        head_budgets: "Calibrated"
       },
       _meta: { title: "H3 Sparse Attention Advanced" }
     };

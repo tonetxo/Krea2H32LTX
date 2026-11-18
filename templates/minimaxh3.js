@@ -4366,7 +4366,8 @@ function buildGraph(job){
           late_kv: 0.6833,
           backend: normalizeSparseBackend(h3opt.sparseBackend),
           early_schedule: "Ramp",
-          video_token_order: "1x8x8"
+          video_token_order: "1x8x8",
+          head_budgets: "Calibrated"
         },
         _meta: { title: "H3 Sparse Attention Advanced" }
       };
@@ -5421,7 +5422,8 @@ function buildGraph(job){
                 late_kv: 0.6833,
                 backend: normalizeSparseBackend(h3opt.sparseBackend),
                 early_schedule: "Ramp",
-                video_token_order: "1x8x8"
+                video_token_order: "1x8x8",
+                head_budgets: "Calibrated"
               },
               _meta: { title: "H3 Sparse Attention Advanced Pase 2" }
             };
