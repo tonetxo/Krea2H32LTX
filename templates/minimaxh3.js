@@ -2994,8 +2994,11 @@ async function applyWorkflow(workflow, opts={}){
       const vLink = ref2vNode.inputs[`ref_videos.ref_video_${i}`];
       const vaLink = ref2vNode.inputs[`ref_video_audios.ref_video_audio_${i}`];
       if(vLink){
-        const nodeId = String(vLink[0]);
-        const srcNode = workflow[nodeId];
+        let srcNode = workflow[String(vLink[0])];
+        // Entre el LoadVideo y el R2V hay un GetVideoComponents (los ficheros antiguos no lo tienen)
+        if(srcNode && srcNode.class_type === "GetVideoComponents" && Array.isArray(srcNode.inputs?.video)){
+          srcNode = workflow[String(srcNode.inputs.video[0])];
+        }
         if(srcNode && srcNode.class_type === "LoadVideo" && srcNode.inputs?.file){
           const p = fetchComfyFile(srcNode.inputs.file).then(async file => {
             if(!file) return;
@@ -4236,7 +4239,10 @@ function buildGraph(job){
         if(v.uploaded){
           const vidKey = "21"+i;
           g[vidKey] = { class_type: "LoadVideo", inputs: { file: (v.uploaded.subfolder ? v.uploaded.subfolder+"/" : "") + v.uploaded.name }, _meta: { title: "Ref Video "+(i+1) } };
-          r2v.inputs["ref_videos.ref_video_"+i] = [vidKey, 0];
+          // LoadVideo devuelve VIDEO; ref_video espera IMAGE (frames), así que se extraen.
+          const compKey = "24"+i;
+          g[compKey] = { class_type: "GetVideoComponents", inputs: { video: [vidKey, 0] }, _meta: { title: "Ref Video "+(i+1)+" (frames)" } };
+          r2v.inputs["ref_videos.ref_video_"+i] = [compKey, 0];
           if(v.audioUploaded){
             const audKey = "22" + i;
             g[audKey] = { class_type: "LoadAudio", inputs: { audio: (v.audioUploaded.subfolder ? v.audioUploaded.subfolder+"/" : "") + v.audioUploaded.name }, _meta: { title: "Ref Video Audio "+(i+1) } };
