@@ -7,6 +7,8 @@ their specific paths, placeholders, and template files.
 import json
 import os
 
+import config_loader
+
 TEMPLATES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
 
 
@@ -198,7 +200,6 @@ def generate_html(config):
     lut_dirs = config.get('lut_dirs')
     if lut_dirs is None:
         try:
-            import config_loader
             lut_dirs = config_loader.get_lut_dirs()
         except Exception:
             lut_dirs = []
@@ -211,6 +212,11 @@ def generate_html(config):
                         lut_files.append(f)
     lut_files.sort()
     lut_js_array = json.dumps(lut_files)
+
+    # --- RelayVSR: UNets x2/x4 y sus decoders Flash (super resolución de vídeo) ---
+    relayvsr_js_array = json.dumps(filter_names(
+        get_file_list(config_loader.get_model_subdirs("diffusion_models")) + get_file_list(config_loader.get_model_subdirs("vae")),
+        include=('relayvsr',)))
 
     # --- Assemble CSS ---
     css = _read_template('base.css') + '\n' + _read_template(config['ui_css'])
@@ -242,6 +248,7 @@ def generate_html(config):
         "const AVAILABLE_INTERP_MODELS = __INTERP_LIST__;\n"
         "const AVAILABLE_UPSCALE_MODELS = __UPSCALE_LIST__;\n"
         "const AVAILABLE_LUTS = __LUT_LIST__;\n"
+        "const AVAILABLE_RELAYVSR = " + relayvsr_js_array + ";\n"
         "const LTXV_UI_PORT = __LTXV_UI_PORT__;\n"
         "const MINIMAXH3_UI_PORT = __MINIMAXH3_UI_PORT__;\n"
         "const MMH3X2_UI_PORT = __MMH3X2_UI_PORT__;\n"

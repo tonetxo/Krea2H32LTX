@@ -849,10 +849,14 @@
           <!-- RTX Video Super Resolution -->
           <div class="row">
             <label class="toggle-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-              <input type="checkbox" id="rtxToggle" checked> <span>RTX Video Super Resolution / Limpieza</span>
+              <input type="checkbox" id="rtxToggle" checked> <span>Super Resolution de vídeo / Limpieza</span>
             </label>
             <div id="rtxControls" style="margin-top:4px;">
-              <select id="rtxQuality">
+              <select id="rtxEngine">
+                <option value="rtx" selected>NVIDIA RTX Video Super Resolution</option>
+                <option value="relayvsr">RelayVSR (difusión, 1 paso)</option>
+              </select>
+              <select id="rtxQuality" style="margin-top:4px;">
                 <optgroup label="Escalado">
                   <option value="HIGHBITRATE_ULTRA" selected>HIGHBITRATE_ULTRA (Óptimo IA / Alta fidelidad)</option>
                   <option value="HIGHBITRATE_HIGH">HIGHBITRATE_HIGH (High Bitrate equilibrado)</option>
@@ -878,8 +882,9 @@
                 <option value="3">3×</option>
                 <option value="4">4×</option>
               </select>
+              <div class="row slider-row" id="relayDetailRow" style="display:none;margin-top:4px;"><label>Detalle RelayVSR</label><input type="range" id="relayDetail" min="0" max="1" step="0.05" value="1"><div class="slider-val" id="relayDetailVal">1.00</div></div>
             </div>
-            <div class="hint" style="font-size:10px;margin-top:2px;">Escalado o limpieza por Tensor Cores. Los modos DENOISE/DEBLUR conservan la resolución.</div>
+            <div class="hint" id="rtxHint" style="font-size:10px;margin-top:2px;">Escalado o limpieza por Tensor Cores. Los modos DENOISE/DEBLUR conservan la resolución.</div>
           </div>
 
           <!-- Interpolación de Frames (RIFE / RTX Frame Gen) -->
@@ -1114,7 +1119,7 @@
             <button class="vid-action-btn" id="btnDownloadFinal" title="Descargar vídeo final" style="display:none;" type="button">Descargar</button>
             <button class="vid-action-btn" id="btnExtractFrameFinal" title="Extraer frame como imagen" style="display:none;" type="button">Extraer Frame</button>
             <button class="vid-action-btn" id="btnInterpolateFinal" title="Interpolar fotogramas del vídeo final (RIFE / RTX Frame Gen)" style="display:none;" type="button">⚡ Interpolar</button>
-            <button class="vid-action-btn" id="btnRtxUpscaleFinal" title="Escalar o limpiar el vídeo final con RTX Video Super Resolution (usa calidad y escala del panel Postprocesado)" style="display:none;" type="button">🔍 RTX Upscale</button>
+            <button class="vid-action-btn" id="btnRtxUpscaleFinal" title="Escalar o limpiar el vídeo final con el motor del panel Postprocesado (RTX VSR o RelayVSR)" style="display:none;" type="button">🔍 Upscale</button>
             <button class="vid-action-btn" id="btnFaceRefineFinal" title="Refinar los rostros del vídeo final con H3 FaceRefine" style="display:none;" type="button">Refinar Rostro</button>
             <button class="vid-action-btn" id="btnLoadMetaFinal" title="Recuperar parámetros del workflow" disabled>Workflow</button>
           </div>

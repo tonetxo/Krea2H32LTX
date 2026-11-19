@@ -65,11 +65,7 @@ def main():
         'model_count_label': '',
         'ltxv_ui_port': MINIMAXH3_UI_PORT,
         'mmh3x2_ui_port': MMH3X2_UI_PORT,
-        'extra_consts': {
-            'AVAILABLE_TAEH3': filter_names(get_file_list(VAE_APPROX_DIR), include=('taeh3',)),
-            # UNets y decoders Flash de RelayVSR (super resolución de vídeo)
-            'AVAILABLE_RELAYVSR': filter_names(get_file_list(UNET_DIR) + get_file_list(VAE_DIR), include=('relayvsr',)),
-        },
+        'extra_consts': {'AVAILABLE_TAEH3': filter_names(get_file_list(VAE_APPROX_DIR), include=('taeh3',))},
     })
 
 if __name__ == '__main__':

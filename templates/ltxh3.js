@@ -157,7 +157,7 @@ function defaultState(){
     savePass1: false, pass1Only: false,
     i2v: { strength: 1.0, fitRes: true, llmImage: true },
     rife: { enabled: false, engine: "rtx", multiplier: 2, model: "rife_v4.26.safetensors" },
-    rtx: { enabled: false, quality: "HIGHBITRATE_ULTRA", scale: 2 },
+    rtx: { enabled: false, engine: "rtx", quality: "HIGHBITRATE_ULTRA", scale: 2, detail: 1.0 },
     postfx: { enabled: false, lut: { enabled: true, name: "", strength: 0.8 }, vignette: { enabled: false, intensity: 0.25 }, grain: { enabled: false, power: 0.15 } },
     prefix: "video/LTXH3",
   };
@@ -514,8 +514,8 @@ function updateResHint(){
   const w = state.width, h = state.height;
   const w2 = nearest32(w * state.upscaleBy), h2 = nearest32(h * state.upscaleBy);
   let final = `${w2}×${h2}`;
-  if(state.rtx.enabled && !/^(DENOISE|DEBLUR)_/.test(state.rtx.quality)){
-    final += ` → RTX ${state.rtx.scale}x ≈ ${Math.round(w2 * state.rtx.scale)}×${Math.round(h2 * state.rtx.scale)}`;
+  if(state.rtx.enabled && (state.rtx.engine === "relayvsr" || !/^(DENOISE|DEBLUR)_/.test(state.rtx.quality))){
+    final += ` → ${state.rtx.engine === "relayvsr" ? "RelayVSR" : "RTX"} ${state.rtx.scale}x ≈ ${Math.round(w2 * state.rtx.scale)}×${Math.round(h2 * state.rtx.scale)}`;
   }
   $("resHint").textContent = $("upscaleResHint").textContent = state.pass1Only
     ? `Solo pase 1: ${w}×${h} px (${getFriendlyRatio(w, h)})`
@@ -622,8 +622,14 @@ function renderPost(){
   $("segRtxOn").classList.toggle("on", state.rtx.enabled);
   $("segRtxOff").classList.toggle("on", !state.rtx.enabled);
   $("rtxControls").style.display = state.rtx.enabled ? "block" : "none";
+  const relay = state.rtx.engine === "relayvsr";
+  $("rtxEngine").value = state.rtx.engine;
+  $("rtxQualityRow").style.display = relay ? "none" : "";
+  $("relayDetailRow").style.display = $("relayHint").style.display = relay ? "" : "none";
   $("rtxQuality").value = state.rtx.quality;
   $("rtxScale").value = String(state.rtx.scale);
+  $("relayDetail").value = String(state.rtx.detail);
+  $("relayDetailVal").textContent = state.rtx.detail.toFixed(2);
   const fx = state.postfx;
   $("segPostFxOn").classList.toggle("on", fx.enabled);
   $("segPostFxOff").classList.toggle("on", !fx.enabled);
@@ -648,6 +654,8 @@ $("segRtxOff").addEventListener("click", postSet(() => state.rtx.enabled = false
 $("rifeEngine").addEventListener("change", postSet(() => state.rife.engine = $("rifeEngine").value));
 $("rifeMultiplier").addEventListener("change", postSet(() => state.rife.multiplier = parseInt($("rifeMultiplier").value, 10)));
 $("rifeModel").addEventListener("change", postSet(() => state.rife.model = $("rifeModel").value));
+$("rtxEngine").addEventListener("change", postSet(() => state.rtx.engine = $("rtxEngine").value));
+$("relayDetail").addEventListener("input", postSet(() => state.rtx.detail = parseFloat($("relayDetail").value)));
 $("rtxQuality").addEventListener("change", postSet(() => state.rtx.quality = $("rtxQuality").value));
 $("rtxScale").addEventListener("change", postSet(() => state.rtx.scale = parseFloat($("rtxScale").value)));
 $("segPostFxOn").addEventListener("click", postSet(() => state.postfx.enabled = true));
@@ -984,7 +992,9 @@ function appendPost(g, images, rife, rtx, prefixId, fx, seed){
     }
     ref = [`${prefixId}_interp`, 0];
   }
-  if(rtx && rtx.enabled){
+  if(rtx && rtx.enabled && rtx.engine === "relayvsr"){
+    ref = addRelayVsr(g, ref, rtx.scale, rtx.detail);
+  } else if(rtx && rtx.enabled){
     const sameRes = /^(DENOISE|DEBLUR)_/.test(rtx.quality);
     g[`${prefixId}_rtx`] = { class_type: "RTXVideoSuperResolution", inputs: {
       images: ref, resize_type: "scale by multiplier", "resize_type.scale": sameRes ? 1.0 : rtx.scale,
@@ -1149,7 +1159,7 @@ function buildOnDemandGraph(job){
   }
   g.od_create = { class_type: "CreateVideo", inputs: { images, audio: ["od_comp", 1], fps }, _meta: { title: "Crear vídeo" } };
   const base = src.filename.replace(/_\d+_?\.[^.]+$/, "").replace(/\.[^.]+$/, "");
-  const suffix = job.onDemand === "interp" ? `_interp${job.rife.multiplier}x` : (/^(DENOISE|DEBLUR)_/.test(job.rtx.quality) ? `_${job.rtx.quality.toLowerCase()}` : `_rtx${job.rtx.scale}x`);
+  const suffix = job.onDemand === "interp" ? `_interp${job.rife.multiplier}x` : (job.rtx.engine === "relayvsr" ? `_relayvsr${job.rtx.scale}x` : (/^(DENOISE|DEBLUR)_/.test(job.rtx.quality) ? `_${job.rtx.quality.toLowerCase()}` : `_rtx${job.rtx.scale}x`));
   g[N.FINAL_SAVE] = saveNode(`${src.subfolder || "video"}/${base}${suffix}`, ["od_create", 0], "Guardar clip post-procesado");
   return g;
 }
@@ -1416,7 +1426,7 @@ async function runSingleGeneration(index){
     const graph = buildGraph({ ...variant, seed });
     variantCounter++;
     const varIndex = variantCounter;
-    log(job.onDemand ? `Encolando ${job.onDemand === "interp" ? "interpolación" : "RTX VSR"} de ${job.sourceMedia.filename}...`
+    log(job.onDemand ? `Encolando ${job.onDemand === "interp" ? "interpolación" : (job.rtx.engine === "relayvsr" ? "RelayVSR" : "RTX VSR")} de ${job.sourceMedia.filename}...`
       : `Var ${varIndex} · ${job.dir === "ltx_h3" ? "LTX→H3" : "H3→LTX"} · seed ${seed} · ${job.width}×${job.height} · ${job.frames}f${job.pass1Only ? " · solo pase 1" : ""}...`);
     uploadInProgress = true;
     const r = await fetch(server() + "/prompt", {

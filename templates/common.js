@@ -3135,3 +3135,51 @@ document.addEventListener("click", (e) => {
     }
   }, 300);
 });
+
+// --- RelayVSR (super resolución de vídeo, nodos nativos de ComfyUI) ---
+// La UNet fija el factor nativo (x2/x4) y su decoder Flash debe ser del mismo factor.
+// Otras escalas reducen la salida nativa (1.5x = x2 y luego 0.75), que conserva más detalle.
+function relayVsrModels(factor){
+  const pick = prefix => AVAILABLE_RELAYVSR.find(n => n.split("/").pop().toLowerCase().startsWith(prefix));
+  return { factor, unet: pick(`relayvsr_x${factor}`), vae: pick(`relayvsr_flash_vae_x${factor}`) };
+}
+
+// Inyecta RelayVSR tras `images` y devuelve la salida escalada.
+function addRelayVsr(g, images, scale, detail){
+  let m = relayVsrModels(scale > 2 ? 4 : 2);
+  if(!m.unet || !m.vae) m = relayVsrModels(m.factor === 2 ? 4 : 2);
+  if(!m.unet || !m.vae) throw new Error("Faltan los modelos RelayVSR (relayvsr_x2/x4 en diffusion_models y relayvsr_flash_vae_x2/x4 en vae).");
+  g.post_relay_unet = { class_type: "UNETLoader", inputs: { unet_name: m.unet, weight_dtype: "default" }, _meta: { title: `RelayVSR UNet x${m.factor}` } };
+  g.post_relay_vae = { class_type: "VAELoader", inputs: { vae_name: m.vae }, _meta: { title: `RelayVSR Flash x${m.factor}` } };
+  g.post_relay_cond = { class_type: "RelayVSRConditioning", inputs: { model: ["post_relay_unet", 0], images }, _meta: { title: "RelayVSR Conditioning" } };
+  g.post_relay_sampler = {
+    class_type: "KSampler",
+    inputs: {
+      seed: 42, steps: 1, cfg: 1, sampler_name: "euler", scheduler: "simple", denoise: 1,
+      model: ["post_relay_unet", 0], positive: ["post_relay_cond", 0], negative: ["post_relay_cond", 0], latent_image: ["post_relay_cond", 1]
+    },
+    _meta: { title: "RelayVSR Sampler" }
+  };
+  g.post_relay_decode = { class_type: "VSRDecode", inputs: { vae: ["post_relay_vae", 0], samples: ["post_relay_sampler", 0], images, detail }, _meta: { title: "VSR Decode" } };
+  if(Math.abs(scale - m.factor) < 1e-6) return ["post_relay_decode", 0];
+  g.post_relay_scale = {
+    class_type: "ImageScaleBy",
+    inputs: { image: ["post_relay_decode", 0], upscale_method: "area", scale_by: scale / m.factor },
+    _meta: { title: "RelayVSR reescalado" }
+  };
+  return ["post_relay_scale", 0];
+}
+
+// Escala y detalle de RelayVSR guardados en un grafo (metadatos), o null si no lo usa.
+function relayVsrFromWorkflow(workflow){
+  const nodes = Object.values(workflow || {});
+  const decode = nodes.find(n => n?.class_type === "VSRDecode");
+  if(!decode) return null;
+  const unet = nodes.find(n => n?.class_type === "UNETLoader" && /relayvsr_x\d/i.test(n.inputs?.unet_name || ""));
+  const factor = parseInt((unet?.inputs.unet_name.match(/relayvsr_x(\d)/i) || [])[1] || "2", 10);
+  const down = nodes.find(n => n?._meta?.title === "RelayVSR reescalado");
+  return {
+    scale: Math.round(factor * (parseFloat(down?.inputs?.scale_by) || 1) * 100) / 100,
+    detail: typeof decode.inputs?.detail === "number" ? decode.inputs.detail : 1.0
+  };
+}

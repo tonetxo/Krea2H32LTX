@@ -78,7 +78,7 @@ REQUIRED_PACKAGES = [
         "repo": "",
         "nodes": ["RelayVSRConditioning", "VSRDecode"],
         "critical": False,
-        "workflows": ["MiniMaxH3 (Super Resolution RelayVSR; modelos en Comfy-Org/RelayVSR)"],
+        "workflows": ["MiniMaxH3 / MMH3X2 / LTXV / LTXH3 (Super Resolution RelayVSR; modelos en Comfy-Org/RelayVSR)"],
     },
     {
         "name": "rgthree-comfy",

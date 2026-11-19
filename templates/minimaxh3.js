@@ -1111,13 +1111,6 @@ function rtxLabel(r){
   if(r.engine === "relayvsr") return `RelayVSR ${r.scale}x`;
   return /^(DENOISE|DEBLUR)_/.test(r.quality || "") ? "limpieza RTX (misma resolución)" : `RTX ${r.scale}x`;
 }
-// RelayVSR: la UNet fija el factor nativo (x2/x4) y el decoder Flash debe ser del mismo factor.
-function relayVsrModels(factor){
-  const list = (typeof AVAILABLE_RELAYVSR !== "undefined") ? AVAILABLE_RELAYVSR : [];
-  const pick = prefix => list.find(n => n.split("/").pop().toLowerCase().startsWith(prefix));
-  return { factor, unet: pick(`relayvsr_x${factor}`), vae: pick(`relayvsr_flash_vae_x${factor}`) };
-}
-
 // Inyecta el escalado de vídeo (RTX VSR o RelayVSR) tras `images`; devuelve la salida.
 function addVideoUpscale(g, images, r){
   if(r.engine !== "relayvsr"){
@@ -1137,31 +1130,7 @@ function addVideoUpscale(g, images, r){
     };
     return [N.RTX_SR, 0];
   }
-  const scale = parseFloat(r.scale || 2) || 2;
-  let m = relayVsrModels(scale > 2 ? 4 : 2);
-  if(!m.unet || !m.vae) m = relayVsrModels(m.factor === 2 ? 4 : 2);
-  if(!m.unet || !m.vae) throw new Error("Faltan los modelos RelayVSR (relayvsr_x2/x4 en diffusion_models y relayvsr_flash_vae_x2/x4 en vae).");
-  g.post_relay_unet = { class_type: "UNETLoader", inputs: { unet_name: m.unet, weight_dtype: "default" }, _meta: { title: `RelayVSR UNet x${m.factor}` } };
-  g.post_relay_vae = { class_type: "VAELoader", inputs: { vae_name: m.vae }, _meta: { title: `RelayVSR Flash x${m.factor}` } };
-  g.post_relay_cond = { class_type: "RelayVSRConditioning", inputs: { model: ["post_relay_unet", 0], images }, _meta: { title: "RelayVSR Conditioning" } };
-  g.post_relay_sampler = {
-    class_type: "KSampler",
-    inputs: {
-      seed: 42, steps: 1, cfg: 1, sampler_name: "euler", scheduler: "simple", denoise: 1,
-      model: ["post_relay_unet", 0], positive: ["post_relay_cond", 0], negative: ["post_relay_cond", 0], latent_image: ["post_relay_cond", 1]
-    },
-    _meta: { title: "RelayVSR Sampler" }
-  };
-  const detail = (typeof r.detail === "number") ? r.detail : 1.0;
-  g.post_relay_decode = { class_type: "VSRDecode", inputs: { vae: ["post_relay_vae", 0], samples: ["post_relay_sampler", 0], images, detail }, _meta: { title: "VSR Decode" } };
-  if(Math.abs(scale - m.factor) < 1e-6) return ["post_relay_decode", 0];
-  // 1.5x / 3x: reducir la salida nativa conserva más detalle que escalar menos.
-  g.post_relay_scale = {
-    class_type: "ImageScaleBy",
-    inputs: { image: ["post_relay_decode", 0], upscale_method: "area", scale_by: scale / m.factor },
-    _meta: { title: "RelayVSR reescalado" }
-  };
-  return ["post_relay_scale", 0];
+  return addRelayVsr(g, images, parseFloat(r.scale || 2) || 2, (typeof r.detail === "number") ? r.detail : 1.0);
 }
 const _rtxState = loadRtx();
 setRtxUI(_rtxState);
@@ -3540,17 +3509,12 @@ async function applyWorkflow(workflow, opts={}){
 
   // RTX Video Super Resolution
   const rtxNode = findByClass("RTXVideoSuperResolution");
-  const relayDecode = findByClass("VSRDecode");
-  if(relayDecode && relayDecode.inputs){
-    const relayUnet = Object.values(workflow).find(n => n?.class_type === "UNETLoader" && /relayvsr_x(\d)/i.test(n.inputs?.unet_name || ""));
-    const factor = parseInt((relayUnet?.inputs.unet_name.match(/relayvsr_x(\d)/i) || [])[1] || "2", 10);
-    const scaleNode = findByTitle("RelayVSR reescalado");
-    const sc = Math.round(factor * (scaleNode ? parseFloat(scaleNode.inputs.scale_by) || 1 : 1) * 100) / 100;
-    const detail = typeof relayDecode.inputs.detail === "number" ? relayDecode.inputs.detail : 1.0;
-    const rtx = { ...getRtxState(), enabled: true, engine: "relayvsr", scale: sc, detail };
+  const relay = relayVsrFromWorkflow(workflow);
+  if(relay){
+    const rtx = { ...getRtxState(), enabled: true, engine: "relayvsr", scale: relay.scale, detail: relay.detail };
     setRtxUI(rtx);
     saveRtx(rtx);
-    setApplied(`RelayVSR ${sc}x (detalle ${detail.toFixed(2)})`);
+    setApplied(`RelayVSR ${relay.scale}x (detalle ${relay.detail.toFixed(2)})`);
   } else if(rtxNode && rtxNode.inputs){
     const q = rtxNode.inputs.quality || "ULTRA";
     const sc = parseFloat(rtxNode.inputs["resize_type.scale"] || rtxNode.inputs.scale || 2) || 2;
