@@ -74,6 +74,13 @@ REQUIRED_PACKAGES = [
         "workflows": ["MiniMaxH3 (RTX SR)", "LTXV (RTX SR)", "LTXH3 (RTX SR / Frame Gen)"],
     },
     {
+        "name": "ComfyUI nativo con RelayVSR (actualiza ComfyUI)",
+        "repo": "",
+        "nodes": ["RelayVSRConditioning", "VSRDecode"],
+        "critical": False,
+        "workflows": ["MiniMaxH3 (Super Resolution RelayVSR; modelos en Comfy-Org/RelayVSR)"],
+    },
+    {
         "name": "rgthree-comfy",
         "repo": "https://github.com/rgthree/rgthree-comfy",
         "nodes": ["Power Lora Loader (rgthree)", "Seed (rgthree)"],
