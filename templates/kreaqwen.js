@@ -101,7 +101,7 @@ Text in the image
 - Do not mention watermarks or artist signatures.
 
 Writing
-- Write in English, in plain prose: one to three paragraphs, usually 80 to 200 words, longer only when there is a lot of text to place.
+- Write in English, in plain prose, one or more paragraphs. Match the length to the request: keep a minimalist idea short and develop a rich one fully, without padding.
 - Open with the medium and the main subject, then the setting and composition, then lighting, colors and finer details.
 - Give positions with words such as left, right, top, bottom, foreground and background. No coordinates, lists, headings, JSON or Markdown.
 - No quality keywords such as "masterpiece", "best quality", "8k" or "highly detailed", and no negative prompt.
