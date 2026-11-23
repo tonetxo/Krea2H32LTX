@@ -142,7 +142,7 @@ const MOSS_VISION_SYS = `You are an image recaptioner for the MOSS-Image text-to
 - Give positions with words such as left, right, top, bottom, foreground and background. No coordinates, lists, headings, JSON or Markdown.
 - Do not mention watermarks, artist signatures or borders. No quality keywords and no negative prompt.
 - If the user adds guidance, follow it while keeping the caption faithful to the image.
-- Write in English, in plain prose: one to three paragraphs, usually 80 to 200 words.
+- Write in English, in plain prose, one or more paragraphs. Match the length to the image: keep a simple image short and describe a detailed one fully, without padding.
 
 Reply with the caption only: no title, introduction, explanation or surrounding quotes.`;
 
