@@ -14,7 +14,7 @@ const CONFIG = {
     IMAGE_FIRST:"137", IMAGE_LAST:"137", AUDIO_FIRST:"151", AUDIO_VOL:"161",
     PROMPT_TEXT:"138", RES_SELECTOR:"115",
     UNET:"127", CLIP:"128", VAE_VIDEO:"119", VAE_AUDIO:"120",
-    LORA1:"145", LORA2:"145_2",
+    LORA1:"145",
     SPARSE_ATTN:"158", SIGMA_SHIFT:"159", MEM_OPT:"164", SPECTRUM:"162",
     ATTN_BACKEND:"147", BLOCK_SPARSE:"190", AIMDO:"191",
     SOL_H3:"166",
@@ -547,7 +547,6 @@ function saveH3Settings(){
     attentionOptimizer: getAttentionOptimizerState(),
     aimdo: getAimdoState(),
     blockSparse: getBlockSparseState(),
-    loras: JSON.parse(JSON.stringify(loras)),
     batchSize: parseInt($("batchSize")?.value || "1", 10),
     aspectRatio: currentAspectRatio,
     arMode,
@@ -596,13 +595,6 @@ function restoreH3Settings(){
     if(s.evolveAuto !== undefined && $("evolveAuto")) $("evolveAuto").checked = !!s.evolveAuto;
     if(s.arMode){ arMode = s.arMode; saveArMode(arMode); }
     if(s.aspectRatio) currentAspectRatio = s.aspectRatio;
-    if(Array.isArray(s.loras) && s.loras.length){
-      s.loras.forEach((l, i) => {
-        if(i < loras.length && l) loras[i] = l;
-      });
-      renderLoras();
-      saveLoraState();
-    }
     return true;
   } catch(e){ console.warn("Error restaurando ajustes MiniMaxH3:", e); return false; }
 }
@@ -3153,29 +3145,20 @@ async function applyWorkflow(workflow, opts={}){
   if(vaeSet) setApplied("VAE Vídeo"); else setMissing("VAE Vídeo");
 
   // LoRAs
-  const loraNodesFound = findAllByClass("LoraLoaderModelOnly").concat(findAllByClass("LoraLoader"));
+  // La Turbo LoRA del pase 2 tiene su propio control: no entra en la lista.
+  const loraNodesFound = findAllByClass("LoraLoaderModelOnly").concat(findAllByClass("LoraLoader"))
+    .filter(f => f.id !== N.LORA_TURBO2 && f.node?._meta?.title !== "Turbo LoRA Pase 2" && f.node?.inputs?.lora_name && f.node.inputs.lora_name !== "None");
   if(loraNodesFound.length > 0){
-    for(let i = 0; i < 2; i++){
-      if(i < loraNodesFound.length && loraNodesFound[i].node && loraNodesFound[i].node.inputs){
-        const inp = loraNodesFound[i].node.inputs;
-        const loraName = inp.lora_name || "";
-        const str = (typeof inp.strength_model === "number") ? inp.strength_model : ((typeof inp.strength === "number") ? inp.strength : 1.0);
-        if(loraName && loraName !== "None"){
-          loras[i].lora = loraName;
-          loras[i].on = true;
-          loras[i].strength = str;
-        } else {
-          loras[i].on = false;
-        }
-      } else {
-        loras[i].on = false;
-      }
-    }
+    loras.splice(0, loras.length, ...loraNodesFound.map(({node: {inputs: inp}}) => ({
+      on: true,
+      lora: inp.lora_name,
+      strength: (typeof inp.strength_model === "number") ? inp.strength_model : ((typeof inp.strength === "number") ? inp.strength : 1.0)
+    })));
     renderLoras();
     saveLoraState();
     setApplied("LoRAs");
   } else {
-    for(let i = 0; i < 2; i++) loras[i].on = false;
+    loras.forEach(l => l.on = false);
     renderLoras();
     saveLoraState();
     setMissing("LoRAs");
@@ -4606,7 +4589,7 @@ function buildGraph(job){
     if(shouldBypass){
       if(i === 0) delete g[N.LORA1];
     } else {
-      const nodeKey = (i === 0) ? N.LORA1 : "145_2";
+      const nodeKey = (i === 0) ? N.LORA1 : `${N.LORA1}_${i + 1}`;
       g[nodeKey] = {
         class_type: "LoraLoaderModelOnly",
         inputs: {

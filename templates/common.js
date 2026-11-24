@@ -1148,7 +1148,10 @@ function loadLoraState() {
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
+      if (Array.isArray(parsed) && $("loraAdd")) {
+        // Lista dinámica (botón «＋ LoRA»): se restaura tal cual, con cualquier número de entradas.
+        loras.splice(0, loras.length, ...parsed.filter(l => l && (AVAILABLE_LORAS.includes(l.lora) || l.lora === "")));
+      } else if (Array.isArray(parsed)) {
         parsed.forEach((l, i) => {
           if (i < loras.length && (AVAILABLE_LORAS.includes(l.lora) || l.lora === "")) loras[i] = l;
         });
@@ -1184,6 +1187,8 @@ function renderLoras(){
   const wrap=$("loraList");
   if(!wrap) return;
   wrap.innerHTML="";
+  const dynamic = !!$("loraAdd");
+  if(dynamic && !loras.length) wrap.innerHTML = `<div class="hint" style="font-size:10px;">Sin LoRAs.</div>`;
   loras.forEach((l,i)=>{
     const box=document.createElement("div");
     box.className="lora"+(l.on?"":" off");
@@ -1194,12 +1199,13 @@ function renderLoras(){
       const displayName = path.split('/').pop();
       optionsHtml += `<option value="${escPath}" ${selected} title="${escPath}">${escapeHtml(displayName)}</option>`;
     });
-    box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div></div>
+    box.innerHTML=`<div class="lora-top"><div class="switch ${l.on?'on':''}" data-i="${i}"><i></i></div><div class="lname">LoRA ${i+1}</div>${dynamic?`<button class="ghost btn-mini lora-del" data-i="${i}" title="Quitar">✕</button>`:""}</div>
     <div class="row" style="margin-bottom:8px;"><select data-field="lora" data-i="${i}">${optionsHtml}</select></div>
     <div class="slider-row"><input type="range" min="-4" max="4" step="0.05" value="${l.strength}" data-field="strength" data-i="${i}"><div class="slider-val" data-val="${i}">${Number(l.strength).toFixed(2)}</div></div>`;
     wrap.appendChild(box);
   });
   wrap.querySelectorAll(".switch").forEach(sw=>sw.addEventListener("click",()=>{loras[+sw.dataset.i].on=!loras[+sw.dataset.i].on;renderLoras();saveLoraState();}));
+  wrap.querySelectorAll(".lora-del").forEach(b=>b.addEventListener("click",()=>{loras.splice(+b.dataset.i,1);renderLoras();saveLoraState();}));
   wrap.querySelectorAll('select[data-field="lora"]').forEach(sel=>sel.addEventListener("change",()=>{loras[+sel.dataset.i].lora=sel.value;saveLoraState();}));
   wrap.querySelectorAll('input[data-field="strength"]').forEach(inp=>inp.addEventListener("input",()=>{const i=+inp.dataset.i;loras[i].strength=parseFloat(inp.value);wrap.querySelector(`[data-val="${i}"]`).textContent=loras[i].strength.toFixed(2);saveLoraState();}));
 }
@@ -2443,6 +2449,7 @@ function initCommon(){
 
   // LoRA state
   loadLoraState(); renderLoras(); loadModels();
+  $("loraAdd")?.addEventListener("click", () => { loras.push({ on: true, lora: "", strength: 1.0 }); renderLoras(); saveLoraState(); });
 
   // Enhancer shared listeners
   $("enhancerToggle").addEventListener("click", () => {
