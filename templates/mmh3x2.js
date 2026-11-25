@@ -1173,13 +1173,7 @@ CONFIG.variantMeta = function(seedValue, timeText){
   const h = $("height")?.value || "720";
   const rMode = $("rifeMultiplier")?.value || "2";
 
-  const lorasActive = [];
-  if($("lora1Toggle")?.checked && $("lora1Select")?.value){
-    lorasActive.push(`${$("lora1Select").value.split('/').pop()} (${$("lora1Strength")?.value || "1.0"})`);
-  }
-  if($("lora2Toggle")?.checked && $("lora2Select")?.value){
-    lorasActive.push(`${$("lora2Select").value.split('/').pop()} (${$("lora2Strength")?.value || "1.0"})`);
-  }
+  const lorasActive = loras.filter(l => l.on && l.lora).map(l => `${l.lora.split('/').pop()} (${Number(l.strength).toFixed(2)})`);
 
   const audioMode = $("audioMode")?.value || "none";
   let audioDesc = "sin audio externo";
@@ -1258,6 +1252,12 @@ function findClipInWorkflow(workflow){
   return "";
 }
 
+// Nodos LoRA inyectados (145_1, 145_2, ...) en orden de cadena.
+function workflowLoraNodes(workflow){
+  return Object.keys(workflow).filter(k => /^145_\d+$/.test(k) && workflow[k]?.inputs?.lora_name)
+    .sort((a, b) => a.split("_")[1] - b.split("_")[1]).map(k => workflow[k]);
+}
+
 function formatWorkflowToMeta(workflow, extra = {}){
   if(!workflow || typeof workflow !== "object") return null;
   const rows = [];
@@ -1286,9 +1286,7 @@ function formatWorkflowToMeta(workflow, extra = {}){
   else if(workflow["18"]?.inputs?.scheduler) rows.push(["Scheduler", workflow["18"].inputs.scheduler]);
   if(workflow["15"]?.inputs?.noise_seed !== undefined) rows.push(["Seed", workflow["15"].inputs.noise_seed]);
   if(workflow["77"]?.inputs?.megapixels) rows.push(["Megapixels", workflow["77"].inputs.megapixels]);
-  const loras = [];
-  if(workflow["145_1"]?.inputs?.lora_name) loras.push(`${workflow["145_1"].inputs.lora_name.split('/').pop()} (${workflow["145_1"].inputs.strength_model || 1})`);
-  if(workflow["145_2"]?.inputs?.lora_name) loras.push(`${workflow["145_2"].inputs.lora_name.split('/').pop()} (${workflow["145_2"].inputs.strength_model || 1})`);
+  const loras = workflowLoraNodes(workflow).map(n => `${n.inputs.lora_name.split('/').pop()} (${n.inputs.strength_model || 1})`);
   if(loras.length) rows.push(["LoRAs", loras.join(", ")]);
 
   return { title: "Metadata Vídeo", rows, loras };
@@ -2160,18 +2158,9 @@ function applyWorkflow(workflow){
   }
 
   // 7. LoRAs
-  if(workflow["145_1"]?.inputs && $("lora1Toggle")){
-    $("lora1Toggle").checked = true;
-    if($("lora1Select")) $("lora1Select").value = workflow["145_1"].inputs.lora_name || "";
-    if($("lora1Strength")) $("lora1Strength").value = workflow["145_1"].inputs.strength_model || 1.0;
-    if($("lora1StrengthVal")) $("lora1StrengthVal").textContent = parseFloat($("lora1Strength").value).toFixed(2);
-  }
-  if(workflow["145_2"]?.inputs && $("lora2Toggle")){
-    $("lora2Toggle").checked = true;
-    if($("lora2Select")) $("lora2Select").value = workflow["145_2"].inputs.lora_name || "";
-    if($("lora2Strength")) $("lora2Strength").value = workflow["145_2"].inputs.strength_model || 1.0;
-    if($("lora2StrengthVal")) $("lora2StrengthVal").textContent = parseFloat($("lora2Strength").value).toFixed(2);
-  }
+  loras.splice(0, loras.length, ...workflowLoraNodes(workflow).map(n => ({ on: true, lora: n.inputs.lora_name, strength: n.inputs.strength_model ?? 1.0 })));
+  renderLoras();
+  saveLoraState();
 
   // 8. Sampler & Scheduler
   const samplerNode = workflow["123"] || findByClass("KSamplerSelect");
@@ -2888,12 +2877,6 @@ function saveSettings(){
     h3ShiftVideo: $("h3ShiftVideo")?.value || "12.0",
     h3ShiftAudio: $("h3ShiftAudio")?.value || "3.0",
     spectrum: getSpectrumState(),
-    lora1Toggle: $("lora1Toggle") ? $("lora1Toggle").checked : false,
-    lora1Select: $("lora1Select")?.value || "",
-    lora1Strength: $("lora1Strength")?.value || "1.0",
-    lora2Toggle: $("lora2Toggle") ? $("lora2Toggle").checked : false,
-    lora2Select: $("lora2Select")?.value || "",
-    lora2Strength: $("lora2Strength")?.value || "1.0",
     blendToggle: $("blendToggle") ? $("blendToggle").checked : true,
     blendStrength: $("blendStrength")?.value || "0.35",
     blendFrames: $("blendFrames")?.value || "4",
@@ -3028,20 +3011,6 @@ function restoreSettings(){
     if(s.solH3){ setSolH3UI(s.solH3); saveSolH3(s.solH3); }
     if(s.faceRefine){ setFaceRefineUI(s.faceRefine); saveFaceRefine(s.faceRefine); }
 
-    if(s.lora1Toggle !== undefined && $("lora1Toggle")) $("lora1Toggle").checked = s.lora1Toggle;
-    if(s.lora1Select && $("lora1Select")) $("lora1Select").value = s.lora1Select;
-    if(s.lora1Strength !== undefined && $("lora1Strength")){
-      $("lora1Strength").value = s.lora1Strength;
-      if($("lora1StrengthVal")) $("lora1StrengthVal").textContent = parseFloat(s.lora1Strength).toFixed(2);
-    }
-
-    if(s.lora2Toggle !== undefined && $("lora2Toggle")) $("lora2Toggle").checked = s.lora2Toggle;
-    if(s.lora2Select && $("lora2Select")) $("lora2Select").value = s.lora2Select;
-    if(s.lora2Strength !== undefined && $("lora2Strength")){
-      $("lora2Strength").value = s.lora2Strength;
-      if($("lora2StrengthVal")) $("lora2StrengthVal").textContent = parseFloat(s.lora2Strength).toFixed(2);
-    }
-
     if(s.blendToggle !== undefined && $("blendToggle")) $("blendToggle").checked = s.blendToggle;
     if(s.blendStrength !== undefined && $("blendStrength")){
       $("blendStrength").value = s.blendStrength;
@@ -3148,8 +3117,7 @@ function attachAutoSaveListeners(){
     "prompt", "prompt2", "seg2EnhanceStyle", "seg2PromptMode", "seg2OllamaModel", "durationSlider1", "durationSlider2", "aspectRatioSelect", "mpSlider", "stepsSlider", "denoiseSlider2", "seg1TrimTail",
     "seedVal", "batchSize", "filenamePrefix", "samplerName", "schedulerName",
     "unetModel", "clipModel", "vaeModel", "attentionBackend", "h3VideoBudget", "h3ShiftVideo", "h3ShiftAudio",
-    "lora1Toggle", "lora1Select",
-    "lora1Strength", "lora2Toggle", "lora2Select", "lora2Strength", "blendToggle", "blendStrength", "blendFrames", "blendMode",
+    "blendToggle", "blendStrength", "blendFrames", "blendMode",
     "rtxToggle", "rtxEngine", "rtxQuality", "rtxScale", "relayDetail", "rifeToggle", "rifeEngine", "rifeMultiplier", "rifeModel", "audioMode",
     "postFxMasterToggle", "postFxLutToggle", "postFxLutSelect", "postFxLutStrength", "postFxVigToggle", "postFxVigIntensity", "postFxGrainToggle", "postFxGrainPower",
     "audioCrossfadeToggle", "audioCrossfadeSlider", "audioCrossfadeCurve",
@@ -4174,28 +4142,16 @@ function buildGraph(j){
     delete g[N.SOL_H3];
   }
 
-  // 8. Inyección dinámica de LoRAs
-  if($("lora1Toggle")?.checked && $("lora1Select")?.value){
-    const l1 = $("lora1Select").value;
-    const s1 = parseFloat($("lora1Strength")?.value || "1.0");
-    g["145_1"] = {
+  // 8. Inyección dinámica de LoRAs (145_1, 145_2, ...)
+  loras.filter(l => l.on && l.lora).forEach((l, i) => {
+    const id = `145_${i + 1}`;
+    g[id] = {
       class_type: "LoraLoaderModelOnly",
-      inputs: { model: [currentModelNode, 0], lora_name: l1, strength_model: s1 },
-      _meta: { title: "LoRA 1" }
+      inputs: { model: [currentModelNode, 0], lora_name: l.lora, strength_model: l.strength },
+      _meta: { title: `LoRA ${i + 1}` }
     };
-    currentModelNode = "145_1";
-  }
-
-  if($("lora2Toggle")?.checked && $("lora2Select")?.value){
-    const l2 = $("lora2Select").value;
-    const s2 = parseFloat($("lora2Strength")?.value || "1.0");
-    g["145_2"] = {
-      class_type: "LoraLoaderModelOnly",
-      inputs: { model: [currentModelNode, 0], lora_name: l2, strength_model: s2 },
-      _meta: { title: "LoRA 2" }
-    };
-    currentModelNode = "145_2";
-  }
+    currentModelNode = id;
+  });
 
   // 9. ModelPreviewOverrideKJ (Live preview animado multi-frame en tiempo real)
   const prevMethod = getPreviewMethod();
@@ -6813,17 +6769,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   attachAttentionOptimizerListeners();
 
-  if($("lora1Strength")){
-    $("lora1Strength").addEventListener("input", (e) => {
-      $("lora1StrengthVal").textContent = parseFloat(e.target.value).toFixed(2);
-    });
-  }
-  if($("lora2Strength")){
-    $("lora2Strength").addEventListener("input", (e) => {
-      $("lora2StrengthVal").textContent = parseFloat(e.target.value).toFixed(2);
-    });
-  }
-
   document.querySelectorAll(".vid-view-tab").forEach(tab => {
     tab.addEventListener("click", () => {
       document.querySelectorAll(".vid-view-tab").forEach(t => t.classList.remove("active"));
@@ -6896,13 +6841,11 @@ window.addEventListener("DOMContentLoaded", () => {
       AVAILABLE_UNETS.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m.split("/").pop())}</option>`).join("");
   }
   if(typeof AVAILABLE_LORAS !== "undefined"){
-    ["lora1Select", "lora2Select", "latentRefineLora"].forEach(id => {
-      const sel = $(id);
-      if(sel){
-        sel.innerHTML = '<option value="">(ninguno)</option>' +
-          AVAILABLE_LORAS.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l.split("/").pop())}</option>`).join("");
-      }
-    });
+    const sel = $("latentRefineLora");
+    if(sel){
+      sel.innerHTML = '<option value="">(ninguno)</option>' +
+        AVAILABLE_LORAS.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l.split("/").pop())}</option>`).join("");
+    }
   }
 
   // Restaurar ajustes guardados previamente
